@@ -11,6 +11,7 @@ import { SummaryTab } from "@/components/features/matches/match-details/SummaryT
 import { LineupTab } from "@/components/features/matches/match-details/LineupTab"
 import { StatsTab } from "@/components/features/matches/match-details/StatsTab"
 import { LiveTab } from "@/components/features/matches/match-details/LiveTab";
+import { ConvocatoriaList } from "@/components/features/matches/ConvocatoriaList";
 import { useParams } from "next/navigation";
 
 // MOCK DATA FOR PLACEHOLDERS
@@ -100,50 +101,7 @@ export default function MatchDetailPage() {
           {/* TAB: ASISTENCIAS */}
           {activeTab === "asistencias" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Control de Asistencia</h3>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">ESTADO DE CONVOCATORIA</p>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">14 Jugadores</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* List of confirmed players */}
-                <div className="bg-slate-50/50 rounded-xl border border-slate-150 p-4 shadow-sm space-y-3">
-                  <h4 className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg inline-block">Confirmados (11)</h4>
-                  <div className="divide-y divide-slate-100 space-y-2">
-                    {MOCK_PLAYERS.slice(0, 11).map(p => (
-                      <div key={p.id} className="flex items-center justify-between pt-2">
-                        <span className="text-xs font-bold text-slate-700">{p.first_name} {p.last_name}</span>
-                        <span className="text-[9px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">CONFIRMADO</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {/* Pendientes & Ausentes */}
-                <div className="space-y-4">
-                  <div className="bg-slate-50/50 rounded-xl border border-slate-150 p-4 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg inline-block mb-3">Pendientes (2)</h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs text-slate-650">
-                        <span className="font-bold">Mateo Ramos</span>
-                        <span className="text-[9px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">PENDIENTE</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-650">
-                        <span className="font-bold">Lucas Mendoza</span>
-                        <span className="text-[9px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">PENDIENTE</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50/50 rounded-xl border border-slate-150 p-4 shadow-sm">
-                    <h4 className="text-xs font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded-lg inline-block mb-3">Ausentes (1)</h4>
-                    <div className="flex items-center justify-between text-xs text-slate-650">
-                      <span className="font-bold">Daniel Alonso</span>
-                      <span className="text-[9px] font-extrabold text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">AUSENTE</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ConvocatoriaList />
             </div>
           )}
 

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SPORTS, GENDERS, AGE_GROUPS, FORMATS, COLORS } from "@/lib/constants";
+import { importSportingSaladarData } from "@/lib/import-actions";
 
 // Types
 interface Team {
@@ -391,6 +392,31 @@ export default function EquiposPage() {
   const [showPlayersFor, setShowPlayersFor] = useState<string | null>(null);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null); // which card's dropdown is open
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleImportSportingSaladar = async () => {
+    setIsImporting(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from("profiles").select("club_id").eq("id", user.id).single();
+      if (!profile?.club_id) return;
+      
+      const res = await importSportingSaladarData(profile.club_id);
+      if (res.success) {
+        alert(`¡Importación exitosa! Se han creado ${res.count} equipos.`);
+        fetchTeams();
+        router.refresh();
+      } else {
+        alert("Error en la importación: " + res.error);
+      }
+    } catch (error: any) {
+      alert("Error en la importación: " + error.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const fetchTeams = async () => {
     setLoading(true);
@@ -586,6 +612,13 @@ export default function EquiposPage() {
           <h1 className="text-4xl font-bold text-blue-900">Equipos</h1>
           {isAdmin && (
             <div className="flex gap-3">
+              <button
+                onClick={handleImportSportingSaladar}
+                disabled={isImporting}
+                className="flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm disabled:opacity-50"
+              >
+                <span>{isImporting ? 'Importando...' : '⚡ Importar Sporting Saladar'}</span>
+              </button>
               <button
                 onClick={() => router.push('/dashboard/equipos/crear-varios')}
                 className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm"

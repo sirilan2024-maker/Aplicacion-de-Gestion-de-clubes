@@ -32,7 +32,7 @@ const MOCK_STATS_PLAYERS: StatRow[] = [
   { id: "sp17", number: 17, name: "Felipe Romero", avatar: "FR", position: "Delantero" }
 ]
 
-export function StatsTab() {
+export function StatsTab({ players, matchEvents }: { players?: any[], matchEvents?: any[] }) {
   const { rol } = useUserRole()
   const [checkedState, setCheckedState] = useState<Record<string, boolean>>({
     // Pre-populate some stats for a premium initial dashboard look

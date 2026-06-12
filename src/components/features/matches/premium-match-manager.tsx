@@ -135,7 +135,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
           )}
 
           {/* TAB: RESEÑA */}
-          {activeTab === "reseña" && (
+          {activeTab === "foro" && (
             <div className="space-y-4 max-w-2xl mx-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>

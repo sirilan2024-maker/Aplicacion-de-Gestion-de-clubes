@@ -275,7 +275,7 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
                 </div>
 
                 {/* Renderizado de jugadores con notas en badges naranjas */}
-                {PITCH_PLAYERS.map(player => (
+                {FORMATIONS["4-3-3"].map(player => (
                   <div
                     key={player.id}
                     className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none"
@@ -283,17 +283,17 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
                   >
                     {/* Node circle */}
                     <div className="relative w-8 h-8 rounded-full bg-slate-900 border border-white flex items-center justify-center text-[9px] font-black text-white shadow-md">
-                      {player.name.substring(0, 2).toUpperCase()}
+                      {player.label}
                       
                       {/* Orange Rating Badge */}
                       <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[7px] font-extrabold px-1 rounded-full border border-white shadow-sm">
-                        {player.rating}
+                        7.5
                       </span>
                     </div>
                     {/* Name */}
-                    <span className="text-[8px] font-black text-white mt-0.5 bg-slate-950/70 px-1.5 py-0.2 rounded shadow-sm">
-                      {player.name}
-                    </span>
+                    <div className="mt-1 bg-black/60 px-1.5 py-0.5 rounded text-[7px] font-bold text-white whitespace-nowrap backdrop-blur-sm border border-white/10">
+                      {player.label}
+                    </div>
                   </div>
                 ))}
               </div>

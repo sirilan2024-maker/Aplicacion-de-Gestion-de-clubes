@@ -8,7 +8,7 @@ import { cookies } from "next/headers"
  * we will simulate an AI analysis engine that reads the events and coach report.
  */
 export async function analyzeMatchData(matchId: string, teamId: string) {
-  const supabase = createClient(cookies())
+  const supabase = await createClient()
 
   // 1. Fetch match and coach report
   const { data: match } = await supabase.from("partidos").select("*").eq("id", matchId).single()

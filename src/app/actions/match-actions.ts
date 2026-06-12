@@ -48,7 +48,7 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
   return { success: true, message: `Alertas push enviadas a ${playerIds.length} jugadores.` }
 }
 
-export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string }) {
+export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string }) {
   const supabase = await createClient()
   await supabase.from('partidos').update(updates).eq('id', matchId)
   revalidatePath(`/dashboard/e/${teamId}/partidos`, 'page')

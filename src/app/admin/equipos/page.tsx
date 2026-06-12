@@ -232,6 +232,7 @@ function EditTeamModal({
   const [ageGroup, setAgeGroup] = useState(team.age_group);
   const [format, setFormat] = useState(team.format);
   const [color, setColor] = useState(team.color);
+  const [ffcvUrl, setFfcvUrl] = useState(team.ffcv_url || "");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -248,6 +249,7 @@ function EditTeamModal({
       age_group: ageGroup,
       format,
       color,
+      ffcv_url: ffcvUrl,
     });
     setSubmitting(false);
     onClose();

@@ -1,3 +1,3 @@
-import TeamMatchesPage from '@/app/dashboard/e/[teamId]/partidos/page';
+import TeamMatchesPage from '@/app/dashboard/equipos/[teamId]/partidos/page';
 
 export default TeamMatchesPage;

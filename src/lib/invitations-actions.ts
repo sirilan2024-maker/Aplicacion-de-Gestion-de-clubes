@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 
 // 1. CREATE INVITATION
 export async function createInvitation({ email, role, teamId }: { email: string, role: string, teamId: string }) {
-  const supabase = createClient(cookies())
+  const supabase = await createClient()
   
   // Verify permissions (admin or coach of the team)
   const { data: { user } } = await supabase.auth.getUser()
@@ -41,7 +41,7 @@ export async function createInvitation({ email, role, teamId }: { email: string,
 
 // 2. GET INVITATION BY TOKEN
 export async function getInvitationByToken(token: string) {
-  const supabase = createClient(cookies())
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from("invitations")
     .select(`
@@ -62,7 +62,7 @@ export async function acceptInvitation(token: string, playerData: {
   medical_notes?: string, 
   gdpr_consent: boolean 
 }) {
-  const supabase = createClient(cookies())
+  const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Debes registrarte o iniciar sesión primero." }

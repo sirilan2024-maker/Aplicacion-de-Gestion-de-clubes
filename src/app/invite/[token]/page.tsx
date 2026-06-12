@@ -41,7 +41,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     }
   }
 
-  const supabase = createClient(cookies())
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   return (

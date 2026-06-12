@@ -99,7 +99,7 @@ export default function MatchDetailPage() {
           )}
 
           {/* TAB: ASISTENCIAS */}
-          {activeTab === "asistencias" && (
+          {activeTab === "convocatoria" && (
             <div className="space-y-4">
               <ConvocatoriaList />
             </div>
@@ -134,7 +134,7 @@ export default function MatchDetailPage() {
           )}
 
           {/* TAB: RESEÑA */}
-          {activeTab === "reseña" && (
+          {activeTab === "post-partido" && (
             <div className="space-y-4 max-w-2xl mx-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div>

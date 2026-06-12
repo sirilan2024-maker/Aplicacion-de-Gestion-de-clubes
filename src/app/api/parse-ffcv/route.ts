@@ -35,8 +35,8 @@ export async function POST(req: Request) {
 
     // Extraer texto del PDF con pdf2json
     const text = await new Promise<string>((resolve, reject) => {
-      const pdfParser = new PDFParser(null, 1);
-      pdfParser.on("pdfParser_dataError", errData => reject(errData.parserError));
+      const pdfParser = new PDFParser(null, true);
+      pdfParser.on("pdfParser_dataError", (errData: any) => reject(errData.parserError || errData));
       pdfParser.on("pdfParser_dataReady", () => {
         try {
           // pdf2json a menudo devuelve el texto con URL-encoding

@@ -62,6 +62,7 @@ export default function PlayerProfilePage() {
   const [playerEvents, setPlayerEvents] = useState<any[]>([]);
   const [playerAttendance, setPlayerAttendance] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [measurementsHistory, setMeasurementsHistory] = useState<any[]>([]);
 
   // ACWR & History State
   const [acwrData, setAcwrData] = useState<{ acute: number, chronic: number, acwr: number } | null>(null);
@@ -95,6 +96,8 @@ export default function PlayerProfilePage() {
       fetchPlayerAttendance();
     } else if (activeTab === 'stats') {
       fetchPlayerACWR();
+    } else if (activeTab === 'medico') {
+      fetchPlayerMeasurements();
     }
   }, [activeTab, playerId, teamId]);
 
@@ -243,6 +246,23 @@ export default function PlayerProfilePage() {
     }
   };
 
+  const fetchPlayerMeasurements = async () => {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('player_measurements')
+        .select('*')
+        .eq('player_id', playerId)
+        .order('date', { ascending: false });
+      
+      if (!error && data) {
+        setMeasurementsHistory(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSave = async () => {
     if (!player) return;
     setSaving(true);
@@ -254,6 +274,47 @@ export default function PlayerProfilePage() {
         .eq('id', player.id);
         
       if (error) throw error;
+
+      // Si cambió el peso o la altura, guardamos en el historial
+      if (
+        (editData.weight && editData.weight !== player.weight) ||
+        (editData.height && editData.height !== player.height)
+      ) {
+        const h = editData.height || player.height;
+        const w = editData.weight || player.weight;
+        let bmi = null;
+        if (h && w && h > 0) {
+          bmi = parseFloat((w / (h * h)).toFixed(1));
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Comprobar si ya hay un registro hoy
+        const { data: existing } = await supabase
+          .from('player_measurements')
+          .select('id')
+          .eq('player_id', player.id)
+          .eq('date', today)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from('player_measurements').update({
+            weight: w, height: h, bmi
+          }).eq('id', existing.id);
+        } else {
+          await supabase.from('player_measurements').insert({
+            player_id: player.id,
+            date: today,
+            weight: w, height: h, bmi
+          });
+        }
+        
+        // Refrescar historial
+        if (activeTab === 'medico') {
+          fetchPlayerMeasurements();
+        }
+      }
+
       toast.success("Información guardada correctamente");
       setPlayer({ ...player, ...editData } as PlayerData);
       setIsEditing(false);
@@ -633,6 +694,13 @@ export default function PlayerProfilePage() {
                     <input type="number" step="0.1" value={editData.weight || ''} onChange={e => setEditData({...editData, weight: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
                   ) : <span className="text-2xl font-bold text-gray-900">{player.weight ? `${player.weight}kg` : '-'}</span>}
                 </div>
+                <div className="w-px h-12 bg-gray-200"></div>
+                <div className="flex-1 pl-2">
+                  <span className="block text-xs font-bold text-gray-500 uppercase">IMC</span>
+                  <span className="text-2xl font-bold text-gray-900">
+                    {player.weight && player.height && player.height > 0 ? (player.weight / (player.height * player.height)).toFixed(1) : '-'}
+                  </span>
+                </div>
               </div>
               
               <div>
@@ -679,6 +747,40 @@ export default function PlayerProfilePage() {
                   )}
                 </div>
               )}
+
+              {/* TABLA HISTORIAL DE PROGRESIÓN (IMC / Peso) */}
+              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mt-8 flex items-center gap-2">
+                <TrendingUp size={18} className="text-blue-500" />
+                Historial de Progresión (Peso / IMC)
+              </h3>
+              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                {measurementsHistory.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">
+                    No hay mediciones históricas. Modifica el peso o la altura para crear el primer registro.
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-xs">
+                      <tr>
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3 text-center">Peso</th>
+                        <th className="px-4 py-3 text-center">Altura</th>
+                        <th className="px-4 py-3 text-center">IMC</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {measurementsHistory.map((m, idx) => (
+                        <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-gray-900">{new Date(m.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-center text-gray-700">{m.weight ? `${m.weight} kg` : '-'}</td>
+                          <td className="px-4 py-3 text-center text-gray-700">{m.height ? `${m.height} m` : '-'}</td>
+                          <td className="px-4 py-3 text-center font-bold text-blue-700">{m.bmi ? m.bmi : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
         )}

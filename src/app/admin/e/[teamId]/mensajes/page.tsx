@@ -1,3 +1,6 @@
-import TeamMessagesPage from '@/app/dashboard/e/[teamId]/mensajes/page';
+import { TeamMessagesView } from '@/components/features/dashboard/TeamMessagesView';
 
-export default TeamMessagesPage;
+export default async function AdminTeamMessagesPage({ params }: { params: Promise<{ teamId: string }> }) {
+  const { teamId } = await params;
+  return <TeamMessagesView teamId={teamId} />;
+}

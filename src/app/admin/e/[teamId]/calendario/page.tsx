@@ -1,3 +1,6 @@
-import TeamCalendarPage from '@/app/dashboard/e/[teamId]/calendario/page';
+import { TeamCalendarView } from '@/components/features/dashboard/TeamCalendarView';
 
-export default TeamCalendarPage;
+export default async function AdminTeamCalendarPage({ params }: { params: Promise<{ teamId: string }> }) {
+  const { teamId } = await params;
+  return <TeamCalendarView teamId={teamId} />;
+}

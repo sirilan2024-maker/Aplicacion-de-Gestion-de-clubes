@@ -71,11 +71,16 @@ export default function EntrenamientoDetailPage() {
     if (profile) {
       const { data: metricData } = await supabase.from('club_metrics').select('*').eq('club_id', profile.club_id).eq('is_active', true);
       if (metricData) {
-        // Parse options JSONB into array
-        const parsedMetrics = metricData.map((m: any) => ({
-          ...m,
-          options: m.options ? (typeof m.options === 'string' ? JSON.parse(m.options) : m.options) : null
-        }));
+        // Parse options JSONB into array and filter out unwanted metrics
+        const parsedMetrics = metricData
+          .filter((m: any) => {
+            const name = m.name.toLowerCase();
+            return !name.includes('asistencia') && !name.includes('goles') && !name.includes('gol');
+          })
+          .map((m: any) => ({
+            ...m,
+            options: m.options ? (typeof m.options === 'string' ? JSON.parse(m.options) : m.options) : null
+          }));
         setMetrics(parsedMetrics);
       }
     }

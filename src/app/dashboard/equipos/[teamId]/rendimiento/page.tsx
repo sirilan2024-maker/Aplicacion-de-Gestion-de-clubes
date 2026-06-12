@@ -66,8 +66,13 @@ export default function RendimientoGlobalPage() {
       const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
 
       // 2. Fetch all players
-      const { data: players } = await supabase.from('players').select('id, first_name, last_name, dorsal, avatar_url, accumulated_minutes, technical_rating').eq('team_id', teamId);
-      if (!players) return;
+      const { data: allPlayers } = await supabase.from('players').select('id, first_name, last_name, dorsal, avatar_url, accumulated_minutes, technical_rating, posicion').eq('team_id', teamId);
+      if (!allPlayers) return;
+
+      const players = allPlayers.filter(p => {
+        const pos = p.posicion?.toLowerCase() || '';
+        return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('técnico');
+      });
 
       // 3. Fetch all events and separate them
       const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type').eq('team_id', teamId);

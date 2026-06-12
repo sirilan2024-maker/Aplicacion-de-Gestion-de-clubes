@@ -49,6 +49,7 @@ const SPORTING_SALADAR_DATA = [
 
 export async function importSportingSaladarData(clubId: string) {
   const supabase = await createClient()
+  const adminSupabase = createAdminClient()
 
   // 1. Get current admin profile ID to assign as team's coach_id for backwards compatibility
   const { data: { user } } = await supabase.auth.getUser()
@@ -57,21 +58,37 @@ export async function importSportingSaladarData(clubId: string) {
   let importedTeams = 0
 
   for (const teamData of SPORTING_SALADAR_DATA) {
-    // A. Insert Team
-    const { data: newTeam, error: teamError } = await supabase
-      .from('teams')
+    // A. Insert Team into 'equipos'
+    const { data: newTeam, error: teamError } = await adminSupabase
+      .from('equipos')
       .insert({
         name: teamData.name,
         category: teamData.category,
         club_id: clubId,
-        coach_id: user.id // Set creator as primary coach to satisfy existing logic
+        coach_id: user.id, // Set creator as primary coach to satisfy existing logic
+        sport: "Futbol",
+        gender: "Masculino",
+        age_group: "Sub-15",
+        format: "11x11",
+        color: "#1E3A8A"
       })
       .select('id')
       .single()
 
-    if (teamError) {
+    if (teamError || !newTeam?.id) {
       console.error("Error creating team:", teamError)
-      return { success: false, error: "Error creando equipo: " + teamError.message }
+      return { success: false, error: "Error creando equipo: " + teamError?.message }
+    }
+
+    // Diagnostic: verify the team actually exists in the DB
+    const { data: verifyTeam, error: verifyError } = await adminSupabase
+      .from('equipos')
+      .select('id')
+      .eq('id', newTeam.id)
+      .single()
+
+    if (!verifyTeam) {
+      return { success: false, error: `Error crítico: El equipo ${teamData.name} devolvió ID ${newTeam.id} pero no se pudo leer de la base de datos. ` + (verifyError?.message || '') }
     }
 
     // B. Handle Staff (team_coaches)
@@ -86,8 +103,6 @@ export async function importSportingSaladarData(clubId: string) {
       // Let's create an auth user using a dummy email for the staff member
       const dummyEmail = `${member.name.toLowerCase().replace(/[^a-z0-9]+/g, '.')}.${Math.random().toString(36).substring(2, 8)}@sportingsaladar.temp`
       const dummyPassword = "TempPassword123!"
-      
-      const adminSupabase = createAdminClient()
       
       // We use admin.createUser to avoid overwriting the current user's session
       const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
@@ -122,7 +137,7 @@ export async function importSportingSaladarData(clubId: string) {
 
       if (profileId) {
         // Insert into team_coaches
-        const { error: coachError } = await supabase
+        const { error: coachError } = await adminSupabase
           .from('team_coaches')
           .insert({
             team_id: newTeam.id,
@@ -154,13 +169,13 @@ export async function importSportingSaladarData(clubId: string) {
       }
     })
 
-    const { error: playersError } = await supabase
+    const { error: playersError } = await adminSupabase
       .from('players')
       .insert(playersToInsert)
 
     if (playersError) {
       console.error("Error creating players for team:", newTeam.id, playersError)
-      return { success: false, error: "Error insertando jugadores: " + playersError.message }
+      return { success: false, error: `Error insertando jugadores en equipo ${teamData.name} (ID: ${newTeam.id}): ` + playersError.message }
     }
 
     importedTeams++

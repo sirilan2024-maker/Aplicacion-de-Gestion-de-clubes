@@ -75,36 +75,99 @@ const FORMATIONS: Record<string, FormationSlot[]> = {
     { id: "slot-8", label: "MI", x: 85, y: 48 },
     { id: "slot-9", label: "DC", x: 35, y: 22 },
     { id: "slot-10", label: "DC", x: 65, y: 22 }
+  ],
+  "4-2-3-1": [
+    { id: "slot-0", label: "POR", x: 50, y: 88 },
+    { id: "slot-1", label: "LD", x: 15, y: 70 },
+    { id: "slot-2", label: "DFC", x: 38, y: 73 },
+    { id: "slot-3", label: "DFC", x: 62, y: 73 },
+    { id: "slot-4", label: "LI", x: 85, y: 70 },
+    { id: "slot-5", label: "MCD", x: 38, y: 55 },
+    { id: "slot-6", label: "MCD", x: 62, y: 55 },
+    { id: "slot-7", label: "MD", x: 20, y: 35 },
+    { id: "slot-8", label: "MCO", x: 50, y: 38 },
+    { id: "slot-9", label: "MI", x: 80, y: 35 },
+    { id: "slot-10", label: "DC", x: 50, y: 20 }
+  ],
+  "3-4-3": [
+    { id: "slot-0", label: "POR", x: 50, y: 88 },
+    { id: "slot-1", label: "DFC", x: 25, y: 73 },
+    { id: "slot-2", label: "DFC", x: 50, y: 75 },
+    { id: "slot-3", label: "DFC", x: 75, y: 73 },
+    { id: "slot-4", label: "MD", x: 15, y: 48 },
+    { id: "slot-5", label: "MC", x: 38, y: 50 },
+    { id: "slot-6", label: "MC", x: 62, y: 50 },
+    { id: "slot-7", label: "MI", x: 85, y: 48 },
+    { id: "slot-8", label: "ED", x: 25, y: 25 },
+    { id: "slot-9", label: "DC", x: 50, y: 20 },
+    { id: "slot-10", label: "EI", x: 75, y: 25 }
+  ],
+  "4-1-4-1": [
+    { id: "slot-0", label: "POR", x: 50, y: 88 },
+    { id: "slot-1", label: "LD", x: 15, y: 70 },
+    { id: "slot-2", label: "DFC", x: 38, y: 73 },
+    { id: "slot-3", label: "DFC", x: 62, y: 73 },
+    { id: "slot-4", label: "LI", x: 85, y: 70 },
+    { id: "slot-5", label: "MCD", x: 50, y: 58 },
+    { id: "slot-6", label: "MD", x: 20, y: 42 },
+    { id: "slot-7", label: "MC", x: 40, y: 45 },
+    { id: "slot-8", label: "MC", x: 60, y: 45 },
+    { id: "slot-9", label: "MI", x: 80, y: 42 },
+    { id: "slot-10", label: "DC", x: 50, y: 20 }
+  ],
+  "5-3-2": [
+    { id: "slot-0", label: "POR", x: 50, y: 88 },
+    { id: "slot-1", label: "CAD", x: 10, y: 65 },
+    { id: "slot-2", label: "DFC", x: 30, y: 73 },
+    { id: "slot-3", label: "DFC", x: 50, y: 75 },
+    { id: "slot-4", label: "DFC", x: 70, y: 73 },
+    { id: "slot-5", label: "CAI", x: 90, y: 65 },
+    { id: "slot-6", label: "MC", x: 35, y: 48 },
+    { id: "slot-7", label: "MCD", x: 50, y: 52 },
+    { id: "slot-8", label: "MC", x: 65, y: 48 },
+    { id: "slot-9", label: "DC", x: 35, y: 22 },
+    { id: "slot-10", label: "DC", x: 65, y: 22 }
   ]
 }
 
-export function LineupTab() {
+export function LineupTab({ players = [], convocatorias = [] }: { players?: any[], convocatorias?: any[] }) {
   const { rol } = useUserRole()
+  
+  const mappedPlayers: Player[] = players.map(p => ({
+    id: p.id,
+    name: `${p.first_name} ${p.last_name}`,
+    pos: p.posicion_principal || "N/A",
+    avatar: `${p.first_name[0]}${p.last_name[0]}`,
+    demarcation: "Mediocampista" // Placeholder as it's not fetched
+  }))
+  
+  const initialPlayersList = mappedPlayers.length > 0 ? mappedPlayers : INITIAL_PLAYERS;
+
   const [tactic, setTactic] = useState<string>("4-3-3")
   const [assignments, setAssignments] = useState<Record<string, Player>>({
-    "slot-0": INITIAL_PLAYERS[0], // David G.
-    "slot-1": INITIAL_PLAYERS[1], // Jorge R.
-    "slot-2": INITIAL_PLAYERS[2], // Miguel S.
-    "slot-3": INITIAL_PLAYERS[3], // Pablo T.
-    "slot-4": INITIAL_PLAYERS[4], // Luis M.
-    "slot-5": INITIAL_PLAYERS[5], // Rubén D.
-    "slot-6": INITIAL_PLAYERS[6], // Andrés G.
-    "slot-7": INITIAL_PLAYERS[7], // Sergio L.
-    "slot-8": INITIAL_PLAYERS[8], // Carlos P.
-    "slot-9": INITIAL_PLAYERS[9], // Álvaro N.
-    "slot-10": INITIAL_PLAYERS[10] // Iván C.
+    "slot-0": initialPlayersList[0] || null,
+    "slot-1": initialPlayersList[1] || null,
+    "slot-2": initialPlayersList[2] || null,
+    "slot-3": initialPlayersList[3] || null,
+    "slot-4": initialPlayersList[4] || null,
+    "slot-5": initialPlayersList[5] || null,
+    "slot-6": initialPlayersList[6] || null,
+    "slot-7": initialPlayersList[7] || null,
+    "slot-8": initialPlayersList[8] || null,
+    "slot-9": initialPlayersList[9] || null,
+    "slot-10": initialPlayersList[10] || null
   })
   const [savedAlert, setSavedAlert] = useState(false)
 
   const isFamilyView = rol === "familia" || rol === "jugador"
 
   // List of players currently not assigned to any slot
-  const assignedPlayerIds = Object.values(assignments).map(p => p.id)
-  const availablePlayers = INITIAL_PLAYERS.filter(p => !assignedPlayerIds.includes(p.id))
+  const assignedPlayerIds = Object.values(assignments).filter(Boolean).map(p => p.id)
+  const availablePlayers = initialPlayersList.filter(p => !assignedPlayerIds.includes(p.id))
 
   const handleAssignPlayer = (playerId: string, slotId: string) => {
     if (isFamilyView) return
-    const player = INITIAL_PLAYERS.find(p => p.id === playerId)
+    const player = initialPlayersList.find(p => p.id === playerId)
     if (!player) return
 
     // If this player is already in another slot, clear that slot
@@ -157,9 +220,13 @@ export function LineupTab() {
               }}
               className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none"
             >
-              <option value="4-3-3">Táctica: 4-3-3</option>
-              <option value="4-4-2">Táctica: 4-4-2</option>
-              <option value="3-5-2">Táctica: 3-5-2</option>
+              <option value="4-3-3">Sistema: 4-3-3</option>
+              <option value="4-4-2">Sistema: 4-4-2</option>
+              <option value="3-5-2">Sistema: 3-5-2</option>
+              <option value="4-2-3-1">Sistema: 4-2-3-1</option>
+              <option value="3-4-3">Sistema: 3-4-3</option>
+              <option value="4-1-4-1">Sistema: 4-1-4-1</option>
+              <option value="5-3-2">Sistema: 5-3-2</option>
             </select>
           )}
         </div>

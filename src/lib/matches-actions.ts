@@ -87,7 +87,8 @@ export async function saveMatchStats(
   partidoId: string, 
   stats: Record<string, { minutos_jugados: number, goles: number, asistencias: number, tarjetas_amarillas: number, tarjetas_rojas: number }>,
   resultadoPropio: number,
-  resultadoRival: number
+  resultadoRival: number,
+  coachReport?: string
 ) {
   if (partidoId.startsWith('demo')) {
     return { success: true }
@@ -95,13 +96,19 @@ export async function saveMatchStats(
   const supabase = await createClient()
 
   try {
+    const updateData: any = { 
+      resultado_propio: resultadoPropio, 
+      resultado_rival: resultadoRival,
+      estado: 'Finalizado' 
+    }
+    
+    if (coachReport !== undefined) {
+      updateData.coach_report = coachReport
+    }
+
     const { error: matchError } = await supabase
       .from('partidos')
-      .update({ 
-        resultado_propio: resultadoPropio, 
-        resultado_rival: resultadoRival,
-        estado: 'Finalizado' 
-      })
+      .update(updateData)
       .eq('id', partidoId)
 
     if (matchError) {

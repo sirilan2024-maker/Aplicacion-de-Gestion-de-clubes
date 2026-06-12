@@ -22,6 +22,7 @@ interface Team {
   age_group: string;
   format: string;
   color: string;
+  ffcv_url?: string;
 }
 
 // Create-Team modal (inline – no extra file needed for the beta)
@@ -38,6 +39,7 @@ function CreateTeamModal({
   const [category, setCategory] = useState("");
   const [members, setMembers] = useState("");
   const [coaches, setCoaches] = useState("");
+  const [ffcvUrl, setFfcvUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,12 +56,14 @@ function CreateTeamModal({
       age_group: AGE_GROUPS[0],
       format: FORMATS[0],
       color: COLORS[0].value,
+      ffcv_url: ffcvUrl,
     });
     // Reset form
     setName("");
     setCategory("");
     setMembers("");
     setCoaches("");
+    setFfcvUrl("");
     setSubmitting(false);
     onClose();
   };
@@ -118,6 +122,16 @@ function CreateTeamModal({
                 className="mt-1 w-full rounded-md bg-white text-slate-900 border border-gray-300 placeholder-gray-400"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-900">Enlace Público FFCV (Opcional)</label>
+            <input
+              type="url"
+              value={ffcvUrl}
+              onChange={(e) => setFfcvUrl(e.target.value)}
+              placeholder="https://www.ffcv.es/ncompeticiones/..."
+              className="mt-1 w-full rounded-md bg-white text-slate-900 border border-gray-300 placeholder-gray-400"
+            />
           </div>
           <button
             disabled={submitting}
@@ -217,6 +231,7 @@ function EditTeamModal({
   const [ageGroup, setAgeGroup] = useState(team.age_group);
   const [format, setFormat] = useState(team.format);
   const [color, setColor] = useState(team.color);
+  const [ffcvUrl, setFfcvUrl] = useState(team.ffcv_url || "");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -233,6 +248,7 @@ function EditTeamModal({
       age_group: ageGroup,
       format,
       color,
+      ffcv_url: ffcvUrl,
     });
     setSubmitting(false);
     onClose();
@@ -364,6 +380,16 @@ function EditTeamModal({
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-900">Enlace Público FFCV (Opcional)</label>
+            <input
+              type="url"
+              value={ffcvUrl}
+              onChange={(e) => setFfcvUrl(e.target.value)}
+              placeholder="https://www.ffcv.es/ncompeticiones/..."
+              className="mt-1 w-full rounded-md bg-white text-slate-900 border border-gray-300 placeholder-gray-400"
+            />
+          </div>
           <button
             disabled={submitting}
             type="submit"
@@ -392,31 +418,6 @@ export default function EquiposPage() {
   const [showPlayersFor, setShowPlayersFor] = useState<string | null>(null);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null); // which card's dropdown is open
-  const [isImporting, setIsImporting] = useState(false);
-
-  const handleImportSportingSaladar = async () => {
-    setIsImporting(true);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase.from("profiles").select("club_id").eq("id", user.id).single();
-      if (!profile?.club_id) return;
-      
-      const res = await importSportingSaladarData(profile.club_id);
-      if (res.success) {
-        alert(`¡Importación exitosa! Se han creado ${res.count} equipos.`);
-        fetchTeams();
-        router.refresh();
-      } else {
-        alert("Error en la importación: " + res.error);
-      }
-    } catch (error: any) {
-      alert("Error en la importación: " + error.message);
-    } finally {
-      setIsImporting(false);
-    }
-  };
 
   const fetchTeams = async () => {
     setLoading(true);
@@ -436,7 +437,7 @@ export default function EquiposPage() {
 
       let query = supabase
         .from("equipos")
-        .select("id, name, category, members, coaches, sport, gender, age_group, format, color")
+        .select("id, name, category, members, coaches, sport, gender, age_group, format, color, ffcv_url")
         .eq("club_id", profile.club_id)
         .order("name");
         
@@ -542,6 +543,7 @@ export default function EquiposPage() {
       age_group: newTeam.age_group,
       format: newTeam.format,
       color: newTeam.color,
+      ffcv_url: newTeam.ffcv_url,
       club_id: profile.club_id
     }).select().single();
 
@@ -613,11 +615,10 @@ export default function EquiposPage() {
           {isAdmin && (
             <div className="flex gap-3">
               <button
-                onClick={handleImportSportingSaladar}
-                disabled={isImporting}
-                className="flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm disabled:opacity-50"
+                onClick={() => router.push('/admin/equipos/importador')}
+                className="flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm"
               >
-                <span>{isImporting ? 'Importando...' : '⚡ Importar Sporting Saladar'}</span>
+                <span>⚡ Importar Equipos</span>
               </button>
               <button
                 onClick={() => router.push('/dashboard/equipos/crear-varios')}
@@ -781,6 +782,7 @@ export default function EquiposPage() {
               age_group: updated.age_group,
               format: updated.format,
               color: updated.color,
+              ffcv_url: updated.ffcv_url,
             })
             .eq('id', updated.id);
           if (error) {

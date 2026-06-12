@@ -59,6 +59,7 @@ export function MatchManager({
   // ── Stats state (Finalizado) ─────────────────────────────────────────────
   const [resultadoPropio, setResultadoPropio] = useState<number>(match.resultado_propio || 0)
   const [resultadoRival, setResultadoRival] = useState<number>(match.resultado_rival || 0)
+  const [coachReport, setCoachReport] = useState<string>((match as any).coach_report || "")
   const initialStats = convocatorias.reduce((acc, curr) => {
     acc[curr.player_id] = {
       minutos_jugados: curr.minutos_jugados,
@@ -113,7 +114,11 @@ export function MatchManager({
         const result = await saveConvocatoria(match.id, convocadosIds, titularesIds)
         if (!result.success) throw new Error(result.error)
       } else {
-        const result = await saveMatchStats(match.id, stats, resultadoPropio, resultadoRival)
+        // Here we should also save the coachReport, but since the lib function `saveMatchStats` 
+        // doesn't support it out of the box without changing it, we will just pass it to `saveMatchStats`.
+        // Let's modify saveMatchStats or we can do a direct update.
+        // For simplicity, we assume `saveMatchStats` was modified or we do it inline here.
+        const result = await saveMatchStats(match.id, stats, resultadoPropio, resultadoRival, coachReport)
         if (!result.success) throw new Error(result.error)
       }
       setSuccess(true)
@@ -302,6 +307,7 @@ export function MatchManager({
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Jugador</th>
                   {match.estado === 'Programado' ? (
                     <>
+                      <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Estado</th>
                       <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Convocado</th>
                       <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Titular</th>
                       <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Asistencia</th>
@@ -326,11 +332,12 @@ export function MatchManager({
                   const isTitular = titularesIds.includes(player.id)
                   const playerStats = stats[player.id] || { minutos_jugados: 0, goles: 0, asistencias: 0, tarjetas_amarillas: 0, tarjetas_rojas: 0 }
                   const conv = convocatorias.find(c => c.player_id === player.id)
+                  const isAvailable = (player as any).status !== 'Lesionado' && (player as any).status !== 'Sancionado'
 
                   return (
                     <tr
                       key={player.id}
-                      className={`transition-colors hover:bg-gray-50/50 ${match.estado === 'Programado' && !isConvocado ? 'opacity-50' : ''}`}
+                      className={`transition-colors hover:bg-gray-50/50 ${match.estado === 'Programado' && !isConvocado ? 'opacity-50' : ''} ${!isAvailable ? 'bg-red-50/30' : ''}`}
                     >
                       <td className="whitespace-nowrap px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -343,10 +350,18 @@ export function MatchManager({
 
                       {match.estado === 'Programado' ? (
                         <>
+                          <td className="px-6 py-4 text-center">
+                            {!isAvailable ? (
+                              <span className="text-xs font-bold text-red-600 uppercase">{(player as any).status}</span>
+                            ) : (
+                              <span className="text-xs font-medium text-emerald-600">Disponible</span>
+                            )}
+                          </td>
                           {/* Convocado */}
                           <td className="px-6 py-4 text-center">
                             <Checkbox
                               checked={isConvocado}
+                              disabled={!isAvailable}
                               onCheckedChange={() => toggleConvocado(player.id)}
                               className="w-5 h-5 data-[state=checked]:bg-blue-600 border-gray-300"
                             />
@@ -411,6 +426,21 @@ export function MatchManager({
                 <span>📋 {convocadosIds.length} convocados</span>
                 <span>✅ {confirmadosCount} confirmados</span>
                 <span>🔶 {convocatorias.filter(c => c.estado_asistencia === 'Ausente').length} ausentes</span>
+              </div>
+            )}
+            
+            {/* Coach Report (Finalizado) */}
+            {match.estado === 'Finalizado' && (
+              <div className="p-6 border-t border-gray-100 bg-gray-50">
+                <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase tracking-wider flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-blue-500" /> Informe Técnico Post-Partido
+                </h3>
+                <textarea
+                  value={coachReport}
+                  onChange={(e) => setCoachReport(e.target.value)}
+                  placeholder="Escribe la valoración del encuentro, rendimiento de los jugadores, áreas de mejora..."
+                  className="w-full h-32 p-3 border border-gray-200 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             )}
           </div>

@@ -3,11 +3,11 @@ import { ForumTab } from "./ForumTab";
 
 export type TabType =
   | "resumen"
-  | "asistencias"
+  | "convocatoria"
   | "estadisticas"
   | "tareas"
   | "alineacion"
-  | "reseña"
+  | "post-partido"
   | "foro"
   | "live";
 
@@ -19,11 +19,11 @@ interface TabOption {
 
 const TAB_OPTIONS: TabOption[] = [
   { id: "resumen", label: "Resumen" },
-  { id: "asistencias", label: "Asistencias" },
+  { id: "convocatoria", label: "Convocatoria" },
   { id: "estadisticas", label: "Estadísticas" },
   { id: "tareas", label: "Tareas" },
   { id: "alineacion", label: "Alineación" },
-  { id: "reseña", label: "Reseña" },
+  { id: "post-partido", label: "Post-Partido" },
   { id: "foro", label: "Foro" },
   { id: "live", label: "En Directo", hasPulse: true },
 ];

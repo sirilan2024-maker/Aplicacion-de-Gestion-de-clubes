@@ -10,6 +10,7 @@ BEGIN
   -- Añadido el campo 'slug' que es obligatorio
   INSERT INTO public.clubs (name, slug) 
   VALUES ('Sporting Saladar', 'sporting-saladar') 
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
   RETURNING id INTO nuevo_club_id;
 
   -- 2. Le asignamos este nuevo club a todos los usuarios que no tengan ninguno

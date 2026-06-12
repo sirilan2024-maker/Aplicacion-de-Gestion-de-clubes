@@ -33,10 +33,10 @@ export function useMvpVoting(matchId: string) {
     setLoading(true);
     const { data, error } = await supabase
       .from("mvp_votes")
-      .select("player_id, user_id")
+      .select("player_id, voter_profile_id")
       .eq("match_id", matchId);
     if (error) {
-      console.error("Error fetching MVP votes", error);
+      console.error("Error fetching MVP votes:", error.message || error);
       setLoading(false);
       return;
     }
@@ -45,7 +45,7 @@ export function useMvpVoting(matchId: string) {
     data?.forEach((row: any) => {
       const pid = row.player_id as string;
       tally[pid] = (tally[pid] || 0) + 1;
-      if (row.user_id === userId) alreadyVoted = true;
+      if (row.voter_profile_id === userId) alreadyVoted = true;
     });
     setVotes(tally);
     setHasVoted(alreadyVoted);
@@ -57,7 +57,7 @@ export function useMvpVoting(matchId: string) {
     const { error } = await supabase.from("mvp_votes").insert({
       match_id: matchId,
       player_id: playerId,
-      user_id: userId,
+      voter_profile_id: userId,
     });
     if (error) console.error("Vote error", error);
     // No need to manually refresh – realtime will sync
@@ -76,7 +76,7 @@ export function useMvpVoting(matchId: string) {
             ...prev,
             [newRow.player_id]: (prev[newRow.player_id] || 0) + 1,
           }));
-          if (newRow.user_id === userId) setHasVoted(true);
+          if (newRow.voter_profile_id === userId) setHasVoted(true);
         }
       })
       .subscribe();

@@ -27,23 +27,15 @@ export const MOCK_LIVE_PLAYERS = [
   { id: "p11", name: "Iván Castro", dorsal: 11 }
 ];
 
-const INITIAL_EVENTS: LiveEvent[] = [
-  { id: "le1", minuto: 18, tipo: "Gol", descripcion: "Gol de Carlos Pérez a pase de Álvaro Núñez", player_id: "p9" },
-  { id: "le2", minuto: 30, tipo: "Gol", descripcion: "Gol de J. Gómez (Atlético Écija)", player_id: undefined },
-  { id: "le3", minuto: 42, tipo: "Gol", descripcion: "Gol de Carlos Pérez tras jugada individual", player_id: "p9" },
-  { id: "le4", minuto: 55, tipo: "Amarilla", descripcion: "Tarjeta Amarilla para Jorge Ruiz", player_id: "p2" },
-  { id: "le5", minuto: 65, tipo: "Gol", descripcion: "Gol de Andrés Gil tras remate de córner", player_id: "p7" },
-  { id: "le6", minuto: 78, tipo: "Cambio", descripcion: "Entra Iván Castro, sale Álvaro Núñez", player_id: "p11" },
-  { id: "le7", minuto: 81, tipo: "Gol", descripcion: "Gol de Rubén Díaz tras centro al área", player_id: "p6" }
-];
-
 interface LiveTabProps {
   matchId: string;
+  players?: any[];
+  matchEvents?: any[];
   onEventChange: (localGoals: number, awayGoals: number, goalsList: { local: string; away: string }) => void;
 }
 
-export function LiveTab({ matchId, onEventChange }: LiveTabProps) {
-  const [events, setEvents] = useState<LiveEvent[]>(INITIAL_EVENTS);
+export function LiveTab({ matchId, players = [], matchEvents = [], onEventChange }: LiveTabProps) {
+  const [events, setEvents] = useState<LiveEvent[]>(matchEvents);
   const [activeForm, setActiveForm] = useState<"Gol" | "Amarilla" | "Cambio" | "Tiro al larguero" | "Tiro al palo" | "Penalti" | "Lesión" | "Gol en propia puerta" | null>(null);
 
   // Initialize Supabase client
@@ -82,8 +74,8 @@ export function LiveTab({ matchId, onEventChange }: LiveTabProps) {
     const localScorers = updatedEvents
       .filter(e => e.tipo === "Gol" && e.player_id)
       .map(e => {
-        const player = MOCK_LIVE_PLAYERS.find(p => p.id === e.player_id);
-        return player ? `${player.name} (${e.minuto}')` : `Sporting (${e.minuto}')`;
+        const player = players.find((p: any) => p.id === e.player_id);
+        return player ? `${player.first_name} (${e.minuto}')` : `Sporting (${e.minuto}')`;
       })
       .join(", ");
 
@@ -99,8 +91,8 @@ export function LiveTab({ matchId, onEventChange }: LiveTabProps) {
     e.preventDefault();
     if (!activeForm) return;
 
-    const player = MOCK_LIVE_PLAYERS.find(p => p.id === playerId);
-    const playerName = player ? player.name : "Jugador";
+    const player = players.find((p: any) => p.id === playerId);
+    const playerName = player ? `${player.first_name} ${player.last_name || ''}`.trim() : "Jugador";
     let desc = "";
 
     if (activeForm === "Gol") {
@@ -145,8 +137,8 @@ export function LiveTab({ matchId, onEventChange }: LiveTabProps) {
   };
 
   const handleReset = () => {
-    setEvents(INITIAL_EVENTS);
-    updateParentScores(INITIAL_EVENTS);
+    setEvents([]);
+    updateParentScores([]);
   };
 
   return (
@@ -290,10 +282,10 @@ export function LiveTab({ matchId, onEventChange }: LiveTabProps) {
                     className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-500 focus:bg-white"
                   >
                     <option value="">— Seleccionar jugador —</option>
-                    <option value="rival">Rival (Atlético Écija)</option>
-                    {MOCK_LIVE_PLAYERS.map(p => (
+                    <option value="rival">Rival</option>
+                    {players.map((p: any) => (
                       <option key={p.id} value={p.id}>
-                        #{p.dorsal} {p.name}
+                        #{p.dorsal || '-'} {p.first_name} {p.last_name}
                       </option>
                     ))}
                   </select>

@@ -79,7 +79,7 @@ USING (
 
 -- 5. EVITAR RECURSIÓN INFINITA (RECOMENDACIÓN DE SEGURIDAD DEFINER)
 -- Si hay consultas masivas a profiles, es mejor crear una función segura para leer el rol
-CREATE OR REPLACE FUNCTION auth.get_user_role()
+CREATE OR REPLACE FUNCTION public.get_user_role()
 RETURNS TEXT
 LANGUAGE sql
 SECURITY DEFINER
@@ -89,7 +89,7 @@ AS $$
   SELECT role FROM profiles WHERE id = auth.uid();
 $$;
 
-CREATE OR REPLACE FUNCTION auth.get_user_club_id()
+CREATE OR REPLACE FUNCTION public.get_user_club_id()
 RETURNS UUID
 LANGUAGE sql
 SECURITY DEFINER

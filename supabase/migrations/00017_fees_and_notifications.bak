@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.fees (
   updated_at timestamp with time zone DEFAULT now()
 );
 
+ALTER TABLE public.fees ADD COLUMN IF NOT EXISTS profile_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_fees_profile ON public.fees (profile_id);
 
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at timestamp with time zone DEFAULT now()
 );
 
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS profile_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_notifications_profile ON public.notifications (profile_id);
 
 -- RLS for fees

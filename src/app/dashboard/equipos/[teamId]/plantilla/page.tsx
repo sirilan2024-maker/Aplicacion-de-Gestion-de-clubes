@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Users, Pencil, X } from "lucide-react";
+import { Loader2, Users, Pencil, X, ChevronRight } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Player {
@@ -22,6 +22,7 @@ interface Player {
 
 export default function PlantillaEquipoPage() {
   const params = useParams();
+  const router = useRouter();
   const teamId = typeof params.teamId === 'string' ? params.teamId : '';
 
   const [players, setPlayers] = useState<Player[]>([]);
@@ -46,7 +47,20 @@ export default function PlantillaEquipoPage() {
         .order("last_name", { ascending: true });
 
       if (error) throw error;
-      setPlayers(playersData || []);
+      
+      const sorted = (playersData || []).sort((a, b) => {
+        const isCoachA = a.posicion?.toLowerCase().includes('entrenador') || a.posicion?.toLowerCase().includes('delegado') || a.posicion?.toLowerCase().includes('técnico');
+        const isCoachB = b.posicion?.toLowerCase().includes('entrenador') || b.posicion?.toLowerCase().includes('delegado') || b.posicion?.toLowerCase().includes('técnico');
+        
+        if (isCoachA && !isCoachB) return -1;
+        if (!isCoachA && isCoachB) return 1;
+        
+        const nameA = a.last_name || a.first_name || '';
+        const nameB = b.last_name || b.first_name || '';
+        return nameA.localeCompare(nameB);
+      });
+      
+      setPlayers(sorted);
     } catch (err: any) {
       toast.error("Error al cargar la plantilla: " + err.message);
     } finally {
@@ -144,7 +158,11 @@ export default function PlantillaEquipoPage() {
                 players.map((player) => {
                   const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
                   return (
-                    <tr key={player.id} className="hover:bg-gray-50/80 transition-colors group">
+                    <tr 
+                      key={player.id} 
+                      onClick={() => router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`)}
+                      className="hover:bg-blue-50/50 transition-colors group cursor-pointer"
+                    >
                       <td className="px-6 py-4">
                         {player.dorsal ? (
                           <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-gray-700">
@@ -156,7 +174,7 @@ export default function PlantillaEquipoPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
+                          <span className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors flex items-center gap-2">
                             {player.first_name} {player.last_name}
                           </span>
                           <span className="text-xs text-gray-500 lg:hidden mt-0.5">{getDisplayEmail(player)}</span>
@@ -197,13 +215,21 @@ export default function PlantillaEquipoPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => setEditingPlayer(player)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex"
-                          title="Editar Jugador"
-                        >
-                          <Pencil size={18} />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingPlayer(player);
+                            }}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors inline-flex"
+                            title="Edición rápida"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                          <div className="p-2 text-gray-300 group-hover:text-blue-500 transition-colors">
+                            <ChevronRight size={18} />
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   );

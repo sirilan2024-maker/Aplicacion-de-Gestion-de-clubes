@@ -42,7 +42,7 @@ export default function TeamLayout({
     { name: "Entrenamientos", href: `/dashboard/equipos/${teamId}/entrenamientos`, icon: CalendarIcon },
     { name: "Rendimiento", href: `/dashboard/equipos/${teamId}/rendimiento`, icon: Activity },
     { name: "Asistencia", href: `/dashboard/equipos/${teamId}/asistencia`, icon: LayoutList },
-    { name: "Calendario", href: `/dashboard/equipos/${teamId}/calendario`, icon: CalendarIcon },
+    { name: "Eventos", href: `/dashboard/equipos/${teamId}/calendario`, icon: CalendarIcon },
   ];
 
   return (

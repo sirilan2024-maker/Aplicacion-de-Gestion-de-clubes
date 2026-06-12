@@ -27,7 +27,7 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-widest">
         <span>{teamName}</span>
         <span className="text-slate-300">/</span>
-        <span>Calendario</span>
+        <span>Eventos</span>
         <span className="text-slate-300">/</span>
         <span className="text-slate-600 font-bold">Partido vs {rivalName}</span>
       </div>

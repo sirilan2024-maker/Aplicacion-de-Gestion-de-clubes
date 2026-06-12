@@ -52,7 +52,7 @@ export function AdminSidebar() {
         { name: "Calendario FFCV", href: "/admin/calendario-ffcv", icon: Database },
         { name: "Partidos", href: "/admin/partidos", icon: Trophy },
         { name: "Eventos", href: "/admin/eventos", icon: Target },
-        { name: "Calendario", href: "/admin/calendario", icon: CalendarDays },
+        { name: "Eventos", href: "/admin/calendario", icon: CalendarDays },
       ],
     },
     {
@@ -88,7 +88,7 @@ export function AdminSidebar() {
       items: [
         { name: "Plantilla",    href: `/admin/e/${activeTeamId}/jugadores`, icon: Users },
         { name: "Partidos",     href: `/admin/e/${activeTeamId}/partidos`, icon: Trophy },
-        { name: "Calendario",   href: `/admin/e/${activeTeamId}/calendario`, icon: CalendarDays },
+        { name: "Eventos",   href: `/admin/e/${activeTeamId}/calendario`, icon: CalendarDays },
         { name: "Asistencia",   href: `/admin/e/${activeTeamId}/asistencia`, icon: ClipboardCheck },
         { name: "Mensajes",     href: `/admin/e/${activeTeamId}/mensajes`, icon: MessageSquare },
       ]

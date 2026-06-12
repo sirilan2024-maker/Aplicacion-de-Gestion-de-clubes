@@ -153,7 +153,7 @@ export default function CalendarioEquipoPage({ params }: { params: Promise<{ tea
       <div className="flex items-center gap-3 border-b pb-4">
         <CalendarIcon className="text-blue-500" size={32} />
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Calendario</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Eventos</h1>
           <p className="text-slate-500">Planifica entrenamientos, eventos y revisa el horario del equipo.</p>
         </div>
       </div>

@@ -112,7 +112,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         items: [
           { name: "Plantilla",    href: `/dashboard/equipos/${activeTeamId}/plantilla`, icon: Users },
           { name: "Partidos",     href: `/dashboard/equipos/${activeTeamId}/partidos`, icon: Trophy },
-          { name: "Calendario",   href: `/dashboard/equipos/${activeTeamId}/calendario`, icon: CalendarDays },
+          { name: "Eventos",   href: `/dashboard/equipos/${activeTeamId}/calendario`, icon: CalendarDays },
           { name: "Asistencia",   href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: ClipboardCheck },
           { name: "Rendimiento",  href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
           { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },

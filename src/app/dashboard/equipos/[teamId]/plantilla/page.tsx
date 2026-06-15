@@ -60,8 +60,6 @@ export default function PlantillaEquipoPage() {
         const nameB = b.last_name || b.first_name || '';
         return nameA.localeCompare(nameB);
       });
-      
-      toast.success("Fetch terminó. Jugadores: " + sorted.length + " | teamId: " + teamId);
       setPlayers(sorted);
     } catch (err: any) {
       toast.error("Error al cargar la plantilla: " + err.message);

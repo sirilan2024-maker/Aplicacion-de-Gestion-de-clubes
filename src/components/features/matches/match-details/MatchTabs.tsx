@@ -8,7 +8,8 @@ export type TabType =
   | "alineacion"
   | "post-partido"
   | "foro"
-  | "live";
+  | "live"
+  | "tareas";
 
 interface TabOption {
   id: TabType;

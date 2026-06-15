@@ -17,6 +17,8 @@ interface Convocatoria {
   id: string
   player_id: string
   coach_rating?: number
+  estado_asistencia?: string
+  status?: string
 }
 
 interface PlayerRatingsModalProps {

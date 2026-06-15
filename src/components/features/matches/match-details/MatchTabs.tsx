@@ -5,7 +5,6 @@ export type TabType =
   | "resumen"
   | "convocatoria"
   | "estadisticas"
-  | "tareas"
   | "alineacion"
   | "post-partido"
   | "foro"
@@ -21,7 +20,6 @@ const TAB_OPTIONS: TabOption[] = [
   { id: "resumen", label: "Resumen" },
   { id: "convocatoria", label: "Convocatoria" },
   { id: "estadisticas", label: "Estadísticas" },
-  { id: "tareas", label: "Tareas" },
   { id: "alineacion", label: "Alineación" },
   { id: "post-partido", label: "Post-Partido" },
   { id: "foro", label: "Foro" },

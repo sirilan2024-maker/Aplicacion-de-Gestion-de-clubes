@@ -11,6 +11,9 @@ export interface PlayerInfo {
   name: string;
   dorsal: number;
   avatarUrl?: string;
+  posicion?: string;
+  goals?: number;
+  assists?: number;
 }
 
 interface MVPAwardProps {
@@ -39,42 +42,53 @@ export function MVPAward({ matchId, players }: MVPAwardProps) {
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl bg-slate-900 p-6 shadow-xl text-white h-fit">
-      <h2 className="text-2xl font-extrabold text-gold-400 tracking-wider">Estrella del partido</h2>
-
-      {loading && <p className="text-sm text-slate-400">Cargando datos…</p>}
-
       {/* If the user hasn't voted yet */}
       {!loading && !hasVoted && (
-        <button
-          onClick={() => setModalOpen(true)}
-          className="mt-2 self-start rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-gold-600 transition"
-        >
-          Votar al MVP
-        </button>
+        <>
+          <h2 className="text-2xl font-extrabold text-gold-400 tracking-wider">Estrella del partido</h2>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="mt-2 self-start rounded-lg bg-gold-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-gold-600 transition"
+          >
+            Votar al MVP
+          </button>
+        </>
       )}
 
       {/* After voting */}
       {!loading && hasVoted && leadingPlayer && (
-        <div className="flex items-center gap-4">
-          <div className="relative h-20 w-20 flex-shrink-0">
+        <div className="flex items-center gap-5">
+          <div className="relative h-[80px] w-[80px] flex-shrink-0">
             {leadingPlayer.avatarUrl ? (
               <Image
                 src={leadingPlayer.avatarUrl}
                 alt={leadingPlayer.name}
-                layout="fill"
-                className="rounded-full border-2 border-gold-500 object-cover"
+                fill
+                className="rounded-full border-[3px] border-gold-500 object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-slate-800 text-gold-500 font-bold text-xl border-2 border-gold-500">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-slate-800 text-gold-500 font-bold text-2xl border-[3px] border-gold-500">
                 {leadingPlayer.dorsal}
               </div>
             )}
           </div>
-          <div className="flex flex-col">
-            <p className="text-lg font-medium text-white">{leadingPlayer.name}</p>
-            <p className="text-sm text-gold-400">
-              {votes[leadingPlayer.id] || 0} voto{votes[leadingPlayer.id] === 1 ? "" : "s"} (total {totalVotes})
+          
+          <div className="flex flex-col items-start gap-1">
+            <div className="bg-gold-500/10 text-gold-500 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-gold-500/20">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+              Estrella del partido
+            </div>
+            
+            <p className="text-xl font-bold text-white leading-none mt-1">{leadingPlayer.name}</p>
+            <p className="text-xs text-slate-400 font-medium">
+              {leadingPlayer.posicion || "Jugador"} · Dorsal #{leadingPlayer.dorsal}
             </p>
+            
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs font-bold text-gold-400">⚽ {leadingPlayer.goals || 0} Goles</span>
+              <span className="text-gold-500/40 font-bold">·</span>
+              <span className="text-xs font-bold text-gold-400">🎯 {leadingPlayer.assists || 0} Asistencia{leadingPlayer.assists !== 1 ? 's' : ''}</span>
+            </div>
           </div>
         </div>
       )}

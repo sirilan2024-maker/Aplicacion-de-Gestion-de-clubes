@@ -23,11 +23,20 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       
       if (matchData) setMatchDetails(matchData)
 
+      // Handle both new teams table ID and old equipos table ID
+      const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", params.teamId).single()
+      let oldTeamId = params.teamId;
+      if (newTeamData) {
+        const { data: oldTeamData } = await supabase.from("equipos").select("id").ilike("name", newTeamData.name).single()
+        if (oldTeamData) oldTeamId = oldTeamData.id;
+      }
+
       // 2. Fetch all team players
       const { data: playersData } = await supabase
         .from("players")
         .select("id, first_name, last_name, dorsal, status, medical_notes")
-        .eq("team_id", params.teamId)
+        .or(`team_id.eq.${params.teamId},team_id.eq.${oldTeamId}`)
+        .neq('status', 'inactive')
         .order("first_name")
       
       if (playersData) setPlayers(playersData)

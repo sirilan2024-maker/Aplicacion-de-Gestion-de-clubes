@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { LayoutGrid, List, Lock, Unlock } from "lucide-react"
+import { useState, useTransition } from "react"
+import { LayoutGrid, List, Lock, Unlock, Check, X } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
+import { useParams } from "next/navigation"
+import Link from "next/link"
 import { MVPAward } from "./MVPAward"
 import { MOCK_LIVE_PLAYERS } from "./LiveTab"
 
@@ -11,30 +13,32 @@ interface PlayerRow {
   number: number
   name: string
   pos: string
-  rating: number
+  titular: boolean
   coachRating: number
+  actitud: number
   assists: number
   goals: number
   yellowCards: number
   redCards: number
   avatar: string
+  status: string | null
 }
 
 const MOCK_SUMMARY_PLAYERS: PlayerRow[] = [
-  { id: "p1", number: 1, name: "David García", pos: "POR", rating: 7.2, coachRating: 7.0, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "DG" },
-  { id: "p2", number: 2, name: "Jorge Ruiz", pos: "LD", rating: 7.5, coachRating: 7.5, assists: 1, goals: 0, yellowCards: 1, redCards: 0, avatar: "JR" },
-  { id: "p3", number: 5, name: "Miguel Sanz", pos: "DFC", rating: 8.1, coachRating: 8.0, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "MS" },
-  { id: "p4", number: 6, name: "Pablo Torres", pos: "DFC", rating: 7.8, coachRating: 7.5, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "PT" },
-  { id: "p5", number: 3, name: "Luis Moreno", pos: "LI", rating: 6.9, coachRating: 7.0, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "LM" },
-  { id: "p6", number: 8, name: "Rubén Díaz", pos: "MC", rating: 7.4, coachRating: 7.5, assists: 0, goals: 1, yellowCards: 0, redCards: 0, avatar: "RD" },
-  { id: "p7", number: 4, name: "Andrés Gil", pos: "MC", rating: 8.3, coachRating: 8.0, assists: 0, goals: 1, yellowCards: 0, redCards: 0, avatar: "AG" },
-  { id: "p8", number: 7, name: "Sergio López", pos: "MC", rating: 7.6, coachRating: 7.5, assists: 1, goals: 0, yellowCards: 0, redCards: 0, avatar: "SL" },
-  { id: "p9", number: 10, name: "Carlos Pérez", pos: "MP", rating: 9.2, coachRating: 9.5, assists: 1, goals: 2, yellowCards: 0, redCards: 0, avatar: "CP" },
-  { id: "p10", number: 9, name: "Álvaro Núñez", pos: "DC", rating: 7.5, coachRating: 7.0, assists: 1, goals: 0, yellowCards: 0, redCards: 0, avatar: "AN" },
-  { id: "p11", number: 11, name: "Iván Castro", pos: "DC", rating: 7.0, coachRating: 6.5, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "IC" },
-  { id: "p12", number: 12, name: "Mateo Ramos", pos: "SUPL", rating: 6.8, coachRating: 6.0, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "MR" },
-  { id: "p13", number: 13, name: "Lucas Mendoza", pos: "SUPL", rating: 7.0, coachRating: 6.5, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "LM" },
-  { id: "p14", number: 14, name: "Daniel Alonso", pos: "SUPL", rating: 6.5, coachRating: 6.0, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "DA" }
+  { id: "p1", number: 1, name: "David García", pos: "POR", titular: true, coachRating: 7.0, actitud: 8, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "DG", status: "convocado" },
+  { id: "p2", number: 2, name: "Jorge Ruiz", pos: "LD", titular: true, coachRating: 7.5, actitud: 7, assists: 1, goals: 0, yellowCards: 1, redCards: 0, avatar: "JR", status: "convocado" },
+  { id: "p3", number: 5, name: "Miguel Sanz", pos: "DFC", titular: true, coachRating: 8.0, actitud: 9, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "MS", status: "convocado" },
+  { id: "p4", number: 6, name: "Pablo Torres", pos: "DFC", titular: true, coachRating: 7.5, actitud: 8, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "PT", status: "convocado" },
+  { id: "p5", number: 3, name: "Luis Moreno", pos: "LI", titular: true, coachRating: 7.0, actitud: 7, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "LM", status: "convocado" },
+  { id: "p6", number: 8, name: "Rubén Díaz", pos: "MC", titular: true, coachRating: 7.5, actitud: 8, assists: 0, goals: 1, yellowCards: 0, redCards: 0, avatar: "RD", status: "convocado" },
+  { id: "p7", number: 4, name: "Andrés Gil", pos: "MC", titular: true, coachRating: 8.0, actitud: 9, assists: 0, goals: 1, yellowCards: 0, redCards: 0, avatar: "AG", status: "convocado" },
+  { id: "p8", number: 7, name: "Sergio López", pos: "MC", titular: true, coachRating: 7.5, actitud: 8, assists: 1, goals: 0, yellowCards: 0, redCards: 0, avatar: "SL", status: "convocado" },
+  { id: "p9", number: 10, name: "Carlos Pérez", pos: "MP", titular: true, coachRating: 9.5, actitud: 10, assists: 1, goals: 2, yellowCards: 0, redCards: 0, avatar: "CP", status: "convocado" },
+  { id: "p10", number: 9, name: "Álvaro Núñez", pos: "DC", titular: true, coachRating: 7.0, actitud: 7, assists: 1, goals: 0, yellowCards: 0, redCards: 0, avatar: "AN", status: "convocado" },
+  { id: "p11", number: 11, name: "Iván Castro", pos: "DC", titular: false, coachRating: 6.5, actitud: 6, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "IC", status: "convocado" },
+  { id: "p12", number: 12, name: "Mateo Ramos", pos: "SUPL", titular: false, coachRating: 6.0, actitud: 6, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "MR", status: "no_convocado" },
+  { id: "p13", number: 13, name: "Lucas Mendoza", pos: "SUPL", titular: false, coachRating: 6.5, actitud: 7, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "LM", status: "no_convocado" },
+  { id: "p14", number: 14, name: "Daniel Alonso", pos: "SUPL", titular: false, coachRating: 6.0, actitud: 6, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "DA", status: "no_convocado" }
 ]
 
 const FORMATIONS: Record<string, { id: string, label: string, x: number, y: number }[]> = {
@@ -131,35 +135,50 @@ const FORMATIONS: Record<string, { id: string, label: string, x: number, y: numb
   ]
 }
 
-export function SummaryTab({ matchId, players = [] }: { matchId: string, players?: any[] }) {
+export function SummaryTab({ matchId, match, players = [], convocatorias = [] }: { matchId: string, match?: any, players?: any[], convocatorias?: any[] }) {
   const { rol } = useUserRole()
+  const { teamId } = useParams()
   const isFamilyView = rol === "familia" || rol === "jugador"
   
-  const mappedPlayers: PlayerRow[] = players.map(p => ({
-    id: p.id,
-    number: p.dorsal || 0,
-    name: `${p.first_name} ${p.last_name}`,
-    pos: p.posicion_principal || "N/A",
-    rating: 0,
-    coachRating: 0,
-    assists: 0,
-    goals: 0,
-    yellowCards: 0,
-    redCards: 0,
-    avatar: `${p.first_name[0]}${p.last_name[0]}`
-  }))
+  const mappedPlayers: PlayerRow[] = players.map(p => {
+    const conv = convocatorias.find(c => c.player_id === p.id);
+    return {
+      id: p.id,
+      number: p.dorsal || 0,
+      name: `${p.first_name} ${p.last_name}`,
+      avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
+      pos: p.posicion_principal || "Jugador",
+      titular: conv?.titular || false,
+      coachRating: conv?.coach_rating || 0,
+      actitud: conv?.actitud || 0,
+      goals: conv?.goals || 0,
+      assists: conv?.assists || 0,
+      yellowCards: conv?.yellow_cards || 0,
+      redCards: conv?.red_cards || 0,
+      minutes: conv?.minutes_played || 0,
+      status: (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado') ? conv.estado_asistencia : 'Presente'
+    };
+  })
 
   const [playerList, setPlayerList] = useState<PlayerRow[]>(mappedPlayers.length > 0 ? mappedPlayers : MOCK_SUMMARY_PLAYERS)
   const [tactic, setTactic] = useState("4-3-3")
   const [isPrivate, setIsPrivate] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  
+  const [isPending, startTransition] = useTransition()
 
-  const mvpPlayers = players.map(p => ({
-    id: p.id,
-    name: `${p.first_name} ${p.last_name || ''}`.trim(),
-    dorsal: p.dorsal || 0,
-    avatarUrl: p.avatar_url
-  }))
+  const mvpPlayers = players.map(p => {
+    const conv = convocatorias.find((c: any) => c.player_id === p.id);
+    return {
+      id: p.id,
+      name: `${p.first_name} ${p.last_name}`,
+      dorsal: p.dorsal || 0,
+      avatarUrl: p.avatar_url,
+      posicion: p.posicion_principal || "Jugador",
+      goals: conv?.goals || 0,
+      assists: conv?.assists || 0
+    };
+  })
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -167,85 +186,47 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
         <MVPAward matchId={matchId} players={mvpPlayers} />
       </div>
       
-      {/* ── Columna Izquierda: Tabla ── */}
+      {/* ── Columna Izquierda: Informe del Cuerpo Técnico ── */}
       <div className="lg:col-span-7 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-            Estadísticas y Notas
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4 h-full">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
+            Informe del Cuerpo Técnico
           </h3>
-          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-            14 Jugadores
-          </span>
-        </div>
-
-        <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="py-3 px-3 text-center">#</th>
-                  <th className="py-3 px-4">Jugador</th>
-                  <th className="py-3 px-3 text-center">Media</th>
-                  <th className="py-3 px-3 text-center">Mi Nota</th>
-                  <th className="py-3 px-3 text-center">Asist.</th>
-                  <th className="py-3 px-3 text-center">Goles</th>
-                  <th className="py-3 px-3 text-center">Tarjetas</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {playerList.map(player => (
-                  <tr key={player.id} className="hover:bg-blue-50/20 transition-colors">
-                    <td className="py-3 px-3 text-center text-xs font-bold text-slate-400">
-                      {player.number}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
-                          {player.avatar}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">
-                            {player.name}
-                          </p>
-                          <p className="text-[9px] text-slate-400 font-semibold">
-                            {player.pos}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-slate-100 text-slate-700 rounded-md">
-                        {player.rating.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-blue-50 text-blue-700 rounded-md">
-                        {player.coachRating.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold text-slate-700 text-xs">
-                      {player.assists || "—"}
-                    </td>
-                    <td className="py-3 px-3 text-center font-black text-emerald-600 text-xs">
-                      {player.goals || "—"}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {player.yellowCards > 0 && (
-                          <span className="w-2.5 h-3.5 bg-amber-400 rounded-sm inline-block shadow-sm" title="Amarilla" />
-                        )}
-                        {player.redCards > 0 && (
-                          <span className="w-2.5 h-3.5 bg-red-500 rounded-sm inline-block shadow-sm" title="Roja" />
-                        )}
-                        {player.yellowCards === 0 && player.redCards === 0 && (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nota del Partido</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Valoración global</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 font-black text-xl flex items-center justify-center border-2 border-white shadow-sm">
+                  {match?.coach_rating || "-"}
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Valoración General</p>
+                <p className="text-xs font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">{match?.coach_summary || "Sin valoración general."}</p>
+              </div>
+              
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Actitud y Observaciones</p>
+                <p className="text-xs font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">{match?.attitude_notes || "Sin observaciones adicionales."}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 h-[calc(50%-0.5rem)]">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-2">Aspectos Positivos</p>
+                <p className="text-xs font-semibold text-emerald-800 whitespace-pre-wrap leading-relaxed">{match?.positive_aspects || "No se han especificado."}</p>
+              </div>
+              
+              <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 h-[calc(50%-0.5rem)]">
+                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest mb-2">Aspectos a Mejorar</p>
+                <p className="text-xs font-semibold text-orange-800 whitespace-pre-wrap leading-relaxed">{match?.improvement_aspects || "No se han especificado."}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -317,7 +298,7 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] font-black text-slate-450 uppercase tracking-widest">{player.pos}</span>
                           <span className="text-[9px] font-extrabold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded">
-                            {player.rating.toFixed(1)}
+                            {player.coachRating.toFixed(1)}
                           </span>
                         </div>
                       </div>
@@ -403,7 +384,7 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-black uppercase text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{player.pos}</span>
                       <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
-                        {player.rating.toFixed(1)}
+                        {player.coachRating.toFixed(1)}
                       </span>
                     </div>
                   </div>
@@ -439,7 +420,7 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
                       
                       {/* Orange Rating Badge */}
                       <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] font-extrabold px-1 rounded-full border border-white shadow-sm">
-                        {player.rating}
+                        {player.coachRating}
                       </span>
                     </div>
                     {/* Name */}
@@ -463,7 +444,7 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
                     </div>
                     <span className="text-xs font-bold text-slate-700">{supl.name}</span>
                     <span className="text-[9px] font-extrabold text-orange-500 bg-orange-50 px-1 rounded border border-orange-100">
-                      {supl.rating}
+                      {supl.coachRating}
                     </span>
                   </div>
                 ))}
@@ -472,6 +453,8 @@ export function SummaryTab({ matchId, players = [] }: { matchId: string, players
           </div>
         )}
       </div>
+
+
 
     </div>
   )

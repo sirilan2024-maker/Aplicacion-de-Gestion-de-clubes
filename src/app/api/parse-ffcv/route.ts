@@ -101,12 +101,12 @@ export async function POST(req: Request) {
 
           if (localClean.includes(baseTeamName)) {
             rivalNombre = visitanteRaw;
-            lugar = 'Local';
+            lugar = lugarRaw;
             resultadoPropio = golLocal;
             resultadoRival = golVisitante;
           } else if (visitanteClean.includes(baseTeamName)) {
             rivalNombre = localRaw;
-            lugar = 'Visitante';
+            lugar = lugarRaw;
             resultadoPropio = golVisitante;
             resultadoRival = golLocal;
           }

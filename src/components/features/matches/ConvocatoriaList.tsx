@@ -1,25 +1,23 @@
 import React, { useState, useTransition } from 'react';
 import { updateConvocatoria, sendConvocatoriaAlerts } from '@/app/actions/match-actions';
-import { Bell, Check, Loader2 } from 'lucide-react';
-import { useUserRole } from '@/hooks/useUserRole';
+import { Loader2 } from 'lucide-react';
 
 export type AttendanceStatus = 'Convocado' | 'No convocado' | 'Duda' | 'Lesión' | null;
 
 export interface Player {
   id: string;
   name: string;
+  position: string;
   status: AttendanceStatus;
 }
 
-const initialPlayers: Player[] = [
-  { id: '1', name: 'Carlos Rodríguez', status: null },
-  { id: '2', name: 'Miguel Ángel', status: 'Convocado' },
-  { id: '3', name: 'Javier Fernández', status: 'Duda' },
-  { id: '4', name: 'Lucas Silva', status: 'No convocado' },
-];
+export function ConvocatoriaList({ players = [], matchId, convocatorias = [], onCloseModal }: { players?: any[], matchId?: string, convocatorias?: any[], onCloseModal?: () => void }) {
+  const validPlayers = players.filter(p => {
+    const pos = (p.posicion || '').toLowerCase();
+    return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
+  });
 
-export function ConvocatoriaList({ players = [], matchId, convocatorias = [] }: { players?: any[], matchId?: string, convocatorias?: any[] }) {
-  const mappedPlayers: Player[] = players.map(p => {
+  const mappedPlayers: Player[] = validPlayers.map(p => {
     // If the player is in `convocatorias`, find their status
     const conv = convocatorias.find(c => c.player_id === p.id);
     let status: AttendanceStatus = null;
@@ -31,17 +29,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [] }: 
     }
     return {
       id: p.id,
-      name: `${p.first_name} ${p.last_name}`,
+      name: `${p.first_name} ${p.last_name}`.toUpperCase(),
+      position: (p.posicion || 'Jugador').toLowerCase(),
       status: status
     };
   });
 
-  const [playerList, setPlayerList] = useState<Player[]>(mappedPlayers.length > 0 ? mappedPlayers : initialPlayers);
+  const [playerList, setPlayerList] = useState<Player[]>(mappedPlayers);
   const [isPending, startTransition] = useTransition();
-  const [alertSent, setAlertSent] = useState(false);
-  const { rol } = useUserRole();
-
-  const isFamily = rol === 'familia' || rol === 'jugador';
 
   const handleStatusChange = (playerId: string, newStatus: AttendanceStatus) => {
     setPlayerList((prev) =>
@@ -49,123 +44,172 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [] }: 
         player.id === playerId ? { ...player, status: newStatus } : player
       )
     );
-    
-    // Convert AttendanceStatus to DB status
-    let dbStatus: "convocado" | "lesionado" | "duda" | "no_convocado" | null = null;
-    if (newStatus === 'Convocado') dbStatus = 'convocado';
-    else if (newStatus === 'No convocado') dbStatus = 'no_convocado';
-    else if (newStatus === 'Duda') dbStatus = 'duda';
-    else if (newStatus === 'Lesión') dbStatus = 'lesionado';
+  };
 
-    startTransition(() => {
-      if (matchId) {
-        updateConvocatoria(matchId, playerId, dbStatus);
+  const handleConvocarTodos = () => {
+    setPlayerList((prev) => prev.map(p => ({ ...p, status: 'Convocado' })));
+  };
+
+  const handleDesmarcarTodos = () => {
+    setPlayerList((prev) => prev.map(p => ({ ...p, status: 'No convocado' })));
+  };
+
+  const handleGuardar = () => {
+    if (!matchId) return;
+    
+    startTransition(async () => {
+      const updates = playerList.map(p => {
+        let dbStatus: "convocado" | "lesionado" | "duda" | "no_convocado" | null = null;
+        if (p.status === 'Convocado') dbStatus = 'convocado';
+        else if (p.status === 'No convocado') dbStatus = 'no_convocado';
+        else if (p.status === 'Duda') dbStatus = 'duda';
+        else if (p.status === 'Lesión') dbStatus = 'lesionado';
+        
+        return { playerId: p.id, status: dbStatus };
+      });
+      
+      const { updateConvocatoriaBatch } = await import('@/app/actions/match-actions');
+      const result = await updateConvocatoriaBatch(matchId, updates);
+      
+      if (result && !result.success) {
+        alert("Error al guardar la convocatoria: " + (result.error?.message || "Error desconocido"));
+      } else if (onCloseModal) {
+        onCloseModal();
       }
     });
   };
 
-  const handleSendAlerts = async () => {
-    if (!matchId) return;
-    const convocados = playerList.filter(p => p.status === 'Convocado').map(p => p.id);
-    startTransition(async () => {
-      await sendConvocatoriaAlerts(matchId, "teamId", convocados);
-      setAlertSent(true);
-      setTimeout(() => setAlertSent(false), 3000);
-    });
-  };
-
   const getStatusClasses = (currentStatus: AttendanceStatus, targetStatus: AttendanceStatus) => {
-    const baseClasses = "px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 active:scale-95";
-    if (currentStatus !== targetStatus) {
-      return `${baseClasses} bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700`;
-    }
+    const baseClasses = "px-3 py-1 text-[11px] font-bold rounded-md transition-all shadow-sm";
     
+    if (currentStatus !== targetStatus) {
+      return `${baseClasses} bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200`;
+    }
+
     switch (targetStatus) {
       case 'Convocado':
-        return `${baseClasses} bg-green-100 text-green-700 ring-2 ring-green-600 ring-offset-2 shadow-sm`;
+        return `${baseClasses} bg-emerald-500 text-white shadow-emerald-500/30 border border-emerald-600`;
       case 'No convocado':
-        return `${baseClasses} bg-gray-100 text-gray-700 ring-2 ring-gray-600 ring-offset-2 shadow-sm`;
+        return `${baseClasses} bg-slate-700 text-white shadow-slate-700/30 border border-slate-800`;
       case 'Duda':
-        return `${baseClasses} bg-amber-100 text-amber-700 ring-2 ring-amber-600 ring-offset-2 shadow-sm`;
+        return `${baseClasses} bg-amber-500 text-white shadow-amber-500/30 border border-amber-600`;
       case 'Lesión':
-        return `${baseClasses} bg-red-100 text-red-700 ring-2 ring-red-600 ring-offset-2 shadow-sm`;
+        return `${baseClasses} bg-rose-500 text-white shadow-rose-500/30 border border-rose-600`;
       default:
-        return baseClasses;
+        return `${baseClasses} bg-slate-100 text-slate-500 border border-slate-200`;
     }
   };
 
+  const counts = playerList.reduce(
+    (acc, player) => {
+      if (player.status === 'Convocado') acc.convocados++;
+      else if (player.status === 'Duda') acc.dudas++;
+      else if (player.status === 'Lesión') acc.lesionados++;
+      return acc;
+    },
+    { convocados: 0, dudas: 0, lesionados: 0 }
+  );
+
   return (
-    <div className="w-full max-w-lg mx-auto bg-white/80 backdrop-blur-xl shadow-xl rounded-2xl border border-gray-100 overflow-hidden">
-      <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex justify-between items-center">
-        <div>
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Disponibilidad del Equipo</h3>
-          <p className="text-[10px] text-slate-400 font-bold mt-0.5">ESTADO PARA EL PARTIDO</p>
+    <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl">
+      <div className="flex flex-col gap-3 mb-4 shrink-0 px-1">
+        <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
+          <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">Resumen</span>
+          <div className="text-xs font-bold">
+            <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">Conv: {counts.convocados}</span>
+            <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 ml-2">Dudas: {counts.dudas}</span>
+            <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded-md border border-rose-100 ml-2">Les: {counts.lesionados}</span>
+          </div>
         </div>
-        {!isFamily && (
+        <div className="flex gap-2">
           <button
-            onClick={handleSendAlerts}
-            disabled={isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm shadow-blue-200 transition-colors disabled:opacity-50"
+            onClick={handleConvocarTodos}
+            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-sm"
           >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (alertSent ? <Check className="w-4 h-4" /> : <Bell className="w-4 h-4" />)}
-            <span className="text-xs font-bold">{alertSent ? "Alertas Enviadas" : "Notificar Convocados"}</span>
+            Convocar a Todos
           </button>
+          <button
+            onClick={handleDesmarcarTodos}
+            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-sm"
+          >
+            Desmarcar Todos
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto min-h-0 pr-2 custom-scrollbar px-1">
+        {playerList.length === 0 ? (
+          <div className="text-center text-slate-500 py-8 text-sm">
+            No hay jugadores disponibles en la plantilla.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {playerList.map((player) => (
+              <li 
+                key={player.id} 
+                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                  player.status === 'Convocado' 
+                    ? 'border-emerald-200 bg-emerald-50/30' 
+                    : 'border-slate-100 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="min-w-0 pr-4">
+                  <span className="font-bold text-slate-800 text-sm block truncate uppercase">{player.name}</span>
+                  <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
+                </div>
+                
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleStatusChange(player.id, 'Convocado')}
+                    className={getStatusClasses(player.status, 'Convocado')}
+                  >
+                    Conv.
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(player.id, 'No convocado')}
+                    className={getStatusClasses(player.status, 'No convocado')}
+                  >
+                    No Conv.
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(player.id, 'Duda')}
+                    className={getStatusClasses(player.status, 'Duda')}
+                  >
+                    Duda
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(player.id, 'Lesión')}
+                    className={getStatusClasses(player.status, 'Lesión')}
+                  >
+                    Les.
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      <div className="px-6 py-3 bg-slate-50 border-b border-gray-100 flex items-center justify-between text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-        <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500"></div> C = Convocado</span>
-        <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-gray-400"></div> NC = No Conv.</span>
-        <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div> D = Duda</span>
-        <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div> L = Lesionado</span>
+      <div className="mt-2 shrink-0 bg-white border-t border-slate-200 p-4 flex items-center justify-end rounded-b-xl">
+        <div className="flex gap-3">
+          {onCloseModal && (
+            <button 
+              onClick={onCloseModal}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-sm"
+            >
+              Cancelar
+            </button>
+          )}
+          <button 
+            onClick={handleGuardar}
+            disabled={isPending}
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+          >
+            {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+            Guardar Convocatoria
+          </button>
+        </div>
       </div>
-      
-      <ul className="divide-y divide-gray-50 p-2">
-        {playerList.map((player) => (
-          <li key={player.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-gray-50/50 rounded-xl transition-colors gap-4">
-            <div className="flex items-center gap-4 min-w-0 flex-1 pr-2">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-bold shadow-inner ring-1 ring-black/5 shrink-0">
-                {player.name.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <span className="font-semibold text-gray-800 block truncate">{player.name}</span>
-                <span className="text-xs text-gray-400 font-medium block truncate">Jugador</span>
-              </div>
-            </div>
-            
-            <div className="flex gap-1.5 sm:gap-2 shrink-0">
-              <button
-                onClick={() => handleStatusChange(player.id, 'Convocado')}
-                className={getStatusClasses(player.status, 'Convocado')}
-                title="Convocado"
-              >
-                C
-              </button>
-              <button
-                onClick={() => handleStatusChange(player.id, 'No convocado')}
-                className={getStatusClasses(player.status, 'No convocado')}
-                title="No convocado"
-              >
-                NC
-              </button>
-              <button
-                onClick={() => handleStatusChange(player.id, 'Duda')}
-                className={getStatusClasses(player.status, 'Duda')}
-                title="Duda"
-              >
-                D
-              </button>
-              <button
-                onClick={() => handleStatusChange(player.id, 'Lesión')}
-                className={getStatusClasses(player.status, 'Lesión')}
-                title="Lesionado"
-              >
-                L
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

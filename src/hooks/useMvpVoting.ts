@@ -36,7 +36,7 @@ export function useMvpVoting(matchId: string) {
       .select("player_id, voter_profile_id")
       .eq("match_id", matchId);
     if (error) {
-      console.error("Error fetching MVP votes:", error.message || error);
+      console.error("Error fetching MVP votes:", JSON.stringify(error, null, 2));
       setLoading(false);
       return;
     }
@@ -54,12 +54,16 @@ export function useMvpVoting(matchId: string) {
 
   // Submit a vote
   const vote = async (playerId: string) => {
+    if (!userId) {
+       console.error("Vote error: No User ID");
+       return;
+    }
     const { error } = await supabase.from("mvp_votes").insert({
       match_id: matchId,
       player_id: playerId,
       voter_profile_id: userId,
     });
-    if (error) console.error("Vote error", error);
+    if (error) console.error("Vote error", JSON.stringify(error, null, 2));
     // No need to manually refresh – realtime will sync
   };
 

@@ -4,7 +4,7 @@ export interface Partido {
   equipo_id: string;
   rival_nombre: string;
   fecha_hora: string;
-  lugar: 'Local' | 'Visitante';
+  lugar: string;
   resultado_propio: number | null;
   resultado_rival: number | null;
   estado: 'Programado' | 'Finalizado';

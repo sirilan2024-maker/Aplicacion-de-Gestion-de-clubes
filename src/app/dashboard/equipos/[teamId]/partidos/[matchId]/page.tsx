@@ -17,10 +17,19 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
 
   if (!matchData) redirect(`/dashboard/equipos/${teamId}/partidos`)
 
+  // Find matching team in the old 'equipos' table using the name from 'teams'
+  const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", teamId).single()
+  let oldTeamId = teamId;
+  if (newTeamData) {
+    const { data: oldTeamData } = await supabase.from("equipos").select("id").ilike("name", newTeamData.name).single()
+    if (oldTeamData) oldTeamId = oldTeamData.id;
+  }
+
   const { data: playersData } = await supabase
     .from("players")
-    .select("id, first_name, last_name, dorsal, status, medical_notes")
-    .eq("team_id", teamId)
+    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion")
+    .or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`)
+    .neq("status", "inactive")
     .order("first_name")
 
   const { data: convocatoriasData } = await supabase

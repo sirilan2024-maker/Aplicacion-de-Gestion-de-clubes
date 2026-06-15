@@ -25,6 +25,12 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
   const teamId = match.equipo_id;
   const [activeTab, setActiveTab] = useState<TabType>("resumen");
 
+  // Filtrar entrenadores y delegados
+  const activePlayers = players.filter(p => {
+    const pos = p.posicion?.toLowerCase() || '';
+    return !pos.includes('entrenador') && !pos.includes('delegado');
+  });
+
   // Calculate live goals from matchEvents
   const localGoalsList = matchEvents.filter(e => e.tipo === 'Gol' && e.player_id);
   const localGoalsCount = localGoalsList.length;
@@ -82,30 +88,42 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
         <div className="bg-white rounded-xl border border-slate-150 p-6 shadow-sm min-h-[400px]">
           
           {/* TAB: RESUMEN */}
-          {activeTab === "resumen" && <SummaryTab matchId={matchId} players={players} />}
+          {activeTab === "resumen" && <SummaryTab matchId={matchId} match={match} players={activePlayers} convocatorias={convocatorias} />}
 
           {/* TAB: ALINEACIÓN (Modo Edición Interactiva) */}
-          {activeTab === "alineacion" && <LineupTab players={players} convocatorias={convocatorias} />}
+          {activeTab === "alineacion" && <LineupTab matchId={matchId} players={activePlayers} convocatorias={convocatorias} />}
 
           {/* TAB: ESTADÍSTICAS */}
-          {activeTab === "estadisticas" && <StatsTab players={players} matchEvents={matchEvents} />}
+          {activeTab === "estadisticas" && <StatsTab players={activePlayers} convocatorias={convocatorias} matchEvents={matchEvents} />}
 
           {/* TAB: EN DIRECTO */}
           {activeTab === "live" && (
-            <LiveTab matchId={matchId} players={players} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
-          )}
-
-          {/* TAB: POST-PARTIDO */}
-          {activeTab === "post-partido" && (
-            <PostMatchTab matchId={matchId} initialData={match} />
+            <LiveTab matchId={matchId} players={activePlayers} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
           )}
 
           {/* TAB: CONVOCATORIA */}
           {activeTab === "convocatoria" && (
             <div className="space-y-4">
-              <ConvocatoriaList players={players} matchId={matchId} convocatorias={convocatorias} />
+              <ConvocatoriaList players={activePlayers} matchId={matchId} convocatorias={convocatorias} />
             </div>
           )}
+
+          {/* TAB: POST-PARTIDO */}
+          {activeTab === "post-partido" && (
+            <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={convocatorias} />
+          )}
+
+          {/* TAB: FORO */}
+          {activeTab === "foro" && (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <MessageSquare className="w-12 h-12 text-slate-200 mb-4" />
+              <h3 className="text-lg font-black text-slate-800 mb-2 uppercase tracking-wider">Foro del Partido</h3>
+              <p className="text-sm text-slate-500 font-medium max-w-sm">
+                Espacio para comentarios, fotos y debate entre el cuerpo técnico y los familiares. (En desarrollo)
+              </p>
+            </div>
+          )}
+
 
           {/* TAB: TAREAS */}
           {activeTab === "tareas" && (

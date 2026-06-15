@@ -151,6 +151,12 @@ export default function PlayerProfilePage() {
         .eq('player_id', playerId)
         .in('event_id', eventIds);
 
+      // Fetch Convocatorias for Match History
+      const { data: convocatoriasData } = await supabase
+        .from('convocatorias')
+        .select('*, partidos:partido_id(*)')
+        .eq('player_id', playerId);
+
       // Fetch Metrics if metrics exist
       let ptData: any[] = [];
       try {
@@ -182,10 +188,30 @@ export default function PlayerProfilePage() {
           if (rpe !== undefined && min !== undefined && rpe !== null && min !== null) {
             dailyLoads[ev.date] = (dailyLoads[ev.date] || 0) + (rpe * min);
           }
-        } else if (ev.event_type === 'Partido') {
-          mHistory.push({ ...ev, attendance: att?.status, minutes: min, goles, asistencias: asist });
         }
       });
+
+      if (convocatoriasData) {
+        convocatoriasData.forEach(c => {
+          if (c.partidos) {
+            mHistory.push({
+              id: c.partido_id,
+              date: c.partidos.fecha_hora,
+              title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar})`,
+              attendance: c.estado_asistencia,
+              minutes: c.minutes_played,
+              goles: c.goals,
+              asistencias: c.assists,
+              coach_rating: c.coach_rating,
+              actitud: c.actitud,
+              amarillas: c.yellow_cards,
+              rojas: c.red_cards
+            });
+          }
+        });
+        // Sort by date descending
+        mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      }
 
       setTrainingHistory(tHistory);
       setMatchHistory(mHistory);
@@ -422,6 +448,14 @@ export default function PlayerProfilePage() {
 
       {/* Cabecera del Perfil */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6 relative">
+        {player.status === 'inactive' && (
+          <div className="bg-orange-50 border-b border-orange-200 p-4 text-center">
+            <div className="flex items-center justify-center gap-2 text-orange-800 font-medium">
+              <AlertCircle size={20} />
+              <span>Este jugador está en el Archivo Histórico. Sus datos son de solo lectura. Para editarlo, debes restaurarlo primero.</span>
+            </div>
+          </div>
+        )}
         <div className="h-32 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
         <div className="px-8 pb-8">
           <div className="relative flex justify-between items-end -mt-12 mb-4">
@@ -475,7 +509,9 @@ export default function PlayerProfilePage() {
             {!isEditing ? (
               <button 
                 onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                disabled={player.status === 'inactive'}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
               >
                 <Edit3 size={16} /> Editar Perfil
               </button>
@@ -954,19 +990,23 @@ export default function PlayerProfilePage() {
                     <Calendar className="text-indigo-500" />
                     <h3 className="text-lg font-bold text-slate-900">Historial de Partidos</h3>
                   </div>
-                  <div className="p-0">
+                  <div className="p-0 overflow-x-auto">
                     {matchHistory.length === 0 ? (
                       <div className="text-center text-slate-500 py-8">No hay partidos registrados.</div>
                     ) : (
-                      <table className="w-full text-left text-sm text-slate-600">
+                      <table className="w-full min-w-max text-left text-sm text-slate-600 whitespace-nowrap">
                         <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
                           <tr>
                             <th className="px-6 py-3">Fecha</th>
                             <th className="px-6 py-3">Partido</th>
-                            <th className="px-6 py-3 text-center">Convocatoria</th>
+                            <th className="px-6 py-3 text-center">Asistencia</th>
+                            <th className="px-6 py-3 text-center">Nota (1-10)</th>
+                            <th className="px-6 py-3 text-center">Actitud (1-10)</th>
                             <th className="px-6 py-3 text-center">Minutos</th>
                             <th className="px-6 py-3 text-center">Goles</th>
-                            <th className="px-6 py-3 text-center">Asist.</th>
+                            <th className="px-6 py-3 text-center">Asistencias</th>
+                            <th className="px-6 py-3 text-center">Amarillas</th>
+                            <th className="px-6 py-3 text-center">Rojas</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -975,13 +1015,18 @@ export default function PlayerProfilePage() {
                               <td className="px-6 py-4 font-medium text-slate-900">{new Date(m.date).toLocaleDateString()}</td>
                               <td className="px-6 py-4">{m.title}</td>
                               <td className="px-6 py-4 text-center">
-                                {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Presente</span> : 
-                                 m.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Ausente</span> : 
+                                {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Asiste</span> : 
+                                 m.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">No Asiste</span> : 
+                                 m.attendance === 'Justificado' ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">Justificado</span> : 
                                  <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
                               </td>
-                              <td className="px-6 py-4 text-center font-bold text-indigo-600">{m.minutes ?? '-'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-slate-700">{m.goles ?? '-'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-slate-700">{m.asistencias ?? '-'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-blue-600">{m.coach_rating || '0'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-purple-600">{m.actitud || '0'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-indigo-600">{m.minutes > 0 ? `${m.minutes}'` : '0'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-slate-700">{m.goles || '0'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-slate-700">{m.asistencias || '0'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-amber-500">{m.amarillas || '0'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-red-500">{m.rojas || '0'}</td>
                             </tr>
                           ))}
                         </tbody>

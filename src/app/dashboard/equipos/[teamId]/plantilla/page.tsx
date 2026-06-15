@@ -44,6 +44,7 @@ export default function PlantillaEquipoPage() {
         .from("players")
         .select("id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone")
         .eq("team_id", teamId)
+        .neq("status", "inactive")
         .order("last_name", { ascending: true });
 
       if (error) throw error;
@@ -60,6 +61,7 @@ export default function PlantillaEquipoPage() {
         return nameA.localeCompare(nameB);
       });
       
+      toast.success("Fetch terminó. Jugadores: " + sorted.length + " | teamId: " + teamId);
       setPlayers(sorted);
     } catch (err: any) {
       toast.error("Error al cargar la plantilla: " + err.message);

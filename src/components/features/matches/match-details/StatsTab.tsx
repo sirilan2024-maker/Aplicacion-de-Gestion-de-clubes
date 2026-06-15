@@ -3,81 +3,34 @@
 import { useState } from "react"
 import { Check, BarChart3, Award } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
+import { useParams } from "next/navigation"
+import Link from "next/link"
 
-interface StatRow {
-  id: string
-  number: number
-  name: string
-  avatar: string
-  position: string
-}
-
-const MOCK_STATS_PLAYERS: StatRow[] = [
-  { id: "sp1", number: 1, name: "David García", avatar: "DG", position: "Portero" },
-  { id: "sp2", number: 2, name: "Jorge Ruiz", avatar: "JR", position: "Defensa" },
-  { id: "sp3", number: 3, name: "Luis Moreno", avatar: "LM", position: "Defensa" },
-  { id: "sp4", number: 4, name: "Andrés Gil", avatar: "AG", position: "Mediocampista" },
-  { id: "sp5", number: 5, name: "Miguel Sanz", avatar: "MS", position: "Defensa" },
-  { id: "sp6", number: 6, name: "Pablo Torres", avatar: "PT", position: "Defensa" },
-  { id: "sp7", number: 7, name: "Sergio López", avatar: "SL", position: "Mediocampista" },
-  { id: "sp8", number: 8, name: "Rubén Díaz", avatar: "RD", position: "Mediocampista" },
-  { id: "sp9", number: 9, name: "Álvaro Núñez", avatar: "AN", position: "Delantero" },
-  { id: "sp10", number: 10, name: "Carlos Pérez", avatar: "CP", position: "Delantero" },
-  { id: "sp11", number: 11, name: "Iván Castro", avatar: "IC", position: "Delantero" },
-  { id: "sp12", number: 12, name: "Mateo Ramos", avatar: "MR", position: "Mediocampista" },
-  { id: "sp13", number: 13, name: "Lucas Mendoza", avatar: "LM", position: "Mediocampista" },
-  { id: "sp14", number: 14, name: "Daniel Alonso", avatar: "DA", position: "Defensa" },
-  { id: "sp15", number: 15, name: "Diego Vázquez", avatar: "DV", position: "Defensa" },
-  { id: "sp16", number: 16, name: "Enrique Ortiz", avatar: "EO", position: "Mediocampista" },
-  { id: "sp17", number: 17, name: "Felipe Romero", avatar: "FR", position: "Delantero" }
-]
-
-export function StatsTab({ players, matchEvents }: { players?: any[], matchEvents?: any[] }) {
+export function StatsTab({ players = [], convocatorias = [], matchEvents }: { players?: any[], convocatorias?: any[], matchEvents?: any[] }) {
   const { rol } = useUserRole()
-  const [checkedState, setCheckedState] = useState<Record<string, boolean>>({
-    // Pre-populate some stats for a premium initial dashboard look
-    "sp10-titular": true, "sp10-gol": true, "sp10-mvp": true,
-    "sp4-titular": true, "sp4-gol": true,
-    "sp8-titular": true, "sp8-gol": true,
-    "sp2-titular": true, "sp2-asistencia": true, "sp2-amarilla": true,
-    "sp7-titular": true, "sp7-asistencia": true,
-    "sp9-titular": true, "sp9-asistencia": true
-  })
-  const [alertVisible, setAlertVisible] = useState(false)
+  const { teamId } = useParams()
+  
+  const mappedPlayers = players.map(p => {
+    const conv = convocatorias.find(c => c.player_id === p.id);
+    return {
+      id: p.id,
+      number: p.dorsal || '-',
+      name: `${p.first_name} ${p.last_name}`,
+      avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
+      position: p.posicion_principal || "Jugador",
+      status: (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado') ? conv.estado_asistencia : 'Presente',
+      coachRating: conv?.coach_rating || 0,
+      actitud: conv?.actitud || 0,
+      goals: conv?.goals || 0,
+      assists: conv?.assists || 0,
+      yellowCards: conv?.yellow_cards || 0,
+      redCards: conv?.red_cards || 0,
+      minutes: conv?.minutes_played || 0,
+      titular: conv?.titular || false
+    };
+  });
 
   const isFamilyView = rol === "familia" || rol === "jugador"
-
-  const handleCheckboxChange = (playerId: string, actionType: string) => {
-    if (isFamilyView) return
-    const key = `${playerId}-${actionType}`
-    setCheckedState(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }))
-  }
-
-  const handleValidate = () => {
-    if (isFamilyView) return
-    setAlertVisible(true)
-    setTimeout(() => setAlertVisible(false), 3000)
-  }
-
-  const handleCancel = () => {
-    if (isFamilyView) return
-    setCheckedState({})
-  }
-
-  const actions = [
-    { id: "asist", label: "Asistido" },
-    { id: "titular", label: "Titular" },
-    { id: "gol", label: "Gol" },
-    { id: "asistencia", label: "Pase Gol" },
-    { id: "amarilla", label: "Amarilla" },
-    { id: "roja", label: "Roja" },
-    { id: "mvp", label: "MVP" }
-  ]
-
-  // Mock global team statistics comparison
   const TEAM_STATS = [
     { label: "Posesión", local: 58, away: 42, unit: "%" },
     { label: "Tiros (A puerta)", local: 14, away: 6, unit: "" },
@@ -89,8 +42,6 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
   if (isFamilyView) {
     return (
       <div className="space-y-8">
-        
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Estadísticas del Partido</h3>
@@ -101,10 +52,7 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
           </span>
         </div>
 
-        {/* Global stats block */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* COMPARISON BARS PANEL */}
           <div className="bg-slate-50/40 rounded-xl border border-slate-150 p-5 space-y-5">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
               <BarChart3 className="w-4 h-4 text-blue-600" />
@@ -122,7 +70,6 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
                       <span className="text-[10px] text-slate-450 uppercase tracking-wide font-semibold">{stat.label}</span>
                       <span>{stat.away}{stat.unit}</span>
                     </div>
-                    {/* Double progress bar container */}
                     <div className="h-2 rounded-full overflow-hidden flex bg-slate-200">
                       <div 
                         className="h-full bg-blue-600 rounded-l-full transition-all duration-500" 
@@ -139,7 +86,6 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
             </div>
           </div>
 
-          {/* INDIVIDUAL PERFORMANCE HIGHLIGHTS */}
           <div className="bg-slate-50/40 rounded-xl border border-slate-150 p-5 space-y-4">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Award className="w-4 h-4 text-amber-500" />
@@ -147,7 +93,6 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
             </h4>
 
             <div className="space-y-2.5">
-              {/* MVP card */}
               <div className="flex items-center justify-between p-3 bg-amber-50/70 border border-amber-100 rounded-xl">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-[11px] font-black text-amber-700">
@@ -164,7 +109,6 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
                 </div>
               </div>
 
-              {/* Other goal scorers / cards */}
               {[
                 { name: "Andrés Gil", initials: "AG", desc: "Gol anotado en min 65'", badge: "⚽ Gol" },
                 { name: "Rubén Díaz", initials: "RD", desc: "Gol anotado en min 81'", badge: "⚽ Gol" },
@@ -187,10 +131,8 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
               ))}
             </div>
           </div>
-
         </div>
 
-        {/* Read-only Squad stats table */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold text-slate-550 uppercase tracking-wider">Estadísticas Individuales de la Plantilla</h4>
           <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
@@ -199,41 +141,60 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
                 <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-3 px-3 text-center w-12">#</th>
                   <th className="py-3 px-4">Jugador</th>
+                  <th className="py-3 px-3 text-center">Asistencia</th>
+                  <th className="py-3 px-3 text-center">Nota (1-10)</th>
+                  <th className="py-3 px-3 text-center">Actitud (1-10)</th>
+                  <th className="py-3 px-3 text-center">Minutos</th>
                   <th className="py-3 px-3 text-center">Goles</th>
                   <th className="py-3 px-3 text-center">Asistencias</th>
-                  <th className="py-3 px-3 text-center">Tarjetas</th>
-                  <th className="py-3 px-3 text-center">Titular</th>
-                  <th className="py-3 px-3 text-center">Asistido</th>
+                  <th className="py-3 px-3 text-center">Amarillas</th>
+                  <th className="py-3 px-3 text-center">Rojas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {MOCK_STATS_PLAYERS.slice(0, 11).map((player: StatRow, idx: number) => {
-                  const firstName = player.name.split(" ")[0]
-                  const isMVP = firstName === "Carlos"
-                  const hasGoal = firstName === "Carlos" || firstName === "Andrés" || firstName === "Rubén"
-                  const hasAssist = firstName === "Carlos" || firstName === "Jorge"
-                  const hasYellow = firstName === "Jorge"
-                  const initials = player.avatar
-
+                {mappedPlayers.map((player: any, idx: number) => {
                   return (
                     <tr key={player.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
-                      <td className="py-2.5 px-4 font-bold text-slate-800 flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
-                          {initials}
-                        </div>
-                        {player.name}
-                        {isMVP && <span className="bg-amber-100 text-amber-800 text-[8px] font-extrabold px-1 py-0.2 rounded border border-amber-200 ml-1">★ MVP</span>}
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-400">{player.number}</td>
+                      <td className="py-2.5 px-4 font-bold text-slate-800">
+                        <Link 
+                          href={`/dashboard/equipos/${teamId}/jugador/${player.id}?view=partidos&tab=stats`}
+                          className="flex items-center gap-2 hover:bg-slate-50/80 p-1 -m-1 rounded-lg transition-colors group cursor-pointer"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
+                            {player.avatar}
+                          </div>
+                          <span className="group-hover:text-blue-600 transition-colors">{player.name}</span>
+                        </Link>
                       </td>
-                      <td className="py-2.5 px-3 text-center font-black text-emerald-600">{hasGoal ? (isMVP ? "2" : "1") : "—"}</td>
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-700">{hasAssist ? "1" : "—"}</td>
                       <td className="py-2.5 px-3 text-center">
-                        {hasYellow ? (
-                          <span className="w-2 h-3 bg-amber-400 rounded-sm inline-block shadow-xs" title="Amarilla" />
-                        ) : "—"}
+                        <div className="flex items-center justify-center">
+                          {player.status === 'Presente' ? (
+                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-700 rounded-md">Asiste</span>
+                          ) : player.status === 'Ausente' ? (
+                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-red-100 text-red-700 rounded-md">No Asiste</span>
+                          ) : player.status === 'Justificado' ? (
+                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md">Justificado</span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-500 rounded-md">-</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 text-center text-emerald-600 font-bold">✓ Sí</td>
-                      <td className="py-2.5 px-3 text-center text-slate-400">✓ Sí</td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-blue-50 text-blue-700 rounded-md">
+                          {player.coachRating.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-purple-50 text-purple-700 rounded-md">
+                          {player.actitud.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-700">{player.minutes > 0 ? `${player.minutes}'` : "0"}</td>
+                      <td className="py-2.5 px-3 text-center font-black text-emerald-600">{player.goals || "0"}</td>
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-700">{player.assists || "0"}</td>
+                      <td className="py-2.5 px-3 text-center font-bold text-amber-500">{player.yellowCards || "0"}</td>
+                      <td className="py-2.5 px-3 text-center font-bold text-red-500">{player.redCards || "0"}</td>
                     </tr>
                   )
                 })}
@@ -254,15 +215,9 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
           <p className="text-[10px] text-slate-400 font-bold mt-0.5">REGISTRO MASIVO DE ACCIONES</p>
         </div>
         <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-          17 Jugadores
+          {mappedPlayers.length} Jugadores
         </span>
       </div>
-
-      {alertVisible && (
-        <div className="bg-blue-50 border border-blue-100 text-blue-700 text-xs font-bold px-4 py-3 rounded-xl animate-in fade-in duration-200">
-          ✨ ¡Estadísticas registradas de forma simulada!
-        </div>
-      )}
 
       <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
         <div className="overflow-x-auto">
@@ -271,76 +226,83 @@ export function StatsTab({ players, matchEvents }: { players?: any[], matchEvent
               <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 <th className="py-3.5 px-3 text-center w-12">#</th>
                 <th className="py-3.5 px-4 min-w-[180px]">Jugador</th>
-                {actions.map(action => (
-                  <th key={action.id} className="py-3.5 px-3 text-center min-w-[80px]">
-                    {action.label}
-                  </th>
-                ))}
+                <th className="py-3.5 px-3 text-center">Asistencia</th>
+                <th className="py-3.5 px-3 text-center">Nota (1-10)</th>
+                <th className="py-3.5 px-3 text-center">Actitud (1-10)</th>
+                <th className="py-3.5 px-3 text-center">Minutos</th>
+                <th className="py-3.5 px-3 text-center">Goles</th>
+                <th className="py-3.5 px-3 text-center">Asistencias</th>
+                <th className="py-3.5 px-3 text-center">Amarillas</th>
+                <th className="py-3.5 px-3 text-center">Rojas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {MOCK_STATS_PLAYERS.map((player: StatRow, idx: number) => {
-                const initials = player.avatar
-                return (
-                  <tr key={player.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3 px-3 text-center text-xs font-bold text-slate-400">
-                      {idx + 1}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
-                          {initials}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">
-                            {player.name}
-                          </p>
-                          <p className="text-[9px] text-slate-400 font-semibold">
-                            {player.position}
-                          </p>
-                        </div>
+              {mappedPlayers.map((player: any) => (
+                <tr key={player.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="py-3 px-3 text-center text-xs font-bold text-slate-400">
+                    {player.number}
+                  </td>
+                  <td className="py-3 px-4">
+                    <Link 
+                      href={`/dashboard/equipos/${teamId}/jugador/${player.id}?view=partidos&tab=stats`}
+                      className="flex items-center gap-3 hover:bg-slate-50/80 p-1 -m-1 rounded-lg transition-colors group cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
+                        {player.avatar}
                       </div>
-                    </td>
-                    {actions.map(action => {
-                      const isChecked = !!checkedState[`${player.id}-${action.id}`]
-                      return (
-                        <td key={action.id} className="py-3 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleCheckboxChange(player.id, action.id)}
-                            className={[
-                              "w-5 h-5 rounded-md border flex items-center justify-center mx-auto transition-all",
-                              isChecked
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "border-slate-300 hover:border-blue-500 bg-white"
-                            ].join(" ")}
-                          >
-                            {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                          </button>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                          {player.name}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-semibold">
+                          {player.position}
+                        </p>
+                      </div>
+                    </Link>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <div className="flex items-center justify-center">
+                      {player.status === 'Presente' ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-700 rounded-md">Asiste</span>
+                      ) : player.status === 'Ausente' ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-red-100 text-red-700 rounded-md">No Asiste</span>
+                      ) : player.status === 'Justificado' ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md">Justificado</span>
+                      ) : (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-500 rounded-md">-</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-blue-50 text-blue-700 rounded-md">
+                      {player.coachRating.toFixed(1)}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-purple-50 text-purple-700 rounded-md">
+                      {player.actitud.toFixed(1)}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center text-xs font-bold text-slate-600">
+                    {player.minutes > 0 ? `${player.minutes}'` : "0"}
+                  </td>
+                  <td className="py-3 px-3 text-center text-xs font-black text-emerald-600">
+                    {player.goals || "0"}
+                  </td>
+                  <td className="py-3 px-3 text-center text-xs font-bold text-slate-600">
+                    {player.assists || "0"}
+                  </td>
+                  <td className="py-3 px-3 text-center text-xs font-bold text-amber-500">
+                    {player.yellowCards || "0"}
+                  </td>
+                  <td className="py-3 px-3 text-center text-xs font-bold text-red-500">
+                    {player.redCards || "0"}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-        <button
-          onClick={handleCancel}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={handleValidate}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm shadow-blue-200 transition-colors"
-        >
-          Validar estadísticas
-        </button>
       </div>
     </div>
   )

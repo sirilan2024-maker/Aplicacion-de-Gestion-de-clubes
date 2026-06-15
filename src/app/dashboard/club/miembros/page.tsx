@@ -1,9 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Users, Search, Loader2, Mail, Shield, User as UserIcon } from "lucide-react"
+import { Users, Search, Loader2, Mail, Shield, User as UserIcon, Archive } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
+import { archivePlayerAction } from "@/app/actions/player-actions"
+import Link from "next/link"
 
 interface Member {
   id: string
@@ -13,14 +16,17 @@ interface Member {
   role: string
   team_name?: string | null
   team_color?: string | null
+  team_id?: string | null
   type: 'staff' | 'player'
 }
 
 export default function GlobalMembersPage() {
+  const router = useRouter()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
+  const [archivingId, setArchivingId] = useState<string | null>(null)
   
   // Stats
   const [stats, setStats] = useState({ total: 0, staff: 0, players: 0 })
@@ -52,10 +58,11 @@ export default function GlobalMembersPage() {
         const { data: playersData } = await supabase
           .from("players")
           .select(`
-            id, first_name, last_name, email,
-            teams:team_id (name, color)
+            id, first_name, last_name, email, team_id,
+            equipos (name, color)
           `)
           .eq("club_id", profile.club_id)
+          .neq("status", "inactive")
 
         const allMembers: Member[] = []
 
@@ -80,8 +87,9 @@ export default function GlobalMembersPage() {
               last_name: p.last_name || '',
               email: p.email,
               role: 'jugador',
-              team_name: p.teams?.name,
-              team_color: p.teams?.color,
+              team_name: p.equipos?.name,
+              team_color: p.equipos?.color,
+              team_id: p.team_id,
               type: 'player'
             })
           })
@@ -106,6 +114,23 @@ export default function GlobalMembersPage() {
 
     fetchMembers()
   }, [])
+
+  const handleArchive = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm("¿Seguro que quieres archivar a este miembro? Desaparecerá de las listas pero podrás restaurarlo desde el Archivo Histórico.")) return
+    
+    setArchivingId(id)
+    const result = await archivePlayerAction(id, true)
+    
+    if (result.success) {
+      toast.success("Miembro archivado correctamente")
+      setMembers(members.filter(m => m.id !== id))
+      setStats(prev => ({...prev, total: prev.total - 1, players: prev.players - 1}))
+    } else {
+      toast.error(result.error?.message || "Error al archivar")
+    }
+    setArchivingId(null)
+  }
 
   const filteredMembers = members.filter(m => {
     const searchMatch = `${m.first_name} ${m.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -142,10 +167,16 @@ export default function GlobalMembersPage() {
           <p className="text-gray-500 mt-1">Gestión global de todos los miembros y permisos.</p>
         </div>
         
-        <button className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700 transition-colors shadow-sm font-medium">
-          <Mail size={18} />
-          <span>Invitar Staff</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/dashboard/club/miembros/archivo" className="inline-flex items-center justify-center gap-2 rounded-md bg-white border border-gray-200 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm font-medium">
+            <Archive size={18} />
+            <span>Archivo Histórico</span>
+          </Link>
+          <button className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700 transition-colors shadow-sm font-medium">
+            <Mail size={18} />
+            <span>Invitar Staff</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -232,7 +263,15 @@ export default function GlobalMembersPage() {
                 </tr>
               ) : (
                 filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-gray-50/80 transition-colors">
+                  <tr 
+                    key={member.id} 
+                    className={`hover:bg-gray-50/80 transition-colors ${member.type === 'player' && member.team_id ? 'cursor-pointer' : ''}`}
+                    onClick={() => {
+                      if (member.type === 'player' && member.team_id) {
+                        router.push(`/dashboard/equipos/${member.team_id}/jugador/${member.id}`)
+                      }
+                    }}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-900">{member.first_name} {member.last_name}</span>
@@ -255,9 +294,21 @@ export default function GlobalMembersPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-blue-600 hover:text-blue-800 font-medium text-sm px-3 py-1 rounded-md hover:bg-blue-50 transition-colors">
-                        Gestionar
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button className="text-blue-600 hover:text-blue-800 font-medium text-sm px-3 py-1 rounded-md hover:bg-blue-50 transition-colors">
+                          Gestionar
+                        </button>
+                        {member.type === 'player' && (
+                          <button 
+                            onClick={(e) => handleArchive(e, member.id)}
+                            disabled={archivingId === member.id}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="Archivar miembro"
+                          >
+                            {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

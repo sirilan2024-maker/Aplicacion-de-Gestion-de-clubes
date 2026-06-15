@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Sparkles, Save, CheckCircle2, AlertCircle } from "lucide-react"
+import { Sparkles, Save, CheckCircle2, AlertCircle, Users, Star, BarChart2, FileText } from "lucide-react"
 import { saveMatchReport } from "@/app/actions/match-actions"
 import { Button } from "@/components/ui/button"
+import { MatchFullReportModal } from "./MatchFullReportModal"
 
-export function PostMatchTab({ matchId, initialData }: { matchId: string, initialData?: any }) {
+export function PostMatchTab({ matchId, initialData, players = [], convocatorias = [] }: { matchId: string, initialData?: any, players?: any[], convocatorias?: any[] }) {
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
+  const [showFullReportModal, setShowFullReportModal] = useState(false)
 
   const [rating, setRating] = useState<string>(initialData?.coach_rating?.toString() || "7")
   const [summary, setSummary] = useState(initialData?.coach_summary || "")
@@ -32,19 +34,39 @@ export function PostMatchTab({ matchId, initialData }: { matchId: string, initia
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
+      {showFullReportModal && (
+        <MatchFullReportModal
+          matchId={matchId}
+          matchDate={initialData?.fecha_hora || ""}
+          teamId={initialData?.equipo_id || ""}
+          players={players}
+          convocatorias={convocatorias}
+          onClose={() => setShowFullReportModal(false)}
+        />
+      )}
+
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Informe Técnico del Partido</h2>
           <p className="text-sm font-medium text-slate-500 mt-1">Análisis táctico, rendimiento y evaluación post-partido.</p>
         </div>
-        <Button 
-          variant="outline" 
-          className="gap-2 text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 font-bold"
-          onClick={() => alert('Analizando informe con IA...')}
-        >
-          <Sparkles className="w-4 h-4" />
-          Analizar con IA
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowFullReportModal(true)}
+            className="w-full mt-4 px-4 py-4 border-2 border-slate-200 text-slate-700 bg-white hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 group shadow-sm hover:shadow"
+          >
+            <FileText className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+            Rellenar Informe Completo del Partido
+          </button>
+          <Button 
+            variant="outline" 
+            className="gap-2 text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 font-bold"
+            onClick={() => alert('Analizando informe con IA...')}
+          >
+            <Sparkles className="w-4 h-4" />
+            Análisis IA
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -52,7 +74,7 @@ export function PostMatchTab({ matchId, initialData }: { matchId: string, initia
         <div className="md:col-span-1 space-y-6">
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
             <label className="block text-xs font-black uppercase text-slate-500 tracking-wider mb-3">
-              Calificación (1-10)
+              Nota del Partido (1-10)
             </label>
             <select 
               value={rating}
@@ -129,6 +151,7 @@ export function PostMatchTab({ matchId, initialData }: { matchId: string, initia
           </div>
         </div>
       </div>
+
     </div>
   )
 }

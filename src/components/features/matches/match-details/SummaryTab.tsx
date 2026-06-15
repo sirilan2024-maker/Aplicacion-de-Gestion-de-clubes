@@ -256,27 +256,33 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                 </div>
 
                 {/* Renderizado de jugadores con notas en badges naranjas */}
-                {FORMATIONS["4-3-3"].map(player => (
-                  <div
-                    key={player.id}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none"
-                    style={{ left: `${player.x}%`, top: `${player.y}%` }}
-                  >
-                    {/* Node circle */}
-                    <div className="relative w-8 h-8 rounded-full bg-slate-900 border border-white flex items-center justify-center text-[9px] font-black text-white shadow-md">
-                      {player.label}
-                      
-                      {/* Orange Rating Badge */}
-                      <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[7px] font-extrabold px-1 rounded-full border border-white shadow-sm">
-                        7.5
-                      </span>
+                {FORMATIONS["4-3-3"].map((slot, idx) => {
+                  const titularPlayers = playerList.filter(p => p.titular);
+                  const player = titularPlayers[idx];
+                  if (!player) return null;
+                  
+                  return (
+                    <div
+                      key={slot.id}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none"
+                      style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                    >
+                      {/* Node circle */}
+                      <div className="relative w-8 h-8 rounded-full bg-slate-900 border border-white flex items-center justify-center text-[10px] font-black text-white shadow-md">
+                        {player.avatar}
+                        
+                        {/* Orange Rating Badge */}
+                        <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[7px] font-extrabold px-1 rounded-full border border-white shadow-sm">
+                          {player.coachRating > 0 ? player.coachRating : "-"}
+                        </span>
+                      </div>
+                      {/* Name */}
+                      <div className="mt-1 bg-black/60 px-1.5 py-0.5 rounded text-[7px] font-bold text-white whitespace-nowrap backdrop-blur-sm border border-white/10">
+                        {player.name.split(" ")[0]}
+                      </div>
                     </div>
-                    {/* Name */}
-                    <div className="mt-1 bg-black/60 px-1.5 py-0.5 rounded text-[7px] font-bold text-white whitespace-nowrap backdrop-blur-sm border border-white/10">
-                      {player.label}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Lista estática de titulares */}

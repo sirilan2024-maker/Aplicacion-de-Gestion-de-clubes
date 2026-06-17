@@ -1,47 +1,65 @@
-// src/hooks/useLiveTimer.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { updateLiveTimer } from "@/lib/match-actions";
+import { toggleMatchTimer } from "@/app/actions/live-match-actions";
 
-/**
- * Hook that encapsulates the live‑timer logic used in the match‑details view.
- * It mirrors the behaviour of `LiveTimer` component but exposes the state
- * and control functions so it can be reused elsewhere (e.g. a custom hook
- * inside a Server Component or for unit‑testing).
- *
- * Design goals:
- *  - Keep the UI‑free logic separate from presentation.
- *  - Auto‑sync with Supabase every 5 s while the timer is running.
- *  - Provide a clean API: `seconds`, `running`, `start`, `pause`, `reset`.
- */
-export function useLiveTimer(matchId: string, initialSeconds = 0) {
-  const [seconds, setSeconds] = useState(initialSeconds);
-  const [running, setRunning] = useState(false);
+export function useLiveTimer(
+  matchId: string, 
+  initialElapsedSeconds = 0, 
+  initialStartedAt: string | null = null
+) {
+  const [seconds, setSeconds] = useState(initialElapsedSeconds);
+  const [running, setRunning] = useState(!!initialStartedAt);
+  const [startedAt, setStartedAt] = useState<string | null>(initialStartedAt);
+  const [baseElapsed, setBaseElapsed] = useState(initialElapsedSeconds);
 
-  // Increment each second when the timer is active.
+  // Sync internal state if props change from Supabase realtime
   useEffect(() => {
-    if (!running) return undefined;
-    const id = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [running]);
+    setStartedAt(initialStartedAt);
+    setBaseElapsed(initialElapsedSeconds);
+    setRunning(!!initialStartedAt);
+  }, [initialElapsedSeconds, initialStartedAt]);
 
-  // Server sync – debounced every 5 s.
-  const sync = useCallback(async () => {
-    await updateLiveTimer(matchId, seconds, running);
-  }, [matchId, seconds, running]);
-
+  // Calculate current elapsed time every second if running
   useEffect(() => {
-    if (!running) return undefined;
-    const id = setInterval(sync, 5_000);
-    return () => clearInterval(id);
-  }, [running, sync]);
+    if (!running || !startedAt) {
+      setSeconds(baseElapsed);
+      return;
+    }
 
-  const start = () => setRunning(true);
-  const pause = () => setRunning(false);
-  const reset = (to = 0) => {
-    setSeconds(to);
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const start = new Date(startedAt).getTime();
+      const diffSeconds = Math.floor((now - start) / 1000);
+      setSeconds(baseElapsed + diffSeconds);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [running, startedAt, baseElapsed]);
+
+  const start = async () => {
+    const nowStr = new Date().toISOString();
+    setStartedAt(nowStr);
+    setRunning(true);
+    // Optimistic UI updates, server action will persist
+    await toggleMatchTimer(matchId, true, baseElapsed);
+  };
+
+  const pause = async () => {
+    const currentSeconds = seconds;
     setRunning(false);
+    setStartedAt(null);
+    setBaseElapsed(currentSeconds);
+    setSeconds(currentSeconds);
+    await toggleMatchTimer(matchId, false, currentSeconds);
+  };
+
+  const reset = async (to = 0) => {
+    setSeconds(to);
+    setBaseElapsed(to);
+    setRunning(false);
+    setStartedAt(null);
+    await toggleMatchTimer(matchId, false, to);
   };
 
   return { seconds, running, start, pause, reset };

@@ -147,18 +147,18 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
             {playerList.map((player) => (
               <li 
                 key={player.id} 
-                className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-3 sm:gap-0 ${
                   player.status === 'Convocado' 
                     ? 'border-emerald-200 bg-emerald-50/30' 
                     : 'border-slate-100 bg-white hover:bg-slate-50'
                 }`}
               >
-                <div className="min-w-0 pr-4">
-                  <span className="font-bold text-slate-800 text-sm block truncate uppercase">{player.name}</span>
+                <div className="min-w-0 w-full sm:w-auto pr-0 sm:pr-4">
+                  <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
                   <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
                 </div>
                 
-                <div className="flex gap-1.5 shrink-0">
+                <div className="flex flex-wrap gap-1.5 shrink-0">
                   <button
                     onClick={() => handleStatusChange(player.id, 'Convocado')}
                     className={getStatusClasses(player.status, 'Convocado')}

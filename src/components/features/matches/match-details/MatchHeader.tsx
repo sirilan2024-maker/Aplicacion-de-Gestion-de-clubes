@@ -75,11 +75,11 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
       {/* ── Marcador Central (Scoreboard) ── */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-150 overflow-hidden">
         {/* Cabecera Azul */}
-        <div className="bg-blue-600 text-white px-6 py-4 flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-2 text-xs font-bold tracking-wide">
-          <span className="uppercase">{match?.competicion_nombre || 'Competición FFCV'}</span>
-          <div className="flex flex-wrap items-center gap-4 opacity-90 text-[11px] sm:text-xs">
-            <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-            <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {matchLocation}</span>
+        <div className="bg-blue-600 text-white px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-3 sm:gap-2 text-xs font-bold tracking-wide">
+          <span className="uppercase block w-full sm:w-auto truncate">{match?.competicion_nombre || 'Competición FFCV'}</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 opacity-90 text-[11px] sm:text-xs w-full sm:w-auto">
+            <span className="flex items-center gap-1.5 break-words whitespace-normal"><Calendar className="w-4 h-4 shrink-0" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+            <span className="flex items-center gap-1.5 break-words whitespace-normal"><MapPin className="w-4 h-4 shrink-0" /> <span className="truncate">{matchLocation}</span></span>
           </div>
         </div>
 

@@ -35,6 +35,7 @@ export default function CalendarioEquipoPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   // Form states
   const [title, setTitle] = useState("");
@@ -109,6 +110,7 @@ export default function CalendarioEquipoPage() {
 
   const handleDayClick = (day: Date) => {
     setSelectedDate(day);
+    setEditingEventId(null);
     setShowModal(true);
     // Pre-fill
     setTitle("");
@@ -116,16 +118,29 @@ export default function CalendarioEquipoPage() {
     setStartTime("18:00");
     setEndTime("19:30");
     setLocation("Campo Principal");
+    setNotes("");
   };
 
-  const handleCreateEvent = async (e: React.FormEvent) => {
+  const handleOpenEditModal = (event: TeamEvent) => {
+    setSelectedDate(parseISO(event.date));
+    setEditingEventId(event.id);
+    setTitle(event.title);
+    setEventType(event.event_type);
+    setStartTime(event.start_time.substring(0, 5));
+    setEndTime(event.end_time ? event.end_time.substring(0, 5) : "19:30");
+    setLocation(event.location || "");
+    setNotes(event.notes || "");
+    setShowModal(true);
+  };
+
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDate || !title) return;
     
     setSubmitting(true);
     const supabase = createClient();
     
-    const newEvent = {
+    const eventData = {
       team_id: teamId,
       title,
       event_type: eventType,
@@ -136,14 +151,21 @@ export default function CalendarioEquipoPage() {
       notes: notes || null
     };
 
-    const { error } = await supabase.from('team_events').insert(newEvent);
+    let error;
+    if (editingEventId) {
+      const { error: updateError } = await supabase.from('team_events').update(eventData).eq('id', editingEventId);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase.from('team_events').insert(eventData);
+      error = insertError;
+    }
     
     setSubmitting(false);
     
     if (error) {
-      toast.error("Error al crear el evento: " + error.message);
+      toast.error("Error al guardar el evento: " + error.message);
     } else {
-      toast.success("Evento creado exitosamente");
+      toast.success(editingEventId ? "Evento actualizado" : "Evento creado exitosamente");
       setShowModal(false);
       fetchEvents();
     }
@@ -214,23 +236,26 @@ export default function CalendarioEquipoPage() {
                   )}
                 </div>
                 
-                <div className="space-y-1">
+                <div className="space-y-1 mt-1">
                   {dayEvents.slice(0, 3).map(event => (
                     <div 
                       key={event.id}
-                      onClick={(e) => { e.stopPropagation(); /* TODO: Open event details */ }}
-                      className={`px-2 py-1.5 rounded-md text-xs font-medium truncate shadow-sm border ${
+                      onClick={(e) => { e.stopPropagation(); handleOpenEditModal(event); }}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] sm:text-xs font-bold truncate shadow-sm border cursor-pointer hover:opacity-90 transition-opacity ${
                         event.event_type === 'Entrenamiento' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                         event.event_type === 'Partido' ? 'bg-blue-50 text-blue-700 border-blue-100' :
                         'bg-amber-50 text-amber-700 border-amber-100'
                       }`}
                     >
-                      <span className="font-bold mr-1">{event.start_time.substring(0,5)}</span>
-                      {event.title}
+                      <span className="shrink-0 flex items-center justify-center">
+                        {event.event_type === "Partido" ? "⚽" : event.event_type === "Entrenamiento" ? "🏃" : "📅"}
+                      </span>
+                      <span className="truncate hidden md:inline">{event.start_time.substring(0,5)} • {event.title}</span>
+                      <span className="truncate md:hidden">{event.title}</span>
                     </div>
                   ))}
                   {dayEvents.length > 3 && (
-                    <div className="text-xs text-gray-500 font-medium px-2 py-1">
+                    <div className="text-[11px] text-gray-500 font-bold px-1 pt-1">
                       +{dayEvents.length - 3} más
                     </div>
                   )}
@@ -297,6 +322,12 @@ export default function CalendarioEquipoPage() {
                 {/* ACTION BUTTONS */}
                 <div className="w-full sm:w-auto pt-4 sm:pt-0 border-t sm:border-0 border-gray-100 flex gap-2">
                   <button 
+                    onClick={() => handleOpenEditModal(event)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                  >
+                    Editar
+                  </button>
+                  <button 
                     onClick={() => router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${event.id}&date=${event.date}`)}
                     className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
                   >
@@ -317,21 +348,21 @@ export default function CalendarioEquipoPage() {
         )}
       </div>
 
-      {/* CREATE EVENT MODAL */}
+      {/* CREATE / EDIT EVENT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
                 <CalendarIcon className="text-blue-600" size={20} />
-                Nuevo Evento - {selectedDate && format(selectedDate, "d MMMM", { locale: es })}
+                {editingEventId ? "Editar Evento" : "Nuevo Evento"} - {selectedDate && format(selectedDate, "d MMMM", { locale: es })}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-700 hover:bg-gray-200 p-1 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleCreateEvent} className="p-6 space-y-4">
+            <form onSubmit={handleSaveEvent} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Título del Evento</label>
                 <input 

@@ -96,7 +96,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
 
   const isVisible = (item: any) => {
     const isAdmin = userRole === "admin" || userRole === "metodologo";
-    const isRestrictedClubItem = ["Directorio", "Tesorería", "Secretaría", "Entrenamientos"].includes(item.name);
+    const isRestrictedClubItem = ["Directorio", "Tesorería", "Secretaría"].includes(item.name);
     if (isRestrictedClubItem) return isAdmin;
     return true;
   }
@@ -116,6 +116,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Asistencia",   href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: ClipboardCheck },
           { name: "Rendimiento",  href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
           { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
+          { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
           { name: "Mensajes",     href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
         ],
       },
@@ -144,7 +145,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Directorio", href: "/dashboard/club/miembros", icon: Users },
           { name: "Estadísticas", href: "/dashboard/club/estadisticas", icon: BarChart3 },
           { name: "Equipos", href: "/dashboard/equipos", icon: Target },
-          { name: "Entrenamientos", href: "/dashboard/entrenamientos", icon: Target },
+          { name: "Banco de Tareas", href: "/dashboard/entrenamientos", icon: Target },
           { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
           { name: "Secretaría", href: "/dashboard/secretaria", icon: Settings },
           { name: "Configuración", href: "/admin/configuracion", icon: Settings },

@@ -98,7 +98,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
 
           {/* TAB: EN DIRECTO */}
           {activeTab === "live" && (
-            <LiveTab matchId={matchId} players={activePlayers} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
+            <LiveTab matchId={matchId} match={match} players={activePlayers} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
           )}
 
           {/* TAB: CONVOCATORIA */}

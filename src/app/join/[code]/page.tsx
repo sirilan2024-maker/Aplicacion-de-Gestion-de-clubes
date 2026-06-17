@@ -35,7 +35,7 @@ export default function JoinTeamPage() {
       const supabase = createClient();
       const { data, error: fetchError } = await supabase
         .from("equipos")
-        .select("id, name, sport, category")
+        .select("id, name, sport, category, club_id")
         .eq("invite_code", inviteCode)
         .single();
         
@@ -68,9 +68,7 @@ export default function JoinTeamPage() {
     try {
       const supabase = createClient();
       
-      // Get club_id for the NOT NULL constraint
-      const { data: clubData } = await supabase.from("clubs").select("id").limit(1).single();
-      const club_id = clubData?.id ?? null;
+      const club_id = team.club_id;
 
       const verificationToken = crypto.randomUUID();
 

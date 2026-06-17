@@ -77,8 +77,8 @@ export default function TeamLayout({
           </div>
         </div>
 
-        {/* TABS NAVIGATION */}
-        <div className="px-6 flex gap-6 overflow-x-auto">
+        {/* TABS NAVIGATION (Desktop) */}
+        <div className="hidden sm:flex px-6 gap-6">
           {tabs.map((tab) => {
             const isActive = pathname.includes(tab.href);
             const Icon = tab.icon;
@@ -97,6 +97,27 @@ export default function TeamLayout({
               </Link>
             );
           })}
+        </div>
+
+        {/* TABS NAVIGATION (Mobile Dropdown) */}
+        <div className="sm:hidden px-4 pb-4 pt-2">
+          <select 
+            value={tabs.find(tab => pathname.includes(tab.href))?.href || ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                router.push(e.target.value);
+              }
+            }}
+            className="w-full bg-slate-50 border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25rem' }}
+          >
+            <option value="" disabled>Seleccionar vista...</option>
+            {tabs.map(tab => (
+              <option key={tab.name} value={tab.href}>
+                {tab.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

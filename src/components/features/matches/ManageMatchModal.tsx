@@ -106,7 +106,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
             <Input name="rival" defaultValue={match.rival_nombre} className="font-semibold text-slate-800 bg-white border-slate-200" required />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nuestro Equipo</label>
               {teams && teams.length > 0 ? (
@@ -128,9 +128,9 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fecha y Hora</label>
-              <div className="flex gap-2">
-                <Input type="date" name="date" defaultValue={new Date(match.fecha_hora).toISOString().split('T')[0]} required className="font-semibold text-slate-800 bg-white border-slate-200" />
-                <Input type="time" name="time" defaultValue={new Date(match.fecha_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} required className="font-semibold text-slate-800 bg-white border-slate-200 px-2" />
+              <div className="flex flex-row gap-2">
+                <Input type="date" name="date" defaultValue={new Date(match.fecha_hora).toISOString().split('T')[0]} required className="font-semibold text-slate-800 bg-white border-slate-200 w-[60%]" />
+                <Input type="time" name="time" defaultValue={new Date(match.fecha_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} required className="font-semibold text-slate-800 bg-white border-slate-200 px-2 w-[40%]" />
               </div>
             </div>
           </div>

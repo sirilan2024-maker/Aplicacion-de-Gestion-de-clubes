@@ -36,8 +36,30 @@ interface MatchTabsProps {
 export function MatchTabs({ activeTab, onChangeTab, matchId }: MatchTabsProps) {
   return (
     <>
-      <div className="sticky top-0 bg-white z-20 shadow-sm border-b border-slate-150 -mx-4 md:-mx-8 px-4 md:px-8">
-        <div className="flex overflow-x-auto no-scrollbar max-w-6xl mx-auto">
+      <div className="sticky top-0 bg-white z-20 shadow-sm border-b border-slate-150 -mx-4 md:-mx-8 px-4 md:px-8 mb-4 md:mb-0">
+        
+        {/* Mobile Dropdown */}
+        <div className="md:hidden py-3">
+          <select
+            value={activeTab}
+            onChange={(e) => onChangeTab(e.target.value as TabType)}
+            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold rounded-xl px-4 py-3 outline-none appearance-none shadow-sm focus:ring-2 focus:ring-blue-500"
+          >
+            {TAB_OPTIONS.map((tab) => (
+              <option key={tab.id} value={tab.id}>
+                {tab.label} {tab.hasPulse ? "🔴 (En Directo)" : ""}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center px-2 text-slate-500">
+            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Desktop Tabs */}
+        <div className="hidden md:flex overflow-x-auto no-scrollbar max-w-6xl mx-auto">
           <div className="flex whitespace-nowrap min-w-full">
             {TAB_OPTIONS.map((tab) => (
               <button

@@ -7,9 +7,10 @@ interface CalendarListViewProps {
   events: CalendarEvent[]
   selectedTeams: string[]
   selectedTypes: string[]
+  onEventClick?: (ev: CalendarEvent) => void
 }
 
-export function CalendarListView({ events, selectedTeams, selectedTypes }: CalendarListViewProps) {
+export function CalendarListView({ events, selectedTeams, selectedTypes, onEventClick }: CalendarListViewProps) {
   const filtered = events.filter((ev) => {
     const teamOk = selectedTeams.length === 0 || selectedTeams.includes(ev.teamId)
     const typeOk = selectedTypes.length === 0 || selectedTypes.includes(ev.type)
@@ -78,6 +79,7 @@ export function CalendarListView({ events, selectedTeams, selectedTypes }: Calen
                 .map((ev) => (
                   <tr
                     key={ev.id}
+                    onClick={() => onEventClick && onEventClick(ev)}
                     className="border-t border-gray-50 hover:bg-blue-50/30 transition-colors group cursor-pointer"
                   >
                     {/* Checkbox */}

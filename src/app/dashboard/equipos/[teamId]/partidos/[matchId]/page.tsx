@@ -38,7 +38,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .eq("partido_id", matchId)
 
   const { data: eventsData } = await supabase
-    .from("match_live_events")
+    .from("match_events")
     .select("*, player:players(id, first_name, last_name, dorsal)")
     .eq("partido_id", matchId)
     .order("minuto", { ascending: true })

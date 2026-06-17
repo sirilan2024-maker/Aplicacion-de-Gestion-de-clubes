@@ -1,6 +1,6 @@
 // ─── Mock Data: Eventos & Calendario ───────────────────────────────────────
 
-export type EventType = "Entrenamiento" | "Partido"
+export type EventType = "Entrenamiento" | "Partido" | "Reunión" | "Otro"
 
 export interface CalendarEvent {
   id: string

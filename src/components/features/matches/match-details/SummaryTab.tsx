@@ -242,9 +242,9 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               {/* Campo de Fútbol Verde */}
-              <div className="relative aspect-[3/4] w-full max-w-[260px] mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md">
+              <div className="relative aspect-[3/4] md:aspect-auto md:w-full md:h-[260px] max-w-[260px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all">
                 {/* Marcaje de campo */}
-                <div className="absolute inset-3 border border-white/20 pointer-events-none">
+                <div className="absolute inset-3 border border-white/20 pointer-events-none md:-rotate-90 md:origin-center md:scale-[1.3] md:w-[150%] md:-left-[25%]">
                   {/* Línea media */}
                   <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
                   {/* Círculo central */}
@@ -264,8 +264,24 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                   return (
                     <div
                       key={slot.id}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none"
-                      style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none md:origin-center transition-all"
+                      style={{ 
+                        left: `calc(100% * var(--x))`, 
+                        top: `calc(100% * var(--y))`,
+                        // En desktop (md), rotamos las posiciones matemáticamente o rotamos visualmente
+                      }}
+                      ref={(el) => {
+                         if(el) {
+                           // Responsivo: x/y vertical -> y/x horizontal inverso
+                           if (window.innerWidth >= 768) {
+                             el.style.left = `${slot.y}%`;
+                             el.style.top = `${100 - slot.x}%`;
+                           } else {
+                             el.style.left = `${slot.x}%`;
+                             el.style.top = `${slot.y}%`;
+                           }
+                         }
+                      }}
                     >
                       {/* Node circle */}
                       <div className="relative w-8 h-8 rounded-full bg-slate-900 border border-white flex items-center justify-center text-[10px] font-black text-white shadow-md">
@@ -411,9 +427,10 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                   <div className="absolute bottom-0 left-1/4 right-1/4 h-10 border-t border-x border-white/20" />
                 </div>
 
-                {/* Renderizado de jugadores con notas en badges naranjas */}
+                {/* Renderizado de jugadores */}
                 {playerList.slice(0, 11).map((player, idx) => {
                   const node = FORMATIONS[tactic] ? FORMATIONS[tactic][idx] : FORMATIONS["4-3-3"][idx];
+                  const number = player.number || (idx + 1);
                   return (
                   <div
                     key={player.id}
@@ -421,17 +438,12 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                     style={{ left: `${node?.x || 50}%`, top: `${node?.y || 50}%` }}
                   >
                     {/* Node circle */}
-                    <div className="relative w-9 h-9 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-md">
-                      {player.name.substring(0, 2).toUpperCase()}
-                      
-                      {/* Orange Rating Badge */}
-                      <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] font-extrabold px-1 rounded-full border border-white shadow-sm">
-                        {player.coachRating}
-                      </span>
+                    <div className="relative w-9 h-9 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-[11px] font-black text-white shadow-md">
+                      {number}
                     </div>
                     {/* Name */}
-                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/70 px-1.5 py-0.5 rounded shadow-sm">
-                      {player.name}
+                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/70 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                      {player.name.split(" ")[0]}
                     </span>
                   </div>
                   )

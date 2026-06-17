@@ -244,7 +244,9 @@ export default function EntrenamientoDetailPage() {
         </div>
 
         {/* MODULE SELECTOR */}
-        <div className="flex bg-gray-100 p-1 rounded-xl shrink-0 overflow-x-auto">
+        <div className="w-full md:w-auto">
+        {/* TABS (Desktop) */}
+        <div className="hidden sm:flex gap-2 pb-2 border-b border-gray-100">
           <button 
             onClick={() => setActiveModule('rendimiento')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
@@ -273,6 +275,20 @@ export default function EntrenamientoDetailPage() {
             Carga Rápida (RPE)
           </button>
         </div>
+
+        {/* TABS (Mobile Dropdown) */}
+        <div className="sm:hidden mb-2">
+          <select
+             value={activeModule}
+             onChange={(e) => setActiveModule(e.target.value as any)}
+             className="w-full bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25rem' }}
+          >
+             <option value="rendimiento">💪 Rendimiento</option>
+             <option value="formativo">🧠 Formativo</option>
+             <option value="rapida">⚡ Carga Rápida (RPE)</option>
+          </select>
+        </div>   </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">

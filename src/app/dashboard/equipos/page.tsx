@@ -660,18 +660,16 @@ export default function EquiposPage() {
           {filteredTeams.map((team) => (
             <div
               key={team.id}
-              className="w-full flex flex-row items-center justify-between p-4 bg-white rounded-lg shadow-sm border-l-4"
+              onClick={() => router.push(`/dashboard/equipos/${team.id}/plantilla`)}
+              className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-lg shadow-sm border-l-4 cursor-pointer hover:bg-gray-50 transition-colors relative"
               style={{ borderLeftColor: team.color || '#1E40AF' }}
             >
               {/* ── Bloque 1: Logo + Info ── */}
-              <div 
-                className="flex items-center flex-1 min-w-0 cursor-pointer hover:bg-gray-50 p-2 -m-2 rounded transition-colors"
-                onClick={() => router.push(`/dashboard/equipos/${team.id}/plantilla`)}
-              >
+              <div className="flex items-center flex-1 min-w-0 mb-3 sm:mb-0">
                 <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center mr-4 shrink-0 group-hover:bg-blue-50 transition-colors">
                   <User className="w-6 h-6 text-gray-400 group-hover:text-blue-500 transition-colors" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 pr-2">
                   <h2 className="text-black font-bold uppercase text-base leading-tight truncate group-hover:text-blue-700 transition-colors">
                     {team.name}
                   </h2>
@@ -681,67 +679,70 @@ export default function EquiposPage() {
                 </div>
               </div>
 
-              {/* ── Bloque 2: Contadores ── */}
-              <div className="flex flex-col items-end justify-center shrink-0 mx-4">
-                <div className="flex items-center">
-                  {/* Mini avatars */}
-                  <div className="flex -space-x-1 mr-2">
-                    {[...Array(Math.min(team.members || 0, 3))].map((_, i) => (
-                      <div key={i} className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center">
-                        <User className="w-3 h-3 text-gray-400" />
-                      </div>
-                    ))}
-                    {(team.members || 0) === 0 && (
-                      <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white" />
-                    )}
+              {/* Contenedor derecho para escritorio (y fila inferior para móvil) */}
+              <div className="flex items-center justify-between sm:justify-end shrink-0 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100">
+                {/* ── Bloque 2: Contadores ── */}
+                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center w-full sm:w-auto sm:mx-4 px-2 sm:px-0">
+                  <div className="flex items-center">
+                    {/* Mini avatars */}
+                    <div className="flex -space-x-1 mr-2 hidden sm:flex">
+                      {[...Array(Math.min(team.members || 0, 3))].map((_, i) => (
+                        <div key={i} className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center">
+                          <User className="w-3 h-3 text-gray-400" />
+                        </div>
+                      ))}
+                      {(team.members || 0) === 0 && (
+                        <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white hidden sm:block" />
+                      )}
+                    </div>
+                    <span className="text-gray-800 text-sm font-medium">
+                      {team.members ?? 0} <span className="sm:hidden">Jug.</span><span className="hidden sm:inline">miembros</span>
+                    </span>
                   </div>
-                  <span className="text-gray-800 text-sm font-medium">
-                    {team.members ?? 0} miembros
-                  </span>
-                </div>
-                <div className="flex items-center mt-1">
-                  <div className="flex -space-x-1 mr-2">
-                    {[...Array(Math.min(team.coaches || 0, 2))].map((_, i) => (
-                      <div key={i} className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center">
-                        <User className="w-3 h-3 text-blue-400" />
-                      </div>
-                    ))}
-                    {(team.coaches || 0) === 0 && (
-                      <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white" />
-                    )}
+                  <div className="flex items-center mt-0 sm:mt-1">
+                    <div className="flex -space-x-1 mr-2 hidden sm:flex">
+                      {[...Array(Math.min(team.coaches || 0, 2))].map((_, i) => (
+                        <div key={i} className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center">
+                          <User className="w-3 h-3 text-blue-400" />
+                        </div>
+                      ))}
+                      {(team.coaches || 0) === 0 && (
+                        <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white hidden sm:block" />
+                      )}
+                    </div>
+                    <span className="text-gray-800 text-sm font-medium">
+                      {team.coaches ?? 0} <span className="sm:hidden">Entr.</span><span className="hidden sm:inline">entrenadores</span>
+                    </span>
                   </div>
-                  <span className="text-gray-800 text-sm font-medium">
-                    {team.coaches ?? 0} entrenadores
-                  </span>
                 </div>
-              </div>
 
-              {/* ── Bloque 3: Acciones ── */}
-              <div className="border-l border-gray-300 pl-4 ml-2 flex flex-row items-center space-x-4 shrink-0 relative">
-                <UserPlus
-                  className="text-gray-600 hover:text-black cursor-pointer w-5 h-5 transition-colors"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/dashboard/equipos/${team.id}/anadir-miembros`); }}
-                />
-                <MoreHorizontal
-                  className="text-gray-600 hover:text-black cursor-pointer w-5 h-5 transition-colors"
-                  onClick={() => setOpenMenuId(openMenuId === team.id ? null : team.id)}
-                />
-                {openMenuId === team.id && (
-                  <div className="absolute right-0 top-7 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => { setEditTeam(team); setOpenMenuId(null); }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      onClick={() => handleDeleteTeam(team.id)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                )}
+                {/* ── Bloque 3: Acciones ── */}
+                <div className="sm:border-l sm:border-gray-300 sm:pl-4 sm:ml-2 flex flex-row items-center space-x-4 shrink-0 relative pr-2 sm:pr-0">
+                  <UserPlus
+                    className="text-gray-600 hover:text-black cursor-pointer w-5 h-5 transition-colors"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/dashboard/equipos/${team.id}/anadir-miembros`); }}
+                  />
+                  <MoreHorizontal
+                    className="text-gray-600 hover:text-black cursor-pointer w-5 h-5 transition-colors"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenMenuId(openMenuId === team.id ? null : team.id); }}
+                  />
+                  {openMenuId === team.id && (
+                    <div className="absolute right-0 top-7 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditTeam(team); setOpenMenuId(null); }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteTeam(team.id); }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}

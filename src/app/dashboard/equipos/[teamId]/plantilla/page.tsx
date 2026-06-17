@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Users, Pencil, X, ChevronRight } from "lucide-react";
+import { Search, Filter, Plus, Pencil, Trash2, Users, ChevronRight, CheckCircle2, User, Loader2, X } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Player {
@@ -121,37 +121,37 @@ export default function PlantillaEquipoPage() {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="top-right" />
       
-      {/* TABLA */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      {/* TABLA DESKTOP */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-xs">
               <tr>
                 <th className="px-6 py-4">Dorsal</th>
                 <th className="px-6 py-4">Jugador</th>
                 <th className="px-6 py-4">Posición</th>
-                <th className="px-6 py-4 hidden sm:table-cell">Rol</th>
-                <th className="px-6 py-4 hidden md:table-cell">Edad / Físico</th>
-                <th className="px-6 py-4 hidden lg:table-cell">Contacto</th>
+                <th className="px-6 py-4">Rol</th>
+                <th className="px-6 py-4">Edad / Físico</th>
+                <th className="px-6 py-4">Contacto</th>
                 <th className="px-6 py-4 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
-                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">Cargando plantilla...</p>
+                    <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">Cargando plantilla...</p>
                   </td>
                 </tr>
               ) : players.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
-                    <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                      <Users className="w-8 h-8 text-gray-400" />
+                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                      <Users className="w-8 h-8 text-slate-400" />
                     </div>
-                    <p className="text-gray-900 font-medium text-lg">Sin jugadores</p>
-                    <p className="text-gray-500 mt-1">No hay miembros registrados en este equipo todavía.</p>
+                    <p className="text-slate-900 font-medium text-lg">Sin jugadores</p>
+                    <p className="text-slate-500 mt-1">No hay miembros registrados en este equipo todavía.</p>
                   </td>
                 </tr>
               ) : (
@@ -161,57 +161,56 @@ export default function PlantillaEquipoPage() {
                     <tr 
                       key={player.id} 
                       onClick={() => router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`)}
-                      className="hover:bg-blue-50/50 transition-colors group cursor-pointer"
+                      className="hover:bg-slate-50 transition-colors group cursor-pointer"
                     >
                       <td className="px-6 py-4">
                         {player.dorsal ? (
-                          <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-gray-700">
+                          <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-slate-700">
                             {player.dorsal}
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs ml-2">-</span>
+                          <span className="text-slate-400 text-xs ml-2">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors flex items-center gap-2">
+                          <span className="font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors flex items-center gap-2">
                             {player.first_name} {player.last_name}
                           </span>
-                          <span className="text-xs text-gray-500 lg:hidden mt-0.5">{getDisplayEmail(player)}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="capitalize font-medium text-gray-700">{player.posicion || '-'}</span>
+                        <span className="capitalize font-medium text-slate-700">{player.posicion || '-'}</span>
                       </td>
-                      <td className="px-6 py-4 hidden sm:table-cell">
+                      <td className="px-6 py-4">
                         {esEntrenador ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
                             Entrenador
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             Jugador
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 hidden md:table-cell text-gray-900">
+                      <td className="px-6 py-4 text-slate-900">
                         {player.birth_date ? (
                           <div className="flex flex-col">
                             <span className="font-medium">{calcularEdad(player.birth_date)}</span>
                             {player.height && player.weight && (
-                              <span className="text-xs text-gray-500 mt-0.5">
+                              <span className="text-xs text-slate-500 mt-0.5">
                                 {player.height}m / {player.weight}kg
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 hidden lg:table-cell text-gray-600 font-medium">
+                      <td className="px-6 py-4 text-slate-600 font-medium">
                         <div className="flex flex-col">
                           <span>{getDisplayEmail(player)}</span>
-                          {player.phone && <span className="text-xs text-gray-500">{player.phone}</span>}
+                          {player.phone && <span className="text-xs text-slate-500">{player.phone}</span>}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -221,12 +220,12 @@ export default function PlantillaEquipoPage() {
                               e.stopPropagation();
                               setEditingPlayer(player);
                             }}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors inline-flex"
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors inline-flex"
                             title="Edición rápida"
                           >
                             <Pencil size={18} />
                           </button>
-                          <div className="p-2 text-gray-300 group-hover:text-blue-500 transition-colors">
+                          <div className="p-2 text-slate-300 group-hover:text-emerald-500 transition-colors">
                             <ChevronRight size={18} />
                           </div>
                         </div>
@@ -238,6 +237,92 @@ export default function PlantillaEquipoPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* TARJETAS MÓVIL */}
+      <div className="md:hidden flex flex-col gap-4">
+        {loading ? (
+          <div className="py-16 text-center bg-white rounded-xl border border-slate-200">
+            <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">Cargando plantilla...</p>
+          </div>
+        ) : players.length === 0 ? (
+          <div className="py-16 text-center bg-white rounded-xl border border-slate-200">
+            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4 border border-slate-100">
+              <Users className="w-8 h-8 text-slate-400" />
+            </div>
+            <p className="text-slate-900 font-medium text-lg">Sin jugadores</p>
+            <p className="text-slate-500 mt-1">No hay miembros registrados en este equipo todavía.</p>
+          </div>
+        ) : (
+          players.map((player) => {
+            const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
+            return (
+              <div 
+                key={player.id}
+                onClick={() => router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`)}
+                className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-5">
+                  <span className="text-6xl font-black text-slate-900 italic">
+                    {player.dorsal || '-'}
+                  </span>
+                </div>
+                
+                <div className="flex items-start justify-between relative z-10">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-14 h-14 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center text-slate-700 text-xl font-bold">
+                      {player.dorsal || <User size={24} className="text-slate-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0 pr-8">
+                      <h3 className="text-slate-900 font-bold text-lg leading-tight truncate">
+                        {player.first_name} {player.last_name}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-emerald-700 text-xs font-semibold capitalize bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
+                          {player.posicion || 'Sin posición'}
+                        </span>
+                        {esEntrenador && (
+                          <span className="text-blue-700 text-xs font-semibold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                            Míster
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs relative z-10">
+                  <div className="text-slate-500">
+                    <span className="block text-[10px] uppercase tracking-wider font-semibold opacity-70 mb-0.5">Físico</span>
+                    <span className="text-slate-900 font-medium">
+                      {player.birth_date ? calcularEdad(player.birth_date) : '-'} años
+                      {player.height && player.weight ? ` • ${player.height}m / ${player.weight}kg` : ''}
+                    </span>
+                  </div>
+                  <div className="text-slate-500">
+                    <span className="block text-[10px] uppercase tracking-wider font-semibold opacity-70 mb-0.5">Contacto</span>
+                    <span className="text-slate-900 font-medium truncate block">
+                      {getDisplayEmail(player) || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="absolute top-4 right-4 z-20">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingPlayer(player);
+                    }}
+                    className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-50 border border-slate-200 hover:bg-emerald-50 rounded-full transition-colors"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* MODAL DE EDICIÓN */}

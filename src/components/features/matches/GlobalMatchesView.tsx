@@ -248,25 +248,23 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
                     <span className="font-bold text-sm text-slate-900 leading-tight">{match.equipo?.name || 'Mi Equipo'}</span>
                   </div>
                   
-                  <div className="flex flex-col items-center px-2">
-                    {match.estado === 'Finalizado' ? (
-                      <div className="flex items-center gap-2 text-xl font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">
-                        <span>{match.resultado_propio ?? 0}</span>
-                        <span className="text-slate-300 font-medium">-</span>
-                        <span>{match.resultado_rival ?? 0}</span>
-                      </div>
+                  <div className="px-4 flex flex-col items-center justify-center">
+                    {match.estado === 'Programado' ? (
+                      <span className="text-slate-300 font-black text-xl italic">VS</span>
                     ) : (
-                      <div className="text-xs font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full uppercase tracking-widest border border-slate-100">
-                        VS
+                      <div className="flex items-center gap-2">
+                        <span className={`text-2xl font-black ${match.resultado_propio > match.resultado_rival ? "text-emerald-600" : "text-slate-700"}`}>{match.resultado_propio ?? 0}</span>
+                        <span className="text-slate-300 font-bold">-</span>
+                        <span className={`text-2xl font-black ${match.resultado_rival > match.resultado_propio ? "text-emerald-600" : "text-slate-700"}`}>{match.resultado_rival ?? 0}</span>
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col items-center flex-1 text-center">
-                    <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mb-2 shadow-sm border border-red-100 text-red-500 font-bold text-sm">
-                      {(match.rival_nombre || 'R').substring(0, 1).toUpperCase()}
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-sm border border-slate-200">
+                      <div className="w-3 h-3 rounded-full bg-slate-300" />
                     </div>
-                    <span className="font-bold text-sm text-slate-900 leading-tight line-clamp-2">{match.rival_nombre || 'Rival por definir'}</span>
+                    <span className="font-bold text-sm text-slate-900 leading-tight">{match.rival_nombre || 'Rival'}</span>
                   </div>
                 </div>
 
@@ -312,7 +310,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
                             const oldEquipoId = equipos.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
                             
                             return matchConvs.map(c => {
-                              const p = players.find(player => player.id === c.player_id && (player.team_id === oldEquipoId || player.team_id === match.equipo_id));
+                              const p = players.find(player => player.id === c.player_id);
                               if (!p) return null;
                               const pos = p.posicion?.toLowerCase() || '';
                               if (pos.includes('entrenador') || pos.includes('delegado')) return null;
@@ -389,13 +387,12 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
             const pos = p.posicion?.toLowerCase() || '';
             if (pos.includes('entrenador') || pos.includes('delegado')) return false;
             
-            // FFCV uses teams table, players uses old equipos table.
-            // Map the team IDs by matching the names!
             const matchTeamName = teams.find(t => t.id === convocatoriaMatch.equipo_id)?.name;
-            const oldEquipoId = equipos.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
-            return p.team_id === oldEquipoId || p.team_id === convocatoriaMatch.equipo_id;
+            const oldEquipoId = equipos?.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
+            const isConvocado = (convocatorias || []).some(c => c.partido_id === convocatoriaMatch.id && c.player_id === p.id);
+            return isConvocado || p.team_id === oldEquipoId || p.team_id === convocatoriaMatch.equipo_id;
           })}
-          convocatorias={convocatorias.filter(c => c.partido_id === convocatoriaMatch.id)}
+          convocatorias={(convocatorias || []).filter(c => c.partido_id === convocatoriaMatch.id)}
           onClose={() => setConvocatoriaMatch(null)}
         />
       )}

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
@@ -51,7 +51,7 @@ export default function PlayerProfilePage() {
 
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina'>('info');
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -77,7 +77,7 @@ export default function PlayerProfilePage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab === 'info' || tab === 'medico' || tab === 'stats' || tab === 'asistencia') {
+      if (tab === 'info' || tab === 'medico' || tab === 'stats' || tab === 'asistencia' || tab === 'disciplina') {
         setActiveTab(tab);
       }
       const view = params.get('view');
@@ -571,6 +571,14 @@ export default function PlayerProfilePage() {
               }`}
             >
               <Calendar size={18} /> Asistencia
+            </button>
+            <button 
+              onClick={() => setActiveTab('disciplina')}
+              className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                activeTab === 'disciplina' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <AlertTriangle size={18} /> Disciplina
             </button>
           </>
         )}
@@ -1208,7 +1216,164 @@ export default function PlayerProfilePage() {
           </div>
         )}
 
+        {/* PESTAÑA: DISCIPLINA */}
+        {activeTab === 'disciplina' && (
+          <DisciplineTab playerId={playerId} teamId={teamId} />
+        )}
+
       </div>
     </div>
   );
+}
+
+// ----------------------------------------------------
+// NUEVO COMPONENTE: Pestaña de Disciplina
+// ----------------------------------------------------
+function DisciplineTab({ playerId, teamId }: { playerId: string, teamId: string }) {
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totals, setTotals] = useState({ yellows: 0, reds: 0 })
+
+  useEffect(() => {
+    const fetchDiscipline = async () => {
+      const supabase = createClient()
+      
+      // 1. Obtener IDs de las métricas de tarjetas
+      const { data: metrics } = await supabase.from('club_metrics').select('id, name')
+      const amaIds = metrics?.filter(m => m.name.toLowerCase() === 'tarjetas amarillas').map(m => m.id) || []
+      const rojIds = metrics?.filter(m => m.name.toLowerCase() === 'tarjetas rojas').map(m => m.id) || []
+
+      if (amaIds.length === 0 && rojIds.length === 0) {
+        setLoading(false)
+        return
+      }
+
+      // 2. Obtener todas las tarjetas de este jugador (entrenamientos y partidos)
+      const { data: perf } = await supabase
+        .from('player_training_metrics')
+        .select('event_id, metric_id, value_number')
+        .eq('player_id', playerId)
+        .in('metric_id', [...amaIds, ...rojIds])
+
+      if (!perf || perf.length === 0) {
+        setLoading(false)
+        return
+      }
+
+      const eventIds = [...new Set(perf.map(p => p.event_id))]
+
+      // 3. Obtener info de los eventos correspondientes
+      const { data: events } = await supabase
+        .from('team_events')
+        .select('id, date, title, event_type')
+        .in('id', eventIds)
+        .order('date', { ascending: false })
+
+      const history: any[] = []
+      let tAma = 0, tRoj = 0
+
+      events?.forEach(ev => {
+        let pAma = 0
+        let pRoj = 0
+        
+        perf.filter(p => p.event_id === ev.id).forEach(p => {
+          if (amaIds.includes(p.metric_id)) pAma += (p.value_number || 0)
+          if (rojIds.includes(p.metric_id)) pRoj += (p.value_number || 0)
+        })
+
+        tAma += pAma
+        tRoj += pRoj
+
+        if (pAma > 0 || pRoj > 0) {
+          history.push({
+            id: ev.id,
+            date: ev.date,
+            title: ev.title,
+            type: ev.event_type,
+            yellows: pAma,
+            reds: pRoj
+          })
+        }
+      })
+
+      setData(history)
+      setTotals({ yellows: tAma, reds: tRoj })
+      setLoading(false)
+    }
+
+    fetchDiscipline()
+  }, [playerId])
+
+  if (loading) {
+    return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2"><Activity className="animate-spin text-red-500" /> Cargando historial disciplinario...</div>
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex items-center gap-3 border-b pb-4">
+        <div className="bg-red-50 p-2 rounded-lg text-red-600">
+          <AlertTriangle size={24} />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Historial Disciplinario</h2>
+          <p className="text-sm text-slate-500">Resumen y registro de tarjetas del jugador.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 flex flex-col items-center justify-center">
+          <p className="text-sm font-bold text-yellow-800 uppercase tracking-wide">Tarjetas Amarillas</p>
+          <div className="mt-2 w-12 h-16 bg-yellow-400 rounded shadow-sm flex items-center justify-center text-3xl font-black text-yellow-900 border border-yellow-500">
+            {totals.yellows}
+          </div>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center justify-center">
+          <p className="text-sm font-bold text-red-800 uppercase tracking-wide">Tarjetas Rojas</p>
+          <div className="mt-2 w-12 h-16 bg-red-500 rounded shadow-sm flex items-center justify-center text-3xl font-black text-white border border-red-600">
+            {totals.reds}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 bg-white">
+          <h3 className="font-bold text-slate-800">Registro de Partidos con Amonestación</h3>
+        </div>
+        {data.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 bg-white">
+            <CheckCircle className="mx-auto mb-2 text-green-500" size={32} />
+            El jugador no ha recibido ninguna tarjeta registrada.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-200 bg-white">
+            {data.map((item, idx) => (
+              <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800">{item.title}</span>
+                    <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{item.type}</span>
+                  </div>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {new Date(item.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {item.yellows > 0 && (
+                    <div className="w-6 h-8 bg-yellow-400 rounded-sm shadow-sm border border-yellow-500 flex items-center justify-center font-bold text-yellow-900 text-sm" title={`${item.yellows} Amarillas`}>
+                      {item.yellows}
+                    </div>
+                  )}
+                  {item.reds > 0 && (
+                    <div className="w-6 h-8 bg-red-500 rounded-sm shadow-sm border border-red-600 flex items-center justify-center font-bold text-white text-sm" title={`${item.reds} Rojas`}>
+                      {item.reds}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

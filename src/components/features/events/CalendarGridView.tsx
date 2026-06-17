@@ -9,9 +9,10 @@ interface CalendarGridViewProps {
   month: number // 0-indexed
   events: CalendarEvent[]
   today: Date
+  onEventClick?: (ev: CalendarEvent) => void
 }
 
-export function CalendarGridView({ year, month, events, today }: CalendarGridViewProps) {
+export function CalendarGridView({ year, month, events, today, onEventClick }: CalendarGridViewProps) {
   // Build the grid
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
@@ -65,7 +66,7 @@ export function CalendarGridView({ year, month, events, today }: CalendarGridVie
             <div
               key={idx}
               className={[
-                "min-h-[96px] p-2 border-b border-r border-gray-50 flex flex-col gap-1 transition-colors",
+                "min-h-[120px] sm:min-h-[140px] p-2 border-b border-r border-gray-50 flex flex-col gap-1 transition-colors",
                 isWeekend && day ? "bg-gray-50/60" : "",
                 day ? "hover:bg-blue-50/30 cursor-pointer" : "bg-gray-50/20",
               ].join(" ")}
@@ -84,22 +85,24 @@ export function CalendarGridView({ year, month, events, today }: CalendarGridVie
                   </span>
 
                   {/* Event pills */}
-                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                  <div className="flex flex-col gap-1 overflow-hidden mt-1">
                     {dayEvents.slice(0, 3).map((ev) => (
                       <div
                         key={ev.id}
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-white text-[10px] font-semibold truncate cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={(e) => { e.stopPropagation(); onEventClick && onEventClick(ev); }}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-white text-[11px] sm:text-xs font-bold truncate cursor-pointer hover:opacity-90 transition-opacity shadow-sm"
                         style={{ backgroundColor: ev.teamHex }}
                         title={`${ev.time} · ${ev.title}`}
                       >
-                        <span className="shrink-0">
-                          {ev.type === "Partido" ? "⚽" : "🏃"}
+                        <span className="shrink-0 flex items-center justify-center">
+                          {ev.type === "Partido" ? "⚽" : ev.type === "Entrenamiento" ? "🏃" : "📅"}
                         </span>
-                        <span className="truncate">{ev.title}</span>
+                        <span className="truncate hidden md:inline">{ev.time} • {ev.title}</span>
+                        <span className="truncate md:hidden">{ev.title}</span>
                       </div>
                     ))}
                     {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-gray-400 font-semibold pl-1">
+                      <span className="text-[11px] text-gray-500 font-bold pl-1 pt-1">
                         +{dayEvents.length - 3} más
                       </span>
                     )}

@@ -854,10 +854,10 @@ export default function PlayerProfilePage() {
         {activeTab === 'stats' && (
           <div className="space-y-8">
             {/* Toggle Switch */}
-            <div className="flex bg-gray-100 p-1 rounded-full border border-gray-200 shadow-inner w-fit mx-auto mb-6">
+            <div className="flex flex-col sm:flex-row bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner w-full sm:w-fit mx-auto mb-6 gap-1 sm:gap-0">
               <button
                 onClick={() => setStatsViewMode('entrenamientos')}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+                className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
                   statsViewMode === 'entrenamientos' 
                     ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
                     : 'text-gray-500 hover:text-gray-700'
@@ -867,7 +867,7 @@ export default function PlayerProfilePage() {
               </button>
               <button
                 onClick={() => setStatsViewMode('partidos')}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+                className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
                   statsViewMode === 'partidos' 
                     ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
                     : 'text-gray-500 hover:text-gray-700'

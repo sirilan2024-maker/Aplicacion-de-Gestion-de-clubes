@@ -457,10 +457,10 @@ export default function PlayerProfilePage() {
           </div>
         )}
         <div className="h-32 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
-        <div className="px-8 pb-8">
-          <div className="relative flex justify-between items-end -mt-12 mb-4">
-            <div className="flex items-end gap-6">
-              <div className="relative group w-28 h-28 bg-white rounded-2xl shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
+        <div className="px-4 sm:px-8 pb-8">
+          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-end -mt-12 mb-4 gap-4">
+            <div className="flex items-end gap-4 sm:gap-6">
+              <div className="relative group min-w-24 w-24 h-24 sm:min-w-28 sm:w-28 sm:h-28 bg-white rounded-2xl shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
                 {player.avatar_url ? (
                   <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover" />
                 ) : (
@@ -510,23 +510,23 @@ export default function PlayerProfilePage() {
               <button 
                 onClick={() => setIsEditing(true)}
                 disabled={player.status === 'inactive'}
-                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 sm:mt-0"
                 title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
               >
                 <Edit3 size={16} /> Editar Perfil
               </button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex w-full sm:w-auto gap-2 mt-2 sm:mt-0">
                 <button 
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors text-center"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                 >
                   <Save size={16} /> {saving ? 'Guardando...' : 'Guardar'}
                 </button>

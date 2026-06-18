@@ -930,11 +930,11 @@ export default function PlayerProfilePage() {
                 <Calendar className="text-emerald-500" />
                 <h3 className="text-lg font-bold text-slate-900">Historial de Sesiones</h3>
               </div>
-              <div className="p-0">
+              <div className="p-0 overflow-x-auto">
                 {trainingHistory.length === 0 ? (
                   <div className="text-center text-slate-500 py-8">No hay entrenamientos registrados.</div>
                 ) : (
-                  <table className="w-full text-left text-sm text-slate-600">
+                  <table className="w-full min-w-max text-left text-sm text-slate-600 whitespace-nowrap">
                     <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
                       <tr>
                         <th className="px-6 py-3">Fecha</th>

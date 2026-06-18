@@ -36,7 +36,7 @@ export default function EntrenamientoDetailPage() {
   const [playerMetrics, setPlayerMetrics] = useState<Record<string, Record<string, string | number>>>({});
   
   // Selection States
-  const [activeModule, setActiveModule] = useState<'rendimiento' | 'formativo' | 'rapida'>('rendimiento');
+  const [activeModule, setActiveModule] = useState<'rendimiento' | 'formativo' | 'rapida'>('rapida');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [savingPlayer, setSavingPlayer] = useState<string | null>(null);
 
@@ -248,15 +248,6 @@ export default function EntrenamientoDetailPage() {
         {/* TABS (Desktop) */}
         <div className="hidden sm:flex gap-2 pb-2 border-b border-gray-100">
           <button 
-            onClick={() => setActiveModule('rendimiento')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-              activeModule === 'rendimiento' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <Dumbbell size={18} />
-            Rendimiento
-          </button>
-          <button 
             onClick={() => setActiveModule('formativo')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
               activeModule === 'formativo' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
@@ -284,7 +275,6 @@ export default function EntrenamientoDetailPage() {
              className="w-full bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25rem' }}
           >
-             <option value="rendimiento">💪 Rendimiento</option>
              <option value="formativo">🧠 Formativo</option>
              <option value="rapida">⚡ Carga Rápida (RPE)</option>
           </select>

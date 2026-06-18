@@ -7,16 +7,17 @@ interface TeamDisciplineViewProps {
   matches: any[]
   players: any[]
   convocatorias: any[]
+  teamId: string
 }
 
-export function TeamDisciplineView({ matches, players, convocatorias }: TeamDisciplineViewProps) {
+export function TeamDisciplineView({ matches, players, convocatorias, teamId }: TeamDisciplineViewProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Filtrar jugadores válidos (sin cuerpo técnico)
+  // Filtrar jugadores válidos (del equipo actual y sin cuerpo técnico)
   const validPlayers = players.filter(p => {
     const pos = (p.posicion || '').toLowerCase()
-    return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico')
+    return p.team_id === teamId && !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico')
   })
 
   // Calcular totales por jugador

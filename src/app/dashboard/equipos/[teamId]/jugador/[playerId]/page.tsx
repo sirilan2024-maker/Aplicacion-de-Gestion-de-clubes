@@ -854,26 +854,26 @@ export default function PlayerProfilePage() {
         {activeTab === 'stats' && (
           <div className="space-y-8">
             {/* Toggle Switch */}
-            <div className="flex flex-col sm:flex-row bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner w-full sm:w-fit mx-auto mb-6 gap-1 sm:gap-0">
+            <div className="flex flex-row bg-gray-100 p-1 rounded-full border border-gray-200 shadow-inner w-full sm:w-fit mx-auto mb-6 gap-1">
               <button
                 onClick={() => setStatsViewMode('entrenamientos')}
-                className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
+                className={`flex-1 sm:flex-none flex justify-center items-center gap-1 sm:gap-2 px-2 sm:px-6 py-2 rounded-full text-xs sm:text-sm font-bold transition-all ${
                   statsViewMode === 'entrenamientos' 
                     ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <TrendingUp size={16} /> Entrenamientos
+                <TrendingUp size={14} className="hidden sm:block" /> Entrenamientos
               </button>
               <button
                 onClick={() => setStatsViewMode('partidos')}
-                className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
+                className={`flex-1 sm:flex-none flex justify-center items-center gap-1 sm:gap-2 px-2 sm:px-6 py-2 rounded-full text-xs sm:text-sm font-bold transition-all ${
                   statsViewMode === 'partidos' 
                     ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <Activity size={16} /> Partidos
+                <Activity size={14} className="hidden sm:block" /> Partidos
               </button>
             </div>
 
@@ -1119,10 +1119,10 @@ export default function PlayerProfilePage() {
               return (
                 <div className="space-y-8">
                   {/* Selector de Asistencia */}
-                  <div className="flex flex-wrap sm:flex-nowrap justify-center bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner w-full sm:w-fit mx-auto mb-4 gap-1 sm:gap-0">
+                  <div className="flex flex-row overflow-x-auto no-scrollbar justify-start sm:justify-center bg-gray-100 p-1 rounded-xl sm:rounded-full border border-gray-200 shadow-inner w-full sm:w-fit mx-auto mb-4 gap-1">
                     <button
                       onClick={() => setAttendanceFilter('todos')}
-                      className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
+                      className={`flex-none sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
                         attendanceFilter === 'todos' 
                           ? 'bg-white text-slate-800 shadow-sm border border-gray-200/50' 
                           : 'text-gray-500 hover:text-gray-700'
@@ -1132,7 +1132,7 @@ export default function PlayerProfilePage() {
                     </button>
                     <button
                       onClick={() => setAttendanceFilter('entrenamientos')}
-                      className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
+                      className={`flex-none sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
                         attendanceFilter === 'entrenamientos' 
                           ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
                           : 'text-gray-500 hover:text-gray-700'
@@ -1142,7 +1142,7 @@ export default function PlayerProfilePage() {
                     </button>
                     <button
                       onClick={() => setAttendanceFilter('partidos')}
-                      className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
+                      className={`flex-none sm:flex-none flex justify-center items-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-full text-xs sm:text-sm font-bold transition-all ${
                         attendanceFilter === 'partidos' 
                           ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
                           : 'text-gray-500 hover:text-gray-700'
@@ -1253,72 +1253,64 @@ export default function PlayerProfilePage() {
 function DisciplineTab({ playerId, teamId }: { playerId: string, teamId: string }) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [totals, setTotals] = useState({ yellows: 0, reds: 0 })
+  const [totals, setTotals] = useState({ yellows: 0, reds: 0, cycleCards: 0, cyclesCompleted: 0 })
 
   useEffect(() => {
     const fetchDiscipline = async () => {
       const supabase = createClient()
-      
-      // 1. Obtener IDs de las métricas de tarjetas
-      const { data: metrics } = await supabase.from('club_metrics').select('id, name')
-      const amaIds = metrics?.filter(m => m.name.toLowerCase() === 'tarjetas amarillas').map(m => m.id) || []
-      const rojIds = metrics?.filter(m => m.name.toLowerCase() === 'tarjetas rojas').map(m => m.id) || []
 
-      if (amaIds.length === 0 && rojIds.length === 0) {
-        setLoading(false)
-        return
-      }
-
-      // 2. Obtener todas las tarjetas de este jugador (entrenamientos y partidos)
-      const { data: perf } = await supabase
-        .from('player_training_metrics')
-        .select('event_id, metric_id, value_number')
+      // Obtener convocatorias con los partidos relacionados para este jugador
+      const { data: convs } = await supabase
+        .from('convocatorias')
+        .select('*, partidos:partido_id(*)')
         .eq('player_id', playerId)
-        .in('metric_id', [...amaIds, ...rojIds])
 
-      if (!perf || perf.length === 0) {
+      if (!convs || convs.length === 0) {
         setLoading(false)
         return
       }
-
-      const eventIds = [...new Set(perf.map(p => p.event_id))]
-
-      // 3. Obtener info de los eventos correspondientes
-      const { data: events } = await supabase
-        .from('team_events')
-        .select('id, date, title, event_type')
-        .in('id', eventIds)
-        .order('date', { ascending: false })
 
       const history: any[] = []
       let tAma = 0, tRoj = 0
 
-      events?.forEach(ev => {
-        let pAma = 0
-        let pRoj = 0
-        
-        perf.filter(p => p.event_id === ev.id).forEach(p => {
-          if (amaIds.includes(p.metric_id)) pAma += (p.value_number || 0)
-          if (rojIds.includes(p.metric_id)) pRoj += (p.value_number || 0)
-        })
-
-        tAma += pAma
-        tRoj += pRoj
+      convs.forEach(c => {
+        const pAma = c.yellow_cards || 0
+        const pRoj = c.red_cards || 0
 
         if (pAma > 0 || pRoj > 0) {
-          history.push({
-            id: ev.id,
-            date: ev.date,
-            title: ev.title,
-            type: ev.event_type,
-            yellows: pAma,
-            reds: pRoj
-          })
+          tAma += pAma
+          tRoj += pRoj
+          if (c.partidos) {
+            history.push({
+              id: c.partido_id,
+              date: c.partidos.fecha_hora,
+              title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar || 'Visitante'})`,
+              type: 'Partido',
+              yellows: pAma,
+              reds: pRoj
+            })
+          }
         }
       })
 
+      // Calcular ciclos cronológicamente
+      let cycleCards = 0;
+      let cyclesCompleted = 0;
+      const chronological = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      chronological.forEach(evt => {
+        if (evt.yellows === 1) {
+          cycleCards += 1;
+          if (cycleCards === 5) {
+            cyclesCompleted += 1;
+            cycleCards = 0;
+          }
+        }
+      });
+
+      history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
       setData(history)
-      setTotals({ yellows: tAma, reds: tRoj })
+      setTotals({ yellows: tAma, reds: tRoj, cycleCards, cyclesCompleted })
       setLoading(false)
     }
 
@@ -1337,21 +1329,43 @@ function DisciplineTab({ playerId, teamId }: { playerId: string, teamId: string 
         </div>
         <div>
           <h2 className="text-xl font-bold text-slate-800">Historial Disciplinario</h2>
-          <p className="text-sm text-slate-500">Resumen y registro de tarjetas del jugador.</p>
+          <p className="text-sm text-slate-500">Resumen y registro de tarjetas del jugador en partidos.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 flex flex-col items-center justify-center">
-          <p className="text-sm font-bold text-yellow-800 uppercase tracking-wide">Tarjetas Amarillas</p>
-          <div className="mt-2 w-12 h-16 bg-yellow-400 rounded shadow-sm flex items-center justify-center text-3xl font-black text-yellow-900 border border-yellow-500">
+      {totals.cycleCards === 4 && (
+        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3 shadow-sm">
+          <AlertCircle className="text-orange-500 mt-0.5 shrink-0" size={20} />
+          <div>
+            <h3 className="font-bold text-orange-800">Jugador Apercibido</h3>
+            <p className="text-sm text-orange-700">Este jugador acumula 4 tarjetas amarillas en el ciclo actual. La próxima tarjeta amarilla acarreará un partido de sanción.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 flex flex-col items-center justify-center">
+          <p className="text-xs font-bold text-yellow-800 uppercase tracking-wide">Tarjetas Amarillas (Total)</p>
+          <div className="mt-2 text-4xl font-black text-yellow-600">
             {totals.yellows}
           </div>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center justify-center">
-          <p className="text-sm font-bold text-red-800 uppercase tracking-wide">Tarjetas Rojas</p>
-          <div className="mt-2 w-12 h-16 bg-red-500 rounded shadow-sm flex items-center justify-center text-3xl font-black text-white border border-red-600">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex flex-col items-center justify-center">
+          <p className="text-xs font-bold text-red-800 uppercase tracking-wide">Tarjetas Rojas</p>
+          <div className="mt-2 text-4xl font-black text-red-600">
             {totals.reds}
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col justify-center">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 text-center">Estado del Ciclo</p>
+          <div className="flex gap-1 mb-2 w-full">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className={`h-2 flex-1 rounded-sm ${i <= totals.cycleCards ? (totals.cycleCards === 4 ? 'bg-orange-400' : 'bg-amber-400') : 'bg-slate-100'}`}></div>
+            ))}
+          </div>
+          <div className="flex justify-between text-xs text-slate-500 font-medium px-1">
+            <span>{totals.cycleCards}/5 Amarillas</span>
+            <span>{totals.cyclesCompleted} Sanciones</span>
           </div>
         </div>
       </div>
@@ -1361,16 +1375,16 @@ function DisciplineTab({ playerId, teamId }: { playerId: string, teamId: string 
           <h3 className="font-bold text-slate-800">Registro de Partidos con Amonestación</h3>
         </div>
         {data.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 bg-white">
-            <CheckCircle className="mx-auto mb-2 text-green-500" size={32} />
-            El jugador no ha recibido ninguna tarjeta registrada.
+          <div className="p-8 text-center text-slate-500 bg-white flex flex-col items-center">
+            <CheckCircle className="mb-2 text-emerald-500" size={32} />
+            El jugador no ha recibido ninguna tarjeta en los partidos registrados.
           </div>
         ) : (
           <div className="divide-y divide-slate-200 bg-white">
             {data.map((item, idx) => (
-              <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+              <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-slate-50 transition-colors gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-slate-800">{item.title}</span>
                     <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{item.type}</span>
                   </div>
@@ -1378,7 +1392,7 @@ function DisciplineTab({ playerId, teamId }: { playerId: string, teamId: string 
                     {new Date(item.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   {item.yellows > 0 && (
                     <div className="w-6 h-8 bg-yellow-400 rounded-sm shadow-sm border border-yellow-500 flex items-center justify-center font-bold text-yellow-900 text-sm" title={`${item.yellows} Amarillas`}>
                       {item.yellows}

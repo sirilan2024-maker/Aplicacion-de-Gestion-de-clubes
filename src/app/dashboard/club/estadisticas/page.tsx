@@ -29,7 +29,7 @@ export default function EstadisticasClubPage() {
       // 1. Fetch Players data (remove hardcoded statuses that cause 0 count)
       const { data: players } = await supabase
         .from('players')
-        .select('id, height, weight, team_id')
+        .select('id, first_name, last_name, height, weight, team_id')
         .neq('status', 'inactive')
 
       // 2. Fetch Staff
@@ -95,9 +95,27 @@ export default function EstadisticasClubPage() {
     // CALCULATIONS
     const countJugadores = filteredPlayers.length;
     let sumH = 0, sumW = 0, validH = 0, validW = 0;
+    
+    // player stats map for rankings
+    const playerStatsMap = new Map();
     filteredPlayers.forEach(p => {
       if (p.height) { sumH += p.height; validH++; }
       if (p.weight) { sumW += p.weight; validW++; }
+      
+      playerStatsMap.set(p.id, {
+        id: p.id,
+        name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador',
+        teamName: teams.find((t: any) => t.id === p.team_id)?.name || 'Sin Equipo',
+        teamId: p.team_id,
+        goles: 0,
+        amarillas: 0,
+        rojas: 0,
+        minutos: 0,
+        sumRen: 0,
+        countRen: 0,
+        avgRendimiento: 0,
+        disciplinaPuntos: 0
+      });
     });
     
     const avgHeight = validH > 0 ? (sumH / validH).toFixed(2) : 0;
@@ -120,16 +138,38 @@ export default function EstadisticasClubPage() {
       const name = metricMap.get(row.metric_id) || '';
       const val = row.value_number || 0;
 
+      // Global totals
       if (name === 'goles') totalGoles += val;
       else if (name === 'tarjetas amarillas') totalAma += val;
       else if (name === 'tarjetas rojas') totalRoj += val;
       else if (name.includes('minutos')) totalMin += val;
       else if (name.includes('rpe')) { sumRPE += val; countRPE++; }
       else if (name === 'rendimiento') { sumRen += val; countRen++; }
+      
+      // Player totals
+      const pStats = playerStatsMap.get(row.player_id);
+      if (pStats) {
+        if (name === 'goles') pStats.goles += val;
+        else if (name === 'tarjetas amarillas') pStats.amarillas += val;
+        else if (name === 'tarjetas rojas') pStats.rojas += val;
+        else if (name.includes('minutos')) pStats.minutos += val;
+        else if (name === 'rendimiento') { pStats.sumRen += val; pStats.countRen++; }
+      }
     });
 
     const avgRPE = countRPE > 0 ? (sumRPE / countRPE).toFixed(1) : 0;
     const avgRendimiento = countRen > 0 ? (sumRen / countRen).toFixed(1) : 0;
+    
+    const playersStatsArray = Array.from(playerStatsMap.values()).map(p => {
+      p.avgRendimiento = p.countRen > 0 ? Number((p.sumRen / p.countRen).toFixed(1)) : 0;
+      p.disciplinaPuntos = p.amarillas + (p.rojas * 3);
+      return p;
+    });
+
+    const topGoles = [...playersStatsArray].sort((a, b) => b.goles - a.goles).slice(0, 3);
+    const topRendimiento = [...playersStatsArray].sort((a, b) => b.avgRendimiento - a.avgRendimiento).slice(0, 3);
+    const topMinutos = [...playersStatsArray].sort((a, b) => b.minutos - a.minutos).slice(0, 3);
+    const topDisciplina = [...playersStatsArray].sort((a, b) => b.disciplinaPuntos - a.disciplinaPuntos).slice(0, 3);
 
     return {
       totalJugadores: countJugadores,
@@ -143,7 +183,11 @@ export default function EstadisticasClubPage() {
       totalRojas: totalRoj,
       avgRPE: Number(avgRPE),
       avgRendimiento: Number(avgRendimiento),
-      totalMinutos: totalMin
+      totalMinutos: totalMin,
+      topGoles,
+      topRendimiento,
+      topMinutos,
+      topDisciplina
     }
   }, [rawData, selectedTeamId]);
 
@@ -278,6 +322,100 @@ export default function EstadisticasClubPage() {
               </div>
             </div>
           </Link>
+        </div>
+
+        {/* RANKINGS TOP 3 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6">
+          {/* Top Goleadores */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-emerald-50 py-3 px-4 border-b border-emerald-100 flex items-center gap-2">
+              <Goal size={16} className="text-emerald-600" />
+              <h3 className="font-bold text-emerald-800 text-sm">Top Goleadores</h3>
+            </div>
+            <div className="p-4 flex-1 flex flex-col gap-3">
+              {stats.topGoles.length > 0 ? stats.topGoles.map((p: any, i: number) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg text-sm">{p.goles}</span>
+                </div>
+              )) : <p className="text-xs text-slate-400 text-center py-4">Sin datos suficientes</p>}
+            </div>
+          </div>
+
+          {/* Top Rendimiento */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50 py-3 px-4 border-b border-slate-200 flex items-center gap-2">
+              <Activity size={16} className="text-slate-600" />
+              <h3 className="font-bold text-slate-800 text-sm">Top Rendimiento</h3>
+            </div>
+            <div className="p-4 flex-1 flex flex-col gap-3">
+              {stats.topRendimiento.length > 0 ? stats.topRendimiento.map((p: any, i: number) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-slate-700 bg-slate-100 px-2 py-1 rounded-lg text-sm">{p.avgRendimiento}</span>
+                </div>
+              )) : <p className="text-xs text-slate-400 text-center py-4">Sin datos suficientes</p>}
+            </div>
+          </div>
+
+          {/* Top Minutos */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-indigo-50 py-3 px-4 border-b border-indigo-100 flex items-center gap-2">
+              <Clock size={16} className="text-indigo-600" />
+              <h3 className="font-bold text-indigo-800 text-sm">Más Minutos</h3>
+            </div>
+            <div className="p-4 flex-1 flex flex-col gap-3">
+              {stats.topMinutos.length > 0 ? stats.topMinutos.map((p: any, i: number) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg text-sm">{p.minutos}'</span>
+                </div>
+              )) : <p className="text-xs text-slate-400 text-center py-4">Sin datos suficientes</p>}
+            </div>
+          </div>
+
+          {/* Top Disciplina */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-red-50 py-3 px-4 border-b border-red-100 flex items-center gap-2">
+              <AlertTriangle size={16} className="text-red-600" />
+              <h3 className="font-bold text-red-800 text-sm">Más Tarjetas</h3>
+            </div>
+            <div className="p-4 flex-1 flex flex-col gap-3">
+              {stats.topDisciplina.length > 0 ? stats.topDisciplina.map((p: any, i: number) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {p.amarillas > 0 && <span className="font-bold text-yellow-700 bg-yellow-100 px-1.5 py-0.5 rounded text-xs">{p.amarillas}</span>}
+                    {p.rojas > 0 && <span className="font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded text-xs">{p.rojas}</span>}
+                  </div>
+                </div>
+              )) : <p className="text-xs text-slate-400 text-center py-4">Sin amonestaciones</p>}
+            </div>
+          </div>
         </div>
       </div>
 

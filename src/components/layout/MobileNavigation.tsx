@@ -73,12 +73,14 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   // Secondary links for Hamburger menu
   const secondaryLinks = activeTeamId ? [
     { name: "Volver al Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Disciplina", href: `/dashboard/equipos/${activeTeamId}/partidos?view=disciplina`, icon: Shield },
     { name: "Eventos", href: `/dashboard/equipos/${activeTeamId}/calendario`, icon: CalendarDays },
     { name: "Asistencia", href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: Users },
     { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
     { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
     { name: "Mensajes", href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
   ] : [
+    { name: "Disciplina", href: "/dashboard/club/estadisticas/disciplina", icon: Shield },
     { name: "Eventos", href: "/dashboard/events", icon: CalendarDays },
     { name: "Super Admin ERP", href: "/admin", icon: Shield },
     { name: "Directorio", href: "/dashboard/club/miembros", icon: Users },

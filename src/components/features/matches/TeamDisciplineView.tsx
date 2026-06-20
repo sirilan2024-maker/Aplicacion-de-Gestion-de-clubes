@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { AlertCircle, X, Search } from "lucide-react"
+import { useState, useEffect } from "react"
+import { AlertCircle, ArrowLeft, Search } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { DisciplineModal } from "./DisciplineModal"
 
 interface TeamDisciplineViewProps {
   matches: any[]
@@ -11,29 +13,36 @@ interface TeamDisciplineViewProps {
 }
 
 export function TeamDisciplineView({ matches, players, convocatorias, teamId }: TeamDisciplineViewProps) {
-  const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null)
+  const router = useRouter()
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [localConvocatorias, setLocalConvocatorias] = useState<any[]>(convocatorias)
+
+  useEffect(() => {
+    setLocalConvocatorias(convocatorias)
+  }, [convocatorias])
 
   // Filtrar jugadores válidos (del equipo actual y sin cuerpo técnico)
   const validPlayers = players.filter(p => {
     const pos = (p.posicion || '').toLowerCase()
-    return p.team_id === teamId && !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico')
+    const isTeamMatch = teamId === 'all' || p.team_id === teamId
+    return isTeamMatch && !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico')
   })
 
   // Calcular totales por jugador
   const disciplineData = validPlayers.map(player => {
-    const playerConvs = convocatorias.filter(c => c.player_id === player.id)
+    const playerConvs = localConvocatorias.filter(c => c.player_id === player.id)
     let totalYellow = 0
     let totalRed = 0
     
-    const cardEvents: any[] = []
+    const rawEvents: any[] = []
 
     playerConvs.forEach(conv => {
       const match = matches.find(m => m.id === conv.partido_id)
       if (match && (conv.yellow_cards > 0 || conv.red_cards > 0)) {
         totalYellow += (conv.yellow_cards || 0)
         totalRed += (conv.red_cards || 0)
-        cardEvents.push({
+        rawEvents.push({
           match,
           yellow: conv.yellow_cards || 0,
           red: conv.red_cards || 0
@@ -41,16 +50,38 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
       }
     })
 
+    // Ordenar cronológicamente para calcular ciclos
+    const chronologicalEvents = [...rawEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
+    let cycleCards = 0;
+    let cyclesCompleted = 0;
+
+    chronologicalEvents.forEach(evt => {
+      if (evt.yellow === 2) {
+        // Doble amarilla = Roja. No suma al ciclo.
+      } else if (evt.yellow === 1) {
+        cycleCards += 1;
+        if (cycleCards === 5) {
+          cyclesCompleted += 1;
+          cycleCards = 0;
+        }
+      }
+    });
+
     return {
       player,
       totalYellow,
       totalRed,
-      cardEvents: cardEvents.sort((a, b) => new Date(b.match.fecha_hora).getTime() - new Date(a.match.fecha_hora).getTime())
+      cycleCards,
+      cyclesCompleted,
+      cardEvents: rawEvents.sort((a, b) => new Date(b.match.fecha_hora).getTime() - new Date(a.match.fecha_hora).getTime())
     }
   })
 
-  // Ordenar por rojas primero, luego amarillas, luego nombre
+  // Ordenar por apercibidos primero, luego rojas, luego amarillas
   disciplineData.sort((a, b) => {
+    const aApercibido = a.cycleCards === 4 ? 1 : 0
+    const bApercibido = b.cycleCards === 4 ? 1 : 0
+    if (aApercibido !== bApercibido) return bApercibido - aApercibido
     if (b.totalRed !== a.totalRed) return b.totalRed - a.totalRed
     if (b.totalYellow !== a.totalYellow) return b.totalYellow - a.totalYellow
     return a.player.first_name.localeCompare(b.player.first_name)
@@ -61,6 +92,23 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     const name = `${d.player.first_name} ${d.player.last_name}`.toLowerCase()
     return name.includes(searchQuery.toLowerCase())
   })
+
+  const selectedPlayer = disciplineData.find(d => d.player.id === selectedPlayerId)
+
+  const handleOpenModal = (playerId: string) => {
+    setSelectedPlayerId(playerId)
+  }
+
+  const handleCloseModal = () => {
+    setSelectedPlayerId(null)
+    router.refresh()
+  }
+
+  // Partidos recientes para el modo edición
+  const recentMatches = [...matches]
+    .filter(m => m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date())
+    .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+    .slice(0, 15) // Últimos 15 partidos
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -80,6 +128,33 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
           />
         </div>
       </div>
+
+      {/* BANNER APERCIBIDOS */}
+      {disciplineData.filter(d => d.cycleCards === 4).length > 0 && (
+        <div className="bg-orange-50 border-b border-orange-200 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-orange-500 mt-0.5 shrink-0" size={20} />
+            <div>
+              <h4 className="text-sm font-bold text-orange-800">Jugadores Apercibidos ({disciplineData.filter(d => d.cycleCards === 4).length})</h4>
+              <p className="text-sm text-orange-700 mt-0.5 mb-2">
+                Los siguientes jugadores acumulan 4 tarjetas amarillas y serán suspendidos si reciben una tarjeta más:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {disciplineData.filter(d => d.cycleCards === 4).map(a => (
+                  <button 
+                    key={a.player.id} 
+                    onClick={() => handleOpenModal(a.player.id)}
+                    className="bg-white border border-orange-300 text-orange-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-1.5"
+                  >
+                    <div className="w-2 h-3 bg-amber-400 rounded-sm"></div>
+                    {a.player.first_name} {a.player.last_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-0 overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap min-w-[500px]">
@@ -105,8 +180,8 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
             {filteredData.map(d => (
               <tr 
                 key={d.player.id} 
-                onClick={() => setSelectedPlayer(d)}
-                className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                onClick={() => handleOpenModal(d.player.id)}
+                className={`transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -118,15 +193,25 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                       </div>
                     )}
                     <div>
-                      <div className="font-bold text-slate-900">{d.player.first_name} {d.player.last_name}</div>
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                        {d.player.first_name} {d.player.last_name}
+                        {d.cycleCards === 4 && (
+                          <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                            <AlertCircle size={10} className="mr-1"/> Apercibido
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <span className={`font-black ${d.totalYellow > 0 ? 'text-amber-500' : 'text-slate-300'}`}>
-                    {d.totalYellow}
-                  </span>
+                <td className="px-6 py-4 text-center font-bold text-slate-700">
+                  {d.totalYellow > 0 ? d.totalYellow : '-'}
+                  {d.cyclesCompleted > 0 && (
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5" title="Sanciones cumplidas (Ciclos de 5)">
+                      ({d.cyclesCompleted} ciclos)
+                    </div>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <span className={`font-black ${d.totalRed > 0 ? 'text-red-500' : 'text-slate-300'}`}>
@@ -134,8 +219,8 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <span className="text-blue-600 font-bold text-xs uppercase opacity-0 group-hover:opacity-100 transition-opacity">
-                    Ver Partidos
+                  <span className="text-blue-600 font-bold text-xs uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-1">
+                    Ver <ArrowLeft size={14} className="rotate-180" />
                   </span>
                 </td>
               </tr>
@@ -151,91 +236,26 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
         </table>
       </div>
 
-      {/* Modal Detalles Jugador */}
       {selectedPlayer && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div className="flex items-center gap-3">
-                {selectedPlayer.player.avatar_url ? (
-                  <img src={selectedPlayer.player.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shadow-sm" />
-                ) : (
-                  <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-sm">
-                    {selectedPlayer.player.first_name.charAt(0)}{selectedPlayer.player.last_name.charAt(0)}
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">{selectedPlayer.player.first_name} {selectedPlayer.player.last_name}</h3>
-                  <div className="text-sm font-medium text-slate-500">Historial de Tarjetas</div>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedPlayer(null)}
-                className="p-2 hover:bg-slate-200 text-slate-500 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-0 overflow-y-auto flex-1">
-              {selectedPlayer.cardEvents.length === 0 ? (
-                <div className="p-8 text-center">
-                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <AlertCircle className="text-emerald-500" size={32} />
-                  </div>
-                  <h4 className="text-slate-900 font-bold text-lg mb-1">¡Historial Limpio!</h4>
-                  <p className="text-slate-500 text-sm">Este jugador no ha recibido ninguna tarjeta en los partidos registrados.</p>
-                </div>
-              ) : (
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3">Fecha</th>
-                      <th className="px-6 py-3">Partido</th>
-                      <th className="px-6 py-3 text-center">Tarjetas</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedPlayer.cardEvents.map((ev: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                          {new Date(ev.match.fecha_hora).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-slate-900">{ev.match.rival_nombre}</div>
-                          <div className="text-xs text-slate-500 capitalize">{ev.match.lugar || 'Visitante'}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex justify-center items-center gap-2">
-                            {ev.yellow > 0 && (
-                              <div className="flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm"></div> {ev.yellow}
-                              </div>
-                            )}
-                            {ev.red > 0 && (
-                              <div className="flex items-center gap-1 font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                                <div className="w-2.5 h-3.5 bg-red-500 rounded-sm"></div> {ev.red}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <button 
-                onClick={() => setSelectedPlayer(null)}
-                className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all text-sm"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <DisciplineModal 
+          player={selectedPlayer.player}
+          cardEvents={selectedPlayer.cardEvents}
+          recentMatches={recentMatches}
+          convocatorias={localConvocatorias}
+          onClose={handleCloseModal}
+          onCardsUpdated={(yellowDelta, redDelta, matchId, yellows, reds) => {
+            setLocalConvocatorias(prev => {
+              const existingIdx = prev.findIndex(c => c.partido_id === matchId && c.player_id === selectedPlayer.player.id)
+              if (existingIdx >= 0) {
+                const next = [...prev]
+                next[existingIdx] = { ...next[existingIdx], yellow_cards: yellows, red_cards: reds }
+                return next
+              } else {
+                return [...prev, { partido_id: matchId, player_id: selectedPlayer.player.id, yellow_cards: yellows, red_cards: reds }]
+              }
+            })
+          }}
+        />
       )}
     </div>
   )

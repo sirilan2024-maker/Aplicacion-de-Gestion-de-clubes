@@ -126,10 +126,27 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
 
 export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string }) {
   const supabase = await createClient()
+
+  // Obtener el club_id del usuario autenticado
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    throw new Error("No autenticado")
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("club_id")
+    .eq("id", user.id)
+    .single()
+
+  if (profileError || !profile?.club_id) {
+    throw new Error("No se pudo obtener el club del usuario")
+  }
   
   const { data: newMatch, error } = await supabase
     .from("partidos")
     .insert({
+      club_id: profile.club_id,
       equipo_id: teamId,
       fecha_hora: data.fecha_hora,
       lugar: data.lugar,
@@ -180,11 +197,30 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
   // Set selected players as titular with their coordinates
   if (assignedPlayers.length > 0) {
     for (const player of assignedPlayers) {
-      await supabase
+      const { data: existing } = await supabase
         .from('convocatorias')
-        .update({ titular: true, tactical_x: player.x, tactical_y: player.y })
+        .select('id')
         .eq('partido_id', matchId)
-        .eq('player_id', player.playerId);
+        .eq('player_id', player.playerId)
+        .single();
+
+      if (existing) {
+        await supabase
+          .from('convocatorias')
+          .update({ titular: true, tactical_x: player.x, tactical_y: player.y })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('convocatorias')
+          .insert({ 
+            partido_id: matchId, 
+            player_id: player.playerId, 
+            status: 'convocado', 
+            titular: true, 
+            tactical_x: player.x, 
+            tactical_y: player.y 
+          });
+      }
     }
   }
 
@@ -349,4 +385,41 @@ export async function updateMatchFullReportBatch(
     console.error("Error in updateMatchFullReportBatch:", err);
     return { success: false, error: err.message || "Unknown error" };
   }
+}
+
+export async function updatePlayerCardsInMatch(matchId: string, playerId: string, yellows: number, reds: number) {
+  console.log(`[updatePlayerCardsInMatch] Start: match=${matchId}, player=${playerId}, yellows=${yellows}, reds=${reds}`);
+  const supabase = await createAdminClient();
+  const { data: existing, error: findError } = await supabase
+    .from('convocatorias')
+    .select('id')
+    .eq('partido_id', matchId)
+    .eq('player_id', playerId)
+    .single();
+
+  if (findError && findError.code !== 'PGRST116') {
+    console.error("[updatePlayerCardsInMatch] Error finding row:", findError);
+  }
+
+  if (existing) {
+    console.log(`[updatePlayerCardsInMatch] Row exists (${existing.id}), updating...`);
+    const { error } = await supabase.from('convocatorias').update({ yellow_cards: yellows, red_cards: reds }).eq('id', existing.id);
+    if (error) console.error("[updatePlayerCardsInMatch] Error updating cards:", error);
+    else console.log(`[updatePlayerCardsInMatch] Update SUCCESS!`);
+  } else {
+    console.log(`[updatePlayerCardsInMatch] Row does not exist, inserting...`);
+    const { error } = await supabase.from('convocatorias').insert({
+      partido_id: matchId,
+      player_id: playerId,
+      yellow_cards: yellows,
+      red_cards: reds,
+      estado_asistencia: 'Pendiente',
+      status: 'convocado'
+    });
+    if (error) console.error("[updatePlayerCardsInMatch] Error inserting cards:", error);
+    else console.log(`[updatePlayerCardsInMatch] Insert SUCCESS!`);
+  }
+  revalidatePath(`/dashboard`, 'layout');
+  console.log(`[updatePlayerCardsInMatch] Done.`);
+  return { success: true };
 }

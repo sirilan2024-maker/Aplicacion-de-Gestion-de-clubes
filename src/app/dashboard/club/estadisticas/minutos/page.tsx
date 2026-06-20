@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, ArrowDown, ArrowUp, Activity, Filter, Clock } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface MinutesRow {
   playerId: string;
@@ -16,6 +17,7 @@ interface MinutesRow {
 }
 
 export default function MinutosPage() {
+  const router = useRouter()
   const [data, setData] = useState<MinutesRow[]>([])
   const [teams, setTeams] = useState<{id: string, name: string}[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>("todos")
@@ -157,9 +159,9 @@ export default function MinutosPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/club/estadisticas" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <ArrowLeft className="text-slate-500" size={24} />
-          </Link>
+          </button>
           <div className="flex items-center gap-3">
             <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600">
               <Clock size={28} />

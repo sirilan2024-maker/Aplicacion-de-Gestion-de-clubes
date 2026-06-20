@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter } from "lucide-react"
+import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy } from "lucide-react"
 import { deleteMatchAction } from "@/app/actions/match-actions"
 import { ManageMatchModal } from "./ManageMatchModal"
 import { QuickConvocatoriaModal } from "./QuickConvocatoriaModal"
+import { FFCVStandings } from "./FFCVStandings"
+import { TeamDisciplineView } from "./TeamDisciplineView"
 
 interface GlobalMatchesViewProps {
   initialMatches: any[];
@@ -20,6 +22,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
   const router = useRouter()
   const [matches, setMatches] = useState(initialMatches)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "all")
+  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina'>('partidos')
   
   const [editingMatch, setEditingMatch] = useState<any>(null)
   const [convocatoriaMatch, setConvocatoriaMatch] = useState<any>(null)
@@ -29,6 +32,40 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
   const [showFilters, setShowFilters] = useState(false)
   const [filterLocation, setFilterLocation] = useState("all")
   const [filterResult, setFilterResult] = useState("all")
+
+  // Calculate apercibidos
+  const apercibidosCount = useMemo(() => {
+    if (!players || !convocatorias || !matches) return 0;
+    
+    // Si hay un equipo seleccionado, filtramos por él, si no usamos todos
+    const validPlayers = players.filter((p: any) => 
+      (selectedTeamId === "all" || p.team_id === selectedTeamId) && 
+      !(p.posicion || '').toLowerCase().includes('entrenador') && 
+      !(p.posicion || '').toLowerCase().includes('delegado')
+    )
+    
+    let count = 0;
+    validPlayers.forEach((player: any) => {
+      const playerConvs = convocatorias.filter((c: any) => c.player_id === player.id)
+      const rawEvents: any[] = []
+      playerConvs.forEach((conv: any) => {
+        const match = matches.find((m: any) => m.id === conv.partido_id)
+        if (match && (conv.yellow_cards > 0 || conv.red_cards > 0)) {
+          rawEvents.push({ match, yellow: conv.yellow_cards || 0 })
+        }
+      })
+      const chrono = [...rawEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime())
+      let cycleCards = 0;
+      chrono.forEach(evt => {
+        if (evt.yellow === 1) {
+          cycleCards += 1;
+          if (cycleCards === 5) cycleCards = 0;
+        }
+      })
+      if (cycleCards === 4) count++;
+    })
+    return count;
+  }, [players, convocatorias, matches, selectedTeamId]);
 
   const filteredMatches = matches.filter(m => {
     const matchesTeam = selectedTeamId === "all" || m.equipo_id === selectedTeamId
@@ -207,8 +244,120 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
         </div>
       </div>
 
-      {/* Lista de Partidos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* Toggle View */}
+      {!fixedTeamId && (
+        <div className="flex justify-center mb-6 mt-4">
+          <div className="flex flex-col sm:flex-row bg-slate-100 p-1.5 rounded-2xl sm:rounded-full w-full sm:w-auto gap-1 sm:gap-0">
+            <button
+              onClick={() => setViewMode('partidos')}
+              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all ${
+                viewMode === 'partidos'
+                  ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Calendario y Resultados
+            </button>
+            <button
+              onClick={() => setViewMode('clasificacion')}
+              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all ${
+                viewMode === 'clasificacion'
+                  ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Clasificación
+            </button>
+            <button
+              onClick={() => setViewMode('disciplina')}
+              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+                viewMode === 'disciplina'
+                  ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <AlertCircle size={16} /> Disciplina
+              {apercibidosCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                  !
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Apercibidos */}
+      {viewMode === 'partidos' && apercibidosCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-4 animate-in fade-in slide-in-from-top-2 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-orange-100 p-2 rounded-full">
+              <AlertCircle className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h4 className="font-bold text-orange-900 text-sm sm:text-base">Jugadores Apercibidos</h4>
+              <p className="text-xs sm:text-sm text-orange-700">
+                Tienes {apercibidosCount} jugador{apercibidosCount > 1 ? 'es' : ''} a punto de cumplir ciclo de tarjetas amarillas.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/club/estadisticas/disciplina')}
+            className="w-full sm:w-auto px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+          >
+            Ver Detalles
+          </button>
+        </div>
+      )}
+
+      {/* Vistas */}
+      {viewMode === 'clasificacion' ? (
+        selectedTeamId === 'all' ? (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {equipos.filter(e => e.ffcv_url).length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
+                <p className="text-slate-500 font-medium">No hay ningún equipo con enlace a FFCV configurado en el club.</p>
+              </div>
+            ) : (
+              equipos.filter(e => e.ffcv_url).map(e => (
+                <div key={e.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <h2 className="text-xl font-bold bg-slate-50 p-4 border-b border-slate-200 text-slate-800 flex items-center">
+                    <Trophy className="w-5 h-5 text-amber-500 mr-2" />
+                    {e.name}
+                  </h2>
+                  <div className="p-4">
+                    <FFCVStandings ffcvUrl={e.ffcv_url} teamName={e.name} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          (() => {
+            const selectedTeamName = teams.find(t => t.id === selectedTeamId)?.name || '';
+            const equipoCoach = equipos.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
+            const ffcvUrl = equipoCoach?.ffcv_url || null;
+            return <FFCVStandings ffcvUrl={ffcvUrl} teamName={selectedTeamName} />;
+          })()
+        )
+      ) : viewMode === 'disciplina' ? (
+        (() => {
+          const selectedTeamName = teams.find(t => t.id === selectedTeamId)?.name || '';
+          const equipoCoach = equipos.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
+          const actualEquipoId = selectedTeamId === 'all' ? 'all' : (equipoCoach ? equipoCoach.id : selectedTeamId);
+          return (
+            <div className="pt-2">
+              <TeamDisciplineView 
+                matches={matches}
+                players={players}
+                convocatorias={convocatorias}
+                teamId={actualEquipoId}
+              />
+            </div>
+          );
+        })()
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredMatches.length === 0 ? (
           <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
             <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -358,6 +507,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
           ))
         )}
       </div>
+      )}
 
       {/* Modals */}
       {editingMatch && (

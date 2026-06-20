@@ -38,6 +38,9 @@ interface ClubMember {
   last_name: string;
   role: string;
   avatar_url?: string;
+  category?: string;
+  team_id?: string;
+  birth_date?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -618,23 +621,85 @@ function ScreenMiembrosClub({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const fetchMembers = async () => {
       const supabase = createClient();
+      // Fetch all players
       const { data } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, role")
+        .from("players")
+        .select("id, first_name, last_name, birth_date, team_id, posicion")
+        .neq("status", "inactive")
         .order("last_name");
-      if (data) setMembers(data as ClubMember[]);
+        
+      if (data) {
+        // La temporada actual en el sistema del usuario es 2024/25, por lo que la edad se calcula respecto a 2024
+        const currentYear = 2024;
+        const playersWithCategories = data.map((p: any) => {
+          let category = "desconocida";
+          if (p.birth_date) {
+            const birthYear = new Date(p.birth_date).getFullYear();
+            const age = currentYear - birthYear;
+            if (age >= 19) category = "senior";
+            else if (age >= 16) category = "juvenil";
+            else if (age >= 14) category = "cadete";
+            else if (age >= 12) category = "infantil";
+            else if (age >= 10) category = "alevin";
+            else if (age >= 8) category = "benjamin";
+            else if (age >= 6) category = "prebenjamin";
+            else category = "querubin";
+          }
+          
+          return {
+            ...p,
+            category,
+            role: p.posicion || "jugador"
+          };
+        });
+        
+        // Exclude players already in THIS team
+        const filteredPlayers = playersWithCategories.filter((p: any) => p.team_id !== teamId);
+        
+        setMembers(filteredPlayers as ClubMember[]);
+      }
       setLoading(false);
     };
     fetchMembers();
-  }, []);
+  }, [teamId]);
+
+  // Determine current team category from team name
+  const teamNameLower = teamName.toLowerCase();
+  const currentTeamCategory = 
+    teamNameLower.includes("senior") || teamNameLower.includes("aficionado") || teamNameLower.includes("1er") || teamNameLower.includes("primer") ? "senior" :
+    teamNameLower.includes("juvenil") ? "juvenil" :
+    teamNameLower.includes("cadete") ? "cadete" :
+    teamNameLower.includes("infantil") ? "infantil" :
+    teamNameLower.includes("alevin") ? "alevin" :
+    teamNameLower.includes("benjamin") && !teamNameLower.includes("pre") ? "benjamin" :
+    teamNameLower.includes("prebenjamin") ? "prebenjamin" :
+    teamNameLower.includes("querubin") ? "querubin" : null;
 
   const filtered = members.filter((m) => {
     const full = `${m.first_name} ${m.last_name}`.toLowerCase();
-    return full.includes(search.toLowerCase());
+    const matchesSearch = full.includes(search.toLowerCase());
+    
+    if (showAll) return matchesSearch;
+    
+    // Filter by role
+    let matchesRole = true;
+    if (role) {
+      const playerRole = (m.role || "jugador").toLowerCase();
+      matchesRole = playerRole === role.toLowerCase();
+    }
+    
+    // Filter by category if we found one
+    let matchesCategory = true;
+    if (role === "jugador" && currentTeamCategory && m.category) {
+      matchesCategory = m.category === currentTeamCategory || m.category === "desconocida";
+    }
+    
+    return matchesSearch && matchesCategory && matchesRole;
   });
 
   const allSelected = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
@@ -665,49 +730,29 @@ function ScreenMiembrosClub({
   };
 
   const handleAdd = async () => {
-    if (selected.size === 0 || !role) return;
+    if (selected.size === 0 || !role) {
+      toast.error("Por favor selecciona un rol y al menos un jugador");
+      return;
+    }
     setSubmitting(true);
     try {
       const supabase = createClient();
-      // Get club_id
-      const { data: clubData } = await supabase.from("clubs").select("id").limit(1).single();
-      const club_id = clubData?.id ?? null;
-      // Get profile data for selected members
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name")
+      
+      // Move selected players to this team
+      const { error } = await supabase
+        .from("players")
+        .update({ team_id: teamId, posicion: role })
         .in("id", Array.from(selected));
-      if (!profilesData || profilesData.length === 0) {
-        setSubmitting(false);
-        return;
-      }
-      const inserts = profilesData.map((p: any) => ({
-        first_name: p.first_name || "-",
-        last_name: p.last_name || "-",
-        posicion: role,
-        team_id: teamId,
-        club_id,
-        birth_date: "2000-01-01",
-        parent_contact: "Pendiente",
-      }));
-      const { data: inserted, error } = await supabase.from("players").insert(inserts).select("id");
-      if (error) {
-        alert("Error al añadir: " + error.message);
-      } else if (!inserted || inserted.length === 0) {
-        alert("Error: Inserción bloqueada. Revisa la política RLS de INSERT en la tabla 'players'.");
-      } else {
-        const { data: teamData } = await supabase.from("equipos").select("members, coaches").eq("id", teamId).single();
-        if (teamData) {
-          const updateField = role === "entrenador" ? "coaches" : "members";
-          await supabase.from("equipos").update({ 
-            [updateField]: (teamData[updateField] || 0) + inserts.length 
-          }).eq("id", teamId);
-        }
-        // Instead of going back to the modal, route to the dashboard like the other screen
-        window.location.href = "/dashboard/equipos";
-      }
+        
+      if (error) throw error;
+      
+      toast.success("¡Miembros asignados al equipo correctamente!");
+      setTimeout(() => {
+        window.location.href = `/dashboard/equipos/${teamId}/plantilla`;
+      }, 1000);
+      
     } catch (e: any) {
-      alert("Error inesperado: " + e.message);
+      toast.error("Error inesperado: " + e.message);
     } finally {
       setSubmitting(false);
     }
@@ -743,16 +788,31 @@ function ScreenMiembrosClub({
         </div>
       </div>
 
-      {/* Buscador */}
-      <div className="relative mb-4 max-w-sm">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Buscar"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      {/* Filtros */}
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="show-all"
+            checked={showAll}
+            onChange={(e) => setShowAll(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <label htmlFor="show-all" className="text-sm font-medium text-gray-600 cursor-pointer">
+            Mostrar todo el club (ignorar edad y papel)
+          </label>
+        </div>
       </div>
 
       {/* Seleccionar todo */}
@@ -792,9 +852,16 @@ function ScreenMiembrosClub({
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200">
                 <User size={16} className="text-gray-500" />
               </div>
-              <span className="text-sm text-gray-800 truncate">
-                {member.last_name}, {member.first_name}
-              </span>
+              <div className="flex flex-col ml-2 truncate">
+                <span className="text-sm text-gray-800 truncate font-medium">
+                  {member.last_name}, {member.first_name}
+                </span>
+                {member.category && (
+                  <span className="text-[10px] uppercase font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5 w-max mt-0.5">
+                    {member.category}
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>

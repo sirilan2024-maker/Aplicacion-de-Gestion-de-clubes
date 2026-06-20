@@ -6,6 +6,7 @@ import { Trash2, Clock, X, Target, AlertTriangle, Bandage } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { addLiveEvent, deleteLiveEvent } from "@/app/actions/live-match-actions";
 import { useUserRole } from "@/hooks/useUserRole";
+import { toast } from "react-hot-toast";
 
 interface LiveEvent {
   id: string;
@@ -23,10 +24,10 @@ export const MOCK_LIVE_PLAYERS = [
   { id: "p5", name: "Luis Moreno", dorsal: 3 },
   { id: "p6", name: "Rubén Díaz", dorsal: 8 },
   { id: "p7", name: "Andrés Gil", dorsal: 4 },
-  { id: "p8", name: "Sergio López", dorsal: 7 },
-  { id: "p9", name: "Carlos Pérez", dorsal: 10 },
-  { id: "p10", name: "Álvaro Núñez", dorsal: 9 },
-  { id: "p11", name: "Iván Castro", dorsal: 11 }
+  { id: "p8", name: "Héctor Silva", dorsal: 10 },
+  { id: "p9", name: "Raúl Méndez", dorsal: 9 },
+  { id: "p10", name: "Iván Cano", dorsal: 11 },
+  { id: "p11", name: "Sergio Marín", dorsal: 7 },
 ];
 
 interface LiveTabProps {
@@ -52,11 +53,31 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
   const initialStarted = match?.live_timer_started_at || null;
   const { seconds, start, pause, running } = useLiveTimer(matchId, initialElapsed, initialStarted);
 
+  // Match State Sync
+  const [partidoEstado, setPartidoEstado] = useState(match?.estado || "Programado");
+  const [firstHalfDuration, setFirstHalfDuration] = useState<number | null>(match?.first_half_duration_seconds || null);
+
+  // Category-based half length
+  const getHalfLengthMinutes = () => {
+    const category = (match?.equipo?.category || match?.equipo?.name || "").toLowerCase();
+    if (category.includes("infantil") || category.includes("alevin") || category.includes("benjamin") || category.includes("prebenjamin")) return 35;
+    if (category.includes("cadete")) return 40;
+    return 45; // Juvenil, Senior, and default
+  };
+  const halfLengthMinutes = getHalfLengthMinutes();
+
+  // Is it injury time?
+  const isFirstHalfDescuento = seconds >= halfLengthMinutes * 60 && !firstHalfDuration && partidoEstado !== "Descanso";
+  const isSecondHalfDescuento = seconds >= halfLengthMinutes * 2 * 60 && firstHalfDuration !== null;
+  const isDescuento = (isFirstHalfDescuento || isSecondHalfDescuento) && partidoEstado !== "Finalizado";
+
   // Form states
   const [minuto, setMinuto] = useState<number>(85);
   const [playerId, setPlayerId] = useState<string>("");
+  const [playerOutId, setPlayerOutId] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRival, setIsRival] = useState(false);
 
   // Realtime subscription for events and timer
   useEffect(() => {
@@ -68,6 +89,10 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
         } else if (payload.eventType === 'DELETE') {
           setEvents(prev => prev.filter(e => e.id !== payload.old.id));
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidos', filter: `id=eq.${matchId}` }, (payload) => {
+        setPartidoEstado(payload.new.estado);
+        setFirstHalfDuration(payload.new.first_half_duration_seconds);
       })
       .subscribe();
     return () => {
@@ -105,35 +130,101 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
     onEventChange(local, away, { local: localScorers, away: awayScorers });
   };
 
+  const handlePhaseChange = async (phase: "Descanso" | "Fin de Partido") => {
+    if (partidoEstado === "Finalizado") {
+      toast.error("El partido ya ha finalizado.");
+      return;
+    }
+    
+    if (phase === "Descanso" && firstHalfDuration !== null) {
+      toast.error("El descanso ya ha sido registrado previamente.");
+      return;
+    }
+
+    if (!window.confirm(`¿Seguro que deseas registrar el ${phase}? Esta acción detendrá el cronómetro.`)) {
+      return;
+    }
+
+    pause(); // always pause the timer
+    
+    const secondHalfDuration = firstHalfDuration !== null ? seconds - (halfLengthMinutes * 60) : seconds;
+    
+    // Guardar evento visual
+    const { success } = await addLiveEvent(matchId, {
+      player_id: null,
+      tipo: phase,
+      minuto: Math.floor(seconds / 60),
+      descripcion: phase === "Descanso" 
+        ? `--- DESCANSO (Duración 1ª Parte: ${formatTime(seconds)}) ---` 
+        : `--- FINAL DEL PARTIDO (Duración 2ª Parte: ${formatTime(secondHalfDuration > 0 ? secondHalfDuration : seconds)}) ---`
+    });
+
+    if (success) {
+      if (phase === "Fin de Partido") {
+        await supabase.from("partidos").update({ 
+          estado: "Finalizado",
+          second_half_duration_seconds: secondHalfDuration > 0 ? secondHalfDuration : null
+        }).eq("id", matchId);
+        setPartidoEstado("Finalizado");
+        toast.success("Partido finalizado");
+      } else {
+        await supabase.from("partidos").update({ 
+          estado: "Descanso",
+          first_half_duration_seconds: seconds
+        }).eq("id", matchId);
+        setPartidoEstado("Descanso");
+        setFirstHalfDuration(seconds);
+        toast.success("Descanso registrado");
+      }
+    } else {
+      toast.error("Por favor, asegúrate de haber ejecutado el script SQL para habilitar estos eventos");
+    }
+  };
+
+  const handleStartSecondHalf = async () => {
+    const targetSeconds = halfLengthMinutes * 60;
+    await supabase.from("partidos").update({ estado: "En Curso" }).eq("id", matchId);
+    setPartidoEstado("En Curso");
+    start(targetSeconds);
+    toast.success("Segunda parte iniciada");
+  };
+
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeForm || isSubmitting) return;
 
     setIsSubmitting(true);
-    const player = players.find((p: any) => p.id === playerId);
-    const playerName = player ? `${player.first_name} ${player.last_name || ''}`.trim() : "Jugador";
     let desc = "";
+    
+    if (isRival) {
+      desc = `${activeForm} del equipo rival ${notes ? `(${notes})` : ""}`;
+    } else {
+      const player = players.find((p: any) => p.id === playerId);
+      const playerName = player ? `${player.first_name}`.trim() : "Jugador";
 
-    if (activeForm === "Gol") {
-      desc = `Gol de ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Amarilla" || activeForm === "Tarjeta Amarilla") {
-      desc = `Tarjeta Amarilla para ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Cambio") {
-      desc = `Cambio realizado: Entra ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Tiro al larguero") {
-      desc = `Tiro al larguero de ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Tiro al palo") {
-      desc = `Tiro al palo de ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Penalti") {
-      desc = `Penalti de ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Lesión") {
-      desc = `Lesión de ${playerName} ${notes ? `(${notes})` : ""}`;
-    } else if (activeForm === "Gol en propia puerta") {
-      desc = `Gol en propia puerta de ${playerName} ${notes ? `(${notes})` : ""}`;
+      if (activeForm === "Gol") {
+        desc = `Gol de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Amarilla" || activeForm === "Tarjeta Amarilla") {
+        desc = `Tarjeta Amarilla para ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Cambio") {
+        const playerOut = players.find((p: any) => p.id === playerOutId);
+        const playerOutName = playerOut ? `${playerOut.first_name}`.trim() : "Jugador";
+        desc = `Cambio: Entra ${playerName} por ${playerOutName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Tiro al larguero") {
+        desc = `Tiro al larguero de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Tiro al palo") {
+        desc = `Tiro al palo de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Penalti") {
+        desc = `Penalti de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Lesión") {
+        desc = `Lesión de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Gol en propia puerta") {
+        desc = `Gol en propia puerta de ${playerName} ${notes ? `(${notes})` : ""}`;
+      }
     }
 
     const { success } = await addLiveEvent(matchId, {
-      player_id: playerId || null,
+      player_id: isRival ? null : (playerId || null),
       tipo: activeForm,
       minuto,
       descripcion: desc
@@ -143,7 +234,9 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
     if (success) {
       setActiveForm(null);
       setPlayerId("");
+      setPlayerOutId("");
       setNotes("");
+      setIsRival(false);
     }
   };
 
@@ -154,48 +247,103 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
     }
   };
 
+  const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <>
+    <div className="max-w-5xl mx-auto pb-10">
       {/* ---------- Cronómetro Superior ---------- */}
-      <div className="sticky top-0 z-10 flex items-center justify-between bg-blue-900 text-slate-100 px-4 py-2 rounded-b-xl shadow-sm">
-        {/* Timer display */}
-        <span className="font-mono text-2xl font-bold">
-          {(() => {
-            const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
-            const secs = String(seconds % 60).padStart(2, "0");
-            return `${mins}:${secs}`;
-          })()}
-        </span>
-        {/* Live badge (pulsing) */}
-        {running && (
-          <span className="ml-2 inline-flex items-center rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold text-white shadow animate-pulse">
-            En vivo
-          </span>
-        )}
-        {!running && (
-          <span className="ml-2 inline-flex items-center rounded-full bg-slate-500 px-2.5 py-0.5 text-xs font-semibold text-white shadow">
-            Pausado
-          </span>
-        )}
-        
-        {/* Play / Pause button */}
-        {!isFamilyView && (
-          <button
-            onClick={() => (running ? pause() : start())}
-            className="flex items-center gap-2 rounded-lg bg-blue-800 px-3 py-1 hover:bg-blue-700 transition-colors"
-          >
-            {running ? (
-              <>
-                <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-                <span>Pausar</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                <span>Iniciar</span>
-              </>
+      <div className={`sticky top-0 z-10 flex items-center justify-between px-4 py-2 rounded-b-xl shadow-sm ${partidoEstado === "Finalizado" ? 'bg-slate-800' : (isDescuento ? 'bg-red-900' : 'bg-blue-900')} text-slate-100 transition-colors duration-500`}>
+        <div className="flex items-center gap-3">
+          <Clock className={`w-5 h-5 ${partidoEstado === "Finalizado" ? 'text-slate-400' : (isDescuento ? 'text-red-300' : 'text-blue-300')}`} />
+          <div className="text-2xl font-black font-mono tracking-wider tabular-nums">
+            {formatTime(seconds)}
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${partidoEstado === "Finalizado" ? 'text-slate-300 bg-slate-700 border-slate-600' : (isDescuento ? 'text-red-100 bg-red-800 border-red-700' : 'text-blue-300 bg-blue-900/50 border-blue-700')}`}>
+                {partidoEstado === "Finalizado" ? "Finalizado" : (partidoEstado === "Descanso" ? "Descanso" : (running ? "En juego" : "Pausado"))}
+              </span>
+              {firstHalfDuration && (
+                <span className="text-[10px] text-blue-200/80 font-medium">
+                  1ª Parte: {formatTime(firstHalfDuration)}
+                </span>
+              )}
+              {match?.second_half_duration_seconds && (
+                <span className="text-[10px] text-blue-200/80 font-medium">
+                  2ª Parte: {formatTime(match.second_half_duration_seconds)}
+                </span>
+              )}
+            </div>
+            {isDescuento && (
+              <span className="text-[10px] font-bold text-red-200 mt-0.5 animate-pulse">
+                TIEMPO DE DESCUENTO
+              </span>
             )}
-          </button>
+          </div>
+        </div>
+
+        {!isFamilyView && (
+          <div className="flex items-center gap-2">
+            {partidoEstado === "Descanso" ? (
+              <button
+                onClick={() => {
+                  if (partidoEstado === "Finalizado") {
+                    toast.error("El partido ya ha finalizado.");
+                    return;
+                  }
+                  if (!window.confirm("¿Seguro que deseas iniciar la 2ª Parte?")) return;
+                  handleStartSecondHalf();
+                }}
+                className="flex items-center gap-1 rounded-lg bg-emerald-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-emerald-600 transition-colors"
+              >
+                <span>Iniciar 2ª Parte</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => handlePhaseChange("Descanso")}
+                className="flex items-center gap-1 rounded-lg bg-orange-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-orange-600 transition-colors"
+              >
+                <span>Descanso</span>
+              </button>
+            )}
+            
+            <button
+              onClick={() => handlePhaseChange("Fin de Partido")}
+              className="flex items-center gap-1 rounded-lg bg-red-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-red-600 transition-colors"
+            >
+              <span>Fin de Partido</span>
+            </button>
+            <button
+              onClick={() => {
+                if (partidoEstado === "Finalizado") {
+                  toast.error("El partido ha finalizado. El cronómetro no puede reanudarse.");
+                  return;
+                }
+                if (partidoEstado === "Descanso") {
+                  toast.error("Estás en el descanso. Usa el botón 'Iniciar 2ª Parte' para reanudar el partido.");
+                  return;
+                }
+                running ? pause() : start();
+              }}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors ml-2 ${isDescuento ? 'bg-red-800 hover:bg-red-700' : 'bg-blue-800 hover:bg-blue-700'}`}
+            >
+              {running ? (
+                <>
+                  <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                  <span className="text-xs font-bold">Pausar</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  <span className="text-xs font-bold">Iniciar</span>
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 
@@ -274,46 +422,82 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                 </div>
 
                 <div className="space-y-3">
+                  {/* Team Switcher */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setIsRival(false)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${!isRival ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Nuestro Equipo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsRival(true)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${isRival ? 'bg-white shadow-sm text-red-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Equipo Rival
+                    </button>
+                  </div>
+
                   {/* Minute */}
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
                       Minuto del evento
                     </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="1"
-                        max="120"
-                        value={minuto}
-                        onChange={e => setMinuto(Number(e.target.value))}
-                        className="flex-1 h-1.5 rounded-full bg-slate-100 accent-blue-600"
-                      />
-                      <span className="w-12 text-center text-xs font-black text-blue-600 bg-blue-50 py-1 rounded-md">
+                    <div className="flex items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100">
+                      <span className="text-sm font-bold text-slate-700">
+                        Se registrará automáticamente en el minuto
+                      </span>
+                      <span className="text-sm font-black text-blue-600 bg-blue-100 px-2 py-0.5 rounded-md">
                         {minuto}'
                       </span>
                     </div>
                   </div>
 
-                  {/* Player */}
-                  <div>
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                      Jugador implicado
-                    </label>
-                    <select
-                      required={activeForm !== "Gol" && activeForm !== "Gol en propia puerta"}
-                      value={playerId}
-                      onChange={e => setPlayerId(e.target.value)}
-                      className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-500 focus:bg-white"
-                    >
-                      <option value="">— Seleccionar jugador —</option>
-                      <option value="rival">Rival (Sin jugador asignado)</option>
-                      {players.map((p: any) => (
-                        <option key={p.id} value={p.id}>
-                          #{p.dorsal || '-'} {p.first_name} {p.last_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Player In / General Player */}
+                  {!isRival && (
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                        {activeForm === "Cambio" ? "Jugador que ENTRA" : "Jugador implicado"}
+                      </label>
+                      <select
+                        required={activeForm !== "Gol" && activeForm !== "Gol en propia puerta"}
+                        value={playerId}
+                        onChange={e => setPlayerId(e.target.value)}
+                        className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-500 focus:bg-white"
+                      >
+                        <option value="">— Seleccionar jugador —</option>
+                        {players.map((p: any) => (
+                          <option key={p.id} value={p.id}>
+                            #{p.dorsal || '-'} {p.first_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Player Out (only for Cambio) */}
+                  {!isRival && activeForm === "Cambio" && (
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                        Jugador que SALE
+                      </label>
+                      <select
+                        required
+                        value={playerOutId}
+                        onChange={e => setPlayerOutId(e.target.value)}
+                        className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:border-red-500 focus:bg-white"
+                      >
+                        <option value="">— Seleccionar jugador que sale —</option>
+                        {players.map((p: any) => (
+                          <option key={p.id} value={p.id}>
+                            #{p.dorsal || '-'} {p.first_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Notes */}
                   <div>
@@ -438,6 +622,6 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
         </div>
 
       </div>
-    </>
+    </div>
   );
 }

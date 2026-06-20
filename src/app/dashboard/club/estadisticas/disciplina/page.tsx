@@ -2,16 +2,22 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { AlertTriangle, ArrowLeft, ArrowDown, ArrowUp, Activity, Filter } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ArrowDown, ArrowUp, Activity, Filter, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { DisciplineModal } from "@/components/features/matches/DisciplineModal"
 
 interface DisciplineRow {
   playerId: string;
   playerName: string;
   teamId: string;
   teamName: string;
+  avatar_url?: string;
   yellows: number;
   reds: number;
+  cycleCards: number;
+  playerData: any; // Para pasarlo al modal
+  cardEvents: any[]; // Para pasarlo al modal
 }
 
 export default function DisciplinaPage() {
@@ -21,70 +27,97 @@ export default function DisciplinaPage() {
   const [loading, setLoading] = useState(true)
   const [sortCol, setSortCol] = useState<'yellows' | 'reds' | 'playerName' | 'teamName'>('yellows')
   const [sortDesc, setSortDesc] = useState(true)
+  
+  // States for Modal
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  const [allMatches, setAllMatches] = useState<any[]>([])
+  const [allConvocatorias, setAllConvocatorias] = useState<any[]>([])
+
   const supabase = createClient()
+  const router = useRouter()
+
+  const fetchData = async () => {
+    // 1. Fetch teams
+    const { data: teamsData } = await supabase.from('equipos').select('id, name')
+    if (teamsData) setTeams(teamsData)
+
+    // 2. Fetch all matches
+    const { data: matches } = await supabase.from('partidos').select('*').order('fecha_hora', { ascending: false })
+    if (matches) setAllMatches(matches)
+
+    // 3. Fetch convocatorias with cards
+    const { data: convs } = await supabase.from('convocatorias').select('*')
+    if (convs) setAllConvocatorias(convs)
+
+    // 4. Fetch players with team info
+    const { data: players } = await supabase
+      .from('players')
+      .select(`
+        *,
+        equipos ( name )
+      `)
+      .neq('status', 'inactive')
+
+    const playerMap = new Map<string, DisciplineRow>()
+
+    players?.forEach((p: any) => {
+      playerMap.set(p.id, {
+        playerId: p.id,
+        playerName: `${p.first_name} ${p.last_name || ''}`.trim(),
+        teamId: p.team_id,
+        teamName: p.equipos?.name || 'Sin equipo',
+        avatar_url: p.avatar_url,
+        yellows: 0,
+        reds: 0,
+        cycleCards: 0,
+        playerData: p,
+        cardEvents: []
+      })
+    })
+
+    convs?.forEach(conv => {
+      const p = playerMap.get(conv.player_id)
+      if (p) {
+        if (conv.yellow_cards > 0 || conv.red_cards > 0) {
+          p.yellows += (conv.yellow_cards || 0)
+          p.reds += (conv.red_cards || 0)
+          
+          const match = matches?.find(m => m.id === conv.partido_id)
+          if (match) {
+            p.cardEvents.push({
+              match,
+              yellow: conv.yellow_cards || 0,
+              red: conv.red_cards || 0
+            })
+          }
+        }
+      }
+    })
+
+    // Sort cardEvents by date desc and calculate cycles
+    playerMap.forEach(p => {
+      const chrono = [...p.cardEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
+      let cycleCards = 0;
+      chrono.forEach(evt => {
+        if (evt.yellow === 1) {
+          cycleCards += 1;
+          if (cycleCards === 5) cycleCards = 0;
+        }
+      });
+      p.cycleCards = cycleCards;
+
+      p.cardEvents.sort((a, b) => new Date(b.match.fecha_hora).getTime() - new Date(a.match.fecha_hora).getTime())
+    })
+
+    // Only show players with at least one card
+    const filtered = Array.from(playerMap.values()).filter(p => p.yellows > 0 || p.reds > 0)
+    
+    setData(filtered)
+    setLoading(false)
+    router.refresh()
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      // 1. Fetch metrics definitions
-      const { data: metrics } = await supabase.from('club_metrics').select('id, name')
-      const amaIds = metrics?.filter(m => m.name.toLowerCase() === 'tarjetas amarillas').map(m => m.id) || []
-      const rojIds = metrics?.filter(m => m.name.toLowerCase() === 'tarjetas rojas').map(m => m.id) || []
-
-      if (amaIds.length === 0 && rojIds.length === 0) {
-        setLoading(false)
-        return
-      }
-
-      // 2. Fetch teams
-      const { data: teamsData } = await supabase.from('equipos').select('id, name')
-      if (teamsData) setTeams(teamsData)
-
-      // 3. Fetch players with team info
-      const { data: players } = await supabase
-        .from('players')
-        .select(`
-          id, 
-          first_name, 
-          last_name, 
-          team_id,
-          equipos ( name )
-        `)
-        .neq('status', 'inactive')
-
-      // 4. Fetch performance data for cards
-      const { data: perf } = await supabase
-        .from('player_training_metrics')
-        .select('metric_id, value_number, player_id')
-        .in('metric_id', [...amaIds, ...rojIds])
-
-      const playerMap = new Map<string, DisciplineRow>()
-
-      players?.forEach((p: any) => {
-        playerMap.set(p.id, {
-          playerId: p.id,
-          playerName: `${p.first_name} ${p.last_name || ''}`.trim(),
-          teamId: p.team_id,
-          teamName: p.equipos?.name || 'Sin equipo',
-          yellows: 0,
-          reds: 0
-        })
-      })
-
-      perf?.forEach(row => {
-        const p = playerMap.get(row.player_id)
-        if (p) {
-          if (amaIds.includes(row.metric_id)) p.yellows += (row.value_number || 0)
-          if (rojIds.includes(row.metric_id)) p.reds += (row.value_number || 0)
-        }
-      })
-
-      // Only show players with at least one card
-      const filtered = Array.from(playerMap.values()).filter(p => p.yellows > 0 || p.reds > 0)
-      
-      setData(filtered)
-      setLoading(false)
-    }
-
     fetchData()
   }, [])
 
@@ -124,15 +157,37 @@ export default function DisciplinaPage() {
     return sortDesc ? <ArrowDown size={14} className="inline ml-1" /> : <ArrowUp size={14} className="inline ml-1" />
   }
 
+  // Modal handlers
+  const selectedRow = data.find(r => r.playerId === selectedPlayerId)
+  
+  const getRecentMatches = (teamId: string, cardEvents: any[]) => {
+    // 1. Get matches for the current team
+    const teamMatches = allMatches
+      .filter(m => m.equipo_id === teamId && (m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date()))
+      
+    // 2. Add matches from cardEvents (in case the player got cards in a previous team)
+    const eventMatches = cardEvents.map(ev => ev.match);
+    
+    // Merge and deduplicate
+    const combinedMap = new Map();
+    [...teamMatches, ...eventMatches].forEach(m => {
+      combinedMap.set(m.id, m);
+    });
+
+    return Array.from(combinedMap.values())
+      .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+      .slice(0, 15)
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/club/estadisticas" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
             <ArrowLeft className="text-slate-500" size={24} />
-          </Link>
+          </button>
           <div className="flex items-center gap-3">
             <div className="bg-red-50 p-2 rounded-lg text-red-600">
               <AlertTriangle size={28} />
@@ -171,6 +226,34 @@ export default function DisciplinaPage() {
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          
+          {/* BANNER APERCIBIDOS (GLOBAL) */}
+          {sortedAndFilteredData.filter(d => d.cycleCards === 4).length > 0 && (
+            <div className="bg-orange-50 border-b border-orange-200 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="text-orange-500 mt-0.5 shrink-0" size={20} />
+                <div>
+                  <h4 className="text-sm font-bold text-orange-800">Jugadores Apercibidos ({sortedAndFilteredData.filter(d => d.cycleCards === 4).length})</h4>
+                  <p className="text-sm text-orange-700 mt-0.5 mb-2">
+                    Los siguientes jugadores acumulan 4 tarjetas amarillas y serán suspendidos si reciben una tarjeta más:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {sortedAndFilteredData.filter(d => d.cycleCards === 4).map(a => (
+                      <button 
+                        key={a.playerId} 
+                        onClick={() => setSelectedPlayerId(a.playerId)}
+                        className="bg-white border border-orange-300 text-orange-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-1.5"
+                      >
+                        <div className="w-2 h-3 bg-amber-400 rounded-sm"></div>
+                        {a.playerName} <span className="font-normal opacity-70 ml-1">({a.teamName})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -203,11 +286,31 @@ export default function DisciplinaPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {sortedAndFilteredData.map((row) => (
-                  <tr key={row.playerId} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                      <Link href={`/dashboard/equipos/${row.teamId}/jugador/${row.playerId}`}>
-                        {row.playerName}
-                      </Link>
+                  <tr 
+                    key={row.playerId} 
+                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => setSelectedPlayerId(row.playerId)}
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        {row.avatar_url ? (
+                          <img src={row.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shadow-sm" />
+                        ) : (
+                          <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-xs">
+                            {row.playerName.charAt(0)}
+                          </div>
+                        )}
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-blue-600 group-hover:text-blue-800 transition-colors flex items-center gap-2">
+                            {row.playerName}
+                            {row.cycleCards === 4 && (
+                              <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold">
+                                <AlertCircle size={10} className="mr-1"/> Apercibido
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
                     </td>
                     <td className="p-4 text-slate-600 font-medium">
                       {row.teamName}
@@ -243,6 +346,40 @@ export default function DisciplinaPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {selectedRow && (
+        <DisciplineModal 
+          player={selectedRow.playerData}
+          cardEvents={selectedRow.cardEvents}
+          recentMatches={getRecentMatches(selectedRow.teamId, selectedRow.cardEvents)}
+          convocatorias={allConvocatorias}
+          onClose={() => {
+            setSelectedPlayerId(null)
+          }}
+          onCardsUpdated={(yellowDelta, redDelta) => {
+            setData(prev => {
+              const newData = prev.map(p => {
+                if (p.playerId === selectedRow.playerId) {
+                  return {
+                    ...p,
+                    yellows: p.yellows + yellowDelta,
+                    reds: p.reds + redDelta
+                  }
+                }
+                return p
+              });
+              // Sort them again
+              return newData.sort((a, b) => {
+                if (sortCol === 'yellows') return sortDesc ? b.yellows - a.yellows : a.yellows - b.yellows
+                if (sortCol === 'reds') return sortDesc ? b.reds - a.reds : a.reds - b.reds
+                if (sortCol === 'playerName') return sortDesc ? b.playerName.localeCompare(a.playerName) : a.playerName.localeCompare(b.playerName)
+                if (sortCol === 'teamName') return sortDesc ? b.teamName.localeCompare(a.teamName) : a.teamName.localeCompare(b.teamName)
+                return 0
+              })
+            })
+          }}
+        />
       )}
     </div>
   )

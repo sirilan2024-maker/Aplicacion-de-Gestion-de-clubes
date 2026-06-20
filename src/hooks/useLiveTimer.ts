@@ -37,12 +37,20 @@ export function useLiveTimer(
     return () => clearInterval(interval);
   }, [running, startedAt, baseElapsed]);
 
-  const start = async () => {
+  const start = async (fromSeconds?: number) => {
     const nowStr = new Date().toISOString();
     setStartedAt(nowStr);
     setRunning(true);
+    
+    let newElapsed = baseElapsed;
+    if (fromSeconds !== undefined) {
+      newElapsed = fromSeconds;
+      setBaseElapsed(newElapsed);
+      setSeconds(newElapsed);
+    }
+    
     // Optimistic UI updates, server action will persist
-    await toggleMatchTimer(matchId, true, baseElapsed);
+    await toggleMatchTimer(matchId, true, newElapsed);
   };
 
   const pause = async () => {

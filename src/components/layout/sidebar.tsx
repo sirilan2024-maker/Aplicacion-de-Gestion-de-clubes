@@ -112,6 +112,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         items: [
           { name: "Plantilla",    href: `/dashboard/equipos/${activeTeamId}/plantilla`, icon: Users },
           { name: "Partidos",     href: `/dashboard/equipos/${activeTeamId}/partidos`, icon: Trophy },
+          { name: "Disciplina",   href: `/dashboard/equipos/${activeTeamId}/partidos?view=disciplina`, icon: Shield },
           { name: "Eventos",   href: `/dashboard/equipos/${activeTeamId}/calendario`, icon: CalendarDays },
           { name: "Asistencia",   href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: ClipboardCheck },
           { name: "Rendimiento",  href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
@@ -135,6 +136,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         items: [
           { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
           { name: "Partidos",     href: "/dashboard/matches",    icon: Trophy },
+          { name: "Disciplina",   href: "/dashboard/club/estadisticas/disciplina", icon: Shield },
           { name: "Eventos",      href: "/dashboard/events",     icon: CalendarDays    },
         ],
       },

@@ -11,6 +11,7 @@ interface RoleGuardProps {
 export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const [role, setRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [redirecting, setRedirecting] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
         .eq('id', user.id)
         .single()
       if (error || !profile) {
-        console.error('Failed to fetch profile', error)
+        console.error(`Failed to fetch profile for ${user.email} (${user.id}):`, error ? JSON.stringify(error) : 'No profile returned');
         setRole(null)
       } else {
         setRole(profile.role as string)
@@ -37,14 +38,20 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     fetchRole()
   }, [router])
 
-  if (loading) {
+  useEffect(() => {
+    const isAllowed = role === 'admin' || (role && allowedRoles.includes(role))
+    if (!loading && !isAllowed) {
+      setRedirecting(true)
+      router.replace('/dashboard')
+    }
+  }, [loading, role, allowedRoles, router])
+
+  if (loading || redirecting) {
     return <div className="flex items-center justify-center min-h-screen"><span className="text-gray-600">Cargando...</span></div>
   }
 
-  if (!role || !allowedRoles.includes(role)) {
-    // Redirect to appropriate dashboard based on role
-    const destination = role === 'coach' ? '/dashboard/mis-equipos' : '/dashboard/mi-perfil'
-    router.replace(destination)
+  const isAllowed = role === 'admin' || (role && allowedRoles.includes(role))
+  if (!isAllowed) {
     return null
   }
 

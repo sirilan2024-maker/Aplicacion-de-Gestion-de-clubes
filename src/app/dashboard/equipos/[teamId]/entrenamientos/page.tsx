@@ -62,7 +62,7 @@ export default function EntrenamientosListPage() {
 
     // 2. Calculate ACWR Manually
     try {
-      const { data: teamData } = await supabase.from('equipos').select('club_id').eq('id', teamId).single();
+      const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
       if (teamData) {
         const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
         const rpeMetricId = metrics?.find(m => m.name.toLowerCase().includes('rpe'))?.id;

@@ -32,7 +32,7 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
     const fetchAllData = async () => {
       // 1. Obtener el nombre del equipo del coach (tabla equipos)
       const { data: equipoCoach } = await supabase
-        .from("equipos")
+        .from('teams')
         .select("name, ffcv_url")
         .eq("id", teamId)
         .single()
@@ -62,7 +62,7 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
         { data: convocatoriasData }
       ] = await Promise.all([
         supabase.from("partidos").select(`*, equipo:teams(id, name, color)`).order("fecha_hora", { ascending: false }),
-        supabase.from("equipos").select("*"),
+        supabase.from('teams').select("*"),
         supabase.from("players").select("*").neq("status", "inactive"),
         supabase.from("convocatorias").select("*")
       ])

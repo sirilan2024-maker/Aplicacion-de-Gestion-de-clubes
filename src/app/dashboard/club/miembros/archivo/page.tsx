@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Search, Loader2, ArrowLeft, RefreshCw, User as UserIcon, Trash2 } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
-import { archivePlayerAction, deletePlayerAction } from "@/app/actions/player-actions"
+import { deletePlayerAction, reactivatePlayerAction } from "@/app/actions/player-actions"
 import Link from "next/link"
+import { Dialog } from "@/components/ui/dialog"
 
 interface ArchivedMember {
   id: string
@@ -16,85 +17,137 @@ interface ArchivedMember {
   team_id?: string | null
   team_name?: string | null
   team_color?: string | null
+  season_id?: string | null
 }
 
 export default function ArchivedMembersPage() {
   const router = useRouter()
   const [members, setMembers] = useState<ArchivedMember[]>([])
+  const [teams, setTeams] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [reactivatingPlayer, setReactivatingPlayer] = useState<ArchivedMember | null>(null)
+  const [selectedTeam, setSelectedTeam] = useState<string>("unassigned")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const [seasons, setSeasons] = useState<any[]>([])
+  const [seasonFilter, setSeasonFilter] = useState<string>("all")
+
   useEffect(() => {
-    async function fetchArchived() {
-      setLoading(true)
-      const supabase = createClient()
-
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error("No autenticado")
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("club_id")
-          .eq("id", user.id)
-          .single()
-
-        if (!profile?.club_id) throw new Error("Usuario sin club asignado")
-
-        const { data: playersData } = await supabase
-          .from("players")
-          .select(`
-            id, first_name, last_name, email, team_id,
-            equipos (name, color)
-          `)
-          .eq("club_id", profile.club_id)
-          .eq("status", "inactive")
-
-        const archivedList: ArchivedMember[] = []
-
-        if (playersData) {
-          playersData.forEach((p: any) => {
-            archivedList.push({
-              id: p.id,
-              first_name: p.first_name || '',
-              last_name: p.last_name || '',
-              email: p.email,
-              team_id: p.team_id,
-              team_name: p.equipos?.name,
-              team_color: p.equipos?.color,
-            })
-          })
-        }
-
-        archivedList.sort((a, b) => a.last_name.localeCompare(b.last_name))
-        setMembers(archivedList)
-
-      } catch (err: any) {
-        toast.error(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchArchived()
   }, [])
 
-  const handleRestore = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    if (!confirm("¿Seguro que quieres restaurar a este jugador? Volverá a aparecer en su equipo y en todas las listas.")) return
+  async function fetchArchived() {
+    setLoading(true)
+    const supabase = createClient()
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("club_id")
+        .eq("id", user.id)
+        .single()
+
+      if (!profile?.club_id) throw new Error("Usuario sin club asignado")
+
+      // Fetch all seasons for the club
+      const { data: seasonsData } = await supabase
+        .from("seasons")
+        .select("id, name, is_active")
+        .eq("club_id", profile.club_id)
+        .order("start_date", { ascending: false })
+      
+      if (seasonsData) {
+        setSeasons(seasonsData)
+      }
+
+      // Fetch active season teams
+      const activeSeason = seasonsData?.find(s => s.is_active)
+      if (activeSeason?.id) {
+        const { data: teamsData } = await supabase.from('teams').select('id, name').eq('season_id', activeSeason.id).order('name')
+        setTeams(teamsData || [])
+      }
+
+      const { data: playersData } = await supabase
+        .from("players")
+        .select(`
+          id, first_name, last_name, email, team_id,
+          teams (name, color, season_id)
+        `)
+        .eq("club_id", profile.club_id)
+        .in("status", ["inactive", "archived"]) // Incluimos ambos por si acaso
+
+      const { data: historyData } = await supabase
+        .from("player_season_history")
+        .select(`
+          player_id, 
+          season_id,
+          team_id,
+          teams (name, color)
+        `)
+        .eq("club_id", profile.club_id)
+
+      const playerHistory = new Map<string, any>()
+      if (historyData) {
+        historyData.forEach((h: any) => {
+          const team = Array.isArray(h.teams) ? h.teams[0] : h.teams;
+          playerHistory.set(h.player_id, {
+            season_id: h.season_id,
+            team_id: h.team_id,
+            team_name: team?.name,
+            team_color: team?.color
+          })
+        })
+      }
+
+      const archivedList: ArchivedMember[] = []
+
+      if (playersData) {
+        playersData.forEach((p: any) => {
+          const hist = playerHistory.get(p.id);
+          archivedList.push({
+            id: p.id,
+            first_name: p.first_name || '',
+            last_name: p.last_name || '',
+            email: p.email,
+            team_id: hist?.team_id || p.team_id,
+            team_name: hist?.team_name || p.teams?.name,
+            team_color: hist?.team_color || p.teams?.color,
+            season_id: hist?.season_id || p.teams?.season_id || null,
+          })
+        })
+      }
+
+      archivedList.sort((a, b) => a.last_name.localeCompare(b.last_name))
+      setMembers(archivedList)
+
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleReactivate = async () => {
+    if (!reactivatingPlayer) return
+    setIsSubmitting(true)
     
-    setRestoringId(id)
-    const result = await archivePlayerAction(id, false)
+    const teamId = selectedTeam === "unassigned" ? null : selectedTeam
+    const result = await reactivatePlayerAction(reactivatingPlayer.id, teamId)
     
     if (result.success) {
-      toast.success("Jugador restaurado correctamente")
-      setMembers(members.filter(m => m.id !== id))
+      toast.success("Jugador reactivado correctamente")
+      setMembers(members.filter(m => m.id !== reactivatingPlayer.id))
+      setReactivatingPlayer(null)
     } else {
-      toast.error(result.error?.message || "Error al restaurar")
+      toast.error("Error al reactivar: " + (result.error?.message || "Error desconocido"))
     }
-    setRestoringId(null)
+    
+    setIsSubmitting(false)
   }
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -117,7 +170,13 @@ export default function ArchivedMembersPage() {
     if (m.first_name.includes("[ELIMINADO]")) return false
     const searchMatch = `${m.first_name} ${m.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         (m.email && m.email.toLowerCase().includes(searchTerm.toLowerCase()))
-    return searchMatch
+    if (!searchMatch) return false
+    
+    if (seasonFilter !== "all") {
+      if (m.season_id !== seasonFilter) return false
+    }
+
+    return true
   })
 
   return (
@@ -137,9 +196,9 @@ export default function ArchivedMembersPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <div className="relative">
+      {/* Search & Filter */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
@@ -149,6 +208,16 @@ export default function ArchivedMembersPage() {
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
         </div>
+        <select 
+          value={seasonFilter}
+          onChange={e => setSeasonFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-4 py-2.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-64"
+        >
+          <option value="all">Todas las temporadas</option>
+          {seasons.map(s => (
+            <option key={s.id} value={s.id}>{s.name} {s.is_active ? '(Activa)' : ''}</option>
+          ))}
+        </select>
       </div>
 
       {/* Table */}
@@ -193,7 +262,13 @@ export default function ArchivedMembersPage() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-gray-900 line-through text-opacity-80">{member.first_name} {member.last_name}</span>
+                        <Link 
+                          href={`/dashboard/club/jugador/${member.id}`}
+                          className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {member.first_name} {member.last_name}
+                        </Link>
                         <span className="text-xs text-gray-500 mt-0.5">{member.email || "Sin email"}</span>
                       </div>
                     </td>
@@ -212,16 +287,20 @@ export default function ArchivedMembersPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button 
-                          onClick={(e) => handleRestore(e, member.id)}
-                          disabled={restoringId === member.id || deletingId === member.id}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setReactivatingPlayer(member)
+                            setSelectedTeam("unassigned")
+                          }}
+                          disabled={deletingId === member.id}
                           className="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-800 font-medium text-sm px-3 py-1.5 rounded-md hover:bg-emerald-50 transition-colors disabled:opacity-50"
                         >
-                          {restoringId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                          Restaurar
+                          <RefreshCw className="w-4 h-4" />
+                          Reactivar
                         </button>
                         <button 
                           onClick={(e) => handleDelete(e, member.id)}
-                          disabled={deletingId === member.id || restoringId === member.id}
+                          disabled={deletingId === member.id}
                           className="inline-flex items-center gap-1.5 text-red-500 hover:text-red-700 font-medium text-sm px-2 py-1.5 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
                           title="Eliminar definitivamente"
                         >
@@ -236,6 +315,42 @@ export default function ArchivedMembersPage() {
           </table>
         </div>
       </div>
+
+      <Dialog 
+        isOpen={!!reactivatingPlayer} 
+        onClose={() => setReactivatingPlayer(null)}
+        title={`Reactivar a ${reactivatingPlayer?.first_name || ''}`}
+        description="Selecciona el equipo de la temporada actual al que quieres asignar a este jugador."
+      >
+        <div className="py-4">
+          <select 
+            value={selectedTeam} 
+            onChange={(e) => setSelectedTeam(e.target.value)}
+            className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="unassigned" className="font-semibold">Sin Equipo (Dejar global)</option>
+            {teams.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button 
+            className="px-4 py-2 border border-slate-200 rounded-md text-sm font-medium hover:bg-slate-50 transition-colors"
+            onClick={() => setReactivatingPlayer(null)}
+          >
+            Cancelar
+          </button>
+          <button 
+            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            onClick={handleReactivate} 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Guardando..." : "Confirmar Reactivación"}
+          </button>
+        </div>
+      </Dialog>
     </div>
   )
 }

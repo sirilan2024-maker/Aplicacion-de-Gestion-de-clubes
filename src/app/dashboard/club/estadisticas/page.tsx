@@ -23,21 +23,50 @@ export default function EstadisticasClubPage() {
 
   useEffect(() => {
     const fetchAllData = async () => {
+      // Get active season
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
+      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+
       // Fetch teams
-      const { data: teams } = await supabase.from('equipos').select('id, name')
+      let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
+      if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+      const { data: teams } = await teamsQuery
       
+      const teamIds = (teams || []).map(t => t.id);
+
       // 1. Fetch Players data (remove hardcoded statuses that cause 0 count)
-      const { data: players } = await supabase
-        .from('players')
-        .select('id, first_name, last_name, height, weight, team_id')
-        .neq('status', 'inactive')
+      let players: any[] = []
+      if (teamIds.length > 0) {
+        const { data } = await supabase
+          .from('players')
+          .select('id, first_name, last_name, height, weight, team_id')
+          .neq('status', 'inactive')
+          .in('team_id', teamIds)
+        players = data || []
+      }
 
       // 2. Fetch Staff
-      const { data: staff } = await supabase.from('team_coaches').select('id, team_id')
+      let staff: any[] = []
+      if (teamIds.length > 0) {
+        const { data } = await supabase.from('team_coaches').select('id, team_id').in('team_id', teamIds)
+        staff = data || []
+      }
 
       // 3. Fetch Events & Attendance
-      const { data: events } = await supabase.from('team_events').select('id, team_id')
-      const { data: attendance } = await supabase.from('attendance').select('status, event_id')
+      let events: any[] = []
+      if (teamIds.length > 0) {
+        const { data } = await supabase.from('team_events').select('id, team_id').in('team_id', teamIds)
+        events = data || []
+      }
+      
+      const eventIds = (events || []).map(e => e.id);
+      let attendance: any[] = []
+      if (eventIds.length > 0) {
+        const { data } = await supabase.from('attendance').select('status, event_id').in('event_id', eventIds)
+        attendance = data || []
+      }
 
       // 4. Fetch Metrics Definitions
       const { data: clubMetrics } = await supabase.from('club_metrics').select('id, name')

@@ -60,7 +60,7 @@ export default function RendimientoGlobalPage() {
 
     try {
       // 1. Fetch team and metrics
-      const { data: teamData } = await supabase.from('equipos').select('club_id').eq('id', teamId).single();
+      const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
       if (!teamData) return;
       
       const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);

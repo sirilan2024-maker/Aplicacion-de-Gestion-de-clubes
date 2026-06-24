@@ -20,7 +20,7 @@ export async function submitTrainingFeedback(eventId: string, playerId: string, 
     if (evError || !eventData) throw new Error("Evento no encontrado");
 
     const { data: teamData } = await supabase
-      .from('equipos')
+      .from('teams')
       .select('club_id')
       .eq('id', eventData.team_id)
       .single();

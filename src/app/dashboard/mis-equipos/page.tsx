@@ -2,7 +2,7 @@ import RoleGuard from '@/components/RoleGuard'
 
 export default function MisEquiposPage() {
   return (
-    <RoleGuard allowedRoles={['coach']}>
+    <RoleGuard allowedRoles={['entrenador']}>
       <section className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-8 flex items-center justify-center">
         <div className="max-w-3xl w-full bg-white rounded-xl shadow-xl p-10 space-y-6">
           <h1 className="text-4xl font-extrabold text-gray-800 text-center mb-4">

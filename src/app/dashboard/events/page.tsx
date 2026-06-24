@@ -83,12 +83,25 @@ export default function EventsPage() {
       return
     }
 
+    // Fetch active season
+    const { data: activeSeason } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('club_id', profile.club_id)
+      .eq('is_active', true)
+      .single()
+
     // Fetch teams
-    const { data: equipos } = await supabase
-      .from("equipos")
+    let teamsQuery = supabase
+      .from('teams')
       .select("id, name, color")
       .eq("club_id", profile.club_id)
-      .order("name")
+      
+    if (activeSeason?.id) {
+      teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+    }
+
+    const { data: equipos } = await teamsQuery.order("name")
 
     if (!equipos) {
       setLoading(false)
@@ -105,10 +118,16 @@ export default function EventsPage() {
     // Fetch events for those teams
     const teamIds = equipos.map(eq => eq.id)
     if (teamIds.length > 0) {
-      const { data: eventsData } = await supabase
+      let eventsQuery = supabase
         .from("team_events")
         .select("*")
         .in("team_id", teamIds)
+
+      if (activeSeason?.id) {
+        eventsQuery = eventsQuery.eq('season_id', activeSeason.id)
+      }
+
+      const { data: eventsData } = await eventsQuery
 
       if (eventsData) {
         const mappedEvents: CalendarEvent[] = eventsData.map(ev => {

@@ -20,6 +20,8 @@ interface Player {
   phone: string | null;
 }
 
+import { getTeamCoachesProfilesAction } from "@/app/actions/team-actions";
+
 export default function PlantillaEquipoPage() {
   const params = useParams();
   const router = useRouter();
@@ -40,16 +42,43 @@ export default function PlantillaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
-      const { data: playersData, error } = await supabase
+      // 1. Fetch players
+      const { data: playersData, error: playersError } = await supabase
         .from("players")
         .select("id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone")
         .eq("team_id", teamId)
-        .neq("status", "inactive")
-        .order("last_name", { ascending: true });
+        .neq("status", "inactive");
 
-      if (error) throw error;
+      if (playersError) throw playersError;
+
+      // 2. Fetch assigned coaches from team_coaches using the server action to bypass RLS
+      const coachesData = await getTeamCoachesProfilesAction(teamId);
+
+      // 3. Map coaches to Player interface
+      const validCoaches = (coachesData || []).filter((tc: any) => tc && tc.profiles);
+      const mappedCoaches: Player[] = validCoaches.map((tc: any) => {
+        const p = tc.profiles;
+        return {
+          id: p.id,
+          first_name: p.first_name || "Entrenador",
+          last_name: p.last_name || "",
+          posicion: "Entrenador", // Usamos "Entrenador" para que el sort lo identifique
+          birth_date: "",
+          email: p.email,
+          parent_contact: null,
+          dorsal: null,
+          height: null,
+          weight: null,
+          phone: null,
+        };
+      });
+
+      console.log("Coaches fetched from DB:", coachesData);
+      console.log("Mapped Coaches:", mappedCoaches);
+
+      const combined = [...(playersData || []), ...mappedCoaches];
       
-      const sorted = (playersData || []).sort((a, b) => {
+      const sorted = combined.sort((a, b) => {
         const isCoachA = a.posicion?.toLowerCase().includes('entrenador') || a.posicion?.toLowerCase().includes('delegado') || a.posicion?.toLowerCase().includes('técnico');
         const isCoachB = b.posicion?.toLowerCase().includes('entrenador') || b.posicion?.toLowerCase().includes('delegado') || b.posicion?.toLowerCase().includes('técnico');
         

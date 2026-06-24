@@ -1,5 +1,5 @@
 'use server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
@@ -86,8 +86,8 @@ export async function registerWithInviteCode(
     return { success: false, error: 'Todos los campos son obligatorios.' }
   }
 
-  if (!['entrenador', 'jugador', 'familia'].includes(role)) {
-    return { success: false, error: 'Rol no permitido.' }
+  if (!['jugador', 'tutor'].includes(role)) {
+    return { success: false, error: 'Rol no permitido para registro público.' }
   }
 
   if (password.length < 8) {
@@ -117,8 +117,7 @@ export async function registerWithInviteCode(
       data: {
         first_name: firstName,
         last_name:  lastName,
-        role:       role === 'entrenador' || role === 'jugador' ? 'coach' : role,
-        rol:        role,
+        role:       role,
         club_id:    team.club_id,
         team_id:    team.id,
       },
@@ -135,26 +134,26 @@ export async function registerWithInviteCode(
     return { success: false, error: 'No se pudo crear el usuario. Inténtalo de nuevo.' }
   }
 
-  // ── 3. Si es familia o jugador, crear un jugador placeholder vinculado al equipo ──
+  // ── 3. Crear un jugador placeholder vinculado al equipo ──
   let linkedPlayerId: string | null = null
-  if (role === 'familia' || role === 'jugador') {
-    const { data: playerData, error: playerError } = await supabase
-      .from('players')
-      .insert({
-        first_name:   firstName,
-        last_name:    lastName,
-        team_id:      team.id,
-        club_id:      team.club_id,
-        birth_date:   new Date().toISOString().split('T')[0], // default valid date
-      })
-      .select('id')
-      .single()
+  const { data: playerData, error: playerError } = await supabase
+    .from('players')
+    .insert({
+      first_name:   firstName,
+      last_name:    lastName,
+      team_id:      team.id,
+      club_id:      team.club_id,
+      birth_date:   new Date().toISOString().split('T')[0], // default valid date
+      user_auth_id: role === 'jugador' ? userId : null,
+      tutor_id:     role === 'tutor' ? userId : null,
+    })
+    .select('id')
+    .single()
 
-    if (playerError) {
-      console.error('[InviteRegister] player insert error:', playerError.message)
-    } else if (playerData) {
-      linkedPlayerId = playerData.id
-    }
+  if (playerError) {
+    console.error('[InviteRegister] player insert error:', playerError.message)
+  } else if (playerData) {
+    linkedPlayerId = playerData.id
   }
 
   // ── 4. Insertar/Actualizar perfil ──
@@ -166,8 +165,7 @@ export async function registerWithInviteCode(
       email,
       first_name:       firstName,
       last_name:        lastName,
-      role:             role === 'entrenador' || role === 'jugador' ? 'coach' : role,
-      rol:              role,
+      role:             role,
       club_id:          team.club_id,
       team_id:          team.id,
       linked_player_id: linkedPlayerId,
@@ -187,4 +185,81 @@ export async function signOut() {
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
   return redirect('/login')
+}
+
+// ─── NEW: Register Staff via Invitation Link ─────────────────────────────────
+export async function registerInvitedStaffAction(
+  token: string,
+  formData: FormData
+): Promise<RegisterWithInviteResult> {
+  const email      = (formData.get('email')        as string)?.trim()
+  const password   =  formData.get('password')     as string
+  const firstName  = (formData.get('first_name')   as string)?.trim()
+  const lastName   = (formData.get('last_name')    as string)?.trim()
+
+  if (!token || !email || !password || !firstName || !lastName) {
+    return { success: false, error: 'Todos los campos son obligatorios.' }
+  }
+
+  if (password.length < 8) {
+    return { success: false, error: 'La contraseña debe tener al menos 8 caracteres.' }
+  }
+
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+
+  // 1. Verify token
+  const { data: invite, error: inviteError } = await adminClient
+    .from('staff_invitations')
+    .select('*')
+    .eq('token', token)
+    .single()
+
+  if (inviteError || !invite) {
+    return { success: false, error: 'Enlace de invitación inválido o no existe.' }
+  }
+
+  if (invite.used) {
+    return { success: false, error: 'Este enlace ya ha sido utilizado.' }
+  }
+
+  // 2. Sign up user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      data: { first_name: firstName, last_name: lastName, role: invite.role },
+    },
+  })
+
+  if (authError || !authData.user) {
+    return { success: false, error: authError?.message || 'Error al crear la cuenta.' }
+  }
+
+  const userId = authData.user.id
+
+  // 3. Mark token as used
+  await adminClient
+    .from('staff_invitations')
+    .update({ used: true, used_at: new Date().toISOString() })
+    .eq('id', invite.id)
+
+  // 4. Upsert Profile with correct club_id and role
+  const { error: profileError } = await adminClient
+    .from('profiles')
+    .upsert({
+      id:         userId,
+      email:      email,
+      first_name: firstName,
+      last_name:  lastName,
+      role:       invite.role,
+      club_id:    invite.club_id
+    }, { onConflict: 'id' })
+
+  if (profileError) {
+    console.error('[StaffInvite] profile upsert error:', profileError.message)
+  }
+
+  return { success: true, requireEmailVerification: true }
 }

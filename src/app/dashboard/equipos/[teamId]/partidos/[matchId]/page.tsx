@@ -21,7 +21,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
   const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", teamId).single()
   let oldTeamId = teamId;
   if (newTeamData) {
-    const { data: oldTeamData } = await supabase.from("equipos").select("id").ilike("name", newTeamData.name).single()
+    const { data: oldTeamData } = await supabase.from('teams').select("id").ilike("name", newTeamData.name).single()
     if (oldTeamData) oldTeamId = oldTeamData.id;
   }
 
@@ -44,7 +44,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .order("minuto", { ascending: true })
 
   const { data: equipoCoach } = await supabase
-    .from("equipos")
+    .from('teams')
     .select("name")
     .eq("id", teamId)
     .single()

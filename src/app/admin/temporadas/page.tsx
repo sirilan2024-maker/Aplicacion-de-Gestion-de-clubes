@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save } from "lucide-react";
+import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Season {
@@ -90,6 +90,29 @@ export default function TemporadasPage() {
     setIsSubmitting(false);
   };
 
+  const handleCloseSeason = async (season: Season) => {
+    const daysLeft = Math.ceil(
+      (new Date(season.end_date).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24)
+    );
+    const msg = daysLeft > 0
+      ? `¿Estás seguro de que quieres CERRAR la temporada "${season.name}"? Quedan ${daysLeft} días. Los datos quedarán archivados y no se podrán editar.`
+      : `¿Estás seguro de que quieres CERRAR la temporada "${season.name}"? Los datos quedarán archivados.`;
+    if (!confirm(msg)) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('seasons')
+      .update({ is_active: false })
+      .eq('id', season.id);
+
+    if (error) {
+      toast.error('Error al cerrar la temporada: ' + error.message);
+    } else {
+      toast.success(`Temporada "${season.name}" cerrada y archivada. ¡Puedes crear la nueva temporada!`);
+      fetchData();
+    }
+  };
+
   const handleSetActive = async (seasonId: string) => {
     if (!confirm("¿Estás seguro de que quieres marcar esta temporada como la Activa? Todas las vistas de la plataforma usarán esta temporada por defecto.")) return;
     
@@ -116,12 +139,12 @@ export default function TemporadasPage() {
           <h1 className="text-3xl font-bold text-slate-900">Gestión de Temporadas</h1>
           <p className="text-gray-500 mt-1">Configura y administra los años deportivos de tu club</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+        <button 
+          onClick={() => router.push('/admin/temporadas/nueva')}
+          className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors shadow-sm shadow-green-600/20"
         >
-          <Plus size={18} />
-          Nueva Temporada
+          <Plus size={16} />
+          <span>Nueva Temporada</span>
         </button>
       </div>
 
@@ -175,8 +198,16 @@ export default function TemporadasPage() {
               </div>
               
               <div className="flex items-center gap-3 border-t md:border-t-0 pt-4 md:pt-0">
-                {!season.is_active && (
-                  <button 
+                {season.is_active ? (
+                  <button
+                    onClick={() => handleCloseSeason(season)}
+                    className="flex-1 md:flex-none text-center flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <Lock size={14} />
+                    Cerrar Temporada
+                  </button>
+                ) : (
+                  <button
                     onClick={() => handleSetActive(season.id)}
                     className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
@@ -185,7 +216,7 @@ export default function TemporadasPage() {
                 )}
                 <button 
                   className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                  onClick={() => router.push(`/admin/equipos?seasonId=${season.id}`)}
+                  onClick={() => router.push(`/dashboard/equipos`)}
                 >
                   Ver Equipos
                 </button>

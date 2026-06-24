@@ -28,6 +28,12 @@ export default function MinutosPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      // 0. Get active season
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
+      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+
       // 1. Fetch metrics definitions
       const { data: metrics } = await supabase.from('club_metrics').select('id, name')
       const minIds = metrics?.filter(m => m.name.toLowerCase().includes('minutos')).map(m => m.id) || []
@@ -38,42 +44,64 @@ export default function MinutosPage() {
       }
 
       // 2. Fetch teams
-      const { data: teamsData } = await supabase.from('equipos').select('id, name')
+      let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
+      if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+      const { data: teamsData } = await teamsQuery
+      
+      const teamIds = (teamsData || []).map(t => t.id)
       if (teamsData) setTeams(teamsData)
 
       // 3. Fetch players with team info
-      const { data: players } = await supabase
-        .from('players')
-        .select(`
-          id, 
-          first_name, 
-          last_name, 
-          team_id,
-          equipos ( name )
-        `)
-        .neq('status', 'inactive')
+      let players: any[] = []
+      if (teamIds.length > 0) {
+        const { data } = await supabase
+          .from('players')
+          .select(`
+            id, 
+            first_name, 
+            last_name, 
+            team_id,
+            teams ( name )
+          `)
+          .neq('status', 'inactive')
+          .in('team_id', teamIds)
+        players = data || []
+      }
 
-      // 4. Fetch performance data for minutes
-      const { data: perf } = await supabase
-        .from('player_training_metrics')
-        .select('event_id, value_number, player_id')
-        .in('metric_id', minIds)
+      // 4. Fetch team events for active season to filter perf
+      let events: any[] = []
+      if (teamIds.length > 0) {
+        const { data } = await supabase.from('team_events').select('id').in('team_id', teamIds)
+        events = data || []
+      }
+      const eventIds = (events || []).map(e => e.id)
+
+      // 5. Fetch performance data for minutes
+      let perf: any[] = []
+      if (eventIds.length > 0) {
+        const { data } = await supabase
+          .from('player_training_metrics')
+          .select('event_id, value_number, player_id')
+          .in('metric_id', minIds)
+          .in('event_id', eventIds)
+        perf = data || []
+      }
 
       if (!perf || perf.length === 0) {
         setLoading(false)
         return
       }
 
-      const eventIds = [...new Set(perf.map(p => p.event_id))]
+      const perfEventIds = [...new Set(perf.map(p => p.event_id))]
 
       // 5. Fetch team_events to know if it's training or match
-      const { data: events } = await supabase
+      const { data: perfEvents } = await supabase
         .from('team_events')
         .select('id, event_type')
-        .in('id', eventIds)
+        .in('id', perfEventIds)
 
       const eventTypeMap = new Map<string, string>()
-      events?.forEach(e => eventTypeMap.set(e.id, e.event_type))
+      perfEvents?.forEach(e => eventTypeMap.set(e.id, e.event_type))
 
       const playerMap = new Map<string, MinutesRow>()
 
@@ -82,7 +110,7 @@ export default function MinutosPage() {
           playerId: p.id,
           playerName: `${p.first_name} ${p.last_name || ''}`.trim(),
           teamId: p.team_id,
-          teamName: p.equipos?.name || 'Sin equipo',
+          teamName: p.teams?.name || 'Sin equipo',
           trainingMinutes: 0,
           matchMinutes: 0,
           totalMinutes: 0

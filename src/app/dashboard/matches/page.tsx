@@ -8,8 +8,10 @@ export default async function PartidosPage() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) return null
 
-  // Fetch all matches with team info
-  const { data: matches } = await supabase
+  const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', userData.user.id).single()
+  const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+
+  let matchesQuery = supabase
     .from("partidos")
     .select(`
       *,
@@ -17,14 +19,24 @@ export default async function PartidosPage() {
     `)
     .order("fecha_hora", { ascending: false })
 
-  const { data: teams } = await supabase
+  let teamsQuery = supabase
     .from("teams")
     .select("id, name, category")
     .order("name", { ascending: true })
 
-  const { data: equipos } = await supabase
-    .from("equipos")
+  let equiposQuery = supabase
+    .from('teams')
     .select("id, name")
+
+  if (activeSeason?.id) {
+    matchesQuery = matchesQuery.eq("season_id", activeSeason.id)
+    teamsQuery = teamsQuery.eq("season_id", activeSeason.id)
+    equiposQuery = equiposQuery.eq("season_id", activeSeason.id)
+  }
+
+  const { data: matches } = await matchesQuery
+  const { data: teams } = await teamsQuery
+  const { data: equipos } = await equiposQuery
 
   const { data: players, error: playersError } = await supabase
     .from("players")

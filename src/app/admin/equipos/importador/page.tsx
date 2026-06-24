@@ -59,7 +59,7 @@ export default function ImportadorEquiposPage() {
       
       // Cargar los equipos existentes para el selector
       const { data: teams } = await supabase
-        .from('equipos')
+        .from('teams')
         .select('id, name')
         .eq('club_id', profile.club_id)
         .order('name');
@@ -230,7 +230,7 @@ export default function ImportadorEquiposPage() {
         // Buscar si el equipo ya existe en el club, independientemente de la temporada
         // para re-aprovecharlo si fue creado antes del sistema de temporadas.
         const { data: existingTeam } = await supabase
-          .from('equipos')
+          .from('teams')
           .select('id')
           .eq('club_id', clubId)
           .eq('name', teamName)
@@ -255,7 +255,7 @@ export default function ImportadorEquiposPage() {
            // Actualizar el equipo para asignarlo a esta temporada si no lo estaba
            // Y actualizar contadores agregando los nuevos a los que ya hubiera (o sobrescribiendo si lo prefieres,
            // pero como es un importador masivo es mejor establecer los contadores exactos de este lote)
-           await supabase.from('equipos')
+           await supabase.from('teams')
             .update({ 
               season_id: activeSeason.id,
               members: numPlayers,
@@ -265,7 +265,7 @@ export default function ImportadorEquiposPage() {
         } else {
           // Crear el equipo con todos los campos obligatorios
           const { data: newTeam, error: teamError } = await supabase
-            .from('equipos')
+            .from('teams')
             .insert({
               club_id: clubId,
               season_id: activeSeason.id,

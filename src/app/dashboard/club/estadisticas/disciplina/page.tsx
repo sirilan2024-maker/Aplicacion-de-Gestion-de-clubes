@@ -37,26 +37,49 @@ export default function DisciplinaPage() {
   const router = useRouter()
 
   const fetchData = async () => {
+    // 0. Get active season
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
+    const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+
     // 1. Fetch teams
-    const { data: teamsData } = await supabase.from('equipos').select('id, name')
+    let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
+    if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+    const { data: teamsData } = await teamsQuery
+    
+    const teamIds = (teamsData || []).map(t => t.id)
     if (teamsData) setTeams(teamsData)
 
     // 2. Fetch all matches
-    const { data: matches } = await supabase.from('partidos').select('*').order('fecha_hora', { ascending: false })
+    let matchesQuery = supabase.from('partidos').select('*').eq('club_id', profile?.club_id).order('fecha_hora', { ascending: false })
+    if (activeSeason?.id) matchesQuery = matchesQuery.eq('season_id', activeSeason.id)
+    const { data: matches } = await matchesQuery
+    
+    const matchIds = (matches || []).map(m => m.id)
     if (matches) setAllMatches(matches)
 
     // 3. Fetch convocatorias with cards
-    const { data: convs } = await supabase.from('convocatorias').select('*')
-    if (convs) setAllConvocatorias(convs)
+    let convs: any[] = []
+    if (matchIds.length > 0) {
+      const { data } = await supabase.from('convocatorias').select('*').in('match_id', matchIds)
+      convs = data || []
+    }
+    setAllConvocatorias(convs)
 
     // 4. Fetch players with team info
-    const { data: players } = await supabase
-      .from('players')
-      .select(`
-        *,
-        equipos ( name )
-      `)
-      .neq('status', 'inactive')
+    let players: any[] = []
+    if (teamIds.length > 0) {
+      const { data } = await supabase
+        .from('players')
+        .select(`
+          *,
+          teams ( name )
+        `)
+        .neq('status', 'inactive')
+        .in('team_id', teamIds)
+      players = data || []
+    }
 
     const playerMap = new Map<string, DisciplineRow>()
 
@@ -65,7 +88,7 @@ export default function DisciplinaPage() {
         playerId: p.id,
         playerName: `${p.first_name} ${p.last_name || ''}`.trim(),
         teamId: p.team_id,
-        teamName: p.equipos?.name || 'Sin equipo',
+        teamName: p.teams?.name || 'Sin equipo',
         avatar_url: p.avatar_url,
         yellows: 0,
         reds: 0,

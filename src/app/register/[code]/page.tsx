@@ -20,7 +20,7 @@ export default function InviteRegisterPage() {
       if (!inviteCode) return;
       const supabase = createClient();
       const { data, error: fetchError } = await supabase
-        .from("equipos")
+        .from('teams')
         .select("id, name, club_id")
         .eq("invite_code", inviteCode)
         .single();

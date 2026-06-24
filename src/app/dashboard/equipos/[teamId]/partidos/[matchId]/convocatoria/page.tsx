@@ -27,7 +27,7 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", params.teamId).single()
       let oldTeamId = params.teamId;
       if (newTeamData) {
-        const { data: oldTeamData } = await supabase.from("equipos").select("id").ilike("name", newTeamData.name).single()
+        const { data: oldTeamData } = await supabase.from('teams').select("id").ilike("name", newTeamData.name).single()
         if (oldTeamData) oldTeamId = oldTeamData.id;
       }
 

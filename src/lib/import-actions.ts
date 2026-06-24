@@ -60,7 +60,7 @@ export async function importSportingSaladarData(clubId: string) {
   for (const teamData of SPORTING_SALADAR_DATA) {
     // A. Insert Team into 'equipos'
     const { data: newTeam, error: teamError } = await adminSupabase
-      .from('equipos')
+      .from('teams')
       .insert({
         name: teamData.name,
         category: teamData.category,
@@ -82,7 +82,7 @@ export async function importSportingSaladarData(clubId: string) {
 
     // Diagnostic: verify the team actually exists in the DB
     const { data: verifyTeam, error: verifyError } = await adminSupabase
-      .from('equipos')
+      .from('teams')
       .select('id')
       .eq('id', newTeam.id)
       .single()

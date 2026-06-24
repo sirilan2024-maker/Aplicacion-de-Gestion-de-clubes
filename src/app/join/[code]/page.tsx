@@ -34,7 +34,7 @@ export default function JoinTeamPage() {
       if (!inviteCode) return;
       const supabase = createClient();
       const { data, error: fetchError } = await supabase
-        .from("equipos")
+        .from('teams')
         .select("id, name, sport, category, club_id")
         .eq("invite_code", inviteCode)
         .single();
@@ -99,9 +99,9 @@ export default function JoinTeamPage() {
       }
 
       // Optimistically increment members count in equipos table (optional)
-      const { data: teamData } = await supabase.from("equipos").select("members").eq("id", team.id).single();
+      const { data: teamData } = await supabase.from('teams').select("members").eq("id", team.id).single();
       if (teamData) {
-        await supabase.from("equipos").update({ members: (teamData.members || 0) + 1 }).eq("id", team.id);
+        await supabase.from('teams').update({ members: (teamData.members || 0) + 1 }).eq("id", team.id);
       }
 
       const verificationLink = `${window.location.origin}/verify-email?token=${verificationToken}`;

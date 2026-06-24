@@ -23,7 +23,7 @@ export default function TeamLayout({
       if (!teamId) return;
       const supabase = createClient();
       const { data, error } = await supabase
-        .from("equipos")
+        .from('teams')
         .select("name")
         .eq("id", teamId)
         .single();

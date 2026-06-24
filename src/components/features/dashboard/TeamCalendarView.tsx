@@ -19,7 +19,7 @@ export function TeamCalendarView({ teamId }: { teamId: string }) {
       
       // 1. Obtener el nombre del equipo desde 'equipos' (tabla del Coach Dashboard)
       const { data: equipoCoach } = await supabase
-        .from('equipos')
+        .from('teams')
         .select('name')
         .eq('id', teamId)
         .single();

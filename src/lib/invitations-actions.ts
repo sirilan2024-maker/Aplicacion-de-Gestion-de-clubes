@@ -46,7 +46,7 @@ export async function getInvitationByToken(token: string) {
     .from("invitations")
     .select(`
       *,
-      equipo:equipos(name, club:clubs(name))
+      equipo:teams (name, club:clubs(name))
     `)
     .eq("token", token)
     .single()

@@ -42,7 +42,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           .single()
           
         if (profile?.club_id) {
-          let query = supabase.from("equipos").select("id, name").eq("club_id", profile.club_id).order("name")
+          let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id).order("name")
           if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
             query = query.eq('coach_id', user.id)
           }

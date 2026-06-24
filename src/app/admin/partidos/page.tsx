@@ -33,15 +33,28 @@ export default function AdminPartidosPage() {
         return
       }
 
+      // Obtener temporada activa
+      const { data: activeSeason } = await supabase
+        .from('seasons')
+        .select('id')
+        .eq('club_id', profile.club_id)
+        .eq('is_active', true)
+        .single()
+
       // Buscar los partidos del club
-      const { data, error } = await supabase
+      let query = supabase
         .from("partidos")
         .select(`
           *,
           equipo:teams(id, name, color)
         `)
         .eq("club_id", profile.club_id)
-        .order("fecha_hora", { ascending: false })
+        
+      if (activeSeason?.id) {
+        query = query.eq('season_id', activeSeason.id)
+      }
+      
+      const { data, error } = await query.order("fecha_hora", { ascending: false })
       
       if (data) setMatches(data)
       setLoading(false)

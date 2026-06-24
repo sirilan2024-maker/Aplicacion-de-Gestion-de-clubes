@@ -3,12 +3,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, Search, UserPlus, MoreHorizontal, User } from "lucide-react";
+import { Plus, X, Search, UserPlus, MoreHorizontal, User, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SPORTS, GENDERS, AGE_GROUPS, FORMATS, COLORS } from "@/lib/constants";
 import { importSportingSaladarData } from "@/lib/import-actions";
+import { getAvailableCoachesAction, getTeamCoachesAction, toggleCoachTeamAssignmentAction } from "@/app/actions/team-actions";
+import SeasonAlertBanner from "@/components/season/SeasonAlertBanner";
 
 // Types
 interface Team {
@@ -17,11 +19,11 @@ interface Team {
   category: string;
   members: number;
   coaches: number;
-  sport: string;
-  gender: string;
-  age_group: string;
-  format: string;
   color: string;
+  sport?: string;
+  gender?: string;
+  age_group?: string;
+  format?: string;
   ffcv_url?: string;
 }
 
@@ -403,6 +405,109 @@ function EditTeamModal({
   );
 }
 
+// Modal for Assigning Coaches
+function AssignCoachModal({
+  open,
+  onClose,
+  team,
+  clubId
+}: {
+  open: boolean;
+  onClose: () => void;
+  team: Team | null;
+  clubId: string | null;
+}) {
+  const [coaches, setCoaches] = useState<any[]>([]);
+  const [assignedIds, setAssignedIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (open && team && clubId) {
+      loadData();
+    }
+  }, [open, team, clubId]);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [coachesRes, assignedRes] = await Promise.all([
+      getAvailableCoachesAction(clubId!),
+      getTeamCoachesAction(team!.id)
+    ]);
+    if (coachesRes.success) setCoaches(coachesRes.coaches || []);
+    if (assignedRes.success) setAssignedIds(assignedRes.assignedIds || []);
+    setLoading(false);
+  };
+
+  const handleToggle = async (coachId: string, currentlyAssigned: boolean) => {
+    // Optimistic UI
+    if (currentlyAssigned) {
+      setAssignedIds(prev => prev.filter(id => id !== coachId));
+    } else {
+      setAssignedIds(prev => [...prev, coachId]);
+    }
+    const res = await toggleCoachTeamAssignmentAction(team!.id, coachId, clubId!, !currentlyAssigned);
+    if (!res.success) {
+      alert("Error: " + (res.error || "No se pudo cambiar la asignación"));
+      // Revert if error
+      loadData();
+    }
+  };
+
+  if (!open || !team) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Asignar Entrenadores</h2>
+            <p className="text-sm text-gray-500 mt-1">Equipo: <span className="font-semibold text-blue-600">{team.name}</span></p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1 hover:bg-gray-200">
+            <X className="h-5 w-5 text-gray-800" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
+        ) : coaches.length === 0 ? (
+          <div className="text-center py-6 text-gray-500 text-sm bg-gray-50 rounded-lg">
+            No hay staff disponible en el club.
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+            {coaches.map(coach => {
+              const isAssigned = assignedIds.includes(coach.id);
+              return (
+                <div key={coach.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{coach.first_name} {coach.last_name}</p>
+                      <p className="text-xs text-gray-500 capitalize">{coach.role}</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer" 
+                      checked={isAssigned}
+                      onChange={() => handleToggle(coach.id, isAssigned)}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main page */
 export default function EquiposPage() {
@@ -418,6 +523,10 @@ export default function EquiposPage() {
   const [showPlayersFor, setShowPlayersFor] = useState<string | null>(null);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null); // which card's dropdown is open
+  
+  // Assign Coach Modal State
+  const [assignCoachTeam, setAssignCoachTeam] = useState<Team | null>(null);
+  const [clubId, setClubId] = useState<string | null>(null);
 
   const fetchTeams = async () => {
     setLoading(true);
@@ -435,11 +544,24 @@ export default function EquiposPage() {
         
       if (!profile?.club_id) { setTeams([]); setLoading(false); return; }
 
+      // Fetch the active season to filter teams correctly (avoid duplicates from old seasons)
+      const { data: activeSeason } = await supabase
+        .from('seasons')
+        .select('id')
+        .eq('club_id', profile.club_id)
+        .eq('is_active', true)
+        .single();
+
       let query = supabase
-        .from("equipos")
-        .select("id, name, category, members, coaches, sport, gender, age_group, format, color, ffcv_url")
-        .eq("club_id", profile.club_id)
-        .order("name");
+        .from('teams')
+        .select("id, name, category, members, coaches, color")
+        .eq("club_id", profile.club_id);
+
+      if (activeSeason?.id) {
+        query = query.eq("season_id", activeSeason.id);
+      }
+      
+      query = query.order("name");
         
       // RBAC: Coaches and Delegados only see their assigned teams
       if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
@@ -460,11 +582,7 @@ export default function EquiposPage() {
           category: t.category,
           members: Number(t.members) || 0,
           coaches: Number(t.coaches) || 0,
-          sport: t.sport || '',
-          gender: t.gender || '',
-          age_group: t.age_group || '',
-          format: t.format || '',
-          color: t.color || '',
+          color: t.color || '#1E3A8A'
         }));
         setTeams(mapped);
       }
@@ -480,7 +598,7 @@ export default function EquiposPage() {
     const supabase = createClient();
     // .select() makes Supabase return the deleted rows — empty array means RLS silently blocked it
     const { data: deleted, error } = await supabase
-      .from("equipos")
+      .from('teams')
       .delete()
       .eq('id', teamId)
       .select('id');
@@ -500,7 +618,7 @@ export default function EquiposPage() {
   const handleFieldChange = async (teamId: string, field: string, value: string) => {
     const supabase = createClient();
     const updates: any = { [field]: value };
-    const { error } = await supabase.from("equipos").update(updates).eq('id', teamId);
+    const { error } = await supabase.from('teams').update(updates).eq('id', teamId);
     if (error) {
       console.error('⚠️ Error updating field:', error.message);
     } else {
@@ -532,19 +650,23 @@ export default function EquiposPage() {
     
     const { data: profile } = await supabase.from("profiles").select("club_id").eq("id", user.id).single();
     if (!profile?.club_id) return;
+    setClubId(profile.club_id);
 
-    const { data, error } = await supabase.from("equipos").insert({
+    const { data: activeSeason } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('club_id', profile.club_id)
+      .eq('is_active', true)
+      .single();
+
+    const { data, error } = await supabase.from('teams').insert({
       name: newTeam.name,
       category: newTeam.category,
       members: newTeam.members,
       coaches: newTeam.coaches,
-      sport: newTeam.sport,
-      gender: newTeam.gender,
-      age_group: newTeam.age_group,
-      format: newTeam.format,
       color: newTeam.color,
-      ffcv_url: newTeam.ffcv_url,
-      club_id: profile.club_id
+      club_id: profile.club_id,
+      season_id: activeSeason?.id || null
     }).select().single();
 
     if (error) {
@@ -564,8 +686,9 @@ export default function EquiposPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      const { data } = await supabase.from("profiles").select("role, club_id").eq("id", user.id).single();
       if (data?.role === 'admin') setIsAdmin(true);
+      if (data?.club_id) setClubId(data.club_id);
     }
   };
 
@@ -610,6 +733,7 @@ export default function EquiposPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <SeasonAlertBanner />
       <div className="flex items-center justify-between">
           <h1 className="text-4xl font-bold text-blue-900">Equipos</h1>
           {isAdmin && (
@@ -673,8 +797,8 @@ export default function EquiposPage() {
                   <h2 className="text-black font-bold uppercase text-base leading-tight truncate group-hover:text-blue-700 transition-colors">
                     {team.name}
                   </h2>
-                  <p className="text-gray-500 text-sm truncate">
-                    {team.sport}{team.gender ? ` · ${team.gender}` : ''}
+                  <p className="text-xs text-gray-500 mt-1 flex items-center">
+                    {team.category}
                   </p>
                 </div>
               </div>
@@ -735,6 +859,12 @@ export default function EquiposPage() {
                         Editar
                       </button>
                       <button
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAssignCoachTeam(team); setOpenMenuId(null); }}
+                      >
+                        Asignar Entrenador
+                      </button>
+                      <button
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteTeam(team.id); }}
                       >
@@ -772,7 +902,7 @@ export default function EquiposPage() {
           setEditTeam(null);
           const supabase = createClient();
           const { error } = await supabase
-            .from('equipos')
+            .from('teams')
             .update({
               name: updated.name,
               category: updated.category,
@@ -799,6 +929,16 @@ export default function EquiposPage() {
       open={showCreate}
       onClose={() => setShowCreate(false)}
       onCreate={handleCreateTeam}
+    />
+
+    <AssignCoachModal
+      open={assignCoachTeam !== null}
+      onClose={() => {
+        setAssignCoachTeam(null)
+        fetchTeams()
+      }}
+      team={assignCoachTeam}
+      clubId={clubId}
     />
     </div>
   );

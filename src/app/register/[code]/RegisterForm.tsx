@@ -23,7 +23,7 @@ export function RegisterForm({ inviteCode, teamName }: Props) {
   const [pending,        startTransition]  = useTransition()
   const [showPassword,   setShowPassword]  = useState(false)
   const [result,         setResult]        = useState<RegisterWithInviteResult | null>(null)
-  const [selectedRole,   setSelectedRole]  = useState<"entrenador" | "jugador" | "familia" | "">("")
+  const [selectedRole,   setSelectedRole]  = useState<"jugador" | "tutor" | "">("")
 
   // ── Submit ───────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -149,21 +149,7 @@ export function RegisterForm({ inviteCode, teamName }: Props) {
         <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
           ¿Cuál es tu rol?
         </label>
-        <div className="grid grid-cols-3 gap-2">
-          {/* Coach */}
-          <button
-            type="button"
-            onClick={() => setSelectedRole("entrenador")}
-            className={`flex flex-col items-center gap-2 p-3.5 rounded-xl border-2 text-xs font-semibold transition-all text-slate-900 bg-white ${
-              selectedRole === "entrenador"
-                ? "border-blue-600 ring-2 ring-blue-100"
-                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
-            }`}
-          >
-            <ShieldCheck size={20} className={selectedRole === "entrenador" ? "text-blue-600" : "text-slate-400"} />
-            <span>Soy Entrenador</span>
-          </button>
-
+        <div className="grid grid-cols-2 gap-2">
           {/* Jugador */}
           <button
             type="button"
@@ -181,20 +167,34 @@ export function RegisterForm({ inviteCode, teamName }: Props) {
           {/* Familia */}
           <button
             type="button"
-            onClick={() => setSelectedRole("familia")}
+            onClick={() => setSelectedRole("tutor")}
             className={`flex flex-col items-center gap-2 p-3.5 rounded-xl border-2 text-xs font-semibold transition-all text-slate-900 bg-white ${
-              selectedRole === "familia"
+              selectedRole === "tutor"
                 ? "border-blue-600 ring-2 ring-blue-100"
                 : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
             }`}
           >
-            <Users size={20} className={selectedRole === "familia" ? "text-blue-600" : "text-slate-400"} />
-            <span>Soy Familiar</span>
+            <Users size={20} className={selectedRole === "tutor" ? "text-blue-600" : "text-slate-400"} />
+            <span>Soy Familiar/Tutor</span>
           </button>
         </div>
         {!selectedRole && result && !result.success && (
           <p className="mt-1.5 text-xs text-red-500">Selecciona un rol para continuar.</p>
         )}
+      </div>
+
+      {/* Checkbox LOPDGDD */}
+      <div className="flex items-start gap-2.5 mt-4">
+        <input
+          id="lopd"
+          name="lopd"
+          type="checkbox"
+          required
+          className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+        <label htmlFor="lopd" className="text-xs text-gray-600 leading-relaxed">
+          Declaro que soy <strong>mayor de 14 años</strong> o actúo como <strong>tutor legal</strong> del menor, y consiento el tratamiento de mis datos y los del menor para la gestión deportiva del club según la LOPDGDD.
+        </label>
       </div>
 
       {/* Submit */}

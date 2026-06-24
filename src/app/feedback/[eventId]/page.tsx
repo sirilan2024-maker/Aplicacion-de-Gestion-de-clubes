@@ -41,7 +41,7 @@ export default function PlayerFeedbackPage() {
     // Fetch Event
     const { data: evData, error: evErr } = await supabase
       .from('team_events')
-      .select('*, equipos(name)')
+      .select('*, teams (name)')
       .eq('id', eventId)
       .single();
 
@@ -51,7 +51,7 @@ export default function PlayerFeedbackPage() {
     }
 
     setEventDetails(evData);
-    setTeamName(evData.equipos?.name || "Equipo");
+    setTeamName(evData.teams?.name || "Equipo");
 
     // Fetch Players
     const { data: plData } = await supabase

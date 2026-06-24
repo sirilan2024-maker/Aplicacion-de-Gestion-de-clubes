@@ -63,6 +63,7 @@ export default function GlobalMembersPage() {
           `)
           .eq("club_id", profile.club_id)
           .neq("status", "inactive")
+          .neq("status", "archived")
 
         const allMembers: Member[] = []
 

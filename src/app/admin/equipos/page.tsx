@@ -18,11 +18,11 @@ interface Team {
   category: string;
   members: number;
   coaches: number;
-  sport: string;
-  gender: string;
-  age_group: string;
-  format: string;
   color: string;
+  sport?: string;
+  gender?: string;
+  age_group?: string;
+  format?: string;
   ffcv_url?: string;
 }
 
@@ -441,8 +441,8 @@ function EquiposPageContent() {
       if (!profile?.club_id) { setTeams([]); setLoading(false); return; }
 
       let query = supabase
-        .from("equipos")
-        .select("id, name, category, members, coaches, sport, gender, age_group, format, color, ffcv_url")
+        .from("teams")
+        .select("id, name, category, members, coaches, color")
         .eq("club_id", profile.club_id)
         .order("name");
         
@@ -484,12 +484,7 @@ function EquiposPageContent() {
           category: t.category,
           members: Number(t.members) || 0,
           coaches: Number(t.coaches) || 0,
-          sport: t.sport || '',
-          gender: t.gender || '',
-          age_group: t.age_group || '',
-          format: t.format || '',
-          color: t.color || '',
-          ffcv_url: t.ffcv_url || '',
+          color: t.color || '#1E3A8A',
         }));
         setTeams(mapped);
       }
@@ -505,7 +500,7 @@ function EquiposPageContent() {
     const supabase = createClient();
     // .select() makes Supabase return the deleted rows — empty array means RLS silently blocked it
     const { data: deleted, error } = await supabase
-      .from("equipos")
+      .from('teams')
       .delete()
       .eq('id', teamId)
       .select('id');
@@ -525,7 +520,7 @@ function EquiposPageContent() {
   const handleFieldChange = async (teamId: string, field: string, value: string) => {
     const supabase = createClient();
     const updates: any = { [field]: value };
-    const { error } = await supabase.from("equipos").update(updates).eq('id', teamId);
+    const { error } = await supabase.from("teams").update(updates).eq('id', teamId);
     if (error) {
       console.error('⚠️ Error updating field:', error.message);
     } else {
@@ -558,17 +553,12 @@ function EquiposPageContent() {
     const { data: profile } = await supabase.from("profiles").select("club_id").eq("id", user.id).single();
     if (!profile?.club_id) return;
 
-    const { data, error } = await supabase.from("equipos").insert({
+    const { data, error } = await supabase.from("teams").insert({
       name: newTeam.name,
       category: newTeam.category,
       members: newTeam.members,
       coaches: newTeam.coaches,
-      sport: newTeam.sport,
-      gender: newTeam.gender,
-      age_group: newTeam.age_group,
-      format: newTeam.format,
       color: newTeam.color,
-      ffcv_url: newTeam.ffcv_url,
       club_id: profile.club_id,
       season_id: activeSeasonId
     }).select().single();
@@ -718,8 +708,8 @@ function EquiposPageContent() {
                   <h2 className="text-black font-bold uppercase text-base leading-tight truncate group-hover:text-blue-700 transition-colors">
                     {team.name}
                   </h2>
-                  <p className="text-gray-500 text-sm truncate">
-                    {team.sport}{team.gender ? ` · ${team.gender}` : ''}
+                  <p className="text-xs text-gray-500 mt-1 flex items-center">
+                    {team.category}
                   </p>
                 </div>
               </div>
@@ -814,7 +804,7 @@ function EquiposPageContent() {
           setEditTeam(null);
           const supabase = createClient();
           const { error } = await supabase
-            .from('equipos')
+            .from('teams')
             .update({
               name: updated.name,
               category: updated.category,

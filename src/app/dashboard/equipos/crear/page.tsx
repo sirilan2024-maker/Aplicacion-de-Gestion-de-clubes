@@ -41,7 +41,7 @@ export default function CrearEquipoPage() {
     };
 
     try {
-      const { data, error } = await supabase.from("equipos").insert([payload]);
+      const { data, error } = await supabase.from('teams').insert([payload]);
 
       if (error) throw error;
       toast.success("Equipo creado con éxito");

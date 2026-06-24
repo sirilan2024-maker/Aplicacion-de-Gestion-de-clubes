@@ -262,11 +262,11 @@ function ScreenTablaManual({
         setSaveError("Error: Inserción bloqueada. Revisa la política RLS de INSERT en la tabla 'players'.");
       } else {
         // Increment the counts in the equipos table
-        const { data: teamData } = await supabase.from("equipos").select("members, coaches").eq("id", teamId).single();
+        const { data: teamData } = await supabase.from('teams').select("members, coaches").eq("id", teamId).single();
         if (teamData) {
           const numJugadores = inserts.filter(i => i.posicion !== "entrenador").length;
           const numEntrenadores = inserts.filter(i => i.posicion === "entrenador").length;
-          await supabase.from("equipos").update({ 
+          await supabase.from('teams').update({ 
             members: (teamData.members || 0) + numJugadores,
             coaches: (teamData.coaches || 0) + numEntrenadores 
           }).eq("id", teamId);
@@ -432,7 +432,7 @@ function ScreenEnlaceCodigo({
       
       if (!forceNew) {
          // Obtener el código existente si lo hay
-         const { data } = await supabase.from("equipos").select("invite_code").eq("id", teamId).single();
+         const { data } = await supabase.from('teams').select("invite_code").eq("id", teamId).single();
          if (data?.invite_code) {
            setCode(data.invite_code);
            setLoading(false);
@@ -441,7 +441,7 @@ function ScreenEnlaceCodigo({
       }
 
       newCode = generateRandomCode();
-      const { error } = await supabase.from("equipos").update({ invite_code: newCode }).eq("id", teamId);
+      const { error } = await supabase.from('teams').update({ invite_code: newCode }).eq("id", teamId);
       if (!error) {
          setCode(newCode);
       } else {
@@ -900,7 +900,7 @@ export default function AnadirMiembrosPage() {
     const fetchTeam = async () => {
       const supabase = createClient();
       const { data } = await supabase
-        .from("equipos")
+        .from('teams')
         .select("name")
         .eq("id", teamId)
         .single();

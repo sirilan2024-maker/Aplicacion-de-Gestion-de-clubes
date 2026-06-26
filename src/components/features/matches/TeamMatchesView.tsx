@@ -45,14 +45,7 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
       setTeamName(equipoCoach.name)
       setFfcvUrl(equipoCoach.ffcv_url || null)
 
-      // 2. Buscar TODOS los equivalentes en tabla teams (porque puede haber varios)
-      const { data: globalTeamsData } = await supabase
-        .from("teams")
-        .select("*")
-        
-      const matchingGlobalTeam = globalTeamsData?.find(t => t.name.toLowerCase() === equipoCoach.name.toLowerCase());
-      const gTeamId = matchingGlobalTeam ? matchingGlobalTeam.id : teamId;
-      setGlobalTeamId(gTeamId);
+      setGlobalTeamId(teamId);
 
       // 3. Fetch all needed for GlobalMatchesView
       const [
@@ -69,7 +62,7 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
 
       setData({
         matches: partidosData || [],
-        teams: globalTeamsData || [],
+        teams: equiposData || [],
         equipos: equiposData || [],
         players: playersData || [],
         convocatorias: convocatoriasData || []
@@ -197,7 +190,6 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
             <GlobalMatchesView 
               initialMatches={data.matches}
               teams={data.teams}
-              equipos={data.equipos}
               players={data.players}
               convocatorias={data.convocatorias}
               fixedTeamId={globalTeamId}

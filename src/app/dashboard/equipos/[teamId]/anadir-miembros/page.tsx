@@ -261,6 +261,18 @@ function ScreenTablaManual({
       } else if (!inserted || inserted.length === 0) {
         setSaveError("Error: Inserción bloqueada. Revisa la política RLS de INSERT en la tabla 'players'.");
       } else {
+        // Fetch active season to insert into history
+        const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', club_id).eq('is_active', true).single();
+        if (activeSeason) {
+          const historyInserts = inserted.map((player) => ({
+            player_id: player.id,
+            club_id: club_id,
+            season_id: activeSeason.id,
+            team_id: teamId,
+            status: 'active'
+          }));
+          await supabase.from('player_season_history').insert(historyInserts);
+        }
         // Increment the counts in the equipos table
         const { data: teamData } = await supabase.from('teams').select("members, coaches").eq("id", teamId).single();
         if (teamData) {

@@ -42,14 +42,19 @@ export default function PlantillaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
-      // 1. Fetch players
-      const { data: playersData, error: playersError } = await supabase
-        .from("players")
-        .select("id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone")
+      // 1. Fetch players via history
+      const { data: historyData, error: playersError } = await supabase
+        .from("player_season_history")
+        .select(`
+          status,
+          players!inner (id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone)
+        `)
         .eq("team_id", teamId)
         .neq("status", "inactive");
 
       if (playersError) throw playersError;
+
+      const playersData = historyData?.map((h: any) => h.players) || [];
 
       // 2. Fetch assigned coaches from team_coaches using the server action to bypass RLS
       const coachesData = await getTeamCoachesProfilesAction(teamId);

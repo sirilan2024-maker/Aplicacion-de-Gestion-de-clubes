@@ -13,10 +13,21 @@ export async function archivePlayerAction(playerId: string, isArchived: boolean 
       return { success: false, error: { message: "No autenticado" } }
     }
 
+    const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
+    const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+
     const { error } = await supabase
       .from('players')
       .update({ status: isArchived ? 'inactive' : 'active' })
       .eq('id', playerId)
+
+    if (activeSeason?.id) {
+      await supabase
+        .from('player_season_history')
+        .update({ status: isArchived ? 'inactive' : 'active' })
+        .eq('player_id', playerId)
+        .eq('season_id', activeSeason.id)
+    }
 
     if (error) {
       console.error("Error archiving player:", error)

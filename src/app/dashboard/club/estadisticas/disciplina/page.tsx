@@ -69,16 +69,25 @@ export default function DisciplinaPage() {
 
     // 4. Fetch players with team info
     let players: any[] = []
-    if (teamIds.length > 0) {
+    if (teamIds.length > 0 && activeSeason?.id) {
       const { data } = await supabase
-        .from('players')
+        .from('player_season_history')
         .select(`
-          *,
-          teams ( name )
+          team_id,
+          teams ( name ),
+          players!inner (*)
         `)
-        .neq('status', 'inactive')
         .in('team_id', teamIds)
-      players = data || []
+        .eq('season_id', activeSeason.id)
+        .neq('status', 'inactive')
+        
+      if (data) {
+        players = data.map((h: any) => ({
+          ...h.players,
+          team_id: h.team_id,
+          teams: h.teams
+        }))
+      }
     }
 
     const playerMap = new Map<string, DisciplineRow>()

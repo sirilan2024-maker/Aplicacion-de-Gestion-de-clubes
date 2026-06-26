@@ -53,19 +53,25 @@ export default function MinutosPage() {
 
       // 3. Fetch players with team info
       let players: any[] = []
-      if (teamIds.length > 0) {
+      if (teamIds.length > 0 && activeSeason?.id) {
         const { data } = await supabase
-          .from('players')
+          .from('player_season_history')
           .select(`
-            id, 
-            first_name, 
-            last_name, 
             team_id,
-            teams ( name )
+            teams ( name ),
+            players!inner (id, first_name, last_name, status)
           `)
-          .neq('status', 'inactive')
           .in('team_id', teamIds)
-        players = data || []
+          .eq('season_id', activeSeason.id)
+          .neq('status', 'inactive')
+          
+        if (data) {
+          players = data.map((h: any) => ({
+            ...h.players,
+            team_id: h.team_id,
+            teams: h.teams
+          }))
+        }
       }
 
       // 4. Fetch team events for active season to filter perf

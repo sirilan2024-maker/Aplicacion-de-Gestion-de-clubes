@@ -12,13 +12,12 @@ import { TeamDisciplineView } from "./TeamDisciplineView"
 interface GlobalMatchesViewProps {
   initialMatches: any[];
   teams: any[];
-  equipos?: any[];
   players?: any[];
   convocatorias?: any[];
   fixedTeamId?: string;
 }
 
-export function GlobalMatchesView({ initialMatches, teams, equipos = [], players = [], convocatorias = [], fixedTeamId }: GlobalMatchesViewProps) {
+export function GlobalMatchesView({ initialMatches, teams, players = [], convocatorias = [], fixedTeamId }: GlobalMatchesViewProps) {
   const router = useRouter()
   const [matches, setMatches] = useState(initialMatches)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "all")
@@ -314,19 +313,19 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
       {viewMode === 'clasificacion' ? (
         selectedTeamId === 'all' ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {equipos.filter(e => e.ffcv_url).length === 0 ? (
+            {teams.filter(e => e.ffcv_url).length === 0 ? (
               <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
                 <p className="text-slate-500 font-medium">No hay ningún equipo con enlace a FFCV configurado en el club.</p>
               </div>
             ) : (
-              equipos.filter(e => e.ffcv_url).map(e => (
-                <div key={e.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              teams.filter(e => e.ffcv_url).map(team => (
+                <div key={team.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <h2 className="text-xl font-bold bg-slate-50 p-4 border-b border-slate-200 text-slate-800 flex items-center">
                     <Trophy className="w-5 h-5 text-amber-500 mr-2" />
-                    {e.name}
+                    {team.name}
                   </h2>
                   <div className="p-4">
-                    <FFCVStandings ffcvUrl={e.ffcv_url} teamName={e.name} />
+                    <FFCVStandings ffcvUrl={team.ffcv_url} teamName={team.name} />
                   </div>
                 </div>
               ))
@@ -335,7 +334,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
         ) : (
           (() => {
             const selectedTeamName = teams.find(t => t.id === selectedTeamId)?.name || '';
-            const equipoCoach = equipos.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
+            const equipoCoach = teams.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
             const ffcvUrl = equipoCoach?.ffcv_url || null;
             return <FFCVStandings ffcvUrl={ffcvUrl} teamName={selectedTeamName} />;
           })()
@@ -343,7 +342,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
       ) : viewMode === 'disciplina' ? (
         (() => {
           const selectedTeamName = teams.find(t => t.id === selectedTeamId)?.name || '';
-          const equipoCoach = equipos.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
+          const equipoCoach = teams.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
           const actualEquipoId = selectedTeamId === 'all' ? 'all' : (equipoCoach ? equipoCoach.id : selectedTeamId);
           return (
             <div className="pt-2">
@@ -369,7 +368,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
               key={match.id}
               onClick={() => {
                 const teamName = match.equipo?.name || teams.find(t => t.id === match.equipo_id)?.name;
-                const coachEquipo = equipos.find(e => e.name?.toLowerCase() === teamName?.toLowerCase());
+                const coachEquipo = teams.find(e => e.name?.toLowerCase() === teamName?.toLowerCase());
                 const targetTeamId = coachEquipo ? coachEquipo.id : match.equipo_id;
                 router.push(`/dashboard/equipos/${targetTeamId}/partidos/${match.id}`);
               }}
@@ -456,7 +455,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
                               return <span className="px-3 py-2 text-xs text-slate-400 italic">No hay convocados</span>;
                             }
                             const matchTeamName = teams.find(t => t.id === match.equipo_id)?.name;
-                            const oldEquipoId = equipos.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
+                            const oldEquipoId = teams.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
                             
                             return matchConvs.map(c => {
                               const p = players.find(player => player.id === c.player_id);
@@ -538,7 +537,7 @@ export function GlobalMatchesView({ initialMatches, teams, equipos = [], players
             if (pos.includes('entrenador') || pos.includes('delegado')) return false;
             
             const matchTeamName = teams.find(t => t.id === convocatoriaMatch.equipo_id)?.name;
-            const oldEquipoId = equipos?.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
+            const oldEquipoId = teams?.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
             const isConvocado = (convocatorias || []).some(c => c.partido_id === convocatoriaMatch.id && c.player_id === p.id);
             return isConvocado || p.team_id === oldEquipoId || p.team_id === convocatoriaMatch.equipo_id;
           })}

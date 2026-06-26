@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { BarChart3, Users, Activity, TrendingUp, Goal, AlertTriangle, Clock, Ruler, Scale, Filter } from "lucide-react"
+import { BarChart3, Users, Activity, TrendingUp, Goal, AlertTriangle, Clock, Ruler, Scale, Filter, History } from "lucide-react"
 import Link from "next/link"
 
 interface RawData {
@@ -36,15 +36,24 @@ export default function EstadisticasClubPage() {
       
       const teamIds = (teams || []).map(t => t.id);
 
-      // 1. Fetch Players data (remove hardcoded statuses that cause 0 count)
       let players: any[] = []
-      if (teamIds.length > 0) {
+      if (teamIds.length > 0 && activeSeason?.id) {
         const { data } = await supabase
-          .from('players')
-          .select('id, first_name, last_name, height, weight, team_id')
-          .neq('status', 'inactive')
+          .from('player_season_history')
+          .select(`
+            team_id,
+            players!inner (id, first_name, last_name, height, weight, status)
+          `)
           .in('team_id', teamIds)
-        players = data || []
+          .eq('season_id', activeSeason.id)
+          .neq('status', 'inactive')
+          
+        if (data) {
+          players = data.map((h: any) => ({
+            ...h.players,
+            team_id: h.team_id
+          }))
+        }
       }
 
       // 2. Fetch Staff
@@ -238,7 +247,17 @@ export default function EstadisticasClubPage() {
           </div>
         </div>
         
-        {/* Selector de Equipo */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Botón de Comparativa Histórica */}
+          <Link 
+            href="/dashboard/club/estadisticas/comparativa" 
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 font-semibold rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-200"
+          >
+            <History size={18} />
+            Comparativa Histórica
+          </Link>
+          
+          {/* Selector de Equipo */}
         <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
           <Filter size={18} className="text-gray-400" />
           <select 
@@ -251,6 +270,7 @@ export default function EstadisticasClubPage() {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
+        </div>
         </div>
       </div>
 

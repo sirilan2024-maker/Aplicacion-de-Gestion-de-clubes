@@ -24,27 +24,34 @@ export default async function PartidosPage() {
     .select("id, name, category")
     .order("name", { ascending: true })
 
-  let equiposQuery = supabase
-    .from('teams')
-    .select("id, name")
 
   if (activeSeason?.id) {
     matchesQuery = matchesQuery.eq("season_id", activeSeason.id)
     teamsQuery = teamsQuery.eq("season_id", activeSeason.id)
-    equiposQuery = equiposQuery.eq("season_id", activeSeason.id)
   }
 
   const { data: matches } = await matchesQuery
   const { data: teams } = await teamsQuery
-  const { data: equipos } = await equiposQuery
 
-  const { data: players, error: playersError } = await supabase
-    .from("players")
-    .select("id, first_name, last_name, team_id, posicion")
-    .neq("status", "inactive")
-
-  if (playersError) {
-    console.error("Error fetching players in matches/page.tsx:", playersError)
+  let players: any[] = [];
+  if (activeSeason?.id) {
+    const { data: historyData, error: playersError } = await supabase
+      .from("player_season_history")
+      .select(`
+        team_id,
+        players!inner (id, first_name, last_name, posicion, status)
+      `)
+      .eq("season_id", activeSeason.id)
+      .neq("status", "inactive");
+      
+    if (playersError) {
+      console.error("Error fetching players in matches/page.tsx:", playersError);
+    } else if (historyData) {
+      players = historyData.map((h: any) => ({
+        ...h.players,
+        team_id: h.team_id
+      }));
+    }
   }
 
   const { data: convocatorias } = await supabase
@@ -57,7 +64,6 @@ export default async function PartidosPage() {
         <GlobalMatchesView 
           initialMatches={matches || []}
           teams={teams || []}
-          equipos={equipos || []}
           players={players || []}
           convocatorias={convocatorias || []}
         />

@@ -554,7 +554,14 @@ export default function EquiposPage() {
 
       let query = supabase
         .from('teams')
-        .select("id, name, category, members, coaches, color")
+        .select(`
+          id, name, category, color, team_coaches(count),
+          player_season_history(
+            status,
+            season_id,
+            players(posicion)
+          )
+        `)
         .eq("club_id", profile.club_id);
 
       if (activeSeason?.id) {
@@ -576,14 +583,31 @@ export default function EquiposPage() {
            console.error(error.message || error);
         }
       } else {
-        const mapped = (data as any[]).map((t) => ({
-          id: t.id,
-          name: t.name,
-          category: t.category,
-          members: Number(t.members) || 0,
-          coaches: Number(t.coaches) || 0,
-          color: t.color || '#1E3A8A'
-        }));
+        const mapped = (data as any[]).map((t) => {
+          let membersCount = 0;
+          let coachesCount = t.team_coaches?.[0]?.count || 0;
+          
+          // Filter history manually (allow null season_id or matching active season)
+          const activeHistory = t.player_season_history?.filter((h: any) => 
+            (!h.season_id || h.season_id === activeSeason?.id) && h.status !== 'inactive'
+          ) || [];
+          
+          activeHistory.forEach((h: any) => {
+            const pos = h.players?.posicion?.toLowerCase() || '';
+            const isCoach = pos.includes('entrenador') || pos.includes('delegado') || pos.includes('técnico');
+            if (isCoach) coachesCount++;
+            else membersCount++;
+          });
+          
+          return {
+            id: t.id,
+            name: t.name,
+            category: t.category,
+            members: membersCount,
+            coaches: coachesCount,
+            color: t.color || '#1E3A8A'
+          };
+        });
         setTeams(mapped);
       }
     } catch (e) {
@@ -633,11 +657,18 @@ export default function EquiposPage() {
     try {
       const supabase = createClient();
       const { data, error } = await supabase
-        .from('players')
-        .select('id, first_name, last_name, posicion, dorsal')
-        .eq('team_id', teamId);
+        .from('player_season_history')
+        .select(`
+          players!inner (id, first_name, last_name, posicion, dorsal)
+        `)
+        .eq('team_id', teamId)
+        .neq('status', 'inactive');
+        
       if (error) console.error('⚠️ Error fetching players:', error.message);
-      else setPlayersMap((prev) => ({ ...prev, [teamId]: data || [] }));
+      else {
+        const extractedPlayers = data ? data.map((h: any) => h.players) : [];
+        setPlayersMap((prev) => ({ ...prev, [teamId]: extractedPlayers }));
+      }
     } catch (e) {
       console.error('Unexpected error fetching players for team:', e);
     }
@@ -701,7 +732,7 @@ export default function EquiposPage() {
     const { data: clubData, error: clubError } = await supabase.from("clubs").select("id").limit(1).single();
     if (clubError) { console.error('⚠️ Error fetching club id:', clubError.message); return; }
     const club_id = clubData.id;
-    const { error } = await supabase.from("players").insert({
+    const { data: insertedPlayer, error } = await supabase.from("players").insert({
       first_name: player.name.split(' ')[0] || "",
       last_name: player.name.split(' ').slice(1).join(' ') || "",
       posicion: player.position,
@@ -710,9 +741,22 @@ export default function EquiposPage() {
       club_id: club_id,
       birth_date: "2010-01-01",
       parent_contact: "Pendiente de rellenar",
-    });
-    if (error) console.error('⚠️ Error al añadir jugador:', error.message);
-    else {
+    }).select("id").single();
+    
+    if (error) {
+      console.error('⚠️ Error al añadir jugador:', error.message);
+    } else if (insertedPlayer) {
+      // Fetch active season to insert into history
+      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', club_id).eq('is_active', true).single();
+      if (activeSeason) {
+        await supabase.from('player_season_history').insert({
+          player_id: insertedPlayer.id,
+          club_id: club_id,
+          season_id: activeSeason.id,
+          team_id: selectedTeamId,
+          status: 'active'
+        });
+      }
       fetchTeams();
       setShowAddPlayer(false);
     }

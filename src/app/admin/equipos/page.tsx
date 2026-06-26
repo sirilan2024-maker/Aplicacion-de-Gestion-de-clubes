@@ -442,7 +442,7 @@ function EquiposPageContent() {
 
       let query = supabase
         .from("teams")
-        .select("id, name, category, members, coaches, color")
+        .select("id, name, category, color, players(count), team_coaches(count)")
         .eq("club_id", profile.club_id)
         .order("name");
         
@@ -482,8 +482,8 @@ function EquiposPageContent() {
           id: t.id,
           name: t.name,
           category: t.category,
-          members: Number(t.members) || 0,
-          coaches: Number(t.coaches) || 0,
+          members: t.players?.[0]?.count || 0,
+          coaches: t.team_coaches?.[0]?.count || 0,
           color: t.color || '#1E3A8A',
         }));
         setTeams(mapped);

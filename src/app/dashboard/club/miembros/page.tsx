@@ -54,16 +54,39 @@ export default function GlobalMembersPage() {
           .select("id, first_name, last_name, email, role")
           .eq("club_id", profile.club_id)
 
-        // 2. Fetch Players
-        const { data: playersData } = await supabase
-          .from("players")
-          .select(`
-            id, first_name, last_name, email, team_id,
-            equipos (name, color)
-          `)
+        // Get Active Season
+        const { data: activeSeason } = await supabase
+          .from("seasons")
+          .select("id")
           .eq("club_id", profile.club_id)
-          .neq("status", "inactive")
-          .neq("status", "archived")
+          .eq("is_active", true)
+          .single()
+
+        // 2. Fetch Players (via player_season_history instead of players.team_id)
+        let playersData: any[] = []
+        if (activeSeason) {
+          const { data: historyData } = await supabase
+            .from("player_season_history")
+            .select(`
+              team_id,
+              players!inner (id, first_name, last_name, email),
+              teams!inner (name, color, club_id)
+            `)
+            .eq("teams.club_id", profile.club_id)
+            .eq("season_id", activeSeason.id)
+            .neq("status", "inactive")
+
+          if (historyData) {
+            playersData = historyData.map((h: any) => ({
+              id: h.players.id,
+              first_name: h.players.first_name,
+              last_name: h.players.last_name,
+              email: h.players.email,
+              team_id: h.team_id,
+              equipos: Array.isArray(h.teams) ? h.teams[0] : h.teams
+            }))
+          }
+        }
 
         const allMembers: Member[] = []
 

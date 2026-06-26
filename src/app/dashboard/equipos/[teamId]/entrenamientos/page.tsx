@@ -71,7 +71,19 @@ export default function EntrenamientosListPage() {
         if (rpeMetricId && minMetricId && evData) {
           const eventIds = evData.map(e => e.id);
           const { data: ptData } = await supabase.from('player_training_metrics').select('event_id, player_id, metric_id, value_number').in('event_id', eventIds).in('metric_id', [rpeMetricId, minMetricId]);
-          const { data: plData } = await supabase.from('players').select('id, first_name, last_name').eq('team_id', teamId);
+          const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', teamData.club_id).eq('is_active', true).single();
+          let plData: any[] = [];
+          if (activeSeason?.id) {
+            const { data: historyData } = await supabase
+              .from('player_season_history')
+              .select('player_id, players(id, first_name, last_name)')
+              .eq('team_id', teamId)
+              .neq('status', 'inactive')
+              .or(`season_id.eq.${activeSeason.id},season_id.is.null`);
+            if (historyData) {
+              plData = historyData.map((h: any) => h.players);
+            }
+          }
 
           if (ptData && plData) {
             const today = new Date();

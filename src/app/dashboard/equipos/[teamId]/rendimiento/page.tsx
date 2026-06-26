@@ -65,9 +65,23 @@ export default function RendimientoGlobalPage() {
       
       const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
 
-      // 2. Fetch all players
-      const { data: allPlayers } = await supabase.from('players').select('id, first_name, last_name, dorsal, avatar_url, accumulated_minutes, technical_rating, posicion').eq('team_id', teamId);
-      if (!allPlayers) return;
+      // 2. Fetch Active Season & Players
+      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', teamData.club_id).eq('is_active', true).single();
+      
+      let allPlayers: any[] = [];
+      if (activeSeason?.id) {
+        const { data: historyData } = await supabase
+          .from('player_season_history')
+          .select('player_id, players(id, first_name, last_name, dorsal, avatar_url, accumulated_minutes, technical_rating, posicion)')
+          .eq('team_id', teamId)
+          .neq('status', 'inactive')
+          .or(`season_id.eq.${activeSeason.id},season_id.is.null`);
+          
+        if (historyData) {
+          allPlayers = historyData.map((h: any) => h.players);
+        }
+      }
+      if (!allPlayers.length) return;
 
       const players = allPlayers.filter(p => {
         const pos = p.posicion?.toLowerCase() || '';

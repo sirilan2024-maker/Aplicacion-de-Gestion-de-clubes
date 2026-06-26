@@ -66,14 +66,39 @@ export default function AsistenciaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
+      // 1. Get user profile and club
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
+      if (!profile?.club_id) return;
+
+      // 2. Get active season
+      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile.club_id).eq('is_active', true).single();
+      if (!activeSeason?.id) return;
+
+      // 3. Fetch players via player_season_history
       const { data: playersData, error } = await supabase
-        .from("players")
-        .select("id, first_name, last_name, dorsal")
+        .from("player_season_history")
+        .select(`
+          player_id,
+          players (
+            id, first_name, last_name, dorsal
+          )
+        `)
         .eq("team_id", teamId)
-        .order("last_name", { ascending: true });
+        .eq("season_id", activeSeason.id);
 
       if (error) throw error;
-      setPlayers(playersData || []);
+      
+      // Mapear al formato original
+      const mappedPlayers = (playersData || []).map((history: any) => ({
+        id: history.players.id,
+        first_name: history.players.first_name,
+        last_name: history.players.last_name,
+        dorsal: history.players.dorsal
+      })).sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
+
+      setPlayers(mappedPlayers);
     } catch (err: any) {
       toast.error("Error al cargar jugadores: " + err.message);
     }

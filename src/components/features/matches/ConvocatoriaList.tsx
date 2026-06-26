@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useTransition } from 'react';
 import { updateConvocatoria, sendConvocatoriaAlerts } from '@/app/actions/match-actions';
 import { Loader2 } from 'lucide-react';

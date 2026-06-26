@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, Users, Pencil, X, UserPlus } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useUserRole } from "@/hooks/useUserRole";
+import { getTeamCoachesProfilesAction } from "@/app/actions/team-actions";
 
 interface Player {
   id: string;
@@ -40,14 +41,57 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
     if (!teamId) return;
     const supabase = createClient();
     try {
-      const { data: playersData, error } = await supabase
-        .from("players")
-        .select("id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone")
-        .eq("team_id", teamId)
-        .order("last_name", { ascending: true });
+      const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
+      const { data: activeSeason } = teamData?.club_id ? await supabase.from('seasons').select('id').eq('club_id', teamData.club_id).eq('is_active', true).single() : { data: null };
 
-      if (error) throw error;
-      setPlayers(playersData || []);
+      let playersData: any[] = [];
+      if (activeSeason?.id) {
+        const { data: historyData } = await supabase
+          .from("player_season_history")
+          .select(`
+            status,
+            players!inner (id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone)
+          `)
+          .eq("team_id", teamId)
+          .eq("season_id", activeSeason.id)
+          .neq("status", "inactive");
+          
+        if (historyData) {
+          playersData = historyData.map((h: any) => h.players);
+        }
+      }
+
+      // Fetch coaches
+      const coachesData = await getTeamCoachesProfilesAction(teamId);
+      const mappedCoaches: Player[] = (coachesData || []).filter((tc: any) => tc && tc.profiles).map((tc: any) => {
+        const p = tc.profiles;
+        return {
+          id: p.id,
+          first_name: p.first_name || "Entrenador",
+          last_name: p.last_name || "",
+          posicion: "Entrenador",
+          birth_date: "",
+          email: p.email,
+          parent_contact: null,
+          dorsal: null,
+          height: null,
+          weight: null,
+          phone: null,
+        };
+      });
+
+      const combined = [...playersData, ...mappedCoaches];
+      const sorted = combined.sort((a, b) => {
+        const isCoachA = a.posicion?.toLowerCase().includes('entrenador') || a.posicion?.toLowerCase().includes('delegado');
+        const isCoachB = b.posicion?.toLowerCase().includes('entrenador') || b.posicion?.toLowerCase().includes('delegado');
+        if (isCoachA && !isCoachB) return -1;
+        if (!isCoachA && isCoachB) return 1;
+        const nameA = a.last_name || a.first_name || '';
+        const nameB = b.last_name || b.first_name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      setPlayers(sorted);
     } catch (err: any) {
       toast.error("Error al cargar la plantilla: " + err.message);
     } finally {

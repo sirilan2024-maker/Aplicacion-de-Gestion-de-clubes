@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle } from "lucide-react";
+import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Season {
@@ -132,6 +132,20 @@ export default function TemporadasPage() {
     }
   };
 
+  const handleDeleteSeason = async (season: Season) => {
+    if (!confirm(`¿Estás SEGURO de que quieres ELIMINAR la temporada "${season.name}"? Esta acción borrará todos los datos asociados a ella y no se puede deshacer.`)) return;
+    
+    const supabase = createClient();
+    const { error } = await supabase.from('seasons').delete().eq('id', season.id);
+    
+    if (error) {
+      toast.error("Error al eliminar la temporada: " + error.message);
+    } else {
+      toast.success("Temporada eliminada exitosamente");
+      fetchData();
+    }
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -219,6 +233,13 @@ export default function TemporadasPage() {
                   onClick={() => router.push(`/dashboard/equipos`)}
                 >
                   Ver Equipos
+                </button>
+                <button 
+                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors ml-2"
+                  onClick={() => handleDeleteSeason(season)}
+                  title="Eliminar Temporada"
+                >
+                  <Trash2 size={20} />
                 </button>
               </div>
             </div>

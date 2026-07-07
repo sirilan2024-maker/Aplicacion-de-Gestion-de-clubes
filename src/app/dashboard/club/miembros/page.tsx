@@ -1011,7 +1011,78 @@ export default function GlobalMembersPage() {
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        {/* VISTA MÓVIL (Cards) */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {loading ? (
+            <div className="p-8 text-center">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">Cargando directorio...</p>
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              No se encontraron miembros con esos filtros.
+            </div>
+          ) : (
+            filteredMembers.map((member) => (
+              <div 
+                key={member.id} 
+                className="p-4 hover:bg-blue-50/50 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (member.type === 'staff') router.push(`/dashboard/club/miembros/staff/${member.id}`)
+                  else if (member.type === 'player') router.push(`/dashboard/club/jugador/${member.id}`)
+                }}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{member.first_name} {member.last_name}</h3>
+                    {member.email?.includes('/register/staff/') ? (
+                      <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-1 inline-block">
+                        Pendiente de confirmación
+                      </span>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-0.5">{member.email || "Sin email"}</p>
+                    )}
+                  </div>
+                  <div>{getRoleBadge(member.role)}</div>
+                </div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-50">
+                  <div className="text-sm">
+                    {member.team_name ? (
+                      <div className="flex items-center gap-2">
+                        {member.team_color && (
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: member.team_color }}></div>
+                        )}
+                        <span className="font-medium text-gray-700">{member.team_name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs italic">Global / Sin asignar</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                     <button 
+                        onClick={(e) => { e.stopPropagation(); member.type === 'staff' ? setManagingMember(member) : router.push(`/dashboard/club/jugador/${member.id}`); }}
+                        className="text-blue-600 font-medium text-sm px-2 py-1 rounded-md hover:bg-blue-50"
+                      >
+                        Gestionar
+                      </button>
+                      {member.type === 'player' && (
+                        <button 
+                          onClick={(e) => handleArchive(e, member.id)}
+                          disabled={archivingId === member.id}
+                          className="text-red-500 p-1.5 rounded-md hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                        </button>
+                      )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* VISTA ESCRITORIO (Table) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-xs">
               <tr>

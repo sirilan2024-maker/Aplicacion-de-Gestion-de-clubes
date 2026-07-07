@@ -5,34 +5,73 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
+  CalendarDays,
   Trophy,
   Users,
-  Activity,
-  Menu,
-  X,
-  Target,
-  CalendarDays,
-  LogOut,
-  Settings,
+  ClipboardCheck,
+  BarChart3,
   Wallet,
+  Target,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  ChevronDown,
   MessageSquare,
-  Shield
+  Activity,
+  AlertTriangle,
+  Database,
+  User,
+  Swords,
+  Brain,
+  Globe,
+  Timer,
+  Menu,
+  X
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
+
+const IconMap: Record<string, React.ComponentType<any>> = {
+  Home: LayoutDashboard,
+  Users: Users,
+  Shield: Shield,
+  Swords: Swords,
+  Calendar: CalendarDays,
+  BarChart3: BarChart3,
+  AlertTriangle: AlertTriangle,
+  Database: Database,
+  User: User,
+  Target: Target,
+  Settings: Settings,
+  Wallet: Wallet,
+  Brain: Brain,
+  Globe: Globe,
+  Timer: Timer
+}
+
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ComponentType<any>;
+};
 
 export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   const pathname = usePathname()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [equipos, setEquipos] = useState<any[]>([])
+  const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
   const supabase = createClient()
 
   // Detect active team context
-  const match = pathname.match(/\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
+  const match = pathname.match(/^\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
   const activeTeamId = match ? match[1] : null
 
   useEffect(() => {
-    const fetchEquipos = async () => {
+    const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: profile } = await supabase
@@ -41,55 +80,116 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           .eq("id", user.id)
           .single()
           
-        if (profile?.club_id) {
-          let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id).order("name")
-          if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-            query = query.eq('coach_id', user.id)
+        if (profile) {
+          setUserRole(profile.role)
+          
+          if (profile.club_id) {
+            let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id).order("name")
+            if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
+              const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+              const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+              if (teamIds.length > 0) {
+                query = query.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+              } else {
+                query = query.eq('coach_id', user.id);
+              }
+            }
+            const { data: eqData } = await query
+            if (eqData) setEquipos(eqData)
+
+            // Fetch dynamic navigation
+            const { data: navData } = await supabase
+              .from('role_navigation')
+              .select(`nav_id, app_navigation(label, path, icon_name, sort_order)`)
+              .eq('role', profile.role)
+            
+            if (navData) {
+               const parsedNavs = navData
+                 .filter((n: any) => n.app_navigation)
+                 .map((n: any) => ({
+                   name: n.app_navigation.label,
+                   href: n.app_navigation.path,
+                   icon: IconMap[n.app_navigation.icon_name] || LayoutDashboard,
+                   sortOrder: n.app_navigation.sort_order
+                 }))
+                 .sort((a, b) => a.sortOrder - b.sortOrder)
+               
+               setGlobalNavItems(parsedNavs)
+            }
           }
-          const { data: eqData } = await query
-          if (eqData) setEquipos(eqData)
         }
       }
     }
-    fetchEquipos()
+    fetchData()
   }, [supabase])
 
-  const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === href;
-    return pathname.startsWith(href);
+  const isActive = (href: string) =>
+    href === "/dashboard" ? pathname === href : pathname.startsWith(href)
+
+  // Función auxiliar para buscar enlaces de la DB
+  const getHref = (searchName: string, defaultHref: string) => {
+    const item = globalNavItems.find(n => n.name.toLowerCase() === searchName.toLowerCase());
+    return item ? item.href : defaultHref;
+  };
+
+  // 1. DYNAMIC BOTTOM BAR (Máximo 4 iconos principales)
+  let bottomLinks: NavItem[] = []
+  if (activeTeamId) {
+    bottomLinks = [
+      { name: "Plantilla", href: `/dashboard/equipos/${activeTeamId}/plantilla`, icon: Users },
+      { name: "Partidos", href: `/dashboard/equipos/${activeTeamId}/partidos`, icon: Trophy },
+      { name: "Asistencia", href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: ClipboardCheck },
+      { name: "Rend.", href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
+    ]
+  } else {
+    // Si no estamos en equipo, usamos las rutas generales
+    if (userRole === 'admin') {
+      bottomLinks = [
+        { name: "Equipos", href: getHref("Equipos", "/admin/equipos"), icon: Shield },
+        { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
+        { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
+        { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
+      ]
+    } else if (userRole === 'tutor' || userRole === 'family') {
+      bottomLinks = [
+        { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },
+        { name: "Pagos", href: "/dashboard/treasury", icon: Wallet },
+        { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
+      ]
+    } else {
+      // Coach / Entrenador
+      bottomLinks = [
+        { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },
+        { name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield },
+        { name: "Partidos", href: "/dashboard/matches", icon: Trophy },
+        { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
+      ]
+    }
   }
 
-  // Determine Bottom Bar links based on context
-  const bottomLinks = activeTeamId ? [
-    { name: "Plantilla", href: `/dashboard/equipos/${activeTeamId}/plantilla`, icon: Users },
-    { name: "Partidos", href: `/dashboard/equipos/${activeTeamId}/partidos`, icon: Trophy },
-    { name: "Rend.", href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
-  ] : [
-    { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Equipos", href: "/dashboard/equipos", icon: Target },
-    { name: "Global", href: "/dashboard/matches", icon: Trophy },
-  ]
-
-  // Secondary links for Hamburger menu
-  const secondaryLinks = activeTeamId ? [
-    { name: "Volver al Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Disciplina", href: `/dashboard/equipos/${activeTeamId}/partidos?view=disciplina`, icon: Shield },
-    { name: "Eventos", href: `/dashboard/equipos/${activeTeamId}/calendario`, icon: CalendarDays },
-    { name: "Asistencia", href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: Users },
-    { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
-    { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
-    { name: "Mensajes", href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
-  ] : [
-    { name: "Disciplina", href: "/dashboard/club/estadisticas/disciplina", icon: Shield },
-    { name: "Eventos", href: "/dashboard/events", icon: CalendarDays },
-    { name: "Super Admin ERP", href: "/admin", icon: Shield },
-    { name: "Directorio", href: "/dashboard/club/miembros", icon: Users },
-    { name: "Estadísticas", href: "/dashboard/club/estadisticas", icon: Activity },
-    { name: "Banco de Tareas", href: "/dashboard/entrenamientos", icon: Target },
-    { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
-    { name: "Secretaría", href: "/dashboard/secretaria", icon: Settings },
-    { name: "Configuración", href: "/admin/configuracion", icon: Settings },
-  ]
+  // 2. DYNAMIC HAMBURGER MENU (Secundarios)
+  let secondaryLinks: NavItem[] = []
+  if (activeTeamId) {
+    secondaryLinks = [
+      { name: "Volver a Inicio", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
+      { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
+      { name: "Disciplina", href: `/dashboard/equipos/${activeTeamId}/partidos?view=disciplina`, icon: AlertTriangle },
+      { name: "Estadísticas", href: `/dashboard/equipos/${activeTeamId}/estadisticas`, icon: BarChart3 },
+      { name: "Mensajes", href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
+    ]
+  } else {
+    // Todos los de la DB que NO estén ya en el bottom bar
+    const bottomHrefs = bottomLinks.map(b => b.href);
+    secondaryLinks = globalNavItems.filter(item => !bottomHrefs.includes(item.href));
+    
+    // Si no hay de BD, unos por defecto
+    if (secondaryLinks.length === 0) {
+       secondaryLinks = [
+         { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings }
+       ]
+    }
+  }
 
   return (
     <div className="md:hidden">
@@ -97,16 +197,15 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       <header className="h-14 bg-slate-900 text-white flex items-center justify-between px-4 fixed top-0 w-full z-40 shadow-md">
         <div className="flex items-center gap-2 font-bold text-lg">
           <Trophy className="w-5 h-5 text-emerald-400" />
-          <span>Sporting</span>
+          <span>ClubManager</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
+          <Link href="/dashboard/mi-perfil" className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
             U
-          </div>
+          </Link>
         </div>
       </header>
 
-      {/* Spacer for Top Header */}
       <div className="h-14" />
 
       {/* Bottom Navigation Bar */}
@@ -139,7 +238,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
 
       {/* Fullscreen Overlay Menu */}
       {menuOpen && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-50 animate-in fade-in duration-200 flex flex-col">
           <div className="flex justify-end p-4">
             <button
               onClick={() => setMenuOpen(false)}
@@ -148,58 +247,37 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
               <X className="w-6 h-6" />
             </button>
           </div>
-          <div className="px-6 flex flex-col gap-4 mt-8">
-            <h2 className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">
-              {activeTeamId ? "Opciones del Equipo" : "Menú Global"}
+          
+          <div className="flex-1 overflow-y-auto px-6 pb-24">
+            <h2 className="text-emerald-400 font-bold uppercase tracking-wider text-sm mb-6">
+              Más Opciones
             </h2>
-            {secondaryLinks.map((link) => {
-              const Icon = link.icon
-              return (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-4 text-white text-lg py-3 border-b border-slate-800"
-                >
-                  <Icon className="w-6 h-6 text-emerald-400" />
-                  <span className="font-medium">{link.name}</span>
-                </Link>
-              )
-            })}
-            
-            {/* Mis Equipos Section */}
-            {equipos.length > 0 && (
-              <div className="mt-6">
-                <h2 className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">
-                  Mis Equipos
-                </h2>
-                <div className="space-y-1 bg-slate-800/50 rounded-xl overflow-hidden border border-slate-700">
-                  {equipos.map(eq => (
-                    <button
-                      key={eq.id}
-                      onClick={() => { setMenuOpen(false); router.push(`/dashboard/equipos/${eq.id}/plantilla`); }}
-                      className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${
-                        activeTeamId === eq.id ? "bg-emerald-900/40 text-emerald-400 font-bold border-l-2 border-emerald-400" : "text-slate-200 hover:bg-slate-800"
-                      }`}
-                    >
-                      <Shield className={`w-5 h-5 ${activeTeamId === eq.id ? "text-emerald-400" : "text-slate-400"}`} />
-                      <span className="truncate">{eq.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            <div className="mt-8">
-              <button 
+            <div className="flex flex-col gap-2">
+              {secondaryLinks.map((link) => {
+                const Icon = link.icon
+                return (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-4 px-4 py-3 bg-slate-800/50 rounded-xl text-white hover:bg-slate-800 active:scale-95 transition-all"
+                  >
+                    <Icon className="w-5 h-5 text-emerald-400" />
+                    <span className="font-medium text-lg">{link.name}</span>
+                  </Link>
+                )
+              })}
+              
+              {/* Logout Option */}
+              <button
                 onClick={() => {
-                  setMenuOpen(false);
-                  if(signOutAction) signOutAction();
+                  setMenuOpen(false)
+                  if(signOutAction) signOutAction()
                 }}
-                className="flex items-center gap-4 text-red-400 text-lg py-3"
+                className="flex items-center gap-4 px-4 py-3 mt-4 bg-red-900/30 text-red-400 rounded-xl hover:bg-red-900/50 active:scale-95 transition-all w-full text-left"
               >
-                <LogOut className="w-6 h-6" />
-                <span className="font-medium">Cerrar Sesión</span>
+                <LogOut className="w-5 h-5" />
+                <span className="font-medium text-lg">Cerrar Sesión</span>
               </button>
             </div>
           </div>

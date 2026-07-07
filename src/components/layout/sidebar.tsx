@@ -218,6 +218,13 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Informes IA", href: "/admin/informes-ia", icon: Brain },
           { name: "FFCV/NOVANET", href: "/admin/ffcv-api", icon: Globe },
         ]
+      },
+      {
+        label: "SISTEMA",
+        items: [
+          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+          { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
+        ]
       }
     ];
   } else if (activeTeamId) {

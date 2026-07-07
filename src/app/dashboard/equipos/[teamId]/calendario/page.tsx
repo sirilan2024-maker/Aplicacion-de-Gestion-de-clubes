@@ -13,6 +13,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import toast, { Toaster } from "react-hot-toast";
+import { createTeamEventAction, updateTeamEventAction } from "@/app/actions/event-actions";
 
 interface TeamEvent {
   id: string;
@@ -151,19 +152,21 @@ export default function CalendarioEquipoPage() {
       notes: notes || null
     };
 
-    let error;
-    if (editingEventId) {
-      const { error: updateError } = await supabase.from('team_events').update(eventData).eq('id', editingEventId);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase.from('team_events').insert(eventData);
-      error = insertError;
+    let errorMsg = null;
+    try {
+      if (editingEventId) {
+        await updateTeamEventAction(editingEventId, teamId, eventData);
+      } else {
+        await createTeamEventAction(teamId, eventData);
+      }
+    } catch(e: any) {
+      errorMsg = e.message;
     }
     
     setSubmitting(false);
     
-    if (error) {
-      toast.error("Error al guardar el evento: " + error.message);
+    if (errorMsg) {
+      toast.error("Error al guardar el evento: " + errorMsg);
     } else {
       toast.success(editingEventId ? "Evento actualizado" : "Evento creado exitosamente");
       setShowModal(false);

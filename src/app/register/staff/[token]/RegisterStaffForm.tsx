@@ -38,8 +38,14 @@ export default function RegisterStaffForm({ token, role }: { token: string, role
           Tu cuenta de <strong>{role}</strong> ha sido creada correctamente.
         </p>
         <p className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
-          Te hemos enviado un correo de confirmación. Por favor, revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta antes de iniciar sesión.
+          Ya puedes iniciar sesión con tu email y contraseña.
         </p>
+        <a 
+          href="/login" 
+          className="inline-block w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg hover:bg-blue-700 transition-colors text-center"
+        >
+          Ir a Iniciar Sesión
+        </a>
       </div>
     )
   }

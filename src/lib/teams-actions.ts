@@ -50,9 +50,35 @@ export async function createTeam(formData: FormData) {
 }
 
 export async function deleteTeam(id: string) {
-  const supabase = await createClient()
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
   
-  const { error } = await supabase
+  // 0. Eliminar dependencias problemáticas de los jugadores
+  const { data: players } = await adminClient.from('players').select('id').eq('team_id', id)
+  if (players && players.length > 0) {
+    const playerIds = players.map(p => p.id)
+    await adminClient.from('player_season_history').delete().in('player_id', playerIds)
+  }
+
+  // 1. Eliminar jugadores primero para mantener consistencia
+  const { error: playersError } = await adminClient
+    .from('players')
+    .delete()
+    .eq('team_id', id)
+
+  if (playersError) {
+    console.error('[TeamsAction] Error deleting players:', playersError.message)
+    return { error: playersError.message }
+  }
+
+  // 1.5. Eliminar invitaciones de staff pendientes asignadas a este equipo
+  await adminClient
+    .from('staff_invitations')
+    .delete()
+    .eq('team_id', id)
+
+  // 2. Eliminar equipo
+  const { error } = await adminClient
     .from('teams')
     .delete()
     .eq('id', id)
@@ -63,6 +89,9 @@ export async function deleteTeam(id: string) {
   }
 
   revalidatePath('/dashboard/teams')
+  revalidatePath('/dashboard/equipos')
+  revalidatePath('/admin/equipos')
+  revalidatePath('/dashboard/club/miembros')
   return { success: true }
 }
 

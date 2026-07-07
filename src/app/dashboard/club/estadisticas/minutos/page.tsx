@@ -46,6 +46,18 @@ export default function MinutosPage() {
       // 2. Fetch teams
       let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
       if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+
+      const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
+        const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+        const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+        if (teamIds.length > 0) {
+          teamsQuery = teamsQuery.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+        } else {
+          teamsQuery = teamsQuery.eq('coach_id', user.id);
+        }
+      }
+
       const { data: teamsData } = await teamsQuery
       
       const teamIds = (teamsData || []).map(t => t.id)
@@ -93,12 +105,23 @@ export default function MinutosPage() {
         perf = data || []
       }
 
-      if (!perf || perf.length === 0) {
+      if ((!perf || perf.length === 0) && teamIds.length === 0) {
         setLoading(false)
         return
       }
 
       const perfEventIds = [...new Set(perf.map(p => p.event_id))]
+
+      // 5b. Fetch match minutes from convocatorias
+      let matchMinutes: any[] = []
+      if (teamIds.length > 0) {
+        const { data: convs } = await supabase
+          .from('convocatorias')
+          .select('player_id, minutes_played, partidos!inner(equipo_id, estado)')
+          .in('partidos.equipo_id', teamIds)
+          .eq('partidos.estado', 'Finalizado');
+        if (convs) matchMinutes = convs;
+      }
 
       // 5. Fetch team_events to know if it's training or match
       const { data: perfEvents } = await supabase
@@ -137,6 +160,15 @@ export default function MinutosPage() {
             // fallback
             p.trainingMinutes += mins
           }
+          p.totalMinutes += mins
+        }
+      })
+
+      matchMinutes.forEach(row => {
+        const p = playerMap.get(row.player_id)
+        if (p) {
+          const mins = row.minutes_played || 0
+          p.matchMinutes += mins
           p.totalMinutes += mins
         }
       })

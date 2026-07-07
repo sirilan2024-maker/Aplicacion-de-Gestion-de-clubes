@@ -152,13 +152,15 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
           </h1>
           <p className="text-slate-500 mt-1">Gestiona el calendario de competición, convocatorias y resultados.</p>
         </div>
-        <button
-          onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors self-start sm:self-auto shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Partido
-        </button>
+        {!fixedTeamId && (
+          <button
+            onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors self-start sm:self-auto shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Partido
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -377,7 +379,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
               <div className="p-5 flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-2">
                   <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${match.estado === 'Programado' ? "bg-slate-100 text-slate-500 border border-slate-200" : match.estado === 'Finalizado' ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
-                    {match.estado}
+                    {(match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at) ? 'Descanso' : match.estado}
                   </div>
                   <div className="text-xs font-medium text-slate-500 flex items-center">
                     <Calendar className="w-3.5 h-3.5 mr-1.5" />
@@ -400,10 +402,17 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
                     {match.estado === 'Programado' ? (
                       <span className="text-slate-300 font-black text-xl italic">VS</span>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <span className={`text-2xl font-black ${match.resultado_propio > match.resultado_rival ? "text-emerald-600" : "text-slate-700"}`}>{match.resultado_propio ?? 0}</span>
-                        <span className="text-slate-300 font-bold">-</span>
-                        <span className={`text-2xl font-black ${match.resultado_rival > match.resultado_propio ? "text-emerald-600" : "text-slate-700"}`}>{match.resultado_rival ?? 0}</span>
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-2xl font-black ${match.resultado_propio > match.resultado_rival ? "text-emerald-600" : "text-slate-700"}`}>{match.resultado_propio ?? 0}</span>
+                          <span className="text-slate-300 font-bold">-</span>
+                          <span className={`text-2xl font-black ${match.resultado_rival > match.resultado_propio ? "text-emerald-600" : "text-slate-700"}`}>{match.resultado_rival ?? 0}</span>
+                        </div>
+                        {(match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at) && (
+                          <span className="text-[9px] font-black tracking-widest uppercase mt-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            Descanso
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

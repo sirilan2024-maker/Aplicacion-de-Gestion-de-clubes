@@ -5,9 +5,15 @@ import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server'; // adjust path if needed
 
 // Initialise Stripe with secret key from env (must be set in .env.local)
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
+// We use a getter so the app doesn't crash on import if the key is missing
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('La pasarela de pago (Stripe) no está configurada aún en este entorno.');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2023-10-16' as any,
+  });
+}
 
 /**
  * Create a one‑time Checkout Session for a specific fee.
@@ -37,6 +43,7 @@ export async function createCheckoutSession(params: {
   }
 
   // Create a Checkout Session – we embed feeId as metadata for later reconciliation
+  const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
@@ -92,6 +99,7 @@ export async function createSubscriptionSession(params: {
 
   // If the family already has a Stripe customer ID we could store it, but for
   // simplicity we create a new customer each time (Stripe deduplicates by email).
+  const stripe = getStripe();
   const customer = await stripe.customers.create({
     email: family.email,
     metadata: { family_id: familyId },

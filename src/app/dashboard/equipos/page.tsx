@@ -572,7 +572,13 @@ export default function EquiposPage() {
         
       // RBAC: Coaches and Delegados only see their assigned teams
       if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-        query = query.eq('coach_id', user.id);
+        const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+        const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+        if (teamIds.length > 0) {
+          query = query.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+        } else {
+          query = query.eq('coach_id', user.id);
+        }
       }
 
       const { data, error } = await query;
@@ -618,22 +624,15 @@ export default function EquiposPage() {
   };
 
   const handleDeleteTeam = async (teamId: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este equipo por completo?')) return;
-    const supabase = createClient();
-    // .select() makes Supabase return the deleted rows — empty array means RLS silently blocked it
-    const { data: deleted, error } = await supabase
-      .from('teams')
-      .delete()
-      .eq('id', teamId)
-      .select('id');
-    if (error) {
-      console.error('⚠️ Error al borrar equipo:', error.message);
-      alert('Error al eliminar: ' + error.message);
-    } else if (!deleted || deleted.length === 0) {
-      // RLS blocked the delete silently (no error, but 0 rows removed)
-      alert('No tienes permiso para eliminar este equipo, o no existe. Revisa las políticas RLS en Supabase (tabla "equipos", política DELETE).');
+    if (!confirm('¿Estás seguro de que deseas eliminar este equipo por completo? ¡También se eliminarán del sistema todos los jugadores asignados a él de forma permanente!')) return;
+    
+    const { deleteTeam } = await import('@/lib/teams-actions');
+    const res = await deleteTeam(teamId);
+    
+    if (res.error) {
+      console.error('⚠️ Error al borrar equipo:', res.error);
+      alert('Error al eliminar: ' + res.error);
     } else {
-      // Delete confirmed by DB — remove from UI
       setTeams((prev) => prev.filter((t) => t.id !== teamId));
       setOpenMenuId(null);
     }

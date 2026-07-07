@@ -46,6 +46,18 @@ export default function DisciplinaPage() {
     // 1. Fetch teams
     let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
     if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+
+    const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
+      const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+      const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+      if (teamIds.length > 0) {
+        teamsQuery = teamsQuery.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+      } else {
+        teamsQuery = teamsQuery.eq('coach_id', user.id);
+      }
+    }
+
     const { data: teamsData } = await teamsQuery
     
     const teamIds = (teamsData || []).map(t => t.id)
@@ -54,6 +66,12 @@ export default function DisciplinaPage() {
     // 2. Fetch all matches
     let matchesQuery = supabase.from('partidos').select('*').eq('club_id', profile?.club_id).order('fecha_hora', { ascending: false })
     if (activeSeason?.id) matchesQuery = matchesQuery.eq('season_id', activeSeason.id)
+    if (teamIds.length > 0) {
+      matchesQuery = matchesQuery.in('equipo_id', teamIds)
+    } else if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
+      // If coach has no teams, return empty matches
+      matchesQuery = matchesQuery.eq('id', '00000000-0000-0000-0000-000000000000') // impossible UUID
+    }
     const { data: matches } = await matchesQuery
     
     const matchIds = (matches || []).map(m => m.id)
@@ -62,7 +80,7 @@ export default function DisciplinaPage() {
     // 3. Fetch convocatorias with cards
     let convs: any[] = []
     if (matchIds.length > 0) {
-      const { data } = await supabase.from('convocatorias').select('*').in('match_id', matchIds)
+      const { data } = await supabase.from('convocatorias').select('*').in('partido_id', matchIds)
       convs = data || []
     }
     setAllConvocatorias(convs)

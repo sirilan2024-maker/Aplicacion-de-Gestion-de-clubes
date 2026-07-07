@@ -18,6 +18,7 @@ ALTER TABLE public.staff_invitations ENABLE ROW LEVEL SECURITY;
 -- Políticas de Seguridad (RLS)
 
 -- 1. Los administradores pueden leer todas las invitaciones de su club
+DROP POLICY IF EXISTS "Admins can view their club invitations" ON public.staff_invitations;
 CREATE POLICY "Admins can view their club invitations" ON public.staff_invitations
     FOR SELECT TO authenticated
     USING (
@@ -30,6 +31,7 @@ CREATE POLICY "Admins can view their club invitations" ON public.staff_invitatio
     );
 
 -- 2. Los administradores pueden crear invitaciones para su club
+DROP POLICY IF EXISTS "Admins can create invitations" ON public.staff_invitations;
 CREATE POLICY "Admins can create invitations" ON public.staff_invitations
     FOR INSERT TO authenticated
     WITH CHECK (

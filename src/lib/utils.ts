@@ -70,3 +70,15 @@ export function calculateAge(birthDate: string | Date): number {
   }
   return age;
 }
+
+/**
+ * Genera un PIN alfanumérico para vincular tutores a jugadores.
+ */
+export function generateLinkCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}

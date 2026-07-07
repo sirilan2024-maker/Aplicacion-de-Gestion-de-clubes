@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/client"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 import { TeamDisciplineView } from "@/components/features/matches/TeamDisciplineView"
-import { Trophy, AlertCircle } from "lucide-react"
+import { Trophy, AlertCircle, Plus } from "lucide-react"
+import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
+import { useExport } from "@/components/providers/ExportContext"
 
 export function TeamMatchesView({ teamId }: { teamId: string }) {
   const searchParams = useSearchParams()
@@ -17,6 +19,9 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
   const [teamName, setTeamName] = useState<string>("")
   const [globalTeamId, setGlobalTeamId] = useState<string | null>(null)
   const [apercibidosCount, setApercibidosCount] = useState<number>(0)
+  const [editingMatch, setEditingMatch] = useState<any>(null)
+  
+  const { setExportData } = useExport()
 
   const [data, setData] = useState({
     matches: [] as any[],
@@ -99,6 +104,28 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
     fetchAllData()
   }, [teamId, supabase])
 
+  useEffect(() => {
+    const formattedMatches = data.matches
+      .filter(m => m.equipo_id === globalTeamId || m.equipo_id === teamId)
+      .map(m => ({
+        Fecha: new Date(m.fecha_hora).toLocaleDateString(),
+        Hora: new Date(m.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        Jornada: m.jornada || '-',
+        Rival: m.rival || 'Por definir',
+        Lugar: m.lugar || 'Desconocido',
+        Estado: m.estado || 'Pendiente',
+        Resultado: m.estado === 'Finalizado' ? `${m.goles_local} - ${m.goles_visitante}` : '-'
+      }));
+    setExportData(formattedMatches, `Partidos_Equipo_${teamId}`);
+  }, [data.matches, setExportData, teamId, globalTeamId]);
+
+  useEffect(() => {
+    if (searchParams.get('newMatch') === 'true') {
+      setEditingMatch({ id: 'new', equipo_id: teamId, fecha_hora: new Date().toISOString() })
+      window.history.replaceState({}, '', `/dashboard/equipos/${teamId}/partidos`)
+    }
+  }, [searchParams, teamId])
+
   if (loading) {
     return (
       <div className="w-full max-w-6xl mx-auto p-6 flex justify-center py-20">
@@ -143,10 +170,11 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
             <AlertCircle size={16} /> Disciplina
             {apercibidosCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                !
+                {apercibidosCount}
               </span>
             )}
           </button>
+
         </div>
       </div>
 
@@ -196,6 +224,33 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
             />
           )}
         </div>
+      )}
+
+
+      {/* Modal for adding new match */}
+      {editingMatch && (
+        <ManageMatchModal
+          match={editingMatch}
+          teamId={teamId}
+          teams={data.teams}
+          onClose={() => setEditingMatch(null)}
+          onSave={(updatedMatch) => {
+            // Update the matches list in data
+            if (editingMatch.id === 'new') {
+              const fullMatch = { ...updatedMatch, equipo: data.teams.find(t => t.id === updatedMatch.equipo_id) }
+              setData(prev => ({
+                ...prev,
+                matches: [fullMatch, ...prev.matches].sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+              }))
+            } else {
+              setData(prev => ({
+                ...prev,
+                matches: prev.matches.map(m => m.id === updatedMatch.id ? { ...m, ...updatedMatch } : m)
+              }))
+            }
+            setEditingMatch(null)
+          }}
+        />
       )}
     </div>
   )

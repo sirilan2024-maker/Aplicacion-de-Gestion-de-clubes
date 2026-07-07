@@ -55,6 +55,7 @@ type NavItem = {
   href: string;
   icon: React.ComponentType<any>;
   children?: NavItem[];
+  action?: 'logout';
 };
 
 type NavGroup = {
@@ -69,6 +70,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [clubName, setClubName] = useState<string>("Cargando...")
   const [equipos, setEquipos] = useState<any[]>([])
+  const [linkedPlayers, setLinkedPlayers] = useState<any[]>([])
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
   const supabase = createClient()
@@ -77,10 +79,17 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
   const isAdmin = userRole === "admin";
 
   // Detect active team context from URL (/dashboard/e/[teamId] or /dashboard/equipos/[teamId])
-  const match = pathname.match(/\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
+  const match = pathname.match(/^\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
   const potentialTeamId = match ? match[1] : null
   const activeTeam = equipos.find(e => e.id === potentialTeamId)
   const activeTeamId = activeTeam ? activeTeam.id : null
+
+  // Detect active family player context
+  const familyMatch = pathname.match(/^\/dashboard\/family\/e\/([a-zA-Z0-9-]+)/)
+  const activeFamilyPlayerId = familyMatch ? familyMatch[1] : null
+  
+  // Si no hay jugador activo en la URL, mostrar el primero por defecto en el panel superior en lugar de "Mi Panel Familiar"
+  const activeFamilyPlayer = linkedPlayers.find(lp => lp.player_id === activeFamilyPlayerId) || (linkedPlayers.length > 0 ? linkedPlayers[0] : null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,10 +116,28 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             // Fetch equipos
             let query = supabase.from('teams').select("id, name, category").eq("club_id", profile.club_id).order("name")
             if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-              query = query.eq('coach_id', user.id)
+              const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+              const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+              if (teamIds.length > 0) {
+                query = query.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+              } else {
+                query = query.eq('coach_id', user.id);
+              }
             }
             const { data: eqData } = await query
             if (eqData) setEquipos(eqData)
+
+            // Fetch family players for all users so any role can view their child's family dashboard
+            const { data: tutors } = await supabase
+              .from('player_tutors')
+              .select('player_id, players(first_name, last_name, status, teams(id, name))')
+              .eq('tutor_id', user.id)
+            
+            if (tutors) {
+              // Filter out inactive players in JS just to be absolutely safe
+              const activeTutors = tutors.filter((t: any) => t.players?.status !== 'inactive')
+              setLinkedPlayers(activeTutors)
+            }
 
             // Fetch dynamic navigation
             const { data: navData } = await supabase
@@ -157,13 +184,14 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         label: "GENERAL/CLUB",
         items: [
           { name: "Inicio", href: getHref("Inicio", "/dashboard"), icon: LayoutDashboard },
-          { name: "Jugadores", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
-          { name: "Equipos", href: getHref("Equipos", "/dashboard/equipos"), icon: Shield },
-          { name: "Partidos", href: getHref("Partidos", "/dashboard/partidos"), icon: Trophy },
-          { name: "Eventos", href: getHref("Eventos", "/dashboard/calendario"), icon: CalendarDays },
-          { name: "Estadísticas", href: getHref("Estadísticas", "/dashboard/estadisticas"), icon: BarChart3 },
-          { name: "Disciplina", href: getHref("Disciplina", "/dashboard/partidos?view=disciplina"), icon: AlertTriangle },
-          { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/banco-tareas"), icon: Target },
+          { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
+          { name: "Equipos", href: getHref("Equipos", "/admin/equipos"), icon: Shield },
+          { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
+          { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
+          { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
+          { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
+          { name: "Disciplina", href: getHref("Disciplina", "/admin/partidos?view=disciplina"), icon: AlertTriangle },
+          { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
         ]
       },
       {
@@ -204,6 +232,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Eventos",   href: `/dashboard/equipos/${activeTeamId}/calendario`, icon: CalendarDays },
           { name: "Asistencia",   href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: ClipboardCheck },
           { name: "Rendimiento",  href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
+          { name: "Estadísticas", href: `/dashboard/equipos/${activeTeamId}/estadisticas`, icon: BarChart3 },
           { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
           { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
           { name: "Mensajes",     href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
@@ -212,7 +241,38 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "Volver",
         items: [
-          { name: "Global Club",  href: `/dashboard`, icon: LayoutDashboard },
+          { 
+            name: (userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') ? "Mis Equipos" : "Global Club",  
+            href: (userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') ? `/dashboard/mis-equipos` : `/dashboard`, 
+            icon: LayoutDashboard 
+          },
+          { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
+          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+          { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
+        ]
+      }
+    ]
+  } else if (activeFamilyPlayerId && activeFamilyPlayer) {
+    // FAMILY PLAYER CONTEXT
+    navGroups = [
+      {
+        label: `Mi Equipo: ${activeFamilyPlayer.players?.teams?.name || 'Sin equipo'}`,
+        items: [
+          { name: "Plantilla",    href: `/dashboard/family/e/${activeFamilyPlayerId}/plantilla`, icon: Users },
+          { name: "Partidos",     href: `/dashboard/family/e/${activeFamilyPlayerId}/partidos`, icon: Trophy },
+          { name: "Eventos",      href: `/dashboard/family/e/${activeFamilyPlayerId}/eventos`, icon: CalendarDays },
+          { name: "Entrenamientos", href: `/dashboard/family/e/${activeFamilyPlayerId}/entrenamientos`, icon: Target },
+          { name: "Mensajes",     href: `/dashboard/family/e/${activeFamilyPlayerId}/mensajes`, icon: MessageSquare },
+          { name: "Ficha Técnica",href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },
+          { name: "Mi Perfil",    href: `/dashboard/family/e/${activeFamilyPlayerId}/perfil`, icon: User },
+        ],
+      },
+      {
+        label: "TEAMS CLUB",
+        items: [
+          { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
+          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+          { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]
       }
     ]
@@ -221,9 +281,15 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     navGroups = [
       {
         label: "General / Club",
-        items: globalNavItems.length > 0 ? globalNavItems : [
-          { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
-          { name: "Directorio",   href: "/dashboard/club/miembros", icon: Users },
+        items: [
+          ...(globalNavItems.length > 0 ? globalNavItems : [
+            { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
+            { name: "Directorio",   href: "/dashboard/club/miembros", icon: Users },
+          ]),
+          { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
+          { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
+          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+          { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ],
       }
     ]
@@ -278,7 +344,9 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             <div className="flex flex-col items-start min-w-0">
               <span className={cn("text-[10px] font-semibold uppercase tracking-wider", isAdmin ? "text-slate-400" : "text-gray-500")}>Contexto Actual</span>
               <span className={cn("text-sm font-bold truncate", isAdmin ? "text-slate-100" : "text-slate-900")}>
-                {activeTeam ? activeTeam.name : "Global Club"}
+                {userRole === 'familia' || userRole === 'jugador' || userRole === 'tutor' || userRole === 'family' ? 
+                  (activeFamilyPlayer ? `${activeFamilyPlayer.players?.teams?.name || 'Equipo'} (${activeFamilyPlayer.players?.first_name})` : "Área Personal") 
+                  : (activeTeam ? activeTeam.name : "Global Club")}
               </span>
             </div>
             <ChevronDown size={14} className={cn("transition-transform", isAdmin ? "text-slate-400" : "text-gray-500", showTeamDropdown && "rotate-180")} />
@@ -286,31 +354,51 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           
           {showTeamDropdown && (
             <div className={cn("absolute top-[100%] left-4 right-4 mt-1 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto", isAdmin ? "bg-slate-800 border border-slate-700" : "bg-white border border-gray-200")}>
-              <button
-                onClick={() => { setShowTeamDropdown(false); router.push("/dashboard"); }}
-                className={cn(
-                  "w-full text-left px-4 py-2 text-sm font-medium transition-colors",
-                  isAdmin 
-                    ? (!activeTeamId ? "text-blue-400 bg-slate-700/50" : "text-slate-300 hover:bg-slate-700")
-                    : (!activeTeamId ? "text-blue-700 bg-blue-50/50" : "text-gray-700 hover:bg-blue-50")
-                )}
-              >
-                🌍 Global Club
-              </button>
-              {equipos.map(eq => (
-                <button
-                  key={eq.id}
-                  onClick={() => { setShowTeamDropdown(false); router.push(`/dashboard/equipos/${eq.id}/plantilla`); }}
-                  className={cn(
-                    "w-full text-left px-4 py-2 text-sm transition-colors",
-                    isAdmin
-                      ? (activeTeamId === eq.id ? "text-blue-400 font-bold bg-slate-700/50" : "text-slate-300 font-medium hover:bg-slate-700")
-                      : (activeTeamId === eq.id ? "text-blue-700 font-bold bg-blue-50/50" : "text-gray-700 font-medium hover:bg-blue-50")
-                  )}
-                >
-                  🛡️ {eq.name}
-                </button>
-              ))}
+              {userRole === 'familia' || userRole === 'jugador' || userRole === 'tutor' || userRole === 'family' ? (
+                <>
+                  {linkedPlayers.map(lp => (
+                    <button
+                      key={lp.player_id}
+                      onClick={() => { setShowTeamDropdown(false); router.push(`/dashboard/family/e/${lp.player_id}/plantilla`); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2",
+                        activeFamilyPlayerId === lp.player_id ? "text-blue-700 font-bold bg-blue-50/50" : "text-gray-700 font-medium hover:bg-blue-50"
+                      )}
+                    >
+                      <User size={14} className={activeFamilyPlayerId === lp.player_id ? "text-blue-600" : "text-gray-400"} />
+                      <span>{lp.players?.first_name} <span className="text-xs text-gray-500">({lp.players?.teams?.name || 'Sin equipo'})</span></span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setShowTeamDropdown(false); router.push("/dashboard"); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 text-sm font-medium transition-colors",
+                      isAdmin 
+                        ? (!activeTeamId ? "text-blue-400 bg-slate-700/50" : "text-slate-300 hover:bg-slate-700")
+                        : (!activeTeamId ? "text-blue-700 bg-blue-50/50" : "text-gray-700 hover:bg-blue-50")
+                    )}
+                  >
+                    🌍 Global Club
+                  </button>
+                  {equipos.map(eq => (
+                    <button
+                      key={eq.id}
+                      onClick={() => { setShowTeamDropdown(false); router.push(`/dashboard/equipos/${eq.id}/plantilla`); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-sm transition-colors",
+                        isAdmin
+                          ? (activeTeamId === eq.id ? "text-blue-400 font-bold bg-slate-700/50" : "text-slate-300 font-medium hover:bg-slate-700")
+                          : (activeTeamId === eq.id ? "text-blue-700 font-bold bg-blue-50/50" : "text-gray-700 font-medium hover:bg-blue-50")
+                      )}
+                    >
+                      🛡️ {eq.name}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -334,6 +422,26 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
               <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const active = isActive(item.href)
+                    
+                    if (item.action === 'logout') {
+                      return (
+                        <form key={item.name} action={signOutAction}>
+                          <button
+                            type="submit"
+                            title={collapsed ? item.name : undefined}
+                            className={cn(
+                              "w-full relative flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[13px] font-semibold transition-all duration-150 group",
+                              collapsed && "justify-center",
+                              isAdmin ? "text-slate-400 hover:text-red-400 hover:bg-slate-800/50" : "text-slate-500 hover:text-red-600 hover:bg-red-50"
+                            )}
+                          >
+                            <item.icon size={16} className="shrink-0 transition-colors" />
+                            {!collapsed && item.name}
+                          </button>
+                        </form>
+                      )
+                    }
+
                     return (
                       <div key={item.name}>
                         <Link
@@ -371,42 +479,6 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         })}
       </nav>
 
-      {/* ── Footer ─────────────────────────────── */}
-      <div
-        className={cn(
-          "p-2 space-y-0.5",
-          isAdmin ? "border-t border-slate-800" : "border-t border-gray-100",
-          collapsed && "flex flex-col items-center"
-        )}
-      >
-        <Link
-          href="/dashboard/settings"
-          title={collapsed ? "Ajustes" : undefined}
-          className={cn(
-            "flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[13px] font-medium transition-all",
-            isAdmin ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-gray-100",
-            collapsed && "justify-center w-full"
-          )}
-        >
-          <Settings size={16} className="shrink-0" />
-          {!collapsed && "Ajustes"}
-        </Link>
-
-        <form action={signOutAction} className={collapsed ? "w-full" : ""}>
-          <button
-            type="submit"
-            title={collapsed ? "Cerrar sesión" : undefined}
-            className={cn(
-              "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-[13px] font-medium transition-all",
-              isAdmin ? "text-slate-400 hover:text-red-400 hover:bg-slate-800/50" : "text-slate-500 hover:text-red-600 hover:bg-red-50",
-              collapsed && "justify-center"
-            )}
-          >
-            <LogOut size={16} className="shrink-0" />
-            {!collapsed && "Cerrar sesión"}
-          </button>
-        </form>
-      </div>
 
       {/* ── Collapse Toggle ─────────────────────── */}
       <button

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
+import { getPlayerTutorsAction } from "@/app/actions/player-actions";
 
 interface PlayerData {
   id: string;
@@ -41,6 +42,8 @@ interface PlayerData {
   parent2_last_name: string | null;
   parent2_email: string | null;
   parent2_phone: string | null;
+  tutors?: any[];
+  posicion_principal?: string | null;
 }
 
 export default function PlayerProfilePage() {
@@ -107,11 +110,23 @@ export default function PlayerProfilePage() {
     try {
       const { data, error } = await supabase
         .from('players')
-        .select('*')
+        .select(`
+          *
+        `)
         .eq('id', playerId)
         .single();
         
       if (error) throw error;
+
+      // Usar Server Action (Admin Client) para saltarse las reglas RLS
+      // y obtener los perfiles de los tutores
+      const tutorsRes = await getPlayerTutorsAction(playerId);
+      if (tutorsRes.success && tutorsRes.tutors) {
+        data.tutors = tutorsRes.tutors;
+      } else {
+        data.tutors = [];
+      }
+
       setPlayer(data);
       setEditData(data);
     } catch (err: any) {
@@ -294,9 +309,12 @@ export default function PlayerProfilePage() {
     setSaving(true);
     const supabase = createClient();
     try {
+      const payload = { ...editData };
+      delete payload.tutors; // Remove joined relationship data before updating
+
       const { error } = await supabase
         .from('players')
-        .update(editData)
+        .update(payload)
         .eq('id', player.id);
         
       if (error) throw error;
@@ -488,7 +506,10 @@ export default function PlayerProfilePage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium">
-                  <span className="capitalize">{player.posicion || 'Sin posición'}</span>
+                  <span className="capitalize text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{player.posicion_principal || 'Sin posición'}</span>
+                  {player.posicion && player.posicion.toLowerCase() !== 'jugador' && (
+                    <span className="capitalize text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{player.posicion}</span>
+                  )}
                   {edadJugador !== null && (
                     <>
                       <span>•</span>
@@ -499,9 +520,12 @@ export default function PlayerProfilePage() {
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
                     player.status === 'Lesionado' ? 'bg-red-100 text-red-700' :
                     player.status === 'Sancionado' ? 'bg-orange-100 text-orange-700' :
+                    player.status === 'inactive' ? 'bg-gray-100 text-gray-700' :
                     'bg-green-100 text-green-700'
                   }`}>
-                    {player.status || 'Activo'}
+                    {player.status === 'active' ? 'Activo' : 
+                     player.status === 'inactive' ? 'Inactivo' : 
+                     (player.status || 'Activo')}
                   </span>
                 </div>
               </div>
@@ -633,6 +657,33 @@ export default function PlayerProfilePage() {
                   ) : <div className="text-gray-900 font-medium">{player.nickname || '-'}</div>}
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Posición en el campo</label>
+                  {isEditing ? (
+                    <input type="text" value={editData.posicion_principal || ''} onChange={e => setEditData({...editData, posicion_principal: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" placeholder="Ej. Delantero, Defensa" />
+                  ) : <div className="text-gray-900 font-medium">{player.posicion_principal || '-'}</div>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Rol en el equipo</label>
+                  {isEditing ? (
+                    <input type="text" value={editData.posicion || ''} onChange={e => setEditData({...editData, posicion: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" placeholder="Ej. Jugador, Entrenador" />
+                  ) : <div className="text-gray-900 font-medium">{player.posicion || '-'}</div>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Estado en la app</label>
+                  {isEditing ? (
+                    <select value={editData.status || 'active'} onChange={e => setEditData({...editData, status: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900">
+                      <option value="active">Activo</option>
+                      <option value="inactive">Inactivo (Archivado)</option>
+                      <option value="Lesionado">Lesionado</option>
+                      <option value="Sancionado">Sancionado</option>
+                    </select>
+                  ) : <div className="text-gray-900 font-medium">
+                        {player.status === 'inactive' ? 'Inactivo (Oculto)' : 
+                         player.status === 'active' ? 'Activo' : 
+                         (player.status || 'Activo')}
+                      </div>}
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">N° de licencia</label>
                   {isEditing ? (
                     <input type="text" value={editData.license_number || ''} onChange={e => setEditData({...editData, license_number: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
@@ -676,63 +727,63 @@ export default function PlayerProfilePage() {
                 </div>
                 {!esEntrenador && (
                   <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 mt-6 space-y-6">
-                    <h4 className="font-bold text-blue-900 border-b border-blue-200 pb-2">Información de Padres / Tutores</h4>
+                    <h4 className="font-bold text-blue-900 border-b border-blue-200 pb-2">Información de Padres / Tutores Vinculados</h4>
                     
-                    {/* PADRE 1 */}
-                    <div>
-                      <h5 className="text-sm font-bold text-blue-800 mb-3">Padre/Tutor 1</h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Nombre</label>
-                          {isEditing ? <input type="text" value={editData.parent1_name || ''} onChange={e => setEditData({...editData, parent1_name: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent1_name || '-'}</div>}
+                    {player.tutors && player.tutors.length > 0 ? (
+                      <div className="grid gap-4 mt-4">
+                        {player.tutors.map((t: any, i: number) => (
+                          <div key={t.profiles?.id || i} className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0">
+                              {t.profiles?.first_name?.charAt(0) || <UserIcon size={18} />}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900">{t.profiles?.first_name} {t.profiles?.last_name}</div>
+                              <div className="text-sm text-slate-500">{t.profiles?.email}</div>
+                              <div className="text-xs uppercase font-bold text-blue-500 mt-1 bg-blue-50 px-2 py-0.5 rounded-full inline-block">{t.profiles?.role || 'Tutor'}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-blue-800 mt-2">No hay tutores registrados en el nuevo sistema.</p>
+                    )}
+
+                    <div className="pt-4 border-t border-blue-200 mt-4 space-y-4">
+                      <h5 className="font-bold text-blue-900 text-sm">Datos manuales de tutores (Histórico / App Familia)</h5>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-100">
+                          <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Nombre Tutor 1</label>
+                          {isEditing ? (
+                            <input type="text" value={editData.parent1_name || ''} onChange={e => setEditData({...editData, parent1_name: e.target.value})} className="w-full border-blue-200 rounded p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                          ) : <div className="text-blue-900 font-medium">{player.parent1_name || '-'}</div>}
+                          
+                          <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mt-3 mb-1">Teléfono Tutor 1</label>
+                          {isEditing ? (
+                            <input type="text" value={editData.parent1_phone || ''} onChange={e => setEditData({...editData, parent1_phone: e.target.value})} className="w-full border-blue-200 rounded p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                          ) : <div className="text-blue-900 font-medium">{player.parent1_phone || '-'}</div>}
                         </div>
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Apellidos</label>
-                          {isEditing ? <input type="text" value={editData.parent1_last_name || ''} onChange={e => setEditData({...editData, parent1_last_name: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent1_last_name || '-'}</div>}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Teléfono</label>
-                          {isEditing ? <input type="text" value={editData.parent1_phone || ''} onChange={e => setEditData({...editData, parent1_phone: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent1_phone || '-'}</div>}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Email</label>
-                          {isEditing ? <input type="email" value={editData.parent1_email || ''} onChange={e => setEditData({...editData, parent1_email: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent1_email || '-'}</div>}
+
+                        <div className="bg-white p-4 rounded-lg shadow-sm border border-blue-100">
+                          <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Nombre Tutor 2</label>
+                          {isEditing ? (
+                            <input type="text" value={editData.parent2_name || ''} onChange={e => setEditData({...editData, parent2_name: e.target.value})} className="w-full border-blue-200 rounded p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                          ) : <div className="text-blue-900 font-medium">{player.parent2_name || '-'}</div>}
+                          
+                          <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mt-3 mb-1">Teléfono Tutor 2</label>
+                          {isEditing ? (
+                            <input type="text" value={editData.parent2_phone || ''} onChange={e => setEditData({...editData, parent2_phone: e.target.value})} className="w-full border-blue-200 rounded p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
+                          ) : <div className="text-blue-900 font-medium">{player.parent2_phone || '-'}</div>}
                         </div>
                       </div>
-                    </div>
 
-                    {/* PADRE 2 */}
-                    <div className="pt-4 border-t border-blue-200">
-                      <h5 className="text-sm font-bold text-blue-800 mb-3">Padre/Tutor 2</h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Nombre</label>
-                          {isEditing ? <input type="text" value={editData.parent2_name || ''} onChange={e => setEditData({...editData, parent2_name: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent2_name || '-'}</div>}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Apellidos</label>
-                          {isEditing ? <input type="text" value={editData.parent2_last_name || ''} onChange={e => setEditData({...editData, parent2_last_name: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent2_last_name || '-'}</div>}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Teléfono</label>
-                          {isEditing ? <input type="text" value={editData.parent2_phone || ''} onChange={e => setEditData({...editData, parent2_phone: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent2_phone || '-'}</div>}
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Email</label>
-                          {isEditing ? <input type="email" value={editData.parent2_email || ''} onChange={e => setEditData({...editData, parent2_email: e.target.value})} className="w-full border rounded p-2 text-sm text-slate-900" /> : <div className="text-gray-900 font-medium">{player.parent2_email || '-'}</div>}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Nota antigua (Tutor Legal / Contacto genérico) - Solo si tiene datos históricos o está editando de forma rápida */}
-                    {(player.parent_contact && !player.parent1_name && !player.parent2_name) && (
-                      <div className="pt-4 border-t border-blue-200">
-                        <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Notas / Tutor Legal Genérico (Histórico)</label>
+                      <div className="mt-4">
+                        <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Notas Adicionales de Contacto</label>
                         {isEditing ? (
                           <textarea value={editData.parent_contact || ''} onChange={e => setEditData({...editData, parent_contact: e.target.value})} className="w-full border-blue-200 rounded p-2 bg-white text-sm min-h-[80px] outline-none focus:ring-2 focus:ring-blue-500 text-slate-900" />
-                        ) : <div className="text-blue-900 font-medium whitespace-pre-wrap">{player.parent_contact}</div>}
+                        ) : <div className="text-blue-900 font-medium whitespace-pre-wrap">{player.parent_contact || '-'}</div>}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -769,10 +820,10 @@ export default function PlayerProfilePage() {
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estado Actual</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estado Físico Actual</label>
                 {isEditing ? (
-                  <select value={editData.status || ''} onChange={e => setEditData({...editData, status: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-slate-900">
-                    <option value="Activo">Activo</option>
+                  <select value={editData.status === 'inactive' ? 'active' : (editData.status || 'active')} onChange={e => setEditData({...editData, status: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-slate-900">
+                    <option value="active">Disponible / Activo</option>
                     <option value="Lesionado">Lesionado</option>
                     <option value="Sancionado">Sancionado</option>
                   </select>
@@ -780,9 +831,14 @@ export default function PlayerProfilePage() {
                   <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold ${
                     player.status === 'Lesionado' ? 'bg-red-50 text-red-700 border border-red-200' :
                     player.status === 'Sancionado' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
+                    player.status === 'inactive' ? 'bg-gray-50 text-gray-700 border border-gray-200' :
                     'bg-green-50 text-green-700 border border-green-200'
                   }`}>
-                    <CheckCircle size={16} /> {player.status || 'Activo'}
+                    <CheckCircle size={16} /> {
+                      player.status === 'inactive' ? 'Archivado' : 
+                      player.status === 'active' ? 'Activo' : 
+                      (player.status || 'Activo')
+                    }
                   </span>
                 )}
               </div>

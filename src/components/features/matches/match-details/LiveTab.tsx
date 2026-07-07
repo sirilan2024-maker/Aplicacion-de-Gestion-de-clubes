@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
 import { Trash2, Clock, X, Target, AlertTriangle, Bandage } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { addLiveEvent, deleteLiveEvent } from "@/app/actions/live-match-actions";
+import { toggleMatchTimer, addLiveEvent, deleteLiveEvent, updateMatchState } from "@/app/actions/live-match-actions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "react-hot-toast";
 
@@ -66,8 +66,10 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
   };
   const halfLengthMinutes = getHalfLengthMinutes();
 
+  const isDescansoActive = firstHalfDuration !== null && seconds === firstHalfDuration && !running;
+
   // Is it injury time?
-  const isFirstHalfDescuento = seconds >= halfLengthMinutes * 60 && !firstHalfDuration && partidoEstado !== "Descanso";
+  const isFirstHalfDescuento = seconds >= halfLengthMinutes * 60 && !firstHalfDuration && !isDescansoActive;
   const isSecondHalfDescuento = seconds >= halfLengthMinutes * 2 * 60 && firstHalfDuration !== null;
   const isDescuento = (isFirstHalfDescuento || isSecondHalfDescuento) && partidoEstado !== "Finalizado";
 
@@ -145,7 +147,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
       return;
     }
 
-    pause(); // always pause the timer
+    await pause(); // always pause the timer (await to prevent DB race condition)
     
     const secondHalfDuration = firstHalfDuration !== null ? seconds - (halfLengthMinutes * 60) : seconds;
     
@@ -161,18 +163,17 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
     if (success) {
       if (phase === "Fin de Partido") {
-        await supabase.from("partidos").update({ 
-          estado: "Finalizado",
-          second_half_duration_seconds: secondHalfDuration > 0 ? secondHalfDuration : null
-        }).eq("id", matchId);
+        await updateMatchState(matchId, "Finalizado", { 
+          second_half_duration_seconds: secondHalfDuration > 0 ? secondHalfDuration : null 
+        });
         setPartidoEstado("Finalizado");
         toast.success("Partido finalizado");
       } else {
-        await supabase.from("partidos").update({ 
-          estado: "Descanso",
-          first_half_duration_seconds: seconds
-        }).eq("id", matchId);
-        setPartidoEstado("Descanso");
+        await updateMatchState(matchId, "Programado", { 
+          first_half_duration_seconds: seconds 
+        });
+        // Do not set partidoEstado to Descanso because the DB doesn't support it.
+        // It will be inferred from firstHalfDuration automatically.
         setFirstHalfDuration(seconds);
         toast.success("Descanso registrado");
       }
@@ -183,7 +184,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
   const handleStartSecondHalf = async () => {
     const targetSeconds = halfLengthMinutes * 60;
-    await supabase.from("partidos").update({ estado: "En Curso" }).eq("id", matchId);
+    await updateMatchState(matchId, "Programado");
     setPartidoEstado("En Curso");
     start(targetSeconds);
     toast.success("Segunda parte iniciada");
@@ -265,7 +266,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${partidoEstado === "Finalizado" ? 'text-slate-300 bg-slate-700 border-slate-600' : (isDescuento ? 'text-red-100 bg-red-800 border-red-700' : 'text-blue-300 bg-blue-900/50 border-blue-700')}`}>
-                {partidoEstado === "Finalizado" ? "Finalizado" : (partidoEstado === "Descanso" ? "Descanso" : (running ? "En juego" : "Pausado"))}
+                {partidoEstado === "Finalizado" ? "Finalizado" : (isDescansoActive ? "Descanso" : (running ? "En juego" : "Pausado"))}
               </span>
               {firstHalfDuration && (
                 <span className="text-[10px] text-blue-200/80 font-medium">
@@ -288,7 +289,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
         {!isFamilyView && (
           <div className="flex items-center gap-2">
-            {partidoEstado === "Descanso" ? (
+            {isDescansoActive ? (
               <button
                 onClick={() => {
                   if (partidoEstado === "Finalizado") {
@@ -323,7 +324,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                   toast.error("El partido ha finalizado. El cronómetro no puede reanudarse.");
                   return;
                 }
-                if (partidoEstado === "Descanso") {
+                if (isDescansoActive) {
                   toast.error("Estás en el descanso. Usa el botón 'Iniciar 2ª Parte' para reanudar el partido.");
                   return;
                 }
@@ -352,6 +353,12 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
         {/* ── Columna Izquierda: Acciones Rápidas (Sólo Entrenadores) ── */}
         {!isFamilyView ? (
+          partidoEstado === "Finalizado" ? (
+            <div className="bg-white border border-slate-150 rounded-xl p-8 shadow-sm text-center">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-2">Partido Finalizado</h3>
+              <p className="text-xs text-slate-500">El seguimiento en directo ha concluido. Ya no se pueden registrar acciones rápidas.</p>
+            </div>
+          ) : (
           <div className="space-y-6">
             <div className="bg-white border border-slate-150 rounded-xl p-5 shadow-sm space-y-4">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
@@ -534,6 +541,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
               </form>
             )}
           </div>
+          )
         ) : (
           <div className="space-y-6">
             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 shadow-sm text-center">

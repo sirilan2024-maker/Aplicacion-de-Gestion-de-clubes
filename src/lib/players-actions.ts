@@ -98,6 +98,12 @@ export async function createPlayer(formData: FormData) {
 export async function deletePlayer(id: string) {
   const supabase = await createClient()
   
+  // 1. Manually cascade delete from related tables to avoid FK constraint errors
+  await supabase.from('player_season_history').delete().eq('player_id', id)
+  await supabase.from('player_tutors').delete().eq('player_id', id)
+  await supabase.from('player_medical_records').delete().eq('player_id', id)
+  
+  // 2. Hard delete from players table
   const { error } = await supabase
     .from('players')
     .delete()

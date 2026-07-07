@@ -21,6 +21,8 @@ interface Player {
   phone: string | null;
 }
 
+import { useIsActiveSeason } from "@/hooks/useIsActiveSeason";
+
 export function TeamPlayersView({ teamId }: { teamId: string }) {
   const { rol } = useUserRole();
 
@@ -30,8 +32,10 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
   // Edit Modal State
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [saving, setSaving] = useState(false);
+  const [activeSeasonObj, setActiveSeasonObj] = useState<any>(null);
 
-  const canEdit = rol === "admin" || rol === "entrenador";
+  const isEditableSeason = useIsActiveSeason(activeSeasonObj, activeSeasonObj, rol === 'admin');
+  const canEdit = (rol === "admin" || rol === "entrenador") && isEditableSeason;
 
   useEffect(() => {
     fetchData();
@@ -42,7 +46,12 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
     const supabase = createClient();
     try {
       const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
-      const { data: activeSeason } = teamData?.club_id ? await supabase.from('seasons').select('id').eq('club_id', teamData.club_id).eq('is_active', true).single() : { data: null };
+      
+      const { data: activeSeason } = teamData?.club_id ? await supabase.from('seasons').select('id, name, is_active').eq('club_id', teamData.club_id).eq('is_active', true).single() : { data: null };
+      
+      if (activeSeason) {
+        setActiveSeasonObj(activeSeason);
+      }
 
       let playersData: any[] = [];
       if (activeSeason?.id) {

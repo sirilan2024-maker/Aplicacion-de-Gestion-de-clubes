@@ -99,3 +99,82 @@ async function recalculateScore(matchId: string, supabase: any) {
     })
     .eq("id", matchId)
 }
+
+export async function updateMatchState(matchId: string, estado: string, updates: any = {}) {
+  const supabase = await createClient()
+  
+  const { error } = await supabase
+    .from("partidos")
+    .update({
+      estado,
+      ...updates
+    })
+    .eq("id", matchId)
+
+  if (error) {
+    console.error("Error updating match state:", error)
+    return { success: false, error: error.message }
+  }
+
+  // Si finaliza el partido, sincronizamos automáticamente los eventos en vivo a la convocatoria
+  if (estado === "Finalizado") {
+    await syncMatchEventsToConvocatorias(matchId, supabase);
+  }
+
+  return { success: true }
+}
+
+async function syncMatchEventsToConvocatorias(matchId: string, supabase: any) {
+  // 1. Obtener todos los eventos del partido
+  const { data: events } = await supabase
+    .from("match_events")
+    .select("*")
+    .eq("partido_id", matchId);
+
+  if (!events || events.length === 0) return;
+
+  // Agrupar eventos por jugador
+  const playerStats: Record<string, { goals: number, yellow_cards: number, red_cards: number }> = {};
+  
+  events.forEach((e: any) => {
+    if (!e.player_id) return;
+    
+    if (!playerStats[e.player_id]) {
+      playerStats[e.player_id] = { goals: 0, yellow_cards: 0, red_cards: 0 };
+    }
+    
+    if (e.tipo_evento === "Gol") {
+      playerStats[e.player_id].goals++;
+    } else if (e.tipo_evento === "Tarjeta Amarilla") {
+      playerStats[e.player_id].yellow_cards++;
+    } else if (e.tipo_evento === "Tarjeta Roja") {
+      playerStats[e.player_id].red_cards++;
+    }
+  });
+
+  // 2. Obtener convocatorias actuales
+  const { data: convocatorias } = await supabase
+    .from("convocatorias")
+    .select("id, player_id")
+    .eq("partido_id", matchId);
+
+  if (!convocatorias) return;
+
+  // 3. Actualizar cada convocatoria con los datos agregados
+  for (const conv of convocatorias) {
+    const stats = playerStats[conv.player_id];
+    if (stats) {
+      await supabase
+        .from("convocatorias")
+        .update({
+          goals: stats.goals,
+          goles: stats.goals, // Actualizar ambos por compatibilidad
+          yellow_cards: stats.yellow_cards,
+          tarjetas_amarillas: stats.yellow_cards,
+          red_cards: stats.red_cards,
+          tarjetas_rojas: stats.red_cards
+        })
+        .eq("id", conv.id);
+    }
+  }
+}

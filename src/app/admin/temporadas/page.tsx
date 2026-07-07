@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle, Trash2, Unlock, Users } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { closeSeason, reopenSeason } from "@/app/actions/season-actions";
 
 interface Season {
   id: string;
@@ -19,6 +20,7 @@ export default function TemporadasPage() {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [loading, setLoading] = useState(true);
   const [clubId, setClubId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Modal de creación
   const [showCreate, setShowCreate] = useState(false);
@@ -38,9 +40,10 @@ export default function TemporadasPage() {
     // 1. Obtener club_id del usuario
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
+    const { data: profile } = await supabase.from('profiles').select('club_id, role').eq('id', user.id).single();
     if (!profile?.club_id) return;
     setClubId(profile.club_id);
+    setIsAdmin(profile.role === 'admin');
 
     // 2. Cargar temporadas
     const { data: seasonsData, error } = await supabase
@@ -99,17 +102,23 @@ export default function TemporadasPage() {
       : `¿Estás seguro de que quieres CERRAR la temporada "${season.name}"? Los datos quedarán archivados.`;
     if (!confirm(msg)) return;
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from('seasons')
-      .update({ is_active: false })
-      .eq('id', season.id);
-
-    if (error) {
-      toast.error('Error al cerrar la temporada: ' + error.message);
-    } else {
-      toast.success(`Temporada "${season.name}" cerrada y archivada. ¡Puedes crear la nueva temporada!`);
+    try {
+      await closeSeason(season.id);
+      toast.success(`Temporada cerrada y archivada.`);
       fetchData();
+    } catch(e: any) {
+      toast.error('Error al cerrar la temporada: ' + e.message);
+    }
+  };
+
+  const handleReopenSeason = async (seasonId: string) => {
+    if (!confirm("ADVERTENCIA (Llave Maestra): ¿Estás seguro de que quieres REABRIR esta temporada para editar datos históricos?")) return;
+    try {
+      await reopenSeason(seasonId);
+      toast.success("Temporada reabierta. El candado ha sido retirado.");
+      fetchData();
+    } catch(e: any) {
+      toast.error("Error al reabrir la temporada: " + e.message);
     }
   };
 
@@ -153,13 +162,24 @@ export default function TemporadasPage() {
           <h1 className="text-3xl font-bold text-slate-900">Gestión de Temporadas</h1>
           <p className="text-gray-500 mt-1">Configura y administra los años deportivos de tu club</p>
         </div>
-        <button 
-          onClick={() => router.push('/admin/temporadas/nueva')}
-          className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors shadow-sm shadow-green-600/20"
-        >
-          <Plus size={16} />
-          <span>Nueva Temporada</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => router.push('/admin/temporadas/asistente')}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Users size={16} />
+            <span className="hidden sm:inline">Asistente Matriculación</span>
+            <span className="sm:hidden">Asistente</span>
+          </button>
+          <button 
+            onClick={() => router.push('/admin/temporadas/nueva')}
+            className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors shadow-sm shadow-green-600/20"
+          >
+            <Plus size={16} />
+            <span className="hidden sm:inline">Nueva Temporada</span>
+            <span className="sm:hidden">Nueva</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -221,12 +241,33 @@ export default function TemporadasPage() {
                     Cerrar Temporada
                   </button>
                 ) : (
-                  <button
-                    onClick={() => handleSetActive(season.id)}
-                    className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Establecer como Activa
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleSetActive(season.id)}
+                      className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Establecer como Activa
+                    </button>
+                    {!season.name.includes('🔓') && isAdmin && (
+                      <button
+                        onClick={() => handleReopenSeason(season.id)}
+                        className="flex-1 md:flex-none text-center flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                        title="Llave Maestra: Reabrir para editar"
+                      >
+                        <Unlock size={14} />
+                        Reabrir Temporada
+                      </button>
+                    )}
+                    {season.name.includes('🔓') && isAdmin && (
+                      <button
+                        onClick={() => handleCloseSeason(season)}
+                        className="flex-1 md:flex-none text-center flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                      >
+                        <Lock size={14} />
+                        Bloquear de Nuevo
+                      </button>
+                    )}
+                  </>
                 )}
                 <button 
                   className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"

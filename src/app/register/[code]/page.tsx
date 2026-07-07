@@ -13,7 +13,7 @@ export default function InviteRegisterPage() {
   
   const [team, setTeam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<any>(null);
 
   useEffect(() => {
     async function fetchTeam() {
@@ -26,7 +26,7 @@ export default function InviteRegisterPage() {
         .single();
         
       if (fetchError || !data) {
-        setError(true);
+        setError(fetchError || new Error("Team not found"));
       } else {
         setTeam(data);
       }
@@ -52,10 +52,13 @@ export default function InviteRegisterPage() {
             <AlertCircle size={24} className="text-red-500" />
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Invitación no válida</h1>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-gray-500 mb-2">
             El código <span className="font-mono font-bold text-gray-700">{inviteCode}</span> no existe
             o ya ha expirado. Pide al administrador del club un nuevo enlace de invitación.
           </p>
+          <div className="text-xs text-red-500 bg-red-50 p-2 rounded mb-6 text-left break-all">
+            Detalles técnicos: {error?.message || JSON.stringify(error)}
+          </div>
           <Link
             href="/login"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"

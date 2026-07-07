@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 
 import { useRouter } from "next/navigation";
 import { createCheckoutSession } from "@/actions/stripeActions"; // server action
+import { getFamilyFeesAction } from "@/app/actions/treasury-actions";
 
 // Badge helper (reuse) – can be moved to a shared utils file later
 function EstadoBadge({ estado }: { estado: string }) {
@@ -43,14 +44,14 @@ export default function Subscriptions() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
-        .from("fees")
-        .select("id, concepto, amount_cents, currency, estado, payment_date, charge_type")
-        .eq("family_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) console.error(error);
-      else setFees(data || []);
-      setLoading(false);
+      try {
+        const data = await getFamilyFeesAction(user.id);
+        setFees(data || []);
+      } catch (err) {
+        console.error("Error cargando cuotas:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchFamilyFees();
   }, []);
@@ -106,7 +107,7 @@ export default function Subscriptions() {
           <tbody className="bg-white divide-y divide-gray-200">
             {fees.map((fee) => (
               <tr key={fee.id}>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{fee.concepto}</td>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{fee.concept}</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   {(fee.amount_cents / 100).toFixed(2)} {fee.currency?.toUpperCase()}
                 </td>

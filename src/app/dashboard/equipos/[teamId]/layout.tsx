@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, Users, CalendarIcon, LayoutList, Download, Activity, Trophy } from "lucide-react";
+import { ArrowLeft, Users, CalendarIcon, LayoutList, Download, Activity, Trophy, Plus, BarChart3 } from "lucide-react";
 import Link from "next/link";
+import { ExportProvider } from "@/components/providers/ExportContext";
+import { ExportButton } from "@/components/ui/ExportButton";
 
 export default function TeamLayout({
   children,
@@ -44,10 +46,12 @@ export default function TeamLayout({
     { name: "Rendimiento", href: `/dashboard/equipos/${teamId}/rendimiento`, icon: Activity },
     { name: "Asistencia", href: `/dashboard/equipos/${teamId}/asistencia`, icon: LayoutList },
     { name: "Eventos", href: `/dashboard/equipos/${teamId}/calendario`, icon: CalendarIcon },
+    { name: "Estadísticas", href: `/dashboard/equipos/${teamId}/estadisticas`, icon: BarChart3 },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50/30 min-h-screen">
+    <ExportProvider>
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50/30 min-h-screen">
       
       {/* GLOBAL HEADER */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
@@ -79,10 +83,16 @@ export default function TeamLayout({
                 Añadir miembros
               </button>
             )}
-            <button className="w-full sm:w-auto justify-center items-center flex gap-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm text-sm">
-              <Download size={18} />
-              Exportar
-            </button>
+            {pathname.includes('partidos') && (
+              <button 
+                onClick={() => router.push(`/dashboard/equipos/${teamId}/partidos?newMatch=true`)}
+                className="w-full sm:w-auto justify-center items-center flex gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm text-sm"
+              >
+                <Plus size={18} />
+                Nuevo Partido
+              </button>
+            )}
+            <ExportButton />
           </div>
         </div>
 
@@ -135,5 +145,6 @@ export default function TeamLayout({
         {children}
       </div>
     </div>
+    </ExportProvider>
   );
 }

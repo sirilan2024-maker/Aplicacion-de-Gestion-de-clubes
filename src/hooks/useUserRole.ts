@@ -29,7 +29,10 @@ export function useUserRole() {
           .single()
 
         if (!error && profile) {
-          setRol((profile.rol || "entrenador") as UserRole)
+          let roleStr = profile.rol || "entrenador";
+          if (roleStr === "tutor") roleStr = "familia";
+          
+          setRol(roleStr as UserRole)
           setTeamId(profile.team_id)
           setLinkedPlayerId(profile.linked_player_id)
         } else {

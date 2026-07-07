@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { BarChart3, Users, Activity, TrendingUp, Goal, AlertTriangle, Clock, Ruler, Scale, Filter, History } from "lucide-react"
+import { BarChart3, Users, Activity, TrendingUp, Goal, AlertTriangle, Clock, Ruler, Scale, Filter, History, LayoutGrid } from "lucide-react"
 import Link from "next/link"
+import { PlayerStatsGrid } from "@/components/features/estadisticas/PlayerStatsGrid"
 
 interface RawData {
   players: any[];
@@ -12,13 +13,15 @@ interface RawData {
   attendance: any[];
   events: any[];
   perf: any[];
+  matchStats: any[];
   metricMap: Map<string, string>;
 }
 
-export default function EstadisticasClubPage() {
+export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
   const [rawData, setRawData] = useState<RawData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("todos")
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "todos")
+  const [viewMode, setViewMode] = useState<'global' | 'individual'>('global')
   const supabase = createClient()
 
   useEffect(() => {
@@ -32,6 +35,18 @@ export default function EstadisticasClubPage() {
       // Fetch teams
       let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
       if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+
+      const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
+        const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+        const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+        if (teamIds.length > 0) {
+          teamsQuery = teamsQuery.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+        } else {
+          teamsQuery = teamsQuery.eq('coach_id', user.id);
+        }
+      }
+
       const { data: teams } = await teamsQuery
       
       const teamIds = (teams || []).map(t => t.id);
@@ -42,7 +57,7 @@ export default function EstadisticasClubPage() {
           .from('player_season_history')
           .select(`
             team_id,
-            players!inner (id, first_name, last_name, height, weight, status)
+            players!inner (id, first_name, last_name, height, weight, status, posicion, posicion_principal, dorsal)
           `)
           .in('team_id', teamIds)
           .eq('season_id', activeSeason.id)
@@ -82,8 +97,40 @@ export default function EstadisticasClubPage() {
       const metricMap = new Map();
       clubMetrics?.forEach(m => metricMap.set(m.id, m.name.toLowerCase()));
 
-      // 5. Fetch Performance Data
-      const { data: perf } = await supabase.from('player_training_metrics').select('metric_id, value_number, player_id')
+      // 5. Fetch Performance Data (Trainings)
+      let perf: any[] = []
+      if (eventIds.length > 0) {
+        const { data } = await supabase.from('player_training_metrics').select('metric_id, value_number, player_id, event_id').in('event_id', eventIds)
+        perf = data || []
+      }
+
+      // 6. Fetch Match Data (Convocatorias from finished matches)
+      let matchStats: any[] = []
+      if (teamIds.length > 0) {
+        const { data: matchData } = await supabase
+          .from('convocatorias')
+          .select(`
+            player_id, 
+            goals, 
+            yellow_cards, 
+            red_cards, 
+            minutes_played,
+            partidos!inner(estado, equipo_id)
+          `)
+          .in('partidos.equipo_id', teamIds)
+          .eq('partidos.estado', 'Finalizado');
+        
+        if (matchData) {
+          matchStats = matchData.map((d: any) => ({
+            player_id: d.player_id,
+            goals: d.goals || 0,
+            yellow_cards: d.yellow_cards || 0,
+            red_cards: d.red_cards || 0,
+            minutes_played: d.minutes_played || 0,
+            team_id: d.partidos.equipo_id
+          }));
+        }
+      }
 
       setRawData({
         players: players || [],
@@ -92,6 +139,7 @@ export default function EstadisticasClubPage() {
         events: events || [],
         attendance: attendance || [],
         perf: perf || [],
+        matchStats: matchStats || [],
         metricMap
       })
       
@@ -104,7 +152,7 @@ export default function EstadisticasClubPage() {
   const stats = useMemo(() => {
     if (!rawData) return null;
 
-    const { players, staff, teams, events, attendance, perf, metricMap } = rawData;
+    const { players, staff, teams, events, attendance, perf, matchStats, metricMap } = rawData;
 
     // Helper to filter by team
     const filterByTeam = (teamId: string | null) => {
@@ -129,6 +177,9 @@ export default function EstadisticasClubPage() {
 
     // Filter performance
     const filteredPerf = perf.filter(p => filterByTeam(playerTeamMap.get(p.player_id)));
+
+    // Filter match stats
+    const filteredMatchStats = matchStats.filter(m => filterByTeam(m.team_id));
 
     // CALCULATIONS
     const countJugadores = filteredPlayers.length;
@@ -195,6 +246,22 @@ export default function EstadisticasClubPage() {
       }
     });
 
+    // Add Match Stats
+    filteredMatchStats.forEach(match => {
+      totalGoles += match.goals;
+      totalAma += match.yellow_cards;
+      totalRoj += match.red_cards;
+      totalMin += match.minutes_played;
+
+      const pStats = playerStatsMap.get(match.player_id);
+      if (pStats) {
+        pStats.goles += match.goals;
+        pStats.amarillas += match.yellow_cards;
+        pStats.rojas += match.red_cards;
+        pStats.minutos += match.minutes_played;
+      }
+    });
+
     const avgRPE = countRPE > 0 ? (sumRPE / countRPE).toFixed(1) : 0;
     const avgRendimiento = countRen > 0 ? (sumRen / countRen).toFixed(1) : 0;
     
@@ -247,7 +314,31 @@ export default function EstadisticasClubPage() {
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {/* Tabs / Filters Section */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex bg-slate-100 p-1.5 rounded-xl w-full sm:w-auto">
+          <button
+            onClick={() => setViewMode('global')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              viewMode === 'global' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <BarChart3 size={16} />
+            Vista Global del Equipo
+          </button>
+          <button
+            onClick={() => setViewMode('individual')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              viewMode === 'individual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <LayoutGrid size={16} />
+            Vista Individual
+          </button>
+        </div>
+
+        {!fixedTeamId && (
+        <div className="flex items-center gap-3">
           {/* Botón de Comparativa Histórica */}
           <Link 
             href="/dashboard/club/estadisticas/comparativa" 
@@ -272,9 +363,15 @@ export default function EstadisticasClubPage() {
           </select>
         </div>
         </div>
+        )}
+      </div>
       </div>
 
-      {/* SECCIÓN 1: GENERAL */}
+      {viewMode === 'individual' && rawData ? (
+        <PlayerStatsGrid rawData={rawData} teamId={selectedTeamId} />
+      ) : (
+        <>
+          {/* SECCIÓN 1: GENERAL */}
       <div>
         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
           <Users size={20} className="text-blue-500"/> Visión General
@@ -515,6 +612,12 @@ export default function EstadisticasClubPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
+}
+
+export default function EstadisticasClubPage() {
+  return <EstadisticasView />
 }

@@ -92,3 +92,143 @@ export async function fetchClubPeopleWizardAction(clubId: string) {
     
   return { players: players || [], coaches: coaches || [] }
 }
+
+export async function assignStaffToTeamAction(staffId: string, teamId: string | null) {
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+  
+  if (teamId) {
+    const { data: team } = await adminClient.from('teams').select('club_id').eq('id', teamId).single()
+    if (!team) return { success: false, error: 'Equipo no encontrado' }
+    
+    await adminClient.from('team_coaches').delete().eq('profile_id', staffId)
+    
+    const { error } = await adminClient.from('team_coaches').insert({ 
+      profile_id: staffId, 
+      team_id: teamId, 
+      club_id: team.club_id 
+    })
+    
+    if (error) return { success: false, error: error.message }
+  } else {
+    const { error } = await adminClient.from('team_coaches').delete().eq('profile_id', staffId)
+    if (error) return { success: false, error: error.message }
+  }
+  
+  revalidatePath("/dashboard/club/miembros")
+  return { success: true }
+}
+
+export async function bulkCreateStaffInvitationsAction(
+  clubId: string, 
+  staffList: { first_name: string, last_name: string, role: string, team_id?: string }[]
+) {
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+  
+  const invitationsToInsert = staffList.map(staff => {
+    let sanitizedRole = staff.role.toLowerCase();
+    if (!['admin', 'coordinador', 'entrenador'].includes(sanitizedRole)) {
+      sanitizedRole = 'entrenador'; // Default fallback para delegados, etc.
+    }
+    
+    // El importador pasa first_name y last_name en el objeto staff
+    const fullName = `${(staff as any).first_name || ''} ${(staff as any).last_name || ''}`.trim() || 'Staff Invitado';
+    
+    return {
+      club_id: clubId,
+      role: sanitizedRole,
+      team_id: staff.team_id || null,
+      name: fullName
+    };
+  })
+
+  const { data, error } = await adminClient
+    .from('staff_invitations')
+    .insert(invitationsToInsert)
+    .select('id, token')
+
+  if (error || !data) {
+    console.error('[Bulk Staff Invite]', error)
+    return { success: false, error: 'Error generando invitaciones de staff' }
+  }
+
+  const results = staffList.map((staff, index) => ({
+    name: `${staff.first_name} ${staff.last_name}`.trim(),
+    role: staff.role,
+    token: data[index].token
+  }))
+
+  return { success: true, invitations: results }
+}
+
+export async function getPendingStaffInvitationsAction(clubId: string) {
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+
+  const { data, error } = await adminClient
+    .from('staff_invitations')
+    .select(`
+      id, role, token, created_at, team_id, name,
+      teams (name, color)
+    `)
+    .eq('club_id', clubId)
+    .eq('used', false)
+
+  if (error) {
+    console.error('[getPendingStaffInvitationsAction]', error)
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, data }
+}
+
+export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string }) {
+  const supabase = await createClient()
+  
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      phone: data.phone || null,
+      dni: data.dni || null,
+      birth_date: data.birth_date || null,
+      license_number: data.license_number || null
+    })
+    .eq('id', staffId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+export async function removeStaffFromClubAction(staffId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  // Verify the current user is admin
+  const { data: currentProfile } = await supabase.from("profiles").select("role, club_id").eq("id", user.id).single()
+  if (currentProfile?.role !== 'admin') {
+    return { success: false, error: 'No tienes permisos para realizar esta acción' }
+  }
+
+  // 1. Desasignar de cualquier equipo (usamos adminClient por si RLS bloquea update en teams)
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+  await adminClient.from("team_coaches").delete().eq("profile_id", staffId)
+
+  // 2. Quitar del club
+  const { error } = await adminClient
+    .from("profiles")
+    .update({ club_id: null, role: 'coach' })
+    .eq("id", staffId)
+    .eq("club_id", currentProfile.club_id) // Check de seguridad
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/dashboard/club/miembros")
+  return { success: true }
+}

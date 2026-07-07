@@ -2,6 +2,9 @@ import { Metadata } from "next"
 import { signOut } from "@/lib/auth-actions"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNavigation } from "@/components/layout/MobileNavigation"
+import { GlobalAdminNotifications } from "@/components/features/admin/GlobalAdminNotifications"
+import { RgpdGuard } from "@/components/layout/RgpdGuard"
+import { EmailVerificationGuard } from "@/components/layout/EmailVerificationGuard"
 
 export const metadata: Metadata = {
   title: "Dashboard | Gestión Club Deportivo",
@@ -25,6 +28,9 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col md:overflow-hidden relative pb-16 md:pb-0">
+        <EmailVerificationGuard />
+        <GlobalAdminNotifications />
+        <RgpdGuard />
         {/* Page Content */}
         <div className="flex-1 p-4 md:p-8 overflow-auto">
           {children}

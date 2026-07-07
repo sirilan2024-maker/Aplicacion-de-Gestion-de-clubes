@@ -124,7 +124,7 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
   return { success: true }
 }
 
-export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string }) {
+export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string, season_id?: string }) {
   const supabase = await createClient()
 
   // Obtener el club_id del usuario autenticado
@@ -135,12 +135,28 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("club_id")
+    .select("club_id, role")
     .eq("id", user.id)
     .single()
 
   if (profileError || !profile?.club_id) {
     throw new Error("No se pudo obtener el club del usuario")
+  }
+
+  let finalSeasonId = data.season_id;
+
+  // Fase 1 Caja Fuerte & Llave Maestra: Validación estricta del season_id
+  if (finalSeasonId) {
+    const { data: targetSeason } = await supabase.from('seasons').select('is_active, name').eq('id', finalSeasonId).single();
+    const isOverride = targetSeason && targetSeason.name.includes('🔓') && profile.role === 'admin';
+    if (!targetSeason || (!targetSeason.is_active && !isOverride)) {
+      throw new Error("No se pueden crear datos en una temporada cerrada.");
+    }
+  } else {
+    // Si no lo pasan, buscar la temporada activa
+    const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile.club_id).eq('is_active', true).single();
+    if (!activeSeason) throw new Error("No hay una temporada activa para guardar el partido");
+    finalSeasonId = activeSeason.id;
   }
   
   const { data: newMatch, error } = await supabase
@@ -151,7 +167,8 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
       fecha_hora: data.fecha_hora,
       lugar: data.lugar,
       rival_nombre: data.rival_nombre,
-      estado: 'Programado'
+      estado: 'Programado',
+      season_id: finalSeasonId
     })
     .select()
     .single()

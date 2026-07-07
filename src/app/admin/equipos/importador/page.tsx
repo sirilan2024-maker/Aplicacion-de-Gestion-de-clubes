@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
-import { Upload, FileUp, CheckCircle, AlertCircle, ArrowLeft, Users } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { ChevronLeft, Upload, Loader2, FileSpreadsheet, CheckCircle, AlertCircle, Download, Database, Users, ArrowLeft, FileUp, Copy } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
+import { generateLinkCode } from "@/lib/utils";
+import { bulkCreateStaffInvitationsAction } from "@/app/actions/club-actions";
 
 interface Season {
   id: string;
@@ -33,6 +35,9 @@ export default function ImportadorEquiposPage() {
   // Novedad: Equipos existentes y equipo por defecto
   const [existingTeams, setExistingTeams] = useState<{id: string, name: string}[]>([]);
   const [defaultTeamName, setDefaultTeamName] = useState<string>("");
+  
+  // Novedad: Staff invitations generadas
+  const [staffInvites, setStaffInvites] = useState<{name: string, role: string, token: string}[]>([]);
 
   useEffect(() => {
     checkActiveSeasonAndTeams();
@@ -106,7 +111,8 @@ export default function ImportadorEquiposPage() {
           const nombre = row["Nombre"] || row["NOMBRE"] || row["nombre"] || row["Jugador"] || row["JUGADOR"] || "";
           const apellidos = row["Apellidos"] || row["APELLIDOS"] || row["apellidos"] || "";
           const dorsal = row["N° de camiseta"] || row["Nº de camiseta"] || row["Dorsal"] || row["DORSAL"] || row["dorsal"] || "";
-          const posicion = row["Posición"] || row["Posicion"] || row["Rol"] || row["POSICION"] || row["posicion"] || "";
+          // Detectar Posición o Rol (dando máxima prioridad a las columnas Rol/Roll para evitar que se mezclen posiciones de juego)
+          const posicion = row["Rol"] || row["Roll"] || row["ROL"] || row["rol"] || row["roll"] || row["Posición"] || row["Posicion"] || row["POSICION"] || row["posicion"] || "";
           
           // Intentar parsear fecha de nacimiento si existe
           let birthDate = row["Fecha de nacimiento"] || row["Fecha Nacimiento"] || row["Nacimiento"] || "";
@@ -190,24 +196,29 @@ export default function ImportadorEquiposPage() {
     try {
       const formatBirthDate = (dateStr: string) => {
         if (!dateStr) return null;
-        // Si viene como DD/MM/YYYY
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            // asumiendo DD/MM/YYYY o DD/MM/YY
-            let year = parts[2];
-            if (year.length === 2) {
-               // heuristics for 2000s vs 1900s
-               year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+        try {
+          // Si viene como DD/MM/YYYY
+          if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+              let year = parts[2];
+              if (year.length === 2) {
+                 year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+              }
+              const isoString = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              // Validate date exists
+              const d = new Date(isoString);
+              if (!isNaN(d.getTime()) && d.toISOString().startsWith(isoString)) {
+                return isoString;
+              }
             }
-            return `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
           }
-        }
-        // Si viene como YYYY-MM-DD u otro formato estándar, intentamos validarlo
-        const parsed = new Date(dateStr);
-        if (!isNaN(parsed.getTime())) {
-          return parsed.toISOString().split('T')[0];
-        }
+          // Si viene como YYYY-MM-DD u otro formato estándar
+          const parsed = new Date(dateStr);
+          if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString().split('T')[0];
+          }
+        } catch(e) {}
         return null; // fallback
       };
 
@@ -224,6 +235,7 @@ export default function ImportadorEquiposPage() {
 
       let teamsCreated = 0;
       let playersCreated = 0;
+      const allStaffToInvite: any[] = [];
 
       // 2. Procesar cada equipo
       for (const [teamName, players] of teamsMap.entries()) {
@@ -271,11 +283,7 @@ export default function ImportadorEquiposPage() {
               season_id: activeSeason.id,
               name: teamName,
               category: "General",
-              sport: "Fútbol",
-              gender: "Masculino",
-              age_group: "Adultos", // required
-              format: "Fútbol 11",  // required
-              color: "#1E40AF",     // required
+              color: "#1E40AF",
               members: numPlayers,
               coaches: numCoaches
             })
@@ -288,34 +296,48 @@ export default function ImportadorEquiposPage() {
         }
 
         // 3. Crear jugadores y asignarlos
-        const playersToInsert = players.map(p => {
+        const playersToInsert: any[] = [];
+        
+        players.forEach(p => {
           const d = parseInt(p.Dorsal);
           const y = parseInt(p.AnioLlegada);
           
-          return {
-            club_id: clubId,
-            team_id: teamId,
-            first_name: p.Nombre?.trim() || "Sin Nombre",
-            last_name: p.Apellidos?.trim() || "",
-            dorsal: isNaN(d) ? null : d,
-            posicion: p.Posicion?.trim() || "Jugador",
-            parent_contact: p["Tutor Legal"]?.trim() || "Pendiente",
-            email: p.Email?.trim() || null,
-            phone: p.Telefono?.trim() || null,
-            birth_date: formatBirthDate(p.FechaNacimiento),
-            // Campos extendidos
-            nickname: p.Apodo?.trim() || null,
-            join_year: isNaN(y) ? null : y,
-            license_number: p.Licencia?.trim() || null,
-            parent1_name: p.Padre1Nombre?.trim() || null,
-            parent1_last_name: p.Padre1Apellidos?.trim() || null,
-            parent1_email: p.Padre1Email?.trim() || null,
-            parent1_phone: p.Padre1Tel?.trim() || null,
-            parent2_name: p.Padre2Nombre?.trim() || null,
-            parent2_last_name: p.Padre2Apellidos?.trim() || null,
-            parent2_email: p.Padre2Email?.trim() || null,
-            parent2_phone: p.Padre2Tel?.trim() || null,
-          };
+          const pos = p.Posicion?.toLowerCase() || "";
+          const isCoach = pos.includes('entrenador') || pos.includes('delegado') || pos.includes('técnico') || pos.includes('staff') || pos.includes('coordinador');
+          
+          if (isCoach) {
+            allStaffToInvite.push({
+              first_name: p.Nombre?.trim() || "Sin Nombre",
+              last_name: p.Apellidos?.trim() || "",
+              role: p.Posicion?.trim() || "entrenador",
+              team_id: teamId
+            });
+          } else {
+            playersToInsert.push({
+              club_id: clubId,
+              team_id: teamId,
+              link_code: generateLinkCode(),
+              first_name: p.Nombre?.trim() || "Sin Nombre",
+              last_name: p.Apellidos?.trim() || "",
+              dorsal: isNaN(d) ? null : d,
+              posicion: p.Posicion?.trim() || "Jugador",
+              parent_contact: p["Tutor Legal"]?.trim() || "Pendiente",
+              email: p.Email?.trim() || null,
+              phone: p.Telefono?.trim() || null,
+              birth_date: formatBirthDate(p.FechaNacimiento),
+              nickname: p.Apodo?.trim() || null,
+              join_year: isNaN(y) ? null : y,
+              license_number: p.Licencia?.trim() || null,
+              parent1_name: p.Padre1Nombre?.trim() || null,
+              parent1_last_name: p.Padre1Apellidos?.trim() || null,
+              parent1_email: p.Padre1Email?.trim() || null,
+              parent1_phone: p.Padre1Tel?.trim() || null,
+              parent2_name: p.Padre2Nombre?.trim() || null,
+              parent2_last_name: p.Padre2Apellidos?.trim() || null,
+              parent2_email: p.Padre2Email?.trim() || null,
+              parent2_phone: p.Padre2Tel?.trim() || null,
+            });
+          }
         });
 
         if (playersToInsert.length > 0) {
@@ -335,26 +357,41 @@ export default function ImportadorEquiposPage() {
               club_id: clubId
             }));
 
-            await supabase.from('player_season_teams').insert(historyToInsert);
+            await supabase.from('player_season_history').insert(historyToInsert);
             playersCreated += historyToInsert.length;
           }
         }
       }
 
-      toast.success(`Importación exitosa: ${teamsCreated} equipos nuevos y ${playersCreated} jugadores registrados.`);
+      let staffCreated = 0;
+      if (allStaffToInvite.length > 0) {
+        const res = await bulkCreateStaffInvitationsAction(clubId, allStaffToInvite);
+        if (res.success && res.invitations) {
+          setStaffInvites(res.invitations);
+          staffCreated = res.invitations.length;
+        }
+      }
+
+      toast.success(`Importación exitosa: ${teamsCreated} equipos nuevos, ${playersCreated} jugadores y ${staffCreated} entrenadores importados.`);
       
       // Limpiar formulario y archivo
       setFile(null);
       setPreviewData([]);
-      // Solo hacer push después de un momento
-      setTimeout(() => {
-        router.push('/dashboard/equipos');
-      }, 1000);
+      
+      // Solo volver si no hay staff para invitar (si lo hay, mostramos los enlaces)
+      if (allStaffToInvite.length === 0) {
+        setTimeout(() => {
+          router.push('/dashboard/equipos');
+        }, 1000);
+      }
       
     } catch (error: any) {
-      const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
-      toast.error("Error en la importación: " + errorMsg);
-      console.error(error);
+      let errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+      if (error && typeof error === 'object' && error.details) {
+        errorMsg += ` (Detalles: ${error.details})`;
+      }
+      toast.error("Error crítico en la importación: " + errorMsg, { duration: 10000 });
+      console.error("IMPORT ERROR:", error);
     } finally {
       setIsImporting(false);
     }
@@ -374,6 +411,63 @@ export default function ImportadorEquiposPage() {
           <p className="text-gray-500 mt-1">Sube un archivo Excel/CSV para crear equipos y jugadores masivamente.</p>
         </div>
       </div>
+
+      {staffInvites.length > 0 && (
+        <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <CheckCircle className="w-8 h-8 text-blue-600 shrink-0 mt-1" />
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-blue-900 mb-2">¡Entrenadores Importados Correctamente!</h2>
+              <p className="text-blue-800 mb-4">
+                El sistema ha detectado {staffInvites.length} miembro(s) del cuerpo técnico. Se han creado sus invitaciones reales para que tengan panel de control.
+                <br/><strong>Copia estos enlaces y envíaselos</strong> (por email o WhatsApp) para que puedan completar su registro y crear su contraseña:
+              </p>
+              <div className="space-y-3 bg-white p-4 rounded-lg border border-blue-100 max-h-64 overflow-y-auto">
+                {staffInvites.map((invite, i) => {
+                  const inviteLink = `${window.location.origin}/register/staff/${invite.token}`;
+                  return (
+                    <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 rounded-md border border-slate-100">
+                      <div>
+                        <p className="font-bold text-slate-900">{invite.name}</p>
+                        <p className="text-xs text-slate-500 capitalize">{invite.role}</p>
+                      </div>
+                      <div className="mt-2 sm:mt-0 flex items-center gap-2">
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={inviteLink}
+                          className="text-xs w-48 bg-white border border-slate-200 rounded px-2 py-1.5 focus:outline-none"
+                        />
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(inviteLink);
+                            toast.success("Enlace copiado al portapapeles");
+                          }}
+                          className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+                          title="Copiar enlace"
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6">
+                <button 
+                  onClick={() => {
+                    setStaffInvites([]);
+                    router.push('/dashboard/club/miembros');
+                  }}
+                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                >
+                  Entendido, volver a Miembros
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!activeSeason ? (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center text-center">
@@ -408,7 +502,7 @@ export default function ImportadorEquiposPage() {
                 />
                 <Upload className="w-10 h-10 text-gray-400 mb-3" />
                 <p className="font-medium text-slate-700">Haz clic o arrastra un archivo CSV</p>
-                <p className="text-xs text-gray-500 mt-1">Solo formato .csv delimitado por comas</p>
+                <p className="text-xs text-gray-500 mt-1">Solo formato CSV UTF-8 (delimitado por comas)</p>
               </div>
 
               {file && (
@@ -502,7 +596,7 @@ export default function ImportadorEquiposPage() {
                     <p>No se han cargado datos aún.</p>
                     <p className="text-sm mt-1">Sube un archivo para previsualizar las columnas requeridas:</p>
                     <div className="flex gap-2 mt-4 text-xs font-mono bg-gray-100 p-3 rounded text-slate-600">
-                      <span>Equipo</span> | <span>Nombre</span> | <span>Apellidos</span> | <span>Dorsal</span> | <span>Posicion</span>
+                      <span>Equipo</span> | <span>Nombre</span> | <span>Apellidos</span> | <span>Roll</span>
                     </div>
                   </div>
                 ) : (
@@ -512,8 +606,7 @@ export default function ImportadorEquiposPage() {
                         <th className="p-3 border-b text-gray-500 font-medium whitespace-nowrap">Equipo</th>
                         <th className="p-3 border-b text-gray-500 font-medium whitespace-nowrap">Nombre</th>
                         <th className="p-3 border-b text-gray-500 font-medium whitespace-nowrap">Apellidos</th>
-                        <th className="p-3 border-b text-gray-500 font-medium whitespace-nowrap">Posición</th>
-                        <th className="p-3 border-b text-gray-500 font-medium whitespace-nowrap">Dorsal</th>
+                        <th className="p-3 border-b text-gray-500 font-medium whitespace-nowrap">Roll</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -523,7 +616,6 @@ export default function ImportadorEquiposPage() {
                           <td className="p-3 whitespace-nowrap text-slate-600">{row.Nombre || <span className="text-red-400">Falta</span>}</td>
                           <td className="p-3 whitespace-nowrap text-slate-600">{row.Apellidos || '-'}</td>
                           <td className="p-3 whitespace-nowrap text-slate-600">{row.Posicion || '-'}</td>
-                          <td className="p-3 whitespace-nowrap text-slate-600">{row.Dorsal || '-'}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -49,7 +49,7 @@ export async function getTeamCoachesProfilesAction(teamId: string) {
     .select(`
       profile_id,
       profiles:profile_id (
-        id, first_name, last_name, email, rol, role
+        id, first_name, last_name, email, rol, role, avatar_url
       )
     `)
     .eq("team_id", teamId)

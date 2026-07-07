@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { getClubFeesAction, getClubFamiliesAction, createFeeAction } from "@/app/actions/treasury-actions";
 
 // Badge helper for estados
 function EstadoBadge({ estado }: { estado: string }) {
@@ -30,24 +30,22 @@ export default function Payments() {
   const [families, setFamilies] = useState<any[]>([]);
 
   const fetchFees = async () => {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("fees")
-      .select("id, concepto, amount_cents, currency, estado, payment_date, charge_type")
-      .order("created_at", { ascending: false });
-    if (error) console.error(error.message || error.hint || error);
-    else setFees(data || []);
+    try {
+      const data = await getClubFeesAction();
+      setFees(data || []);
+    } catch (error) {
+      console.error("Error fetching fees:", error);
+    }
     setLoading(false);
   };
 
   const fetchFamilies = async () => {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, name")
-      .eq("role", "familia");
-    if (error) console.error("Error fetching families:", error);
-    else setFamilies(data || []);
+    try {
+      const data = await getClubFamiliesAction();
+      setFamilies(data || []);
+    } catch (error) {
+      console.error("Error fetching families:", error);
+    }
   };
 
   useEffect(() => {
@@ -57,27 +55,26 @@ export default function Payments() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
-    const { error } = await supabase.from("fees").insert({
-      family_id: selectedFamily,
-      concepto,
-      amount_cents: Math.round(importe * 100),
-      currency: "eur",
-      estado: "pendiente",
-      charge_type: tipo,
-    });
-    if (error) {
+    try {
+      await createFeeAction({
+        family_id: selectedFamily,
+        concept: concepto,
+        amount_cents: Math.round(importe * 100),
+        currency: "eur",
+        estado: "pendiente",
+        tipo_cargo: tipo,
+      });
+      // Refresh list
+      fetchFees();
+      setShowModal(false);
+      // Reset form
+      setSelectedFamily("");
+      setConcepto("");
+      setImporte(0);
+      setTipo("one_time");
+    } catch (error) {
       console.error("Error inserting fee:", error);
-      return;
     }
-    // Refresh list
-    fetchFees();
-    setShowModal(false);
-    // Reset form
-    setSelectedFamily("");
-    setConcepto("");
-    setImporte(0);
-    setTipo("one_time");
   };
 
   const filteredFees = fees.filter((fee) => {
@@ -135,10 +132,10 @@ export default function Payments() {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredFees.map((fee) => (
               <tr key={fee.id}>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{fee.concepto}</td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  {(fee.amount_cents / 100).toFixed(2)} {fee.currency?.toUpperCase()}
-                </td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{fee.concept}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                    {(fee.amount_cents / 100).toFixed(2)} {fee.currency?.toUpperCase()}
+                  </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm"><EstadoBadge estado={fee.estado} /></td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
                   {fee.payment_date ? new Date(fee.payment_date).toLocaleDateString() : "-"}
@@ -166,9 +163,11 @@ export default function Payments() {
                   onChange={(e) => setSelectedFamily(e.target.value)}
                   className="w-full border border-gray-300 rounded px-2 py-1 text-gray-900 bg-white"
                 >
-                  <option value="" disabled>Selecciona un jugador / equipo...</option>
+                  <option value="">Selecciona un usuario...</option>
                   {families.map((fam) => (
-                    <option key={fam.id} value={fam.id}>{fam.name || fam.id}</option>
+                    <option key={fam.id} value={fam.id}>
+                      {fam.first_name} {fam.last_name} ({fam.email})
+                    </option>
                   ))}
                 </select>
               </div>

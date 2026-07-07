@@ -32,7 +32,22 @@ export async function login(formData: FormData) {
   const role = (profile?.role as string) ?? 'coach';
   let destination = '/dashboard';
   if (role === 'admin') destination = '/dashboard/equipos';
-  else if (role === 'coach') destination = '/dashboard/mis-equipos';
+  else if (role === 'coach' || role === 'entrenador') destination = '/dashboard/mis-equipos';
+  else if (role === 'tutor' || role === 'familia' || role === 'family') {
+    // Check if they have linked children to redirect them straight into the context
+    const { data: tutors } = await supabase
+      .from('player_tutors')
+      .select('player_id')
+      .eq('tutor_id', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (tutors && tutors.player_id) {
+      destination = `/dashboard/family/e/${tutors.player_id}/perfil`;
+    } else {
+      destination = '/dashboard/family';
+    }
+  }
   else destination = '/dashboard/mi-perfil';
 
   revalidatePath('/', 'layout');
@@ -68,7 +83,7 @@ export async function register(formData: FormData) {
 
 // ─── NEW: Register via invite code ───────────────────────────────────────────
 export type RegisterWithInviteResult =
-  | { success: true;  requireEmailVerification: true }
+  | { success: true;  requireEmailVerification: boolean }
   | { success: false; error: string }
 
 export async function registerWithInviteCode(
@@ -79,6 +94,7 @@ export async function registerWithInviteCode(
   const password   =  formData.get('password')     as string
   const firstName  = (formData.get('first_name')   as string)?.trim()
   const lastName   = (formData.get('last_name')    as string)?.trim()
+  const phone      = (formData.get('phone')        as string)?.trim() || null
   const role       =  formData.get('role')         as string
 
   // ── Validaciones básicas ─────────────────────────────────────────────────
@@ -86,7 +102,7 @@ export async function registerWithInviteCode(
     return { success: false, error: 'Todos los campos son obligatorios.' }
   }
 
-  if (!['jugador', 'tutor'].includes(role)) {
+  if (!['jugador', 'tutor', 'entrenador'].includes(role)) {
     return { success: false, error: 'Rol no permitido para registro público.' }
   }
 
@@ -96,6 +112,7 @@ export async function registerWithInviteCode(
 
   // ── Usar cliente sin sesión para la búsqueda pública del equipo ──────────
   const supabase = await createClient()
+  const adminSupabase = await createAdminClient()
 
   // ── 1. Buscar el equipo por invite_code ──────────────────────────────────
   const { data: team, error: teamError } = await supabase
@@ -106,6 +123,22 @@ export async function registerWithInviteCode(
 
   if (teamError || !team) {
     return { success: false, error: 'Código de invitación inválido o no encontrado.' }
+  }
+
+  const registrationType = (formData.get('registration_type') as string) || 'new' // 'pin' or 'new'
+  const pinCode          = (formData.get('pin_code') as string)?.trim()
+  const childFirstName   = (formData.get('child_first_name') as string)?.trim()
+  const childLastName    = (formData.get('child_last_name') as string)?.trim()
+  const childBirthDate   = (formData.get('child_birth_date') as string)
+
+  // Validate specific tutor fields
+  if (role === 'tutor') {
+    if (registrationType === 'pin' && !pinCode) {
+      return { success: false, error: 'Debes introducir un código PIN.' }
+    }
+    if (registrationType === 'new' && (!childFirstName || !childLastName || !childBirthDate)) {
+      return { success: false, error: 'Debes introducir todos los datos del niño.' }
+    }
   }
 
   // ── 2. Crear usuario en Supabase Auth ────────────────────────────────────
@@ -134,37 +167,130 @@ export async function registerWithInviteCode(
     return { success: false, error: 'No se pudo crear el usuario. Inténtalo de nuevo.' }
   }
 
-  // ── 3. Crear un jugador placeholder vinculado al equipo ──
-  let linkedPlayerId: string | null = null
-  const { data: playerData, error: playerError } = await supabase
-    .from('players')
-    .insert({
-      first_name:   firstName,
-      last_name:    lastName,
-      team_id:      team.id,
-      club_id:      team.club_id,
-      birth_date:   new Date().toISOString().split('T')[0], // default valid date
-      user_auth_id: role === 'jugador' ? userId : null,
-      tutor_id:     role === 'tutor' ? userId : null,
-    })
+  // ── 3. Lógica de Jugador/Tutor ──
+  // Get active season
+  const { data: activeSeason } = await adminSupabase
+    .from('seasons')
     .select('id')
+    .eq('club_id', team.club_id)
+    .eq('is_active', true)
     .single()
 
-  if (playerError) {
-    console.error('[InviteRegister] player insert error:', playerError.message)
-  } else if (playerData) {
-    linkedPlayerId = playerData.id
+  let linkedPlayerId: string | null = null
+
+  if (role === 'tutor') {
+    if (registrationType === 'pin') {
+      // Find player by link_code
+      const { data: playerByPin, error: pinSearchError } = await supabase
+        .from('players')
+        .select('id, club_id')
+        .eq('link_code', pinCode)
+        .eq('team_id', team.id)
+        .single()
+        
+      if (pinSearchError || !playerByPin) {
+        console.error('[InviteRegister] PIN invalid:', pinSearchError?.message)
+        // Cleanup created auth user (not strictly necessary but good practice)
+        return { success: false, error: 'El PIN introducido no es válido o no pertenece a este equipo.' }
+      }
+      
+      linkedPlayerId = playerByPin.id
+      
+      // Link via player_tutors
+      await adminSupabase.from('player_tutors').insert({
+        player_id: linkedPlayerId,
+        tutor_id: userId
+      })
+
+    } else {
+      // Create new player record from scratch
+      const { data: playerData, error: playerError } = await supabase
+        .from('players')
+        .insert({
+          first_name:   childFirstName,
+          last_name:    childLastName,
+          team_id:      team.id,
+          club_id:      team.club_id,
+          birth_date:   childBirthDate,
+          tutor_id:     userId, // Mantenemos tutor_id temporalmente por retrocompatibilidad
+          parent1_name: firstName,
+          parent1_last_name: lastName,
+          parent1_phone: phone,
+          parent1_email: email,
+          parent_contact: `${firstName} ${lastName} - ${phone || 'Sin teléfono'}`,
+          gdpr_consent: true,
+        })
+        .select('id')
+        .single()
+        
+      if (playerError) {
+        console.error('[InviteRegister] player insert error:', playerError.message)
+      } else if (playerData) {
+        linkedPlayerId = playerData.id
+        // Link via player_tutors
+        await adminSupabase.from('player_tutors').insert({
+          player_id: linkedPlayerId,
+          tutor_id: userId
+        })
+        // Añadir a player_season_history para que aparezca en la plantilla
+        await adminSupabase.from('player_season_history').insert({
+          player_id: linkedPlayerId,
+          team_id: team.id,
+          club_id: team.club_id,
+          season_id: activeSeason?.id || null,
+          status: 'active'
+        })
+      }
+    }
+  } else if (role === 'jugador') {
+    // Si es un jugador adulto registrándose a sí mismo
+    const { data: playerData, error: playerError } = await supabase
+      .from('players')
+      .insert({
+        first_name:   firstName,
+        last_name:    lastName,
+        team_id:      team.id,
+        club_id:      team.club_id,
+        gdpr_consent: true,
+        birth_date:   new Date().toISOString().split('T')[0],
+        user_auth_id: userId,
+      })
+      .select('id')
+      .single()
+
+    if (playerError) {
+      console.error('[InviteRegister] player insert error:', playerError.message)
+    } else if (playerData) {
+      linkedPlayerId = playerData.id
+      // Añadir a player_season_history para que aparezca en la plantilla
+      await adminSupabase.from('player_season_history').insert({
+        player_id: linkedPlayerId,
+        team_id: team.id,
+        club_id: team.club_id,
+        season_id: activeSeason?.id || null,
+        status: 'active'
+      })
+    }
+  } else if (role === 'entrenador') {
+    // El rol entrenador no crea una ficha de jugador. 
+    // Lo asignamos a la tabla team_coaches
+    await adminSupabase.from('team_coaches').insert({
+      team_id: team.id,
+      profile_id: userId,
+      club_id: team.club_id
+    })
   }
 
   // ── 4. Insertar/Actualizar perfil ──
   // Solo intentamos upsert; si ya existe, actualiza los roles y campos vinculados.
-  const { error: profileError } = await supabase
+  const { error: profileError } = await adminSupabase
     .from('profiles')
     .upsert({
       id:               userId,
       email,
       first_name:       firstName,
       last_name:        lastName,
+      phone:            phone,
       role:             role,
       club_id:          team.club_id,
       team_id:          team.id,
@@ -223,14 +349,12 @@ export async function registerInvitedStaffAction(
     return { success: false, error: 'Este enlace ya ha sido utilizado.' }
   }
 
-  // 2. Sign up user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  // 2. Create user with admin client (no email verification needed)
+  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email,
     password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-      data: { first_name: firstName, last_name: lastName, role: invite.role },
-    },
+    email_confirm: true,
+    user_metadata: { first_name: firstName, last_name: lastName, role: invite.role },
   })
 
   if (authError || !authData.user) {
@@ -246,6 +370,7 @@ export async function registerInvitedStaffAction(
     .eq('id', invite.id)
 
   // 4. Upsert Profile with correct club_id and role
+  // The trigger may have already created a profile without club_id, so we update it
   const { error: profileError } = await adminClient
     .from('profiles')
     .upsert({
@@ -261,5 +386,20 @@ export async function registerInvitedStaffAction(
     console.error('[StaffInvite] profile upsert error:', profileError.message)
   }
 
-  return { success: true, requireEmailVerification: true }
+  // 5. If the invitation has a team_id, assign the user as the coach of that team
+  if (invite.team_id) {
+    const { error: teamAssignError } = await adminClient
+      .from('team_coaches')
+      .insert({
+        team_id: invite.team_id,
+        profile_id: userId,
+        club_id: invite.club_id
+      })
+      
+    if (teamAssignError) {
+      console.error('[StaffInvite] Error assigning staff to team_coaches:', teamAssignError.message)
+    }
+  }
+
+  return { success: true, requireEmailVerification: false }
 }

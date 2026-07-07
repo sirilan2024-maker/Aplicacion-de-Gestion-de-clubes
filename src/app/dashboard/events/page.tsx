@@ -45,6 +45,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true)
   const [dbTeams, setDbTeams] = useState<TeamData[]>([])
   const [dbEvents, setDbEvents] = useState<CalendarEvent[]>([])
+  const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null)
 
   // Modal states
   const [showModal, setShowModal] = useState(false)
@@ -90,6 +91,10 @@ export default function EventsPage() {
       .eq('club_id', profile.club_id)
       .eq('is_active', true)
       .single()
+
+    if (activeSeason?.id) {
+      setActiveSeasonId(activeSeason.id)
+    }
 
     // Fetch teams
     let teamsQuery = supabase
@@ -236,6 +241,7 @@ export default function EventsPage() {
       // Create new event(s) for all selected teams
       const eventsToInsert = modalSelectedTeams.map(tid => ({
         team_id: tid,
+        season_id: activeSeasonId,
         title: modalTitle,
         event_type: modalType,
         date: modalDate,

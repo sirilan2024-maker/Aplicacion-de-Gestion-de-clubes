@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -43,7 +43,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Sesión creada correctamente → redirigir al dashboard
+    // Sesión creada correctamente → marcar email verificado y redirigir
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const adminSupabase = await createAdminClient()
+      await adminSupabase.from('profiles').update({ email_verified: true }).eq('id', user.id)
+    }
+
     return NextResponse.redirect(
       `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`
     )

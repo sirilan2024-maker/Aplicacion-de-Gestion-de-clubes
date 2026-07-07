@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Search, Filter, Plus, Pencil, Trash2, Users, ChevronRight, CheckCircle2, User, Loader2, X } from "lucide-react";
+import { Search, Filter, Plus, Pencil, Trash2, Users, ChevronRight, CheckCircle2, User, Loader2, X, Download, FileText } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { updatePlayerPositionAction } from "@/app/actions/player-actions";
+import { getTeamCoachesProfilesAction } from "@/app/actions/team-actions";
+import { useExport } from "@/components/providers/ExportContext";
 
 interface Player {
   id: string;
@@ -18,9 +21,10 @@ interface Player {
   height: number | null;
   weight: number | null;
   phone: string | null;
+  link_code?: string | null;
+  posicion_principal?: string | null;
+  status?: string | null;
 }
-
-import { getTeamCoachesProfilesAction } from "@/app/actions/team-actions";
 
 export default function PlantillaEquipoPage() {
   const params = useParams();
@@ -34,22 +38,37 @@ export default function PlantillaEquipoPage() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const { setExportData } = useExport();
+
   useEffect(() => {
     fetchData();
   }, [teamId]);
+
+  useEffect(() => {
+    const exportFormatted = players.map(p => ({
+      Dorsal: p.dorsal || '-',
+      Nombre: p.first_name,
+      Apellidos: p.last_name,
+      Posicion: p.posicion_principal || p.posicion || 'Jugador',
+      Etiqueta: p.posicion || '-',
+      Email: p.email || p.parent_contact || '-',
+      Telefono: p.phone || '-'
+    }));
+    setExportData(exportFormatted, `Plantilla_Equipo_${teamId}`);
+  }, [players, setExportData, teamId]);
 
   async function fetchData() {
     if (!teamId) return;
     const supabase = createClient();
     try {
       // 1. Fetch players via history
-      const { data: historyData, error: playersError } = await supabase
-        .from("player_season_history")
-        .select(`
-          status,
-          players!inner (id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone)
-        `)
-        .eq("team_id", teamId)
+        const { data: historyData, error: playersError } = await supabase
+          .from("player_season_history")
+          .select(`
+            status,
+            players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code)
+          `)
+          .eq("team_id", teamId)
         .neq("status", "inactive");
 
       if (playersError) throw playersError;
@@ -68,6 +87,8 @@ export default function PlantillaEquipoPage() {
           first_name: p.first_name || "Entrenador",
           last_name: p.last_name || "",
           posicion: "Entrenador", // Usamos "Entrenador" para que el sort lo identifique
+          posicion_principal: "-",
+          status: "active",
           birth_date: "",
           email: p.email,
           parent_contact: null,
@@ -102,6 +123,36 @@ export default function PlantillaEquipoPage() {
     }
   }
 
+  const handleRoleChange = async (player: Player, newRole: string) => {
+    // Si viene del mappedCoaches, no tiene email ni teléfono real aquí salvo que sea de profile
+    // Determinamos si es profile (staff) o player comprobando parent_contact que es específico de players.
+    // También podríamos verificar player.id.
+    const isStaff = player.parent_contact === null && player.dorsal === null && player.height === null && player.first_name === "Entrenador"; // This is fragile, better to check if they are from coachesData
+    
+    // Mejor lógica para saber si es Ficha Deportiva:
+    // Los entrenadores que vienen de la tabla 'profiles' (mappedCoaches) no tienen 'parent_contact' definido en DB (undefined o null), 
+    // pero los jugadores (Ficha deportiva) sí lo tienen, al menos como null en la DB.
+    // Para no equivocarnos, asumimos ficha deportiva a menos que haya sido inyectado por coachesData.
+    const adminRoles = ['admin', 'coordinador', 'staff'];
+    const esFicha = true; // Por defecto asumimos ficha en la plantilla a menos que reestruturemos.
+
+    if (esFicha && adminRoles.includes(newRole.toLowerCase())) {
+      const confirm = window.confirm(`ATENCIÓN:\n\nEste miembro es una ficha deportiva.\n\nCambiar su etiqueta a "${newRole}" NO le dará acceso real a la plataforma. Para darle acceso con contraseña debes ir a "Miembros" e invitarle.\n\n¿Quieres cambiar la etiqueta de todas formas?`);
+      if (!confirm) return;
+    }
+
+    const toastId = toast.loading("Actualizando rol...");
+    try {
+      const res = await updatePlayerPositionAction(player.id, newRole);
+      if (!res.success) throw new Error(res.error?.message || "Error al actualizar");
+      
+      setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, posicion: newRole } : p));
+      toast.success("Rol actualizado", { id: toastId });
+    } catch (error: any) {
+      toast.error(error.message, { id: toastId });
+    }
+  };
+
   const calcularEdad = (fechaNacimiento: string) => {
     if (!fechaNacimiento) return "N/A";
     const hoy = new Date();
@@ -133,6 +184,8 @@ export default function PlantillaEquipoPage() {
           first_name: editingPlayer.first_name,
           last_name: editingPlayer.last_name,
           posicion: editingPlayer.posicion,
+          posicion_principal: editingPlayer.posicion_principal,
+          status: editingPlayer.status,
           dorsal: editingPlayer.dorsal,
           height: editingPlayer.height,
           weight: editingPlayer.weight,
@@ -155,6 +208,31 @@ export default function PlantillaEquipoPage() {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="top-right" />
       
+      {/* HEADER DE ACCIONES */}
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-xl font-bold text-slate-800">Plantilla Actual</h2>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => {
+              const csvContent = "data:text/csv;charset=utf-8," 
+                + "Jugador,PIN de Registro\n"
+                + players.filter(p => p.posicion !== 'Entrenador').map(e => `${e.first_name} ${e.last_name},${e.link_code || 'SIN PIN'}`).join("\n");
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement("a");
+              link.setAttribute("href", encodedUri);
+              link.setAttribute("download", "PINs_Registro_Familiares.csv");
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-xl border border-indigo-200 transition-colors shadow-sm text-sm"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Exportar PINs</span>
+          </button>
+        </div>
+      </div>
+
       {/* TABLA DESKTOP */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hidden md:block">
         <div className="overflow-x-auto">
@@ -194,7 +272,13 @@ export default function PlantillaEquipoPage() {
                   return (
                     <tr 
                       key={player.id} 
-                      onClick={() => router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`)}
+                      onClick={() => {
+                        if (esEntrenador) {
+                          router.push(`/dashboard/club/miembros/staff/${player.id}`);
+                        } else {
+                          router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
+                        }
+                      }}
                       className="hover:bg-slate-50 transition-colors group cursor-pointer"
                     >
                       <td className="px-6 py-4">
@@ -214,18 +298,18 @@ export default function PlantillaEquipoPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="capitalize font-medium text-slate-700">{player.posicion || '-'}</span>
+                        <span className="capitalize font-medium text-slate-700">{player.posicion_principal || '-'}</span>
                       </td>
                       <td className="px-6 py-4">
-                        {esEntrenador ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-                            Entrenador
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            Jugador
-                          </span>
-                        )}
+                        <span
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center capitalize ${
+                            esEntrenador ? 'bg-emerald-50 text-emerald-700' :
+                            ['admin', 'coordinador'].includes(player.posicion?.toLowerCase() || '') ? 'bg-purple-50 text-purple-700' :
+                            'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {player.posicion ? player.posicion : 'Jugador'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-slate-900">
                         {player.birth_date ? (
@@ -294,7 +378,13 @@ export default function PlantillaEquipoPage() {
             return (
               <div 
                 key={player.id}
-                onClick={() => router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`)}
+                onClick={() => {
+                  if (esEntrenador) {
+                    router.push(`/dashboard/club/miembros/staff/${player.id}`);
+                  } else {
+                    router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
+                  }
+                }}
                 className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
               >
                 <div className="absolute top-0 right-0 p-4 opacity-5">
@@ -314,8 +404,13 @@ export default function PlantillaEquipoPage() {
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-emerald-700 text-xs font-semibold capitalize bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
-                          {player.posicion || 'Sin posición'}
+                          {player.posicion_principal || 'Sin posición'}
                         </span>
+                        {player.posicion && player.posicion.toLowerCase() !== 'jugador' && !esEntrenador && (
+                          <span className="text-purple-700 text-xs font-semibold capitalize bg-purple-50 border border-purple-100 px-2 py-0.5 rounded">
+                            {player.posicion}
+                          </span>
+                        )}
                         {esEntrenador && (
                           <span className="text-blue-700 text-xs font-semibold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
                             Míster
@@ -395,13 +490,35 @@ export default function PlantillaEquipoPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Posición / Rol</label>
+                  <label className="text-sm font-medium text-gray-700">Rol en el equipo</label>
                   <input 
                     type="text" 
                     value={editingPlayer.posicion || ''}
                     onChange={(e) => setEditingPlayer({...editingPlayer, posicion: e.target.value})}
+                    placeholder="Ej. Jugador, Entrenador..."
                     className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Posición en el campo</label>
+                  <input 
+                    type="text" 
+                    value={editingPlayer.posicion_principal || ''}
+                    onChange={(e) => setEditingPlayer({...editingPlayer, posicion_principal: e.target.value})}
+                    placeholder="Ej. Delantero, Defensa..."
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Estado del jugador</label>
+                  <select 
+                    value={editingPlayer.status || 'active'}
+                    onChange={(e) => setEditingPlayer({...editingPlayer, status: e.target.value})}
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
+                  >
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo (Oculto)</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Dorsal</label>

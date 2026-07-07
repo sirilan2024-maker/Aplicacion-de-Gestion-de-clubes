@@ -43,7 +43,7 @@ export async function proxy(request: NextRequest) {
   // 1. Redirect unauthenticated users trying to access protected routes
   if (!user && (isDashboardRoute || isAdminRoute)) {
     const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
+    url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 

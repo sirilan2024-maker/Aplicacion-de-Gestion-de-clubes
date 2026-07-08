@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
-  }
+  },
+  experimental: {
+    turbopack: {}
+  },
+  // @ts-ignore
+  turbopack: {}
 };
 
 export default withSerwist(nextConfig);

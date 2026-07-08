@@ -8,14 +8,8 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  experimental: {
-    turbopack: {}
   },
   // @ts-ignore
   turbopack: {}

@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 
 // 1. CREATE INVITATION
@@ -85,6 +85,19 @@ export async function acceptInvitation(token: string, playerData: {
 
   if (profileErr) return { error: "Error al actualizar tu perfil." }
 
+  let gdprDate = null;
+  let gdprIp = null;
+  let gdprUserAgent = null;
+  let gdprVersion = null;
+
+  if (playerData.gdpr_consent) {
+    const headersList = await headers();
+    gdprIp = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'IP desconocida';
+    gdprUserAgent = headersList.get('user-agent') || 'Dispositivo desconocido';
+    gdprDate = new Date().toISOString();
+    gdprVersion = 'v1.0';
+  }
+
   // 3. Create Player Record
   const { error: playerErr } = await supabase
     .from("players")
@@ -94,6 +107,10 @@ export async function acceptInvitation(token: string, playerData: {
       last_name: playerData.last_name,
       user_id: user.id,
       gdpr_consent: playerData.gdpr_consent,
+      gdpr_consent_date: gdprDate,
+      gdpr_consent_ip: gdprIp,
+      gdpr_consent_user_agent: gdprUserAgent,
+      gdpr_consent_version: gdprVersion,
       medical_notes: playerData.medical_notes,
       status: "Activo"
     })

@@ -261,7 +261,7 @@ export async function cancelStaffInvitationAction(invitationId: string) {
   const { createAdminClient } = await import('@/lib/supabase/admin')
   const adminClient = createAdminClient()
   
-  const { error } = await adminClient.from('invitations').delete().eq('id', invitationId)
+  const { error } = await adminClient.from('staff_invitations').delete().eq('id', invitationId)
   
   if (error) {
     return { success: false, error: error.message }

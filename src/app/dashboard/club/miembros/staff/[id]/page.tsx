@@ -206,13 +206,13 @@ export default function StaffProfilePage() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Header Ficha */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-white flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="relative group min-w-24 w-24 h-24 sm:min-w-28 sm:w-28 sm:h-28 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border-4 border-white/30 overflow-hidden shadow-lg">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 sm:p-8 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="relative group flex-shrink-0 w-20 h-20 sm:w-28 sm:h-28 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border-4 border-white/30 overflow-hidden shadow-lg">
               {staff.avatar_url ? (
                 <img src={staff.avatar_url} alt="Staff" className="w-full h-full object-cover" />
               ) : (
-                <UserIcon className="w-14 h-14 sm:w-16 sm:h-16 text-white" />
+                <UserIcon className="w-12 h-12 sm:w-16 sm:h-16 text-white" />
               )}
               
               <label className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
@@ -221,19 +221,19 @@ export default function StaffProfilePage() {
                 <input type="file" className="hidden" accept="image/*" onChange={uploadPhoto} />
               </label>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">{staff.first_name} {staff.last_name}</h1>
-              <p className="text-blue-100 mt-1 flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold truncate">{staff.first_name} {staff.last_name}</h1>
+              <p className="text-blue-100 mt-1 flex items-center gap-2 text-sm sm:text-base">
                 <Shield className="w-4 h-4" />
                 Ficha Técnica / Directiva
               </p>
             </div>
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <button 
               onClick={handleSave}
               disabled={submitting}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-2.5 text-blue-700 hover:bg-blue-50 transition-colors font-bold shadow-sm disabled:opacity-50"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 sm:py-2.5 text-blue-700 hover:bg-blue-50 transition-colors font-bold shadow-sm disabled:opacity-50"
             >
               {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
               Guardar Ficha

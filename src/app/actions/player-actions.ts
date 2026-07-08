@@ -177,8 +177,8 @@ export async function exportRgpdAction(clubId: string) {
     // Generate CSV
     const headers = ['Nombre', 'Apellidos', 'Consentimiento', 'Fecha y Hora', 'IP', 'Dispositivo', 'Version']
     const rows = players.map(p => [
-      p.first_name,
-      p.last_name,
+      `"${(p.first_name || '').replace(/"/g, '""')}"`,
+      `"${(p.last_name || '').replace(/"/g, '""')}"`,
       p.gdpr_consent ? 'SI' : 'NO',
       p.gdpr_consent_date ? new Date(p.gdpr_consent_date).toLocaleString('es-ES') : '',
       p.gdpr_consent_ip || '',
@@ -186,7 +186,7 @@ export async function exportRgpdAction(clubId: string) {
       p.gdpr_consent_version || ''
     ])
     
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n')
     
     return { success: true, csv: csvContent }
   } catch (err: any) {

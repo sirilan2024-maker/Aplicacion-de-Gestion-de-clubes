@@ -246,3 +246,27 @@ export async function removeStaffFromClubAction(staffId: string) {
   revalidatePath("/dashboard/club/miembros")
   return { success: true }
 }
+
+export async function cancelStaffInvitationAction(invitationId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  // Verify the current user is admin
+  const { data: currentProfile } = await supabase.from("profiles").select("role, club_id").eq("id", user.id).single()
+  if (currentProfile?.role !== 'admin') {
+    return { success: false, error: 'No tienes permisos para realizar esta acción' }
+  }
+
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+  
+  const { error } = await adminClient.from('invitations').delete().eq('id', invitationId)
+  
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/dashboard/club/miembros")
+  return { success: true }
+}

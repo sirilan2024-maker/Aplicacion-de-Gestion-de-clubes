@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Users, Search, Loader2, Mail, Shield, User as UserIcon, Archive } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
 import { archivePlayerAction, updatePlayerPositionAction, exportRgpdAction, createFamilyAndPlayerAction, getClubStaffAction } from "@/app/actions/player-actions"
-import { updateUserRoleAction, generateStaffInviteAction, assignStaffToTeamAction } from "@/app/actions/club-actions"
+import { updateUserRoleAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction } from "@/app/actions/club-actions"
 import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
@@ -852,14 +852,13 @@ export default function GlobalMembersPage() {
     if (!confirm("¿Seguro que quieres cancelar esta invitación? El enlace dejará de funcionar.")) return
     
     setArchivingId(id)
-    const supabase = createClient()
-    const { error } = await supabase.from('invitations').delete().eq('id', id)
+    const result = await cancelStaffInvitationAction(id)
     
-    if (!error) {
+    if (result.success) {
       toast.success("Invitación cancelada correctamente")
       setMembers(members.filter(m => m.id !== id))
     } else {
-      toast.error("Error al cancelar la invitación")
+      toast.error(result.error || "Error al cancelar la invitación")
     }
     setArchivingId(null)
   }

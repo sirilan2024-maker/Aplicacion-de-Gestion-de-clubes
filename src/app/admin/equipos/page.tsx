@@ -619,7 +619,7 @@ function EquiposPageContent() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b pb-4">
           <div className="flex items-center gap-4">
             <h1 className="text-4xl font-bold text-blue-900">Equipos</h1>
             {seasons.length > 0 && (
@@ -639,23 +639,23 @@ function EquiposPageContent() {
             )}
           </div>
           {isAdmin && (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full md:w-auto">
+            <div className="flex flex-col lg:flex-row flex-wrap gap-2 sm:gap-3 w-full lg:w-auto">
               <button
                 onClick={() => router.push('/admin/equipos/importador')}
-                className="flex items-center justify-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm w-full sm:w-auto"
+                className="flex items-center justify-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm w-full lg:w-auto"
               >
                 <span>⚡ Importar Equipos</span>
               </button>
               <button
                 onClick={() => router.push('/dashboard/equipos/crear-varios')}
-                className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm w-full sm:w-auto"
+                className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm w-full lg:w-auto"
               >
                 <Plus size={16} />
                 <span>Añadir varios equipos</span>
               </button>
               <button
                 onClick={() => setShowCreate(true)}
-                className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto"
+                className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm w-full lg:w-auto"
               >
                 <Plus size={16} />
                 <span>Crear equipo</span>

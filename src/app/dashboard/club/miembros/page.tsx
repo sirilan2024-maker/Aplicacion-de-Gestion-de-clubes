@@ -847,6 +847,23 @@ export default function GlobalMembersPage() {
     setArchivingId(null)
   }
 
+  const handleDeleteInvitation = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm("¿Seguro que quieres cancelar esta invitación? El enlace dejará de funcionar.")) return
+    
+    setArchivingId(id)
+    const supabase = createClient()
+    const { error } = await supabase.from('invitations').delete().eq('id', id)
+    
+    if (!error) {
+      toast.success("Invitación cancelada correctamente")
+      setMembers(members.filter(m => m.id !== id))
+    } else {
+      toast.error("Error al cancelar la invitación")
+    }
+    setArchivingId(null)
+  }
+
   const filteredMembers = members.filter(m => {
     const searchMatch = `${m.first_name} ${m.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         (m.email && m.email.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -1058,13 +1075,23 @@ export default function GlobalMembersPage() {
                       <span className="text-gray-400 text-xs italic">Global / Sin asignar</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                     <button 
-                        onClick={(e) => { e.stopPropagation(); member.type === 'staff' ? setManagingMember(member) : router.push(`/dashboard/club/jugador/${member.id}`); }}
-                        className="text-blue-600 font-medium text-sm px-2 py-1 rounded-md hover:bg-blue-50"
-                      >
-                        Gestionar
-                      </button>
+                  <div className="flex gap-2 items-center">
+                      {member.email?.includes('/register/staff/') ? (
+                        <button 
+                          onClick={(e) => handleDeleteInvitation(e, member.id)}
+                          disabled={archivingId === member.id}
+                          className="text-red-500 font-medium text-sm px-2 py-1 rounded-md hover:bg-red-50 disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4" /> Cancelar</>}
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); member.type === 'staff' ? setManagingMember(member) : router.push(`/dashboard/club/jugador/${member.id}`); }}
+                          className="text-blue-600 font-medium text-sm px-2 py-1 rounded-md hover:bg-blue-50"
+                        >
+                          Gestionar
+                        </button>
+                      )}
                       {member.type === 'player' && (
                         <button 
                           onClick={(e) => handleArchive(e, member.id)}
@@ -1148,7 +1175,16 @@ export default function GlobalMembersPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {member.type === 'staff' ? (
+                        {member.email?.includes('/register/staff/') ? (
+                          <button 
+                            onClick={(e) => handleDeleteInvitation(e, member.id)}
+                            disabled={archivingId === member.id}
+                            className="text-red-500 hover:text-red-700 font-medium text-sm px-3 py-1 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1"
+                            title="Cancelar invitación"
+                          >
+                            {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4" /> Cancelar Invitación</>}
+                          </button>
+                        ) : member.type === 'staff' ? (
                           <button 
                             onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
                             className="text-blue-600 hover:text-blue-800 font-medium text-sm px-3 py-1 rounded-md hover:bg-blue-50 transition-colors"

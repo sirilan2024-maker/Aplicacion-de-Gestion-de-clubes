@@ -184,18 +184,20 @@ export default function AnadirMiembrosPage() {
               <p className="text-xs text-gray-500 mb-4">Si ya tienen cuenta, pueden introducir este código al añadir un equipo.</p>
             </div>
 
-            <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-gray-50 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-              <span className="flex-1 px-5 py-4 text-3xl font-black tracking-widest text-center text-gray-900 font-mono">
-                {code}
-              </span>
+            <div className="flex items-stretch overflow-hidden rounded-lg border border-gray-300 bg-gray-50 shadow-sm focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+              <div className="flex-1 flex items-center justify-center min-w-0 px-2 sm:px-5 py-3 sm:py-4">
+                <span className="text-2xl sm:text-3xl font-black tracking-[0.1em] sm:tracking-widest text-center text-gray-900 font-mono truncate">
+                  {code}
+                </span>
+              </div>
               <button
                 onClick={() => handleCopy(code, "code")}
-                className="shrink-0 border-l border-gray-200 px-5 py-4 text-sm font-bold text-blue-600 hover:bg-blue-50 bg-white transition-colors h-full"
+                className="shrink-0 border-l border-gray-200 px-3 sm:px-5 py-3 sm:py-4 text-sm font-bold text-blue-600 hover:bg-blue-50 bg-white transition-colors flex flex-col items-center justify-center"
               >
                 {copiedCode ? (
-                  <span className="flex flex-col items-center gap-1"><Check size={20} />Copiado</span>
+                  <span className="flex flex-col items-center gap-1"><Check size={20} className="w-4 h-4 sm:w-5 sm:h-5" />Copiado</span>
                 ) : (
-                  <span className="flex flex-col items-center gap-1"><Copy size={20} />Copiar</span>
+                  <span className="flex flex-col items-center gap-1"><Copy size={20} className="w-4 h-4 sm:w-5 sm:h-5" />Copiar</span>
                 )}
               </button>
             </div>

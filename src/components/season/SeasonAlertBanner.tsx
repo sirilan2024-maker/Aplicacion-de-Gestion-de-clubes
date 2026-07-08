@@ -79,7 +79,7 @@ export default function SeasonAlertBanner() {
 
   return (
     <div
-      className={`w-full rounded-xl border px-5 py-4 flex items-center gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-500 ${
+      className={`w-full rounded-xl border px-4 py-4 sm:px-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shadow-sm relative animate-in fade-in slide-in-from-top-2 duration-500 ${
         isExpired
           ? "bg-red-50 border-red-200"
           : isUrgent
@@ -87,49 +87,51 @@ export default function SeasonAlertBanner() {
           : "bg-amber-50 border-amber-200"
       }`}
     >
-      {/* Icon */}
-      <div
-        className={`flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-full ${
-          isExpired
-            ? "bg-red-100 text-red-600"
-            : isUrgent
-            ? "bg-orange-100 text-orange-600"
-            : "bg-amber-100 text-amber-600"
-        }`}
-      >
-        {isExpired ? (
-          <AlertTriangle size={20} />
-        ) : (
-          <Calendar size={20} />
-        )}
-      </div>
+      <div className="flex items-start gap-3 flex-1 min-w-0 pr-6 sm:pr-0">
+        {/* Icon */}
+        <div
+          className={`flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-full ${
+            isExpired
+              ? "bg-red-100 text-red-600"
+              : isUrgent
+              ? "bg-orange-100 text-orange-600"
+              : "bg-amber-100 text-amber-600"
+          }`}
+        >
+          {isExpired ? (
+            <AlertTriangle size={20} />
+          ) : (
+            <Calendar size={20} />
+          )}
+        </div>
 
-      {/* Text */}
-      <div className="flex-1 min-w-0">
-        <p
-          className={`text-sm font-semibold ${
-            isExpired ? "text-red-800" : isUrgent ? "text-orange-800" : "text-amber-800"
-          }`}
-        >
-          {isExpired
-            ? `⏰ La temporada "${season.name}" ha finalizado`
-            : `⏰ La temporada "${season.name}" termina en ${season.daysLeft} día${season.daysLeft !== 1 ? "s" : ""}`}
-        </p>
-        <p
-          className={`text-xs mt-0.5 ${
-            isExpired ? "text-red-600" : isUrgent ? "text-orange-600" : "text-amber-600"
-          }`}
-        >
-          {isExpired
-            ? "Ve a Temporadas para cerrarla y comenzar la nueva."
-            : "Recuerda cerrar la temporada antes de que finalice para archivar los datos correctamente."}
-        </p>
+        {/* Text */}
+        <div className="flex-1 min-w-0 pt-0.5">
+          <p
+            className={`text-sm font-semibold leading-tight ${
+              isExpired ? "text-red-800" : isUrgent ? "text-orange-800" : "text-amber-800"
+            }`}
+          >
+            {isExpired
+              ? `⏰ La temporada "${season.name}" ha finalizado`
+              : `⏰ La temporada "${season.name}" termina en ${season.daysLeft} día${season.daysLeft !== 1 ? "s" : ""}`}
+          </p>
+          <p
+            className={`text-xs mt-1 leading-snug ${
+              isExpired ? "text-red-600" : isUrgent ? "text-orange-600" : "text-amber-600"
+            }`}
+          >
+            {isExpired
+              ? "Ve a Temporadas para cerrarla y comenzar la nueva."
+              : "Recuerda cerrar la temporada antes de que finalice para archivar los datos correctamente."}
+          </p>
+        </div>
       </div>
 
       {/* CTA */}
       <button
         onClick={() => router.push("/admin/temporadas")}
-        className={`flex-shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+        className={`flex-shrink-0 flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 sm:px-3 sm:py-1.5 text-sm sm:text-xs font-semibold transition-colors mt-2 sm:mt-0 w-full sm:w-auto ${
           isExpired
             ? "bg-red-600 text-white hover:bg-red-700"
             : isUrgent
@@ -138,16 +140,16 @@ export default function SeasonAlertBanner() {
         }`}
       >
         Gestionar temporada
-        <ArrowRight size={13} />
+        <ArrowRight size={14} className="sm:w-3 sm:h-3" />
       </button>
 
       {/* Dismiss */}
       <button
         onClick={handleDismiss}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+        className="absolute top-4 right-4 sm:static sm:top-auto sm:right-auto flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
         title="Ocultar 3 días"
       >
-        <X size={16} />
+        <X size={18} className="sm:w-4 sm:h-4" />
       </button>
     </div>
   );

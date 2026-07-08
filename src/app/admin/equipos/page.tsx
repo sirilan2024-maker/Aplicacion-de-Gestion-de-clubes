@@ -639,7 +639,7 @@ function EquiposPageContent() {
             )}
           </div>
           {isAdmin && (
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <button
                 onClick={() => router.push('/admin/equipos/importador')}
                 className="flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-sm"

@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Users, AlertTriangle, ShieldAlert, CheckCircle2, User, ChevronLeft } from "lucide-react"
 import Link from "next/link"
 
-export default function MatchConvocatoriaPage({ params }: { params: { teamId: string, matchId: string } }) {
+export default function MatchConvocatoriaPage({ params }: { params: Promise<{ teamId: string, matchId: string }> }) {
+  const { teamId, matchId } = use(params);
   const [players, setPlayers] = useState<any[]>([])
   const [convocados, setConvocados] = useState<Set<string>>(new Set())
   const [matchDetails, setMatchDetails] = useState<any>(null)
@@ -18,14 +19,14 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       const { data: matchData } = await supabase
         .from("partidos")
         .select("*")
-        .eq("id", params.matchId)
+        .eq("id", matchId)
         .single()
       
       if (matchData) setMatchDetails(matchData)
 
       // Handle both new teams table ID and old equipos table ID
-      const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", params.teamId).single()
-      let oldTeamId = params.teamId;
+      const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", teamId).single()
+      let oldTeamId = teamId;
       if (newTeamData) {
         const { data: oldTeamData } = await supabase.from('teams').select("id").ilike("name", newTeamData.name).single()
         if (oldTeamData) oldTeamId = oldTeamData.id;
@@ -35,7 +36,7 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       const { data: playersData } = await supabase
         .from("players")
         .select("id, first_name, last_name, dorsal, status, medical_notes")
-        .or(`team_id.eq.${params.teamId},team_id.eq.${oldTeamId}`)
+        .or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`)
         .neq('status', 'inactive')
         .order("first_name")
       
@@ -45,7 +46,7 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       const { data: convData } = await supabase
         .from("convocatorias")
         .select("player_id")
-        .eq("partido_id", params.matchId)
+        .eq("partido_id", matchId)
 
       if (convData) {
         setConvocados(new Set(convData.map(c => c.player_id)))
@@ -54,7 +55,7 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       setLoading(false)
     }
     fetchData()
-  }, [params.teamId, params.matchId])
+  }, [teamId, matchId])
 
   const toggleConvocatoria = async (playerId: string, currentStatus: string) => {
     if (currentStatus === 'Lesionado' || currentStatus === 'Sancionado') {
@@ -69,13 +70,13 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
       // Remover
       newConvocados.delete(playerId)
       setConvocados(newConvocados)
-      await supabase.from("convocatorias").delete().match({ partido_id: params.matchId, player_id: playerId })
+      await supabase.from("convocatorias").delete().match({ partido_id: matchId, player_id: playerId })
     } else {
       // Añadir
       newConvocados.add(playerId)
       setConvocados(newConvocados)
       await supabase.from("convocatorias").insert({
-        partido_id: params.matchId,
+        partido_id: matchId,
         player_id: playerId,
         titular: false
       })
@@ -86,7 +87,7 @@ export default function MatchConvocatoriaPage({ params }: { params: { teamId: st
 
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-6">
-      <Link href={`/dashboard/equipos/${params.teamId}/partidos`} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors mb-4">
+      <Link href={`/dashboard/equipos/${teamId}/partidos`} className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors mb-4">
         <ChevronLeft size={16} /> Volver a Partidos
       </Link>
 

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default function TeamIndexPage({ params }: { params: { teamId: string } }) {
-  redirect(`/dashboard/equipos/${params.teamId}/partidos`);
+export default async function TeamIndexPage({ params }: { params: Promise<{ teamId: string }> }) {
+  const { teamId } = await params;
+  redirect(`/dashboard/equipos/${teamId}/partidos`);
 }

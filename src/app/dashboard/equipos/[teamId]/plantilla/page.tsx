@@ -333,16 +333,6 @@ export default function PlantillaEquipoPage() {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingPlayer(player);
-                            }}
-                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors inline-flex"
-                            title="Edición rápida"
-                          >
-                            <Pencil size={18} />
-                          </button>
                           <div className="p-2 text-slate-300 group-hover:text-emerald-500 transition-colors">
                             <ChevronRight size={18} />
                           </div>
@@ -437,17 +427,7 @@ export default function PlantillaEquipoPage() {
                   </div>
                 </div>
 
-                <div className="absolute top-4 right-4 z-20">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingPlayer(player);
-                    }}
-                    className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-50 border border-slate-200 hover:bg-emerald-50 rounded-full transition-colors"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                </div>
+
               </div>
             );
           })

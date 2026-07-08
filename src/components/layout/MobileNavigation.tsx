@@ -191,11 +191,16 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
         { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
         { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
+        { name: "Disciplina", href: getHref("Disciplina", "/admin/partidos?view=disciplina"), icon: AlertTriangle },
+        { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
         { name: "Tesoreria", href: "/admin/tesoreria", icon: Wallet },
         { name: "Secretaria", href: "/admin/secretaria", icon: Settings },
         { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
         { name: "Roles", href: "/admin/configuracion/roles", icon: Shield },
         { name: "Temporadas", href: "/admin/temporadas", icon: Timer },
+        { name: "Calendario FFCV", href: "/admin/calendario-ffcv", icon: Database },
+        { name: "Informes IA", href: "/admin/informes-ia", icon: Brain },
+        { name: "FFCV/NOVANET", href: "/admin/ffcv-api", icon: Globe },
       ].filter(item => !bottomHrefs.includes(item.href));
     } else {
       secondaryLinks = globalNavItems.filter(item => !bottomHrefs.includes(item.href));

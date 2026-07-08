@@ -183,7 +183,7 @@ export async function getPendingStaffInvitationsAction(clubId: string) {
   return { success: true, data }
 }
 
-export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string, first_name?: string, last_name?: string }) {
+export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string, first_name?: string, last_name?: string, email?: string }) {
   const supabase = await createClient()
   
   const payload: any = {
@@ -195,6 +195,7 @@ export async function updateStaffProfileAction(staffId: string, data: { phone: s
   
   if (data.first_name !== undefined) payload.first_name = data.first_name
   if (data.last_name !== undefined) payload.last_name = data.last_name
+  if (data.email !== undefined) payload.email = data.email
 
   const { error } = await supabase
     .from('profiles')
@@ -204,6 +205,14 @@ export async function updateStaffProfileAction(staffId: string, data: { phone: s
   if (error) {
     return { success: false, error: error.message }
   }
+
+  // Update Auth email if provided
+  if (data.email) {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminClient = createAdminClient();
+    await adminClient.auth.admin.updateUserById(staffId, { email: data.email });
+  }
+
   return { success: true }
 }
 

@@ -28,6 +28,7 @@ export default function StaffProfilePage() {
   // Edit states for Ficha (Extended Info)
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [dni, setDni] = useState("")
   const [birthDate, setBirthDate] = useState("")
@@ -74,6 +75,7 @@ export default function StaffProfilePage() {
       // Ficha data
       setFirstName(foundStaff.first_name || "")
       setLastName(foundStaff.last_name || "")
+      setEmail(foundStaff.email || "")
       setPhone(foundStaff.phone || "")
       setDni(foundStaff.dni || "")
       setBirthDate(foundStaff.birth_date || "")
@@ -119,6 +121,7 @@ export default function StaffProfilePage() {
       const profileData = {
         first_name: firstName,
         last_name: lastName,
+        email,
         phone,
         dni,
         birth_date: birthDate,
@@ -280,9 +283,9 @@ export default function StaffProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email (Usuario)</label>
                     <input 
-                      readOnly
-                      value={staff.email}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 bg-slate-100 text-slate-500 cursor-not-allowed outline-none" 
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg p-2.5 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors" 
                     />
                   </div>
                   <div>

@@ -183,17 +183,22 @@ export async function getPendingStaffInvitationsAction(clubId: string) {
   return { success: true, data }
 }
 
-export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string }) {
+export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string, first_name?: string, last_name?: string }) {
   const supabase = await createClient()
   
+  const payload: any = {
+    phone: data.phone || null,
+    dni: data.dni || null,
+    birth_date: data.birth_date || null,
+    license_number: data.license_number || null
+  }
+  
+  if (data.first_name !== undefined) payload.first_name = data.first_name
+  if (data.last_name !== undefined) payload.last_name = data.last_name
+
   const { error } = await supabase
     .from('profiles')
-    .update({
-      phone: data.phone || null,
-      dni: data.dni || null,
-      birth_date: data.birth_date || null,
-      license_number: data.license_number || null
-    })
+    .update(payload)
     .eq('id', staffId)
 
   if (error) {

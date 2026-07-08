@@ -9,7 +9,7 @@ import { archivePlayerAction, updatePlayerPositionAction, exportRgpdAction, crea
 import { updateUserRoleAction, generateStaffInviteAction, assignStaffToTeamAction } from "@/app/actions/club-actions"
 import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
-import { X, Copy, Check, Link as LinkIcon, Edit3 } from "lucide-react"
+import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
 
 // --- Modal para Alta Manual Asistida (Plan B) ---
 function AltaAsistidaModal({ open, onClose, clubId }: { open: boolean; onClose: () => void; clubId: string }) {

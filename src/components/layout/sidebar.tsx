@@ -285,6 +285,10 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     ]
   } else {
     // GLOBAL CONTEXT
+    
+    // Add "Mis Equipos" for coaches if not present
+    const isCoach = userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado';
+    
     navGroups = [
       {
         label: "General / Club",
@@ -293,6 +297,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
             { name: "Directorio",   href: "/dashboard/club/miembros", icon: Users },
           ]),
+          ...(isCoach ? [{ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield }] : []),
           { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
           { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
           { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },

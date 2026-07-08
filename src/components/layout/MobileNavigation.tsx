@@ -181,16 +181,32 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   } else {
     // Todos los de la DB que NO estén ya en el bottom bar
     const bottomHrefs = bottomLinks.map(b => b.href);
-    secondaryLinks = globalNavItems.filter(item => !bottomHrefs.includes(item.href));
     
-    // Si no hay de BD, unos por defecto
-    if (secondaryLinks.length === 0) {
-       secondaryLinks = [
-         { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings }
-       ]
+    if (userRole === 'admin') {
+      // Hardcode admin secondary links since they are not in DB usually
+      secondaryLinks = [
+        { name: "Inicio", href: getHref("Inicio", "/dashboard"), icon: LayoutDashboard },
+        { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
+        { name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield },
+        { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
+        { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
+        { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
+        { name: "Tesoreria", href: "/admin/tesoreria", icon: Wallet },
+        { name: "Secretaria", href: "/admin/secretaria", icon: Settings },
+        { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
+        { name: "Roles", href: "/admin/configuracion/roles", icon: Shield },
+        { name: "Temporadas", href: "/admin/temporadas", icon: Timer },
+      ].filter(item => !bottomHrefs.includes(item.href));
+    } else {
+      secondaryLinks = globalNavItems.filter(item => !bottomHrefs.includes(item.href));
     }
-  }
-
+    
+    // Asegurar que Ajustes siempre esté disponible si no está en el bottom bar
+    if (!bottomHrefs.includes("/dashboard/mi-perfil") && !secondaryLinks.some(s => s.href === "/dashboard/mi-perfil")) {
+       secondaryLinks.push({ name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings });
+    }
+    }
+    
   return (
     <div className="md:hidden">
       {/* Top Header */}

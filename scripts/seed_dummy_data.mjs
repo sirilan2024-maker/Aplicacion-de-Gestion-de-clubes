@@ -74,6 +74,17 @@ async function getOrCreateMetric(clubId, metricName, unit, type) {
 async function run() {
   console.log("🚀 Iniciando generación de datos ficticios...");
 
+  // Limpiar eventos anteriores sin temporada para evitar duplicados y limpiar la base de datos
+  console.log("🧹 Limpiando eventos previos con temporada nula...");
+  const { error: deleteError } = await supabase
+    .from('team_events')
+    .delete()
+    .is('season_id', null);
+
+  if (deleteError) {
+    console.error("Error al limpiar eventos antiguos:", deleteError);
+  }
+
   // 1. Obtener equipos y club_id
   const { data: teams, error: teamsError } = await supabase
     .from('teams')
@@ -143,6 +154,7 @@ async function run() {
     for (let i = 0; i < 10; i++) {
       eventsToInsert.push({
         team_id: team.id,
+        season_id: team.season_id, // Añadido para la correcta visualización en el calendario
         title: `Sesión Entrenamiento #${i+1}`,
         date: getRandomDateInPastDays(30),
         start_time: '18:30',
@@ -156,6 +168,7 @@ async function run() {
     for (let i = 0; i < 4; i++) {
       eventsToInsert.push({
         team_id: team.id,
+        season_id: team.season_id, // Añadido para la correcta visualización en el calendario
         title: `Partido de Liga - Jornada ${i+1}`,
         date: getRandomDateInPastDays(30),
         start_time: '10:30',

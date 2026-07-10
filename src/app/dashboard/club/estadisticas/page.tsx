@@ -440,7 +440,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             </div>
           </div>
 
-          <Link href="/dashboard/club/estadisticas/minutos" className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm flex flex-col justify-center hover:border-indigo-300 hover:shadow-md transition-all group cursor-pointer relative">
+          <Link href={fixedTeamId ? `/dashboard/club/estadisticas/minutos?teamId=${fixedTeamId}` : "/dashboard/club/estadisticas/minutos"} className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm flex flex-col justify-center hover:border-indigo-300 hover:shadow-md transition-all group cursor-pointer relative">
             <div className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
               Ver detalle
             </div>
@@ -452,7 +452,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           </Link>
 
           {/* TARJETA DISCIPLINA CLICKABLE */}
-          <Link href="/dashboard/club/estadisticas/disciplina" className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col justify-center hover:border-red-300 hover:shadow-md transition-all group cursor-pointer relative">
+          <Link href={fixedTeamId ? `/dashboard/club/estadisticas/disciplina?teamId=${fixedTeamId}` : "/dashboard/club/estadisticas/disciplina"} className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col justify-center hover:border-red-300 hover:shadow-md transition-all group cursor-pointer relative">
             <div className="absolute top-4 right-4 bg-red-50 text-red-600 px-2 py-1 rounded-full text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
               Ver detalle
             </div>

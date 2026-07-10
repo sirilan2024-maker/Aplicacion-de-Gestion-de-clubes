@@ -1,10 +1,11 @@
+// src/app/dashboard/club/estadisticas/minutos/page.tsx
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, Suspense } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, ArrowDown, ArrowUp, Activity, Filter, Clock } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface MinutesRow {
   playerId: string;
@@ -17,10 +18,26 @@ interface MinutesRow {
 }
 
 export default function MinutosPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-7xl mx-auto p-12 text-center flex flex-col items-center justify-center gap-2 h-64">
+        <Activity className="animate-spin text-indigo-500" size={32} />
+        <p className="text-slate-500">Cargando registros de minutos...</p>
+      </div>
+    }>
+      <MinutosPageContent />
+    </Suspense>
+  )
+}
+
+function MinutosPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryTeamId = searchParams.get('teamId')
+
   const [data, setData] = useState<MinutesRow[]>([])
   const [teams, setTeams] = useState<{id: string, name: string}[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("todos")
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(queryTeamId || "todos")
   const [loading, setLoading] = useState(true)
   const [sortCol, setSortCol] = useState<'trainingMinutes' | 'matchMinutes' | 'totalMinutes' | 'playerName' | 'teamName'>('totalMinutes')
   const [sortDesc, setSortDesc] = useState(true)
@@ -157,7 +174,6 @@ export default function MinutosPage() {
           } else if (type === 'Partido' || type?.toLowerCase().includes('partido')) {
             p.matchMinutes += mins
           } else {
-            // fallback
             p.trainingMinutes += mins
           }
           p.totalMinutes += mins
@@ -210,7 +226,7 @@ export default function MinutosPage() {
     if (sortCol === col) setSortDesc(!sortDesc)
     else {
       setSortCol(col)
-      setSortDesc(true) // default to descending for new column
+      setSortDesc(true)
     }
   }
 
@@ -225,7 +241,10 @@ export default function MinutosPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button 
+            onClick={() => queryTeamId ? router.push(`/dashboard/equipos/${queryTeamId}/estadisticas`) : router.back()} 
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+          >
             <ArrowLeft className="text-slate-500" size={24} />
           </button>
           <div className="flex items-center gap-3">
@@ -239,20 +258,22 @@ export default function MinutosPage() {
           </div>
         </div>
 
-        {/* Selector de Equipo */}
-        <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
-          <Filter size={18} className="text-gray-400" />
-          <select 
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
-          >
-            <option value="todos">Todos los Equipos</option>
-            {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
+        {/* Selector de Equipo - Hidden if looking at a fixed team */}
+        {!queryTeamId && (
+          <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
+            <Filter size={18} className="text-gray-400" />
+            <select 
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
+            >
+              <option value="todos">Todos los Equipos</option>
+              {teams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {loading ? (

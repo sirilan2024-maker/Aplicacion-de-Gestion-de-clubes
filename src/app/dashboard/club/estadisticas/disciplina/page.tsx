@@ -1,10 +1,11 @@
+// src/app/dashboard/club/estadisticas/disciplina/page.tsx
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, Suspense } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { AlertTriangle, ArrowLeft, ArrowDown, ArrowUp, Activity, Filter, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { DisciplineModal } from "@/components/features/matches/DisciplineModal"
 
 interface DisciplineRow {
@@ -21,9 +22,25 @@ interface DisciplineRow {
 }
 
 export default function DisciplinaPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-7xl mx-auto p-12 text-center flex flex-col items-center justify-center gap-2 h-64">
+        <Activity className="animate-spin text-red-500" size={32} />
+        <p className="text-slate-500">Cargando registros disciplinarios...</p>
+      </div>
+    }>
+      <DisciplinaPageContent />
+    </Suspense>
+  )
+}
+
+function DisciplinaPageContent() {
+  const searchParams = useSearchParams()
+  const queryTeamId = searchParams.get('teamId')
+
   const [data, setData] = useState<DisciplineRow[]>([])
   const [teams, setTeams] = useState<{id: string, name: string}[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("todos")
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(queryTeamId || "todos")
   const [loading, setLoading] = useState(true)
   const [sortCol, setSortCol] = useState<'yellows' | 'reds' | 'playerName' | 'teamName'>('yellows')
   const [sortDesc, setSortDesc] = useState(true)
@@ -69,7 +86,6 @@ export default function DisciplinaPage() {
     if (teamIds.length > 0) {
       matchesQuery = matchesQuery.in('equipo_id', teamIds)
     } else if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
-      // If coach has no teams, return empty matches
       matchesQuery = matchesQuery.eq('id', '00000000-0000-0000-0000-000000000000') // impossible UUID
     }
     const { data: matches } = await matchesQuery
@@ -144,7 +160,6 @@ export default function DisciplinaPage() {
       }
     })
 
-    // Sort cardEvents by date desc and calculate cycles
     playerMap.forEach(p => {
       const chrono = [...p.cardEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
       let cycleCards = 0;
@@ -198,7 +213,7 @@ export default function DisciplinaPage() {
     if (sortCol === col) setSortDesc(!sortDesc)
     else {
       setSortCol(col)
-      setSortDesc(true) // default to descending for new column
+      setSortDesc(true)
     }
   }
 
@@ -207,18 +222,14 @@ export default function DisciplinaPage() {
     return sortDesc ? <ArrowDown size={14} className="inline ml-1" /> : <ArrowUp size={14} className="inline ml-1" />
   }
 
-  // Modal handlers
   const selectedRow = data.find(r => r.playerId === selectedPlayerId)
   
   const getRecentMatches = (teamId: string, cardEvents: any[]) => {
-    // 1. Get matches for the current team
     const teamMatches = allMatches
       .filter(m => m.equipo_id === teamId && (m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date()))
       
-    // 2. Add matches from cardEvents (in case the player got cards in a previous team)
     const eventMatches = cardEvents.map(ev => ev.match);
     
-    // Merge and deduplicate
     const combinedMap = new Map();
     [...teamMatches, ...eventMatches].forEach(m => {
       combinedMap.set(m.id, m);
@@ -235,7 +246,10 @@ export default function DisciplinaPage() {
       {/* HEADER */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button 
+            onClick={() => queryTeamId ? router.push(`/dashboard/equipos/${queryTeamId}/estadisticas`) : router.back()} 
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+          >
             <ArrowLeft className="text-slate-500" size={24} />
           </button>
           <div className="flex items-center gap-3">
@@ -249,20 +263,22 @@ export default function DisciplinaPage() {
           </div>
         </div>
 
-        {/* Selector de Equipo */}
-        <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
-          <Filter size={18} className="text-gray-400" />
-          <select 
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
-          >
-            <option value="todos">Todos los Equipos</option>
-            {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
+        {/* Selector de Equipo - Hidden if looking at a fixed team */}
+        {!queryTeamId && (
+          <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
+            <Filter size={18} className="text-gray-400" />
+            <select 
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
+            >
+              <option value="todos">Todos los Equipos</option>
+              {teams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -277,7 +293,7 @@ export default function DisciplinaPage() {
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           
-          {/* BANNER APERCIBIDOS (GLOBAL) */}
+          {/* BANNER APERCIBIDOS */}
           {sortedAndFilteredData.filter(d => d.cycleCards === 4).length > 0 && (
             <div className="bg-orange-50 border-b border-orange-200 px-5 py-4">
               <div className="flex items-start gap-3">
@@ -419,7 +435,6 @@ export default function DisciplinaPage() {
                 }
                 return p
               });
-              // Sort them again
               return newData.sort((a, b) => {
                 if (sortCol === 'yellows') return sortDesc ? b.yellows - a.yellows : a.yellows - b.yellows
                 if (sortCol === 'reds') return sortDesc ? b.reds - a.reds : a.reds - b.reds

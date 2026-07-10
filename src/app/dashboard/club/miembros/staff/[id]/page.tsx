@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { updateUserRoleAction, updateStaffProfileAction, assignStaffToTeamAction, removeStaffFromClubAction } from "@/app/actions/club-actions"
+import { updateUserRoleAction, updateUserRolesAction, updateStaffProfileAction, assignStaffToTeamAction, removeStaffFromClubAction } from "@/app/actions/club-actions"
 import { getClubStaffAction } from "@/app/actions/player-actions"
 import toast, { Toaster } from "react-hot-toast"
 import { Loader2, ArrowLeft, Shield, Save, User as UserIcon, Phone, CreditCard, Calendar, Award, Camera, Trash2 } from "lucide-react"
@@ -22,7 +22,8 @@ export default function StaffProfilePage() {
   const [isAdmin, setIsAdmin] = useState(false)
 
   // Edit states for permissions
-  const [role, setRole] = useState("")
+  const [activeRole, setActiveRole] = useState("")
+  const [assignedRoles, setAssignedRoles] = useState<string[]>([])
   const [teamIds, setTeamIds] = useState<string[]>([])
   
   // Edit states for Ficha (Extended Info)
@@ -69,7 +70,8 @@ export default function StaffProfilePage() {
       })
 
       // Permissions
-      setRole(foundStaff.role || "entrenador")
+      setActiveRole(foundStaff.role || "entrenador")
+      setAssignedRoles(foundStaff.roles && foundStaff.roles.length > 0 ? foundStaff.roles : [foundStaff.role || "entrenador"])
       setTeamIds(assignedTeamIds)
 
       // Ficha data
@@ -106,8 +108,23 @@ export default function StaffProfilePage() {
     setSubmitting(true)
     try {
       // 1. Guardar Permisos (Rol) - SOLO ADMIN
-      if (isAdmin && role !== staff.role) {
-        const resRole = await updateUserRoleAction(staffId, role)
+      const hasRolesChanged = () => {
+        const originalRoles = staff.roles || [staff.role || "entrenador"];
+        if (assignedRoles.length !== originalRoles.length) return true;
+        const sortedSelected = [...assignedRoles].sort();
+        const sortedOriginal = [...originalRoles].sort();
+        const rolesListEqual = sortedSelected.every((r, idx) => r === sortedOriginal[idx]);
+        return !rolesListEqual || activeRole !== staff.role;
+      }
+
+      if (isAdmin && hasRolesChanged()) {
+        if (assignedRoles.length === 0) {
+          throw new Error("Debe seleccionar al menos un rol asignado.")
+        }
+        if (!assignedRoles.includes(activeRole)) {
+          throw new Error("El rol activo debe estar entre los roles asignados.")
+        }
+        const resRole = await updateUserRolesAction(staffId, activeRole, assignedRoles)
         if (!resRole.success) throw new Error(resRole.error)
       }
 
@@ -364,20 +381,63 @@ export default function StaffProfilePage() {
                   
                   <div className="space-y-5">
                     <div>
-                      <label className="block text-sm font-medium text-blue-900 mb-1">Etiqueta de Rol</label>
-                      <select 
-                        value={role} 
-                        onChange={e => setRole(e.target.value)}
-                        className="w-full border border-blue-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                      >
-                        <option value="entrenador">Entrenador</option>
-                        <option value="coordinador">Coordinador</option>
-                        <option value="admin">Administrador Principal</option>
-                        <option value="secretario">Secretario</option>
-                        <option value="tesorero">Tesorero</option>
-                        <option value="delegado">Delegado</option>
-                      </select>
+                      <label className="block text-sm font-medium text-blue-900 mb-2">Roles Asignados</label>
+                      <div className="grid grid-cols-2 gap-2 p-3 bg-white rounded-lg border border-blue-200">
+                        {[
+                          { val: 'admin', label: 'Administrador' },
+                          { val: 'coordinador', label: 'Coordinador' },
+                          { val: 'entrenador', label: 'Entrenador' },
+                          { val: 'jugador', label: 'Jugador' }
+                        ].map(r => {
+                          const checked = assignedRoles.includes(r.val);
+                          return (
+                            <label key={r.val} className="flex items-center gap-2 p-1 cursor-pointer">
+                              <input 
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  let newRoles = [...assignedRoles];
+                                  if (e.target.checked) {
+                                    if (!newRoles.includes(r.val)) newRoles.push(r.val);
+                                  } else {
+                                    newRoles = newRoles.filter(roleVal => roleVal !== r.val);
+                                  }
+                                  setAssignedRoles(newRoles);
+                                  if (activeRole === r.val && !e.target.checked) {
+                                    if (newRoles.length > 0) {
+                                      setActiveRole(newRoles[0]);
+                                    } else {
+                                      setActiveRole("");
+                                    }
+                                  } else if (newRoles.length > 0 && !newRoles.includes(activeRole)) {
+                                    setActiveRole(newRoles[0]);
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span className="text-sm font-medium text-slate-700">{r.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {assignedRoles.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-blue-900 mb-1">Rol Activo Inicial</label>
+                        <select 
+                          value={activeRole} 
+                          onChange={e => setActiveRole(e.target.value)} 
+                          className="w-full border border-blue-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white capitalize"
+                        >
+                          {assignedRoles.map(r => (
+                            <option key={r} value={r}>
+                              {r === 'admin' ? 'Administrador' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     
                     <div>
                       <label className="block text-sm font-medium text-blue-900 mb-2">Equipos Asignados</label>

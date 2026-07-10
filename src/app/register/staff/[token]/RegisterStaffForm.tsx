@@ -1,13 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { registerInvitedStaffAction } from "@/lib/auth-actions"
+import { registerInvitedStaffAction, acceptStaffInviteExistingUserAction } from "@/lib/auth-actions"
 import { Shield, Loader2, AlertCircle } from "lucide-react"
 
 export default function RegisterStaffForm({ token, role }: { token: string, role: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  
+  // State for existing users
+  const [isExistingUser, setIsExistingUser] = useState(false)
+  const [existingEmail, setExistingEmail] = useState("")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -15,13 +19,30 @@ export default function RegisterStaffForm({ token, role }: { token: string, role
     setError(null)
     
     const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
     
-    const res = await registerInvitedStaffAction(token, formData)
-    
-    if (res.success) {
-      setSuccess(true)
+    if (isExistingUser) {
+      // Flow for existing user: login and accept invite
+      const res = await acceptStaffInviteExistingUserAction(token, formData)
+      if (res.success) {
+        setSuccess(true)
+      } else {
+        setError(res.error || "Contraseña incorrecta o error al vincular.")
+      }
     } else {
-      setError(res.error || "Error inesperado al registrarse.")
+      // Flow for new user
+      const res = await registerInvitedStaffAction(token, formData)
+      
+      if (res.success) {
+        setSuccess(true)
+      } else if (res.existingUser) {
+        // User exists!
+        setIsExistingUser(true)
+        setExistingEmail(email)
+        setError(res.error || "Esta cuenta ya existe. Por favor, inicia sesión.")
+      } else {
+        setError(res.error || "Error inesperado al registrarse.")
+      }
     }
     
     setLoading(false)
@@ -67,48 +88,83 @@ export default function RegisterStaffForm({ token, role }: { token: string, role
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-            <input 
-              name="first_name" 
-              type="text" 
-              required 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
-            <input 
-              name="last_name" 
-              type="text" 
-              required 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-        </div>
+        {!isExistingUser ? (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input 
+                  name="first_name" 
+                  type="text" 
+                  required 
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
+                <input 
+                  name="last_name" 
+                  type="text" 
+                  required 
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-          <input 
-            name="email" 
-            type="email" 
-            required 
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+              <input 
+                name="email" 
+                type="email" 
+                required 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-          <input 
-            name="password" 
-            type="password" 
-            required 
-            minLength={8}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres.</p>
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Crear Contraseña</label>
+              <input 
+                name="password" 
+                type="password" 
+                required 
+                minLength={8}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Mínimo 8 caracteres.</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <p className="text-sm text-blue-800 font-medium mb-1">
+                Vincular equipo a cuenta existente
+              </p>
+              <p className="text-xs text-blue-600">
+                Introduce tu contraseña para aceptar la invitación con esta cuenta.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+              <input 
+                name="email" 
+                type="email" 
+                required 
+                readOnly
+                value={existingEmail}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 text-gray-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+              <input 
+                name="password" 
+                type="password" 
+                required 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </>
+        )}
 
         <div className="pt-4">
           <button
@@ -117,7 +173,7 @@ export default function RegisterStaffForm({ token, role }: { token: string, role
             className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {loading && <Loader2 className="w-5 h-5 animate-spin" />}
-            {loading ? "Creando cuenta..." : "Completar Registro"}
+            {loading ? "Procesando..." : isExistingUser ? "Iniciar Sesión y Aceptar" : "Completar Registro"}
           </button>
         </div>
       </form>

@@ -1,138 +1,103 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 import { TeamDisciplineView } from "@/components/features/matches/TeamDisciplineView"
-import { Trophy, AlertCircle, Plus } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
 import { useExport } from "@/components/providers/ExportContext"
 
-export function TeamMatchesView({ teamId }: { teamId: string }) {
+interface TeamMatchesViewProps {
+  teamId: string;
+  serverTeamData?: { id: string; name: string; ffcv_url?: string | null; color?: string; category?: string } | null;
+  serverMatches?: any[];
+  serverTeams?: any[];
+  serverPlayers?: any[];
+  serverConvocatorias?: any[];
+}
+
+export function TeamMatchesView({
+  teamId,
+  serverTeamData,
+  serverMatches = [],
+  serverTeams = [],
+  serverPlayers = [],
+  serverConvocatorias = [],
+}: TeamMatchesViewProps) {
   const searchParams = useSearchParams()
   const initialView = (searchParams.get('view') as any) || 'partidos'
-  const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina'>(initialView)
-  const [ffcvUrl, setFfcvUrl] = useState<string | null>(null)
-  const [teamName, setTeamName] = useState<string>("")
-  const [globalTeamId, setGlobalTeamId] = useState<string | null>(null)
-  const [apercibidosCount, setApercibidosCount] = useState<number>(0)
+  const [ffcvUrl] = useState<string | null>(serverTeamData?.ffcv_url || null)
+  const [teamName] = useState<string>(serverTeamData?.name || "")
   const [editingMatch, setEditingMatch] = useState<any>(null)
-  
-  const { setExportData } = useExport()
 
   const [data, setData] = useState({
-    matches: [] as any[],
-    teams: [] as any[],
-    equipos: [] as any[],
-    players: [] as any[],
-    convocatorias: [] as any[]
+    matches: serverMatches,
+    teams: serverTeams,
+    players: serverPlayers,
+    convocatorias: serverConvocatorias,
   })
 
-  const supabase = createClient()
+  const { setExportData } = useExport()
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      // 1. Obtener el nombre del equipo del coach (tabla equipos)
-      const { data: equipoCoach } = await supabase
-        .from('teams')
-        .select("name, ffcv_url")
-        .eq("id", teamId)
-        .single()
-        
-      if (!equipoCoach) {
-        setLoading(false)
-        return
-      }
-
-      setTeamName(equipoCoach.name)
-      setFfcvUrl(equipoCoach.ffcv_url || null)
-
-      setGlobalTeamId(teamId);
-
-      // 3. Fetch all needed for GlobalMatchesView
-      const [
-        { data: partidosData },
-        { data: equiposData },
-        { data: playersData },
-        { data: convocatoriasData }
-      ] = await Promise.all([
-        supabase.from("partidos").select(`*, equipo:teams(id, name, color)`).order("fecha_hora", { ascending: false }),
-        supabase.from('teams').select("*"),
-        supabase.from("players").select("*").neq("status", "inactive"),
-        supabase.from("convocatorias").select("*")
-      ])
-
-      setData({
-        matches: partidosData || [],
-        teams: equiposData || [],
-        equipos: equiposData || [],
-        players: playersData || [],
-        convocatorias: convocatoriasData || []
+  // Calculate apercibidos from server data
+  const apercibidosCount = useMemo(() => {
+    const validPlayers = data.players.filter(
+      (p: any) =>
+        p.team_id === teamId &&
+        !(p.posicion || '').toLowerCase().includes('entrenador') &&
+        !(p.posicion || '').toLowerCase().includes('delegado')
+    )
+    let count = 0
+    validPlayers.forEach((player: any) => {
+      const playerConvs = data.convocatorias.filter((c: any) => c.player_id === player.id)
+      const rawEvents: any[] = []
+      playerConvs.forEach((conv: any) => {
+        const match = data.matches.find((m: any) => m.id === conv.partido_id)
+        if (match && (conv.yellow_cards > 0 || conv.red_cards > 0)) {
+          rawEvents.push({ match, yellow: conv.yellow_cards || 0 })
+        }
       })
-      
-      // Calculate apercibidos
-      const validPlayers = (playersData || []).filter((p: any) => p.team_id === teamId && !(p.posicion || '').toLowerCase().includes('entrenador') && !(p.posicion || '').toLowerCase().includes('delegado'))
-      let localApercibidosCount = 0;
-      
-      validPlayers.forEach((player: any) => {
-        const playerConvs = (convocatoriasData || []).filter((c: any) => c.player_id === player.id)
-        const rawEvents: any[] = []
-        playerConvs.forEach((conv: any) => {
-          const match = (partidosData || []).find((m: any) => m.id === conv.partido_id)
-          if (match && (conv.yellow_cards > 0 || conv.red_cards > 0)) {
-            rawEvents.push({ match, yellow: conv.yellow_cards || 0 })
-          }
-        })
-        const chrono = [...rawEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime())
-        let cycleCards = 0;
-        chrono.forEach(evt => {
-          if (evt.yellow === 1) {
-            cycleCards += 1;
-            if (cycleCards === 5) cycleCards = 0;
-          }
-        })
-        if (cycleCards === 4) localApercibidosCount++;
+      const chrono = [...rawEvents].sort(
+        (a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime()
+      )
+      let cycleCards = 0
+      chrono.forEach(evt => {
+        if (evt.yellow === 1) {
+          cycleCards += 1
+          if (cycleCards === 5) cycleCards = 0
+        }
       })
-      
-      setApercibidosCount(localApercibidosCount);
-      setLoading(false)
-    }
-    
-    fetchAllData()
-  }, [teamId, supabase])
+      if (cycleCards === 4) count++
+    })
+    return count
+  }, [data.players, data.convocatorias, data.matches, teamId])
 
+  // Export data
   useEffect(() => {
     const formattedMatches = data.matches
-      .filter(m => m.equipo_id === globalTeamId || m.equipo_id === teamId)
+      .filter(m => m.equipo_id === teamId)
       .map(m => ({
         Fecha: new Date(m.fecha_hora).toLocaleDateString(),
         Hora: new Date(m.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         Jornada: m.jornada || '-',
-        Rival: m.rival || 'Por definir',
+        Rival: m.rival_nombre || m.rival || 'Por definir',
         Lugar: m.lugar || 'Desconocido',
         Estado: m.estado || 'Pendiente',
-        Resultado: m.estado === 'Finalizado' ? `${m.goles_local} - ${m.goles_visitante}` : '-'
-      }));
-    setExportData(formattedMatches, `Partidos_Equipo_${teamId}`);
-  }, [data.matches, setExportData, teamId, globalTeamId]);
+        Resultado: m.estado === 'Finalizado' ? `${m.resultado_propio} - ${m.resultado_rival}` : '-'
+      }))
+    setExportData(formattedMatches, `Partidos_Equipo_${teamId}`)
+  }, [data.matches, setExportData, teamId])
 
+  // Open new match modal from URL param
   useEffect(() => {
     if (searchParams.get('newMatch') === 'true') {
       setEditingMatch({ id: 'new', equipo_id: teamId, fecha_hora: new Date().toISOString() })
       window.history.replaceState({}, '', `/dashboard/equipos/${teamId}/partidos`)
     }
   }, [searchParams, teamId])
-
-  if (loading) {
-    return (
-      <div className="w-full max-w-6xl mx-auto p-6 flex justify-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -174,7 +139,6 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
               </span>
             )}
           </button>
-
         </div>
       </div>
 
@@ -205,7 +169,7 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
         <FFCVStandings ffcvUrl={ffcvUrl} teamName={teamName} />
       ) : viewMode === 'disciplina' ? (
         <div className="pt-2">
-          <TeamDisciplineView 
+          <TeamDisciplineView
             matches={data.matches}
             players={data.players}
             convocatorias={data.convocatorias}
@@ -214,18 +178,15 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
         </div>
       ) : (
         <div className="pt-2">
-          {globalTeamId && (
-            <GlobalMatchesView 
-              initialMatches={data.matches}
-              teams={data.teams}
-              players={data.players}
-              convocatorias={data.convocatorias}
-              fixedTeamId={globalTeamId}
-            />
-          )}
+          <GlobalMatchesView
+            initialMatches={data.matches}
+            teams={data.teams}
+            players={data.players}
+            convocatorias={data.convocatorias}
+            fixedTeamId={teamId}
+          />
         </div>
       )}
-
 
       {/* Modal for adding new match */}
       {editingMatch && (
@@ -235,12 +196,13 @@ export function TeamMatchesView({ teamId }: { teamId: string }) {
           teams={data.teams}
           onClose={() => setEditingMatch(null)}
           onSave={(updatedMatch) => {
-            // Update the matches list in data
             if (editingMatch.id === 'new') {
               const fullMatch = { ...updatedMatch, equipo: data.teams.find(t => t.id === updatedMatch.equipo_id) }
               setData(prev => ({
                 ...prev,
-                matches: [fullMatch, ...prev.matches].sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+                matches: [fullMatch, ...prev.matches].sort(
+                  (a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()
+                )
               }))
             } else {
               setData(prev => ({

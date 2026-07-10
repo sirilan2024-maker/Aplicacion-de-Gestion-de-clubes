@@ -35,6 +35,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           const golesPropiosStr = formData.get("resultado_propio") as string;
           const golesRivalStr = formData.get("resultado_rival") as string;
           const notasStr = formData.get("notas") as string;
+          const highlightJornada = formData.get("highlight_jornada") === 'on';
 
           const golesPropios = golesPropiosStr !== "" ? parseInt(golesPropiosStr) : null;
           const golesRival = golesRivalStr !== "" ? parseInt(golesRivalStr) : null;
@@ -53,7 +54,8 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               resultado_propio: golesPropios,
               resultado_rival: golesRival,
               estado: estado,
-              coach_summary: notasStr
+              coach_summary: notasStr,
+              highlight_jornada: highlightJornada
             };
 
             if (match.id === 'new') {
@@ -164,6 +166,27 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               className="w-full flex rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 resize-none placeholder:text-slate-400"
               placeholder="Ej: Acta FFCV 26377336. Jornada 26..."
             ></textarea>
+          </div>
+
+          {/* Mostrar en Jornada */}
+          <div className="flex items-start gap-3 p-4 bg-blue-50/70 border border-blue-100 rounded-xl">
+            <div className="relative mt-0.5">
+              <input
+                type="checkbox"
+                id="highlight_jornada"
+                name="highlight_jornada"
+                defaultChecked={!!match.highlight_jornada}
+                className="sr-only peer"
+              />
+              <label
+                htmlFor="highlight_jornada"
+                className="block w-10 h-5 bg-slate-200 rounded-full cursor-pointer peer-checked:bg-blue-500 transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:shadow after:transition-transform peer-checked:after:translate-x-5"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">Mostrar en Jornada</p>
+              <p className="text-xs text-slate-500 mt-0.5">Fija este partido en la pestaña Jornada aunque esté fuera de la ventana de 72h automática.</p>
+            </div>
           </div>
         </div>
 

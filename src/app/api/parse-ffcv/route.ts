@@ -11,14 +11,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role, club_id')
       .eq('id', user.id)
       .single();
 
+    if (profileError || !profile?.club_id) {
+      return NextResponse.json({ error: 'No se pudo obtener el club del usuario.' }, { status: 400 });
+    }
+
     if (profile?.role !== 'admin') {
       return NextResponse.json({ error: 'Solo los administradores pueden importar calendarios' }, { status: 403 });
+    }
+    
+    // Obtener la temporada activa del club
+    const { data: activeSeason, error: seasonError } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('club_id', profile.club_id)
+      .eq('is_active', true)
+      .single();
+
+    if (seasonError || !activeSeason) {
+      return NextResponse.json({ error: 'No se encontró una temporada activa para el club. No se pueden importar partidos.' }, { status: 400 });
     }
 
     const formData = await req.formData();
@@ -100,13 +116,15 @@ export async function POST(req: Request) {
           let resultadoRival = null;
 
           if (localClean.includes(baseTeamName)) {
+            // Nuestro equipo es LOCAL (juega en casa)
             rivalNombre = visitanteRaw;
-            lugar = lugarRaw;
+            lugar = 'Local';
             resultadoPropio = golLocal;
             resultadoRival = golVisitante;
           } else if (visitanteClean.includes(baseTeamName)) {
+            // Nuestro equipo es VISITANTE (juega fuera)
             rivalNombre = localRaw;
-            lugar = lugarRaw;
+            lugar = 'Visitante';
             resultadoPropio = golVisitante;
             resultadoRival = golLocal;
           }
@@ -131,7 +149,8 @@ export async function POST(req: Request) {
               lugar: lugar,
               resultado_propio: resultadoPropio,
               resultado_rival: resultadoRival,
-              estado: estado
+              estado: estado,
+              season_id: activeSeason.id
             });
           }
         }

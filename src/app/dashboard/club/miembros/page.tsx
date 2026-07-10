@@ -478,14 +478,20 @@ function AddPlayerModal({ open, onClose, onSuccess, clubId, teams }: { open: boo
 // --- Modal para Gestionar Staff ---
 function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: boolean; onClose: () => void; member: Member | null; teams: {id: string, name: string}[]; onSuccess: () => void }) {
   const [role, setRole] = useState("");
-  const [teamId, setTeamId] = useState("");
+  const [teamIds, setTeamIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (member) {
       setRole(member.role || "entrenador");
-      setTeamId(member.team_id || "");
+      if (member.teams && member.teams.length > 0) {
+        setTeamIds(member.teams.map(t => t.id));
+      } else if (member.team_id) {
+        setTeamIds([member.team_id]);
+      } else {
+        setTeamIds([]);
+      }
     }
   }, [member]);
 
@@ -499,7 +505,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         if (!resRole.success) throw new Error(resRole.error);
       }
       
-      const resTeam = await assignStaffToTeamAction(member.id, teamId || null);
+      const resTeam = await assignStaffToTeamAction(member.id, teamIds);
       if (!resTeam.success) throw new Error(resTeam.error);
       
       toast.success("Staff actualizado correctamente");
@@ -567,13 +573,27 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Asignar a Equipo</label>
-            <select value={teamId} onChange={e => setTeamId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">-- Sin equipo --</option>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Asignar a Equipo(s)</label>
+            <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto p-2 bg-white">
+              {teams.length === 0 && <p className="text-sm text-gray-500 p-2">No hay equipos disponibles</p>}
               {teams.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <label key={t.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={teamIds.includes(t.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setTeamIds([...teamIds, t.id]);
+                      } else {
+                        setTeamIds(teamIds.filter(id => id !== t.id));
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="ml-3 text-sm text-gray-700">{t.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
             <p className="text-xs text-gray-500 mt-1">Al asignar un equipo, este miembro será el responsable principal de dicho equipo.</p>
           </div>
           
@@ -601,6 +621,7 @@ interface Member {
   team_name?: string | null
   team_color?: string | null
   team_id?: string | null
+  teams?: {id: string, name: string, color?: string}[]
   type: 'staff' | 'player'
 }
 
@@ -716,16 +737,18 @@ export default function GlobalMembersPage() {
 
         if (staffData) {
           staffData.forEach((s: any) => {
-            const teamInfo = Array.isArray(s.teams) ? s.teams[0] : s.teams
+            const teamsArray = Array.isArray(s.teams) ? s.teams : [];
+            const primaryTeam = teamsArray[0];
             allMembers.push({
               id: s.id,
               first_name: s.first_name || '',
               last_name: s.last_name || '',
               email: s.email,
               role: s.role || 'staff',
-              team_id: teamInfo?.id,
-              team_name: teamInfo?.name,
-              team_color: teamInfo?.color,
+              team_id: primaryTeam?.id,
+              team_name: primaryTeam?.name,
+              team_color: primaryTeam?.color,
+              teams: teamsArray,
               type: 'staff'
             })
             staffCount++;
@@ -1160,16 +1183,21 @@ export default function GlobalMembersPage() {
                     <td className="px-6 py-4">
                       {getRoleBadge(member.role)}
                     </td>
-                    <td className="px-6 py-4">
-                      {member.team_name ? (
-                        <div className="flex items-center gap-2">
-                          {member.team_color && (
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: member.team_color }}></div>
-                          )}
-                          <span className="font-medium text-gray-700">{member.team_name}</span>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {member.teams && member.teams.length > 1 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {member.teams.map((t, idx) => (
+                            <span key={idx} className="px-2.5 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              {t.name}
+                            </span>
+                          ))}
                         </div>
+                      ) : member.team_name ? (
+                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                          {member.team_name}
+                        </span>
                       ) : (
-                        <span className="text-gray-400 text-sm italic">Global / Sin asignar</span>
+                        <span className="text-sm text-gray-500 italic">Sin equipo</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">

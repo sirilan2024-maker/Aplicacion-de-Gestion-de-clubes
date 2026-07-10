@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy } from "lucide-react"
+import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck } from "lucide-react"
 import { deleteMatchAction } from "@/app/actions/match-actions"
 import { ManageMatchModal } from "./ManageMatchModal"
 import { QuickConvocatoriaModal } from "./QuickConvocatoriaModal"
 import { FFCVStandings } from "./FFCVStandings"
 import { TeamDisciplineView } from "./TeamDisciplineView"
+import { MatchdayView } from "./MatchdayView"
 
 interface GlobalMatchesViewProps {
   initialMatches: any[];
@@ -21,7 +22,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
   const router = useRouter()
   const [matches, setMatches] = useState(initialMatches)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "all")
-  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina'>('partidos')
+  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'en-directo'>('partidos')
   
   const [editingMatch, setEditingMatch] = useState<any>(null)
   const [convocatoriaMatch, setConvocatoriaMatch] = useState<any>(null)
@@ -65,6 +66,8 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
     })
     return count;
   }, [players, convocatorias, matches, selectedTeamId]);
+
+  const hasLiveMatches = useMemo(() => matches.some(m => m.estado === 'En Curso'), [matches]);
 
   const filteredMatches = matches.filter(m => {
     const matchesTeam = selectedTeamId === "all" || m.equipo_id === selectedTeamId
@@ -260,6 +263,23 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
               Calendario y Resultados
             </button>
             <button
+              onClick={() => setViewMode('en-directo')}
+              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+                viewMode === 'en-directo'
+                  ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <CalendarCheck size={15} />
+              Jornada
+              {hasLiveMatches && viewMode !== 'en-directo' && (
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setViewMode('clasificacion')}
               className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all ${
                 viewMode === 'clasificacion'
@@ -312,7 +332,9 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
       )}
 
       {/* Vistas */}
-      {viewMode === 'clasificacion' ? (
+      {viewMode === 'en-directo' ? (
+        <MatchdayView initialMatches={matches} teams={teams} />
+      ) : viewMode === 'clasificacion' ? (
         selectedTeamId === 'all' ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {teams.filter(e => e.ffcv_url).length === 0 ? (

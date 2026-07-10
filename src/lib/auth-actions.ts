@@ -314,10 +314,17 @@ export async function signOut() {
 }
 
 // ─── NEW: Register Staff via Invitation Link ─────────────────────────────────
+export interface RegisterInvitedStaffResult {
+  success: boolean
+  requireEmailVerification?: boolean
+  error?: string
+  existingUser?: boolean
+}
+
 export async function registerInvitedStaffAction(
   token: string,
   formData: FormData
-): Promise<RegisterWithInviteResult> {
+): Promise<RegisterInvitedStaffResult> {
   const email      = (formData.get('email')        as string)?.trim()
   const password   =  formData.get('password')     as string
   const firstName  = (formData.get('first_name')   as string)?.trim()
@@ -349,6 +356,13 @@ export async function registerInvitedStaffAction(
     return { success: false, error: 'Este enlace ya ha sido utilizado.' }
   }
 
+  // 1.5 Check if user already exists
+  const { data: existingProfile } = await adminClient.from('profiles').select('id, email').eq('email', email).single()
+  
+  if (existingProfile) {
+    return { success: false, existingUser: true, error: 'Detectamos que ya tienes una cuenta con este email.' }
+  }
+
   // 2. Create user with admin client (no email verification needed)
   const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email,
@@ -358,6 +372,9 @@ export async function registerInvitedStaffAction(
   })
 
   if (authError || !authData.user) {
+    if (authError?.message?.includes('already registered')) {
+      return { success: false, existingUser: true, error: 'Detectamos que ya tienes una cuenta con este email.' }
+    }
     return { success: false, error: authError?.message || 'Error al crear la cuenta.' }
   }
 
@@ -402,4 +419,90 @@ export async function registerInvitedStaffAction(
   }
 
   return { success: true, requireEmailVerification: false }
+}
+
+export async function acceptStaffInviteExistingUserAction(
+  token: string,
+  formData: FormData
+): Promise<{ success: boolean, error?: string }> {
+  const email = (formData.get('email') as string)?.trim()
+  const password = formData.get('password') as string
+
+  if (!token || !email || !password) {
+    return { success: false, error: 'Todos los campos son obligatorios.' }
+  }
+
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+
+  // 1. Verify token
+  const { data: invite, error: inviteError } = await adminClient
+    .from('staff_invitations')
+    .select('*')
+    .eq('token', token)
+    .single()
+
+  if (inviteError || !invite || invite.used) {
+    return { success: false, error: 'Enlace de invitación inválido o ya utilizado.' }
+  }
+
+  // 2. Authenticate user to verify they own the account
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (authError || !authData.user) {
+    return { success: false, error: 'Contraseña incorrecta.' }
+  }
+
+  const userId = authData.user.id
+
+  // 3. Mark token as used
+  await adminClient
+    .from('staff_invitations')
+    .update({ used: true, used_at: new Date().toISOString() })
+    .eq('id', invite.id)
+
+  // 4. Upsert Profile with correct club_id and role
+  // This will overwrite their club_id and role if they are from another club!
+  // If they are from the same club, it's just an update.
+  const { error: profileError } = await adminClient
+    .from('profiles')
+    .update({
+      role: invite.role,
+      club_id: invite.club_id
+    })
+    .eq('id', userId)
+
+  if (profileError) {
+    console.error('[StaffInviteExisting] profile update error:', profileError.message)
+  }
+
+  // 5. If the invitation has a team_id, assign the user as the coach of that team
+  if (invite.team_id) {
+    // Avoid duplicate assignment
+    const { data: existingCoach } = await adminClient
+      .from('team_coaches')
+      .select('id')
+      .eq('profile_id', userId)
+      .eq('team_id', invite.team_id)
+      .single()
+
+    if (!existingCoach) {
+      const { error: teamAssignError } = await adminClient
+        .from('team_coaches')
+        .insert({
+          team_id: invite.team_id,
+          profile_id: userId,
+          club_id: invite.club_id
+        })
+        
+      if (teamAssignError) {
+        console.error('[StaffInviteExisting] Error assigning staff to team_coaches:', teamAssignError.message)
+      }
+    }
+  }
+
+  return { success: true }
 }

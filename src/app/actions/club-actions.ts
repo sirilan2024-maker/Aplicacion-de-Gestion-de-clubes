@@ -93,25 +93,27 @@ export async function fetchClubPeopleWizardAction(clubId: string) {
   return { players: players || [], coaches: coaches || [] }
 }
 
-export async function assignStaffToTeamAction(staffId: string, teamId: string | null) {
+export async function assignStaffToTeamAction(staffId: string, teamIds: string[]) {
   const { createAdminClient } = await import('@/lib/supabase/admin')
   const adminClient = createAdminClient()
   
-  if (teamId) {
-    const { data: team } = await adminClient.from('teams').select('club_id').eq('id', teamId).single()
+  // Siempre limpiamos las asignaciones anteriores
+  await adminClient.from('team_coaches').delete().eq('profile_id', staffId)
+
+  if (teamIds && teamIds.length > 0) {
+    // Obtenemos el club_id del primer equipo (asumimos que todos los equipos son del mismo club)
+    const { data: team } = await adminClient.from('teams').select('club_id').eq('id', teamIds[0]).single()
     if (!team) return { success: false, error: 'Equipo no encontrado' }
     
-    await adminClient.from('team_coaches').delete().eq('profile_id', staffId)
-    
-    const { error } = await adminClient.from('team_coaches').insert({ 
+    // Preparamos el array de inserciones
+    const inserts = teamIds.map(id => ({
       profile_id: staffId, 
-      team_id: teamId, 
+      team_id: id, 
       club_id: team.club_id 
-    })
+    }))
+
+    const { error } = await adminClient.from('team_coaches').insert(inserts)
     
-    if (error) return { success: false, error: error.message }
-  } else {
-    const { error } = await adminClient.from('team_coaches').delete().eq('profile_id', staffId)
     if (error) return { success: false, error: error.message }
   }
   

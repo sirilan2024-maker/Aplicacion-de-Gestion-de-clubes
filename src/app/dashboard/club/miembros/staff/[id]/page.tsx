@@ -113,7 +113,7 @@ export default function StaffProfilePage() {
 
       // 2. Guardar Equipo Asignado - SOLO ADMIN
       if (isAdmin && teamId !== (staff.team_id || "")) {
-        const resTeam = await assignStaffToTeamAction(staffId, teamId || null)
+        const resTeam = await assignStaffToTeamAction(staffId, teamId ? [teamId] : [])
         if (!resTeam.success) throw new Error(resTeam.error)
       }
 

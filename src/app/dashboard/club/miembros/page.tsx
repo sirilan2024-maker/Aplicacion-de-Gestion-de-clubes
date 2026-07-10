@@ -575,10 +575,11 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
             <label className="block text-sm font-medium text-gray-700 mb-2">Roles Asignados</label>
             <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
               {[
-                { val: 'admin', label: 'Administrador' },
+                { val: 'admin', label: 'Admin' },
                 { val: 'coordinador', label: 'Coordinador' },
                 { val: 'entrenador', label: 'Entrenador' },
-                { val: 'jugador', label: 'Jugador' }
+                { val: 'jugador', label: 'Jugador' },
+                { val: 'tutor', label: 'Padre/Madre/Tutor' }
               ].map(r => {
                 const checked = assignedRoles.includes(r.val);
                 return (
@@ -623,7 +624,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
               >
                 {assignedRoles.map(r => (
                   <option key={r} value={r}>
-                    {r === 'admin' ? 'Administrador' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r}
+                    {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r}
                   </option>
                 ))}
               </select>

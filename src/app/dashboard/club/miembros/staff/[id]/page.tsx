@@ -384,10 +384,11 @@ export default function StaffProfilePage() {
                       <label className="block text-sm font-medium text-blue-900 mb-2">Roles Asignados</label>
                       <div className="grid grid-cols-2 gap-2 p-3 bg-white rounded-lg border border-blue-200">
                         {[
-                          { val: 'admin', label: 'Administrador' },
+                          { val: 'admin', label: 'Admin' },
                           { val: 'coordinador', label: 'Coordinador' },
                           { val: 'entrenador', label: 'Entrenador' },
-                          { val: 'jugador', label: 'Jugador' }
+                          { val: 'jugador', label: 'Jugador' },
+                          { val: 'tutor', label: 'Padre/Madre/Tutor' }
                         ].map(r => {
                           const checked = assignedRoles.includes(r.val);
                           return (
@@ -432,7 +433,7 @@ export default function StaffProfilePage() {
                         >
                           {assignedRoles.map(r => (
                             <option key={r} value={r}>
-                              {r === 'admin' ? 'Administrador' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r}
+                              {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r}
                             </option>
                           ))}
                         </select>

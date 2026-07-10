@@ -381,7 +381,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             >
               {availableRoles.map(role => (
                 <option key={role} value={role} className={isAdmin ? "bg-slate-800 text-slate-200" : "bg-white text-slate-800"}>
-                  {role === 'admin' ? 'Administrador' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role}
+                  {role === 'admin' ? 'Admin' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role === 'tutor' ? 'Padre/Madre/Tutor' : role}
                 </option>
               ))}
             </select>

@@ -300,7 +300,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                 >
                   {availableRoles.map(role => (
                     <option key={role} value={role} className="bg-slate-900 text-slate-200">
-                      {role === 'admin' ? 'Administrador' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role}
+                      {role === 'admin' ? 'Admin' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role === 'tutor' ? 'Padre/Madre/Tutor' : role}
                     </option>
                   ))}
                 </select>

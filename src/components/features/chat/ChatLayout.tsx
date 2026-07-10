@@ -114,7 +114,7 @@ export function ChatLayout() {
     )
   }
 
-  const canPostInActiveChannel = activeChannel?.type !== 'global' || (userRole === 'admin' || userRole === 'staff' || userRole === 'coach' || userRole === 'entrenador')
+  const canPostInActiveChannel = activeChannel?.type === 'global' ? (userRole === 'admin') : true
 
   return (
     <div className="h-[calc(100vh-100px)] max-h-[800px] max-w-6xl mx-auto p-4 flex">

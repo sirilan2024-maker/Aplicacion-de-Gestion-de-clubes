@@ -88,8 +88,13 @@ export async function getChannelsAction(clubId: string) {
 
       allowedChannels = allowedChannels.filter(c => c.type === 'global' || (c.team_id && familyTeamIds.has(c.team_id)))
     } else if (role === 'coach' || role === 'entrenador' || role === 'delegado') {
-      const { data: teams } = await adminClient.from('teams').select('id').eq('coach_id', user.id)
-      const coachTeamIds = new Set(teams?.map(t => t.id) || [])
+      const { data: directTeams } = await adminClient.from('teams').select('id').eq('coach_id', user.id)
+      const directTeamIds = directTeams?.map(t => t.id) || []
+      
+      const { data: coachTeams } = await adminClient.from('team_coaches').select('team_id').eq('profile_id', user.id)
+      const coachTeamIdsFromTable = coachTeams?.map(ct => ct.team_id) || []
+      
+      const coachTeamIds = new Set([...directTeamIds, ...coachTeamIdsFromTable])
       allowedChannels = allowedChannels.filter(c => c.type === 'global' || (c.team_id && coachTeamIds.has(c.team_id)))
     }
 

@@ -23,7 +23,7 @@ export default function StaffProfilePage() {
 
   // Edit states for permissions
   const [role, setRole] = useState("")
-  const [teamId, setTeamId] = useState("")
+  const [teamIds, setTeamIds] = useState<string[]>([])
   
   // Edit states for Ficha (Extended Info)
   const [firstName, setFirstName] = useState("")
@@ -60,17 +60,17 @@ export default function StaffProfilePage() {
       const foundStaff = res.data.find(s => s.id === staffId)
       if (!foundStaff) throw new Error("Staff no encontrado")
 
-      const teamInfo = Array.isArray(foundStaff.teams) ? foundStaff.teams[0] : foundStaff.teams
+      const assignedTeams = Array.isArray(foundStaff.teams) ? foundStaff.teams : (foundStaff.teams ? [foundStaff.teams] : [])
+      const assignedTeamIds = assignedTeams.map((t: any) => t?.id).filter(Boolean) as string[]
       
       setStaff({
         ...foundStaff,
-        team_id: teamInfo?.id,
-        team_name: teamInfo?.name
+        team_ids: assignedTeamIds
       })
 
       // Permissions
       setRole(foundStaff.role || "entrenador")
-      setTeamId(teamInfo?.id || "")
+      setTeamIds(assignedTeamIds)
 
       // Ficha data
       setFirstName(foundStaff.first_name || "")
@@ -111,9 +111,17 @@ export default function StaffProfilePage() {
         if (!resRole.success) throw new Error(resRole.error)
       }
 
-      // 2. Guardar Equipo Asignado - SOLO ADMIN
-      if (isAdmin && teamId !== (staff.team_id || "")) {
-        const resTeam = await assignStaffToTeamAction(staffId, teamId ? [teamId] : [])
+      // 2. Guardar Equipos Asignados - SOLO ADMIN
+      const hasTeamsChanged = () => {
+        const originalIds = staff.team_ids || [];
+        if (teamIds.length !== originalIds.length) return true;
+        const sortedSelected = [...teamIds].sort();
+        const sortedOriginal = [...originalIds].sort();
+        return !sortedSelected.every((id, idx) => id === sortedOriginal[idx]);
+      }
+
+      if (isAdmin && hasTeamsChanged()) {
+        const resTeam = await assignStaffToTeamAction(staffId, teamIds)
         if (!resTeam.success) throw new Error(resTeam.error)
       }
 
@@ -372,19 +380,29 @@ export default function StaffProfilePage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-blue-900 mb-1">Equipo Principal a su cargo</label>
-                      <select 
-                        value={teamId} 
-                        onChange={e => setTeamId(e.target.value)}
-                        className="w-full border border-blue-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                      >
-                        <option value="">-- Sin equipo asignado --</option>
+                      <label className="block text-sm font-medium text-blue-900 mb-2">Equipos Asignados</label>
+                      <div className="border border-blue-200 rounded-lg max-h-48 overflow-y-auto p-3 bg-white space-y-2">
+                        {teams.length === 0 && <p className="text-sm text-gray-500">No hay equipos disponibles</p>}
                         {teams.map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                          <label key={t.id} className="flex items-center hover:bg-slate-50 p-1.5 rounded cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={teamIds.includes(t.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setTeamIds([...teamIds, t.id]);
+                                } else {
+                                  setTeamIds(teamIds.filter(id => id !== t.id));
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="ml-3 text-sm text-slate-700 font-medium">{t.name}</span>
+                          </label>
                         ))}
-                      </select>
+                      </div>
                       <p className="text-xs text-blue-700/80 mt-2 leading-relaxed">
-                        Este es su equipo principal de gestión rápida. Recuerda que un entrenador puede estar asignado a varios equipos desde la pantalla de Plantilla.
+                        Selecciona todos los equipos en los que este miembro del staff/entrenador participa.
                       </p>
                     </div>
                   </div>

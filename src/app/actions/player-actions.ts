@@ -383,6 +383,7 @@ export async function getClubStaffAction(clubId: string) {
         last_name, 
         email, 
         role,
+        roles,
         phone,
         dni,
         birth_date,

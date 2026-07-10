@@ -68,6 +68,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [availableRoles, setAvailableRoles] = useState<string[]>([])
   const [clubName, setClubName] = useState<string>("Cargando...")
   const [equipos, setEquipos] = useState<any[]>([])
   const [linkedPlayers, setLinkedPlayers] = useState<any[]>([])
@@ -97,12 +98,13 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, club_id")
+          .select("role, roles, club_id")
           .eq("id", user.id)
           .single()
           
         if (profile) {
           setUserRole(profile.role)
+          setAvailableRoles(profile.roles || [])
           
           if (profile.club_id) {
             const { data: club } = await supabase
@@ -288,6 +290,11 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     
     // Add "Mis Equipos" for coaches if not present
     const isCoach = userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado';
+    const hasMisEquipos = globalNavItems.some(n => 
+      n.name.toLowerCase() === "mis equipos" || 
+      n.href === "/dashboard/equipos" || 
+      n.href === "/dashboard/mis-equipos"
+    );
     
     navGroups = [
       {
@@ -297,7 +304,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
             { name: "Directorio",   href: "/dashboard/club/miembros", icon: Users },
           ]),
-          ...(isCoach ? [{ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield }] : []),
+          ...(isCoach && !hasMisEquipos ? [{ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield }] : []),
           { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
           { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
           { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
@@ -345,6 +352,42 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           </div>
         )}
       </div>
+
+      {/* ── Role Switcher ──────────────────────────────── */}
+      {!collapsed && availableRoles.length > 1 && (
+        <div className={cn("px-4 py-3", isAdmin ? "border-b border-slate-800" : "border-b border-gray-100")}>
+          <div className="flex flex-col items-start min-w-0">
+            <span className={cn("text-[10px] font-semibold uppercase tracking-wider block mb-1", isAdmin ? "text-slate-400" : "text-gray-500")}>Rol Activo</span>
+            <select 
+              value={userRole || ''}
+              onChange={async (e) => {
+                const newRole = e.target.value;
+                if (newRole && newRole !== userRole) {
+                  const { switchActiveRoleAction } = await import("@/app/actions/club-actions");
+                  const res = await switchActiveRoleAction(newRole);
+                  if (res.success) {
+                    window.location.href = '/dashboard';
+                  } else {
+                    alert('Error al cambiar de rol: ' + res.error);
+                  }
+                }
+              }}
+              className={cn(
+                "w-full text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none border cursor-pointer capitalize transition-all",
+                isAdmin 
+                  ? "bg-slate-800 border-slate-700 text-slate-200 focus:border-slate-500" 
+                  : "bg-gray-50 border-gray-200 text-slate-800 focus:border-blue-500 focus:bg-white"
+              )}
+            >
+              {availableRoles.map(role => (
+                <option key={role} value={role} className={isAdmin ? "bg-slate-800 text-slate-200" : "bg-white text-slate-800"}>
+                  {role === 'admin' ? 'Administrador' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* ── Context Selector ──────────────────────────────── */}
       {!collapsed && !isAdmin && (

@@ -272,3 +272,74 @@ export async function cancelStaffInvitationAction(invitationId: string) {
   revalidatePath("/dashboard/club/miembros")
   return { success: true }
 }
+
+export async function updateUserRolesAction(userId: string, activeRole: string, rolesList: string[]) {
+  const supabase = await createClient()
+
+  // Verify the current user is admin
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  const { data: currentProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (currentProfile?.role !== 'admin' && currentProfile?.role !== 'superadmin') {
+    return { success: false, error: 'No tienes permisos para realizar esta acción' }
+  }
+
+  // Update the user's active role and roles array
+  const { error } = await supabase
+    .from("profiles")
+    .update({ 
+      role: activeRole,
+      roles: rolesList
+    })
+    .eq("id", userId)
+
+  if (error) {
+    console.error('Error updating user roles:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/dashboard/club/miembros")
+  return { success: true }
+}
+
+export async function switchActiveRoleAction(selectedRole: string) {
+  const supabase = await createClient()
+
+  // Get active user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  // Get user profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("roles")
+    .eq("id", user.id)
+    .single()
+
+  if (!profile) return { success: false, error: 'Perfil no encontrado' }
+
+  const roles = profile.roles || []
+  if (!roles.includes(selectedRole)) {
+    return { success: false, error: 'No tienes este rol asignado' }
+  }
+
+  // Update active role
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role: selectedRole })
+    .eq("id", user.id)
+
+  if (error) {
+    console.error('Error switching role:', error)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/dashboard")
+  return { success: true }
+}

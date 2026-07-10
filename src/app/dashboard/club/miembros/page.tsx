@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Users, Search, Loader2, Mail, Shield, User as UserIcon, Archive } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
 import { archivePlayerAction, updatePlayerPositionAction, exportRgpdAction, createFamilyAndPlayerAction, getClubStaffAction } from "@/app/actions/player-actions"
-import { updateUserRoleAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction } from "@/app/actions/club-actions"
+import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction } from "@/app/actions/club-actions"
 import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
@@ -477,14 +477,20 @@ function AddPlayerModal({ open, onClose, onSuccess, clubId, teams }: { open: boo
 }
 // --- Modal para Gestionar Staff ---
 function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: boolean; onClose: () => void; member: Member | null; teams: {id: string, name: string}[]; onSuccess: () => void }) {
-  const [role, setRole] = useState("");
+  const [activeRole, setActiveRole] = useState("");
+  const [assignedRoles, setAssignedRoles] = useState<string[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (member) {
-      setRole(member.role || "entrenador");
+      setActiveRole(member.role || "entrenador");
+      const initialRoles = member.roles && member.roles.length > 0 
+        ? member.roles 
+        : [member.role || "entrenador"];
+      setAssignedRoles(initialRoles);
+      
       if (member.teams && member.teams.length > 0) {
         setTeamIds(member.teams.map(t => t.id));
       } else if (member.team_id) {
@@ -500,10 +506,15 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
   const handleSave = async () => {
     setSubmitting(true);
     try {
-      if (role !== member.role) {
-        const resRole = await updateUserRoleAction(member.id, role);
-        if (!resRole.success) throw new Error(resRole.error);
+      if (assignedRoles.length === 0) {
+        throw new Error("Debe seleccionar al menos un rol asignado.");
       }
+      if (!assignedRoles.includes(activeRole)) {
+        throw new Error("El rol activo debe estar entre los roles asignados.");
+      }
+
+      const resRole = await updateUserRolesAction(member.id, activeRole, assignedRoles);
+      if (!resRole.success) throw new Error(resRole.error);
       
       const resTeam = await assignStaffToTeamAction(member.id, teamIds);
       if (!resTeam.success) throw new Error(resTeam.error);
@@ -561,16 +572,63 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-            <select value={role} onChange={e => setRole(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="entrenador">Entrenador</option>
-              <option value="coordinador">Coordinador</option>
-              <option value="admin">Administrador</option>
-              <option value="secretario">Secretario</option>
-              <option value="tesorero">Tesorero</option>
-              <option value="delegado">Delegado</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Roles Asignados</label>
+            <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {[
+                { val: 'admin', label: 'Administrador' },
+                { val: 'coordinador', label: 'Coordinador' },
+                { val: 'entrenador', label: 'Entrenador' },
+                { val: 'jugador', label: 'Jugador' }
+              ].map(r => {
+                const checked = assignedRoles.includes(r.val);
+                return (
+                  <label key={r.val} className="flex items-center gap-2 p-1 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        let newRoles = [...assignedRoles];
+                        if (e.target.checked) {
+                          if (!newRoles.includes(r.val)) newRoles.push(r.val);
+                        } else {
+                          newRoles = newRoles.filter(roleVal => roleVal !== r.val);
+                        }
+                        setAssignedRoles(newRoles);
+                        if (activeRole === r.val && !e.target.checked) {
+                          if (newRoles.length > 0) {
+                            setActiveRole(newRoles[0]);
+                          } else {
+                            setActiveRole("");
+                          }
+                        } else if (newRoles.length > 0 && !newRoles.includes(activeRole)) {
+                          setActiveRole(newRoles[0]);
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">{r.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
+
+          {assignedRoles.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol Activo Inicial</label>
+              <select 
+                value={activeRole} 
+                onChange={e => setActiveRole(e.target.value)} 
+                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 capitalize"
+              >
+                {assignedRoles.map(r => (
+                  <option key={r} value={r}>
+                    {r === 'admin' ? 'Administrador' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Asignar a Equipo(s)</label>
@@ -598,11 +656,18 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
           </div>
           
           <div className="pt-2 flex gap-3">
-            <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200">
-              Cancelar
-            </button>
-            <button onClick={handleSave} disabled={submitting} className="flex-1 bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            <button 
+              onClick={handleSave} 
+              disabled={submitting} 
+              className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
               {submitting ? "Guardando..." : "Guardar Cambios"}
+            </button>
+            <button 
+              onClick={onClose} 
+              className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-bold hover:bg-gray-200 transition-colors"
+            >
+              Cancelar
             </button>
           </div>
         </div>
@@ -618,6 +683,7 @@ interface Member {
   last_name: string
   email: string | null
   role: string
+  roles?: string[]
   team_name?: string | null
   team_color?: string | null
   team_id?: string | null
@@ -745,6 +811,7 @@ export default function GlobalMembersPage() {
               last_name: s.last_name || '',
               email: s.email,
               role: s.role || 'staff',
+              roles: s.roles || [s.role || 'staff'],
               team_id: primaryTeam?.id,
               team_name: primaryTeam?.name,
               team_color: primaryTeam?.color,

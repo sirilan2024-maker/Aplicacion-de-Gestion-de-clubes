@@ -62,6 +62,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [availableRoles, setAvailableRoles] = useState<string[]>([])
   const [equipos, setEquipos] = useState<any[]>([])
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
   const supabase = createClient()
@@ -76,12 +77,13 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, club_id")
+          .select("role, roles, club_id")
           .eq("id", user.id)
           .single()
           
         if (profile) {
           setUserRole(profile.role)
+          setAvailableRoles(profile.roles || [])
           
           if (profile.club_id) {
             let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id).order("name")
@@ -203,7 +205,11 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "FFCV/NOVANET", href: "/admin/ffcv-api", icon: Globe },
       ].filter(item => !bottomHrefs.includes(item.href));
     } else {
-      secondaryLinks = globalNavItems.filter(item => !bottomHrefs.includes(item.href));
+      const bottomNames = bottomLinks.map(b => b.name.toLowerCase());
+      secondaryLinks = globalNavItems.filter(item => 
+        !bottomHrefs.includes(item.href) && 
+        !bottomNames.includes(item.name.toLowerCase())
+      );
     }
     
     // Asegurar que Ajustes siempre esté disponible si no está en el bottom bar
@@ -270,6 +276,37 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           </div>
           
           <div className="flex-1 overflow-y-auto px-6 pb-24">
+            {availableRoles.length > 1 && (
+              <div className="mb-6 p-4 bg-slate-800/80 rounded-xl border border-slate-700/50">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  Rol Activo
+                </label>
+                <select 
+                  value={userRole || ''}
+                  onChange={async (e) => {
+                    const newRole = e.target.value;
+                    if (newRole && newRole !== userRole) {
+                      setMenuOpen(false);
+                      const { switchActiveRoleAction } = await import("@/app/actions/club-actions");
+                      const res = await switchActiveRoleAction(newRole);
+                      if (res.success) {
+                        window.location.href = '/dashboard';
+                      } else {
+                        alert('Error al cambiar de rol: ' + res.error);
+                      }
+                    }
+                  }}
+                  className="w-full text-sm font-bold bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 outline-none cursor-pointer capitalize"
+                >
+                  {availableRoles.map(role => (
+                    <option key={role} value={role} className="bg-slate-900 text-slate-200">
+                      {role === 'admin' ? 'Administrador' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <h2 className="text-emerald-400 font-bold uppercase tracking-wider text-sm mb-6">
               Más Opciones
             </h2>

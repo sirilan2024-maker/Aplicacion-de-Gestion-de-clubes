@@ -81,7 +81,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       // 3. Fetch Events & Attendance
       let events: any[] = []
       if (teamIds.length > 0) {
-        const { data } = await supabase.from('team_events').select('id, team_id').in('team_id', teamIds)
+        const { data } = await supabase.from('team_events').select('id, team_id, event_type').in('team_id', teamIds)
         events = data || []
       }
       
@@ -164,9 +164,13 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
     const filteredPlayers = players.filter(p => filterByTeam(p.team_id));
     const filteredStaff = staff.filter(s => filterByTeam(s.team_id));
     
-    // Map events for attendance filtering
+    // Map events for attendance filtering and type check
     const eventTeamMap = new Map();
-    events.forEach(e => eventTeamMap.set(e.id, e.team_id));
+    const eventTypeMap = new Map();
+    events.forEach(e => {
+      eventTeamMap.set(e.id, e.team_id);
+      eventTypeMap.set(e.id, e.event_type);
+    });
 
     // Filter attendance
     const filteredAttendance = attendance.filter(a => filterByTeam(eventTeamMap.get(a.event_id)));
@@ -231,7 +235,12 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       if (name === 'goles') totalGoles += val;
       else if (name === 'tarjetas amarillas') totalAma += val;
       else if (name === 'tarjetas rojas') totalRoj += val;
-      else if (name.includes('minutos')) totalMin += val;
+      else if (name.includes('minutos')) {
+        const evType = eventTypeMap.get(row.event_id);
+        if (evType === 'Partido' || evType?.toLowerCase().includes('partido')) {
+          totalMin += val;
+        }
+      }
       else if (name.includes('rpe')) { sumRPE += val; countRPE++; }
       else if (name === 'rendimiento') { sumRen += val; countRen++; }
       
@@ -241,7 +250,12 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         if (name === 'goles') pStats.goles += val;
         else if (name === 'tarjetas amarillas') pStats.amarillas += val;
         else if (name === 'tarjetas rojas') pStats.rojas += val;
-        else if (name.includes('minutos')) pStats.minutos += val;
+        else if (name.includes('minutos')) {
+          const evType = eventTypeMap.get(row.event_id);
+          if (evType === 'Partido' || evType?.toLowerCase().includes('partido')) {
+            pStats.minutos += val;
+          }
+        }
         else if (name === 'rendimiento') { pStats.sumRen += val; pStats.countRen++; }
       }
     });
@@ -305,7 +319,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4 mb-2">
         <div className="flex items-center gap-3">
           <BarChart3 className="text-indigo-600" size={32} />
           <div>
@@ -313,13 +327,14 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             <p className="text-slate-500">Panel global de dirección deportiva con todos los indicadores.</p>
           </div>
         </div>
-        
-        {/* Tabs / Filters Section */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex bg-slate-100 p-1.5 rounded-xl w-full sm:w-auto">
+      </div>
+      
+      {/* Tabs / Filters Section */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex bg-slate-100 p-1.5 rounded-xl w-full md:w-auto">
           <button
             onClick={() => setViewMode('global')}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
               viewMode === 'global' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -328,7 +343,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           </button>
           <button
             onClick={() => setViewMode('individual')}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
               viewMode === 'individual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -338,33 +353,32 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         </div>
 
         {!fixedTeamId && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
           {/* Botón de Comparativa Histórica */}
           <Link 
             href="/dashboard/club/estadisticas/comparativa" 
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 font-semibold rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-200"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 font-semibold rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-200"
           >
             <History size={18} />
             Comparativa Histórica
           </Link>
           
           {/* Selector de Equipo */}
-        <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
-          <Filter size={18} className="text-gray-400" />
-          <select 
-            value={selectedTeamId}
-            onChange={(e) => setSelectedTeamId(e.target.value)}
-            className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
-          >
-            <option value="todos">Todos los Equipos</option>
-            {rawData.teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
+          <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
+            <Filter size={18} className="text-gray-400" />
+            <select 
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer w-full"
+            >
+              <option value="todos">Todos los Equipos</option>
+              {rawData.teams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
         )}
-      </div>
       </div>
 
       {viewMode === 'individual' && rawData ? (

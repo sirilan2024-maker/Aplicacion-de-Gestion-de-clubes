@@ -12,9 +12,7 @@ interface MinutesRow {
   playerName: string;
   teamId: string;
   teamName: string;
-  trainingMinutes: number;
   matchMinutes: number;
-  totalMinutes: number;
 }
 
 export default function MinutosPage() {
@@ -39,7 +37,7 @@ function MinutosPageContent() {
   const [teams, setTeams] = useState<{id: string, name: string}[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>(queryTeamId || "todos")
   const [loading, setLoading] = useState(true)
-  const [sortCol, setSortCol] = useState<'trainingMinutes' | 'matchMinutes' | 'totalMinutes' | 'playerName' | 'teamName'>('totalMinutes')
+  const [sortCol, setSortCol] = useState<'matchMinutes' | 'playerName' | 'teamName'>('matchMinutes')
   const [sortDesc, setSortDesc] = useState(true)
   const supabase = createClient()
 
@@ -106,7 +104,7 @@ function MinutosPageContent() {
       // 4. Fetch team events for active season to filter perf
       let events: any[] = []
       if (teamIds.length > 0) {
-        const { data } = await supabase.from('team_events').select('id').in('team_id', teamIds)
+        const { data } = await supabase.from('team_events').select('id, event_type').in('team_id', teamIds)
         events = data || []
       }
       const eventIds = (events || []).map(e => e.id)
@@ -140,14 +138,9 @@ function MinutosPageContent() {
         if (convs) matchMinutes = convs;
       }
 
-      // 5. Fetch team_events to know if it's training or match
-      const { data: perfEvents } = await supabase
-        .from('team_events')
-        .select('id, event_type')
-        .in('id', perfEventIds)
-
+      // 5c. Fetch team_events to know event types
       const eventTypeMap = new Map<string, string>()
-      perfEvents?.forEach(e => eventTypeMap.set(e.id, e.event_type))
+      events.forEach(e => eventTypeMap.set(e.id, e.event_type))
 
       const playerMap = new Map<string, MinutesRow>()
 
@@ -157,40 +150,34 @@ function MinutosPageContent() {
           playerName: `${p.first_name} ${p.last_name || ''}`.trim(),
           teamId: p.team_id,
           teamName: p.teams?.name || 'Sin equipo',
-          trainingMinutes: 0,
-          matchMinutes: 0,
-          totalMinutes: 0
+          matchMinutes: 0
         })
       })
 
+      // Sum minutes from events that are Matches
       perf.forEach(row => {
         const p = playerMap.get(row.player_id)
         if (p) {
           const type = eventTypeMap.get(row.event_id)
           const mins = row.value_number || 0
           
-          if (type === 'Entrenamiento') {
-            p.trainingMinutes += mins
-          } else if (type === 'Partido' || type?.toLowerCase().includes('partido')) {
+          if (type === 'Partido' || type?.toLowerCase().includes('partido')) {
             p.matchMinutes += mins
-          } else {
-            p.trainingMinutes += mins
           }
-          p.totalMinutes += mins
         }
       })
 
+      // Sum minutes from match convocatorias
       matchMinutes.forEach(row => {
         const p = playerMap.get(row.player_id)
         if (p) {
           const mins = row.minutes_played || 0
           p.matchMinutes += mins
-          p.totalMinutes += mins
         }
       })
 
-      // Only show players with some minutes recorded
-      const filtered = Array.from(playerMap.values()).filter(p => p.totalMinutes > 0)
+      // Only show players with some match minutes recorded
+      const filtered = Array.from(playerMap.values()).filter(p => p.matchMinutes > 0)
       
       setData(filtered)
       setLoading(false)
@@ -253,12 +240,12 @@ function MinutosPageContent() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Detalle de Minutos Jugados</h1>
-              <p className="text-slate-500">Análisis del tiempo en pista por entrenamiento y partido.</p>
+              <p className="text-slate-500">Análisis del tiempo de juego en partidos oficiales.</p>
             </div>
           </div>
         </div>
 
-        {/* Selector de Equipo - Hidden if looking at a fixed team */}
+        {/* Selector de Equipo */}
         {!queryTeamId && (
           <div className="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
             <Filter size={18} className="text-gray-400" />
@@ -283,7 +270,7 @@ function MinutosPageContent() {
         </div>
       ) : data.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-xl border border-gray-200">
-          <p className="text-slate-500 font-medium">No hay registros de minutos en la temporada.</p>
+          <p className="text-slate-500 font-medium">No hay registros de minutos de partidos en la temporada.</p>
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -304,22 +291,10 @@ function MinutosPageContent() {
                     Equipo <SortIcon col="teamName" />
                   </th>
                   <th 
-                    onClick={() => handleSort('trainingMinutes')}
-                    className="p-4 border-b border-gray-200 bg-emerald-50 text-right font-bold text-emerald-800 cursor-pointer hover:bg-emerald-100 transition-colors"
-                  >
-                    Entrenamientos (min) <SortIcon col="trainingMinutes" />
-                  </th>
-                  <th 
                     onClick={() => handleSort('matchMinutes')}
-                    className="p-4 border-b border-gray-200 bg-blue-50 text-right font-bold text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors"
-                  >
-                    Partidos (min) <SortIcon col="matchMinutes" />
-                  </th>
-                  <th 
-                    onClick={() => handleSort('totalMinutes')}
                     className="p-4 border-b border-gray-200 bg-indigo-50 text-right font-bold text-indigo-800 cursor-pointer hover:bg-indigo-100 transition-colors"
                   >
-                    Total General <SortIcon col="totalMinutes" />
+                    Minutos Jugados (min) <SortIcon col="matchMinutes" />
                   </th>
                 </tr>
               </thead>
@@ -334,21 +309,15 @@ function MinutosPageContent() {
                     <td className="p-4 text-slate-600 font-medium">
                       {row.teamName}
                     </td>
-                    <td className="p-4 text-right text-emerald-700 font-medium">
-                      {row.trainingMinutes}
-                    </td>
-                    <td className="p-4 text-right text-blue-700 font-medium">
-                      {row.matchMinutes}
-                    </td>
                     <td className="p-4 text-right font-black text-indigo-700">
-                      {row.totalMinutes}
+                      {row.matchMinutes}
                     </td>
                   </tr>
                 ))}
                 {sortedAndFilteredData.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500">
-                      Este equipo no tiene jugadores con minutos registrados.
+                    <td colSpan={3} className="p-8 text-center text-slate-500">
+                      Este equipo no tiene jugadores con minutos de partidos registrados.
                     </td>
                   </tr>
                 )}

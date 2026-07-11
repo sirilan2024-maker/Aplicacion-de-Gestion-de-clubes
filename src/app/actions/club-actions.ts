@@ -290,8 +290,11 @@ export async function updateUserRolesAction(userId: string, activeRole: string, 
     return { success: false, error: 'No tienes permisos para realizar esta acción' }
   }
 
-  // Update the user's active role and roles array
-  const { error } = await supabase
+  // Use admin client to bypass RLS for the update
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+
+  const { error } = await adminClient
     .from("profiles")
     .update({ 
       role: activeRole,
@@ -329,8 +332,11 @@ export async function switchActiveRoleAction(selectedRole: string) {
     return { success: false, error: 'No tienes este rol asignado' }
   }
 
-  // Update active role
-  const { error } = await supabase
+  // Use admin client to bypass RLS for the update
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+
+  const { error } = await adminClient
     .from("profiles")
     .update({ role: selectedRole })
     .eq("id", user.id)
@@ -343,3 +349,4 @@ export async function switchActiveRoleAction(selectedRole: string) {
   revalidatePath("/dashboard")
   return { success: true }
 }
+

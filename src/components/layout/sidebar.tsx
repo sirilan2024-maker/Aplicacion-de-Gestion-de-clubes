@@ -3,6 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { NotificationBell } from "@/components/features/notifications/NotificationBell"
 import {
   LayoutDashboard,
   CalendarDays,
@@ -192,7 +193,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
           { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
           { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
-          { name: "Disciplina", href: getHref("Disciplina", "/admin/partidos?view=disciplina"), icon: AlertTriangle },
+          { name: "Disciplina", href: getHref("Disciplina", "/dashboard/matches?view=disciplina"), icon: AlertTriangle },
           { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
         ]
       },
@@ -335,21 +336,26 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {/* ── Brand ──────────────────────────────── */}
       <div
         className={cn(
-          "h-14 flex items-center overflow-hidden shrink-0",
+          "h-14 flex items-center justify-between overflow-hidden shrink-0",
           isAdmin ? "border-b border-slate-800" : "border-b border-gray-100",
-          collapsed ? "justify-center" : "gap-2.5 px-4"
+          collapsed ? "justify-center" : "px-4"
         )}
       >
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 shadow-sm shadow-blue-200">
-          <Shield size={16} className="text-white" />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0">
-            <p className={cn("text-[14px] font-bold truncate leading-tight", isAdmin ? "text-slate-100" : "text-slate-900")}>
-              {clubName}
-            </p>
-            <p className={cn("text-[11px] truncate", isAdmin ? "text-slate-400" : "text-gray-400")}>Temp. 2024/25</p>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 shadow-sm shadow-blue-200">
+            <Shield size={16} className="text-white" />
           </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className={cn("text-[14px] font-bold truncate leading-tight", isAdmin ? "text-slate-100" : "text-slate-900")}>
+                {clubName}
+              </p>
+              <p className={cn("text-[11px] truncate", isAdmin ? "text-slate-400" : "text-gray-400")}>Temp. 2024/25</p>
+            </div>
+          )}
+        </div>
+        {!collapsed && !isAdmin && (
+          <NotificationBell />
         )}
       </div>
 

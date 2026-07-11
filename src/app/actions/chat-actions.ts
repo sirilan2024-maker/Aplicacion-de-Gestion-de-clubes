@@ -195,3 +195,93 @@ export async function sendMessageAction(channelId: string, content: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function sendDisciplineAlertAction(playerId: string, teamId: string, playerName: string, teamName: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "No autorizado" }
+
+    const { data: profile } = await supabase.from('profiles').select('club_id, role, roles').eq('id', user.id).single()
+    if (!profile) return { success: false, error: "Perfil no encontrado" }
+    
+    // Check if user is admin, superadmin, or coordinador
+    const hasAccess = ['admin', 'superadmin', 'coordinador'].includes(profile.role) || (profile.roles && profile.roles.some((r: string) => ['admin', 'superadmin', 'coordinador'].includes(r)))
+    if (!hasAccess) {
+      return { success: false, error: "No tienes permisos para enviar avisos disciplinarios" }
+    }
+
+    const adminClient = await createAdminClient()
+
+    // 1. Get or create discipline channel for this team
+    const channelName = `Avisos Disciplinarios - ${teamName}`
+    let { data: channel } = await adminClient
+      .from('chat_channels')
+      .select('*')
+      .eq('team_id', teamId)
+      .eq('name', channelName)
+      .single()
+
+    if (!channel) {
+      const { data: newChannel, error: createError } = await adminClient
+        .from('chat_channels')
+        .insert({
+          club_id: profile.club_id,
+          team_id: teamId,
+          name: channelName,
+          type: 'team'
+        })
+        .select()
+        .single()
+      
+      if (createError) throw createError
+      channel = newChannel
+    }
+
+    // 2. Send the message
+    const messageContent = `⚠️ AVISO: El jugador **${playerName}** acumula 4 tarjetas amarillas y está apercibido. La próxima amarilla conllevará un partido de sanción.`
+    const { data: message, error: messageError } = await adminClient.from('chat_messages').insert({
+      channel_id: channel.id,
+      sender_id: user.id,
+      content: messageContent
+    }).select().single()
+
+    if (messageError) throw messageError
+
+    // 3. Find coaches and coordinators for this team to send notifications
+    // Coaches of this team
+    const { data: teamCoaches } = await adminClient.from('team_coaches').select('profile_id').eq('team_id', teamId)
+    const coachIds = (teamCoaches || []).map(tc => tc.profile_id)
+    
+    // Admins and coordinators of the club
+    const { data: adminsCoords } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('club_id', profile.club_id)
+      .or('role.eq.admin,role.eq.superadmin,role.eq.coordinador,roles.cs.{"admin"},roles.cs.{"coordinador"}')
+      
+    const adminCoordIds = (adminsCoords || []).map(p => p.id)
+    
+    // Combine unique user IDs (excluding sender)
+    const targetUserIds = Array.from(new Set([...coachIds, ...adminCoordIds])).filter(id => id !== user.id)
+
+    // 4. Create notifications
+    if (targetUserIds.length > 0) {
+      const notificationsToInsert = targetUserIds.map(targetId => ({
+        club_id: profile.club_id,
+        user_id: targetId,
+        type: 'disciplina',
+        title: 'Jugador Apercibido',
+        content: `El jugador ${playerName} (${teamName}) está apercibido.`,
+        is_read: false
+      }))
+
+      const { error: notifError } = await adminClient.from('notifications').insert(notificationsToInsert)
+      if (notifError) console.error("Error inserting notifications:", notifError)
+    }
+
+    return { success: true, channelId: channel.id }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

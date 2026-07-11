@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { NotificationBell } from "@/components/features/notifications/NotificationBell"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
   Home: LayoutDashboard,
@@ -193,7 +194,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
         { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
         { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
-        { name: "Disciplina", href: getHref("Disciplina", "/admin/partidos?view=disciplina"), icon: AlertTriangle },
+        { name: "Disciplina", href: getHref("Disciplina", "/dashboard/matches?view=disciplina"), icon: AlertTriangle },
         { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
         { name: "Tesoreria", href: "/admin/tesoreria", icon: Wallet },
         { name: "Secretaria", href: "/admin/secretaria", icon: Settings },
@@ -227,6 +228,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           <span>ClubManager</span>
         </div>
         <div className="flex items-center gap-3">
+          {userRole !== 'admin' && <NotificationBell />}
           <Link href="/dashboard/mi-perfil" className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
             U
           </Link>

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck } from "lucide-react"
 import { deleteMatchAction } from "@/app/actions/match-actions"
 import { ManageMatchModal } from "./ManageMatchModal"
@@ -20,9 +20,11 @@ interface GlobalMatchesViewProps {
 
 export function GlobalMatchesView({ initialMatches, teams, players = [], convocatorias = [], fixedTeamId }: GlobalMatchesViewProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialView = (searchParams.get('view') as 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo') || 'partidos'
   const [matches, setMatches] = useState(initialMatches)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "all")
-  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'en-directo'>('partidos')
+  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'en-directo'>(initialView)
   
   const [editingMatch, setEditingMatch] = useState<any>(null)
   const [convocatoriaMatch, setConvocatoriaMatch] = useState<any>(null)
@@ -323,7 +325,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
             </div>
           </div>
           <button
-            onClick={() => router.push('/dashboard/club/estadisticas/disciplina')}
+            onClick={() => setViewMode('disciplina')}
             className="w-full sm:w-auto px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
           >
             Ver Detalles

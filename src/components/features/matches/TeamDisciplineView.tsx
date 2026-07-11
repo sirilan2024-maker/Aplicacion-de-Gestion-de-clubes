@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AlertCircle, ArrowLeft, Search } from "lucide-react"
+import { AlertCircle, ArrowLeft, Search, Bell } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { DisciplineModal } from "./DisciplineModal"
+import { sendDisciplineAlertAction } from "@/app/actions/chat-actions"
+import { createClient } from "@/lib/supabase/client"
 
 interface TeamDisciplineViewProps {
   matches: any[]
@@ -17,10 +19,56 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [localConvocatorias, setLocalConvocatorias] = useState<any[]>(convocatorias)
+  const [canSendAlerts, setCanSendAlerts] = useState(false)
+  const [alertingId, setAlertingId] = useState<string | null>(null)
 
   useEffect(() => {
     setLocalConvocatorias(convocatorias)
   }, [convocatorias])
+
+  useEffect(() => {
+    const checkRole = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+        if (profile) {
+          const hasAccess = ['admin', 'superadmin', 'coordinador'].includes(profile.role) || (profile.roles && profile.roles.some((r: string) => ['admin', 'superadmin', 'coordinador'].includes(r)))
+          setCanSendAlerts(hasAccess)
+        }
+      }
+    }
+    checkRole()
+  }, [])
+
+  const handleAvisarEntrenador = async (e: React.MouseEvent, player: any) => {
+    e.stopPropagation()
+    const pTeamId = player.team_id || teamId
+    if (pTeamId === 'all') {
+      alert("No se puede determinar el equipo del jugador.")
+      return
+    }
+    
+    setAlertingId(player.id)
+    try {
+      const res = await sendDisciplineAlertAction(
+        player.id, 
+        pTeamId, 
+        `${player.first_name} ${player.last_name}`, 
+        player.teams?.name || "Equipo"
+      )
+      
+      if (res.success) {
+        alert("Aviso enviado correctamente al entrenador.")
+      } else {
+        alert("Error al enviar el aviso: " + res.error)
+      }
+    } catch (err) {
+      alert("Error inesperado.")
+    } finally {
+      setAlertingId(null)
+    }
+  }
 
   // Filtrar jugadores válidos (del equipo actual y sin cuerpo técnico)
   const validPlayers = players.filter(p => {
@@ -141,14 +189,25 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
               </p>
               <div className="flex flex-wrap gap-2">
                 {disciplineData.filter(d => d.cycleCards === 4).map(a => (
-                  <button 
-                    key={a.player.id} 
-                    onClick={() => handleOpenModal(a.player.id)}
-                    className="bg-white border border-orange-300 text-orange-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-1.5"
-                  >
-                    <div className="w-2 h-3 bg-amber-400 rounded-sm"></div>
-                    {a.player.first_name} {a.player.last_name}
-                  </button>
+                  <div key={a.player.id} className="flex items-center gap-0">
+                    <button 
+                      onClick={() => handleOpenModal(a.player.id)}
+                      className="bg-white border border-orange-300 text-orange-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-1.5"
+                    >
+                      <div className="w-2 h-3 bg-amber-400 rounded-sm"></div>
+                      {a.player.first_name} {a.player.last_name}
+                    </button>
+                    {canSendAlerts && (
+                      <button
+                        onClick={(e) => handleAvisarEntrenador(e, a.player)}
+                        disabled={alertingId === a.player.id}
+                        className="bg-white border border-slate-200 text-slate-600 hover:text-blue-600 text-xs px-2 py-1 rounded-full shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-1 -ml-1 disabled:opacity-50 z-10"
+                        title="Avisar al entrenador"
+                      >
+                        <Bell size={12} className={alertingId === a.player.id ? "animate-pulse" : ""} />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -219,9 +278,21 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <span className="text-blue-600 font-bold text-xs uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-1">
-                    Ver <ArrowLeft size={14} className="rotate-180" />
-                  </span>
+                  <div className="flex items-center justify-end gap-3">
+                    {canSendAlerts && d.cycleCards === 4 && (
+                      <button
+                        onClick={(e) => handleAvisarEntrenador(e, d.player)}
+                        disabled={alertingId === d.player.id}
+                        className="text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-50 p-1.5 hover:bg-blue-50 rounded-full"
+                        title="Avisar al entrenador"
+                      >
+                        <Bell size={16} className={alertingId === d.player.id ? "animate-pulse" : ""} />
+                      </button>
+                    )}
+                    <span className="text-blue-600 font-bold text-xs uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-1">
+                      Ver <ArrowLeft size={14} className="rotate-180" />
+                    </span>
+                  </div>
                 </td>
               </tr>
             ))}

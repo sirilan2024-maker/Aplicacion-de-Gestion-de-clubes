@@ -10,6 +10,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [hasUnread, setHasUnread] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export function NotificationBell() {
     const res = await getUnreadNotificationsAction()
     if (res.success && res.data) {
       setNotifications(res.data)
+      setHasUnread(res.data.length > 0)
     }
   }
 
@@ -57,10 +59,15 @@ export function NotificationBell() {
     <div className="relative">
       <button 
         type="button"
-        onClick={(e) => {
+        onClick={async (e) => {
           e.preventDefault();
           e.stopPropagation();
-          setIsOpen(!isOpen);
+          const nextOpen = !isOpen;
+          setIsOpen(nextOpen);
+          if (nextOpen && hasUnread) {
+            setHasUnread(false);
+            await markAllNotificationsAsReadAction();
+          }
         }}
         className="relative p-2 transition-transform hover:scale-105 rounded-full hover:bg-white/10"
       >
@@ -68,7 +75,7 @@ export function NotificationBell() {
         <div className="w-[18px] h-[24px] bg-[#fcd34d] rounded-[3px] border border-[#d97706] shadow-sm flex items-center justify-center">
           <div className="w-[6px] h-[6px] rounded-full bg-white/40"></div>
         </div>
-        {notifications.length > 0 && (
+        {hasUnread && (
           <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-600 rounded-full animate-pulse border-2 border-slate-900"></span>
         )}
       </button>

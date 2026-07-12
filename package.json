@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",
+    "@hookform/resolvers": "^5.4.0",
     "@serwist/next": "^9.5.11",
     "@stripe/stripe-js": "^9.6.0",
     "@supabase/ssr": "^0.10.3",
@@ -30,11 +31,13 @@
     "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-hook-form": "^7.81.0",
     "react-hot-toast": "^2.4.0",
     "recharts": "^3.8.1",
     "serwist": "^9.5.11",
     "stripe": "^22.1.1",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

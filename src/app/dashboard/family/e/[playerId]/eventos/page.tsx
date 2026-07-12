@@ -36,8 +36,8 @@ export default function FamilyEventsPage() {
           .from('team_events')
           .select('*')
           .eq('team_id', pData.team_id)
-          .eq('event_type', 'otro')
-          .order('event_date', { ascending: false });
+          .in('event_type', ['Otro', 'Reunión'])
+          .order('date', { ascending: false });
 
         if (tError) throw tError;
         setEvents(tData || []);
@@ -78,7 +78,7 @@ export default function FamilyEventsPage() {
         ) : (
           <div className="divide-y divide-gray-50">
             {events.map((e) => {
-              const date = new Date(e.event_date);
+              const date = new Date(e.date);
               return (
                 <div key={e.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-4">

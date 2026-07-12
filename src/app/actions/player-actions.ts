@@ -17,30 +17,50 @@ export async function createFamilyAndPlayerAction(playerData: any, familyAuthDat
 
     const clubId = profile.club_id
     let familyProfileId = null
+    let isExistingUser = false
 
     // 1. Crear el usuario de la familia si se proporcionan datos de auth
     if (familyAuthData?.email && familyAuthData?.password) {
       const adminClient = createAdminClient()
       
-      const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-        email: familyAuthData.email,
-        password: familyAuthData.password,
-        email_confirm: true // Saltamos la validación
-      })
+      // Verificar si ya existe un perfil con ese correo electrónico
+      const { data: existingProfile } = await adminClient
+        .from('profiles')
+        .select('id, club_id')
+        .eq('email', familyAuthData.email)
+        .maybeSingle()
 
-      if (authError) {
-        return { success: false, error: "Error creando cuenta: " + authError.message }
-      }
-
-      if (authUser?.user) {
-        familyProfileId = authUser.user.id
-        // Upsert del perfil familiar
-        await adminClient.from('profiles').upsert({
-          id: familyProfileId,
-          club_id: clubId,
+      if (existingProfile) {
+        familyProfileId = existingProfile.id
+        isExistingUser = true
+        // Si no tiene club_id, asociarlo con este club
+        if (!existingProfile.club_id) {
+          await adminClient
+            .from('profiles')
+            .update({ club_id: clubId })
+            .eq('id', familyProfileId)
+        }
+      } else {
+        const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
           email: familyAuthData.email,
-          role: 'family'
+          password: familyAuthData.password,
+          email_confirm: true // Saltamos la validación
         })
+
+        if (authError) {
+          return { success: false, error: "Error creando cuenta: " + authError.message }
+        }
+
+        if (authUser?.user) {
+          familyProfileId = authUser.user.id
+          // Upsert del perfil familiar
+          await adminClient.from('profiles').upsert({
+            id: familyProfileId,
+            club_id: clubId,
+            email: familyAuthData.email,
+            role: 'family'
+          })
+        }
       }
     }
 
@@ -91,7 +111,7 @@ export async function createFamilyAndPlayerAction(playerData: any, familyAuthDat
       success: true, 
       playerId: insertedPlayer.id, 
       linkCode,
-      familyCreated: !!familyProfileId
+      familyCreated: !!familyProfileId && !isExistingUser
     }
 
   } catch (err: any) {

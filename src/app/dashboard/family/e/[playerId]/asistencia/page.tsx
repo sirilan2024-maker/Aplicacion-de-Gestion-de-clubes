@@ -35,7 +35,7 @@ export default function FamilyAttendancePage() {
       // Fetch attendance records for this player
       const { data: attData, error: attError } = await supabase
         .from('attendance')
-        .select('status, is_excused, notes, team_events(title, event_date, event_type)')
+        .select('status, is_excused, notes, team_events(title, date, event_type)')
         .eq('player_id', playerId)
         .order('created_at', { ascending: false });
 
@@ -113,7 +113,7 @@ export default function FamilyAttendancePage() {
         ) : (
           <div className="divide-y divide-gray-50">
             {attendanceRecords.map((record, i) => {
-              const eventDate = new Date(record.team_events?.event_date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+              const eventDate = new Date(record.team_events?.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
               let statusColor = "bg-gray-100 text-gray-600";
               let StatusIcon = Clock;
               if (record.status === 'Presente') { statusColor = "bg-green-100 text-green-700"; StatusIcon = CheckCircle2; }

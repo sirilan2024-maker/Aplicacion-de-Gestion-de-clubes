@@ -250,7 +250,7 @@ function AddPlayerModal({ open, onClose, onSuccess, clubId, teams }: { open: boo
         setSuccessData({
           linkCode: result.linkCode,
           email: email,
-          password: createFamilyAccount ? familyPassword : undefined
+          password: (createFamilyAccount && result.familyCreated) ? familyPassword : undefined
         });
       } else {
         onClose();

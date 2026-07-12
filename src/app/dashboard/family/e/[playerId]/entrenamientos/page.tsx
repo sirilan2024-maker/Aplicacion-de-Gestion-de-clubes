@@ -36,8 +36,8 @@ export default function FamilyTrainingsPage() {
           .from('team_events')
           .select('*')
           .eq('team_id', pData.team_id)
-          .eq('event_type', 'entrenamiento')
-          .order('event_date', { ascending: false });
+          .eq('event_type', 'Entrenamiento')
+          .order('date', { ascending: false });
 
         if (tError) throw tError;
         setTrainings(tData || []);
@@ -78,7 +78,7 @@ export default function FamilyTrainingsPage() {
         ) : (
           <div className="divide-y divide-gray-50">
             {trainings.map((t) => {
-              const date = new Date(t.event_date);
+              const date = new Date(t.date);
               return (
                 <div key={t.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-4">

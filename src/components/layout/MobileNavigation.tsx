@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Activity,
   AlertTriangle,
+  Shirt,
   Database,
   User,
   Swords,
@@ -33,6 +34,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { NotificationBell } from "@/components/features/notifications/NotificationBell"
+import { switchActiveRoleAction } from "@/app/actions/club-actions"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
   Home: LayoutDashboard,
@@ -71,6 +73,10 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   // Detect active team context
   const match = pathname.match(/^\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
   const activeTeamId = match ? match[1] : null
+
+  // Detect active family player context
+  const familyMatch = pathname.match(/^\/dashboard\/family\/e\/([a-zA-Z0-9-]+)/)
+  const activeFamilyPlayerId = familyMatch ? familyMatch[1] : null
 
   useEffect(() => {
     const fetchData = async () => {
@@ -144,6 +150,13 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       { name: "Asistencia", href: `/dashboard/equipos/${activeTeamId}/asistencia`, icon: ClipboardCheck },
       { name: "Rend.", href: `/dashboard/equipos/${activeTeamId}/rendimiento`, icon: Activity },
     ]
+  } else if (activeFamilyPlayerId) {
+    bottomLinks = [
+      { name: "Plantilla", href: `/dashboard/family/e/${activeFamilyPlayerId}/plantilla`, icon: Users },
+      { name: "Partidos", href: `/dashboard/family/e/${activeFamilyPlayerId}/partidos`, icon: Trophy },
+      { name: "Asistencia", href: `/dashboard/family/e/${activeFamilyPlayerId}/asistencia`, icon: ClipboardCheck },
+      { name: "Mi Perfil", href: `/dashboard/family/e/${activeFamilyPlayerId}/perfil`, icon: User },
+    ]
   } else {
     // Si no estamos en equipo, usamos las rutas generales
     if (userRole === 'admin') {
@@ -181,6 +194,15 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       { name: "Estadísticas", href: `/dashboard/equipos/${activeTeamId}/estadisticas`, icon: BarChart3 },
       { name: "Mensajes", href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
     ]
+  } else if (activeFamilyPlayerId) {
+    secondaryLinks = [
+      { name: "Volver a Inicio", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Eventos", href: `/dashboard/family/e/${activeFamilyPlayerId}/eventos`, icon: CalendarDays },
+      { name: "Entrenamientos", href: `/dashboard/family/e/${activeFamilyPlayerId}/entrenamientos`, icon: Target },
+      { name: "Equipación/Ropa", href: `/dashboard/family/e/${activeFamilyPlayerId}/ropa`, icon: Shirt },
+      { name: "Ficha Técnica", href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },
+      { name: "Mensajes", href: `/dashboard/family/e/${activeFamilyPlayerId}/mensajes`, icon: MessageSquare },
+    ]
   } else {
     // Todos los de la DB que NO estén ya en el bottom bar
     const bottomHrefs = bottomLinks.map(b => b.href);
@@ -217,6 +239,11 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     if (!bottomHrefs.includes("/dashboard/mi-perfil") && !secondaryLinks.some(s => s.href === "/dashboard/mi-perfil")) {
        secondaryLinks.push({ name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings });
     }
+
+    const isStaff = userRole === 'admin' || userRole === 'coordinador' || userRole === 'utillero';
+    if (isStaff && !secondaryLinks.some(s => s.href === "/dashboard/utilleria")) {
+      secondaryLinks.push({ name: "Utillería", href: "/dashboard/utilleria", icon: Shirt });
+    }
     }
     
   return (
@@ -228,7 +255,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           <span>ClubManager</span>
         </div>
         <div className="flex items-center gap-3">
-          {userRole !== 'admin' && <NotificationBell />}
+          {(userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') && <NotificationBell />}
           <Link href="/dashboard/mi-perfil" className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
             U
           </Link>
@@ -289,10 +316,20 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                     const newRole = e.target.value;
                     if (newRole && newRole !== userRole) {
                       setMenuOpen(false);
-                      const { switchActiveRoleAction } = await import("@/app/actions/club-actions");
+                      setUserRole(newRole); // Update state immediately to prevent hook mismatch
                       const res = await switchActiveRoleAction(newRole);
                       if (res.success) {
-                        window.location.href = '/dashboard';
+                        let targetUrl = '/dashboard';
+                        if (newRole === 'admin' || newRole === 'coordinador') {
+                          targetUrl = '/dashboard/equipos';
+                        } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
+                          targetUrl = '/dashboard/mis-equipos';
+                        } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {
+                          targetUrl = '/dashboard/family';
+                        } else {
+                          targetUrl = '/dashboard/mi-perfil';
+                        }
+                        window.location.href = targetUrl;
                       } else {
                         alert('Error al cambiar de rol: ' + res.error);
                       }

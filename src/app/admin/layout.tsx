@@ -1,5 +1,6 @@
 import React from "react"
 import { Sidebar } from "@/components/layout/sidebar"
+import { MobileNavigation } from "@/components/layout/MobileNavigation"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { signOut } from "@/lib/auth-actions"
@@ -28,11 +29,15 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+    <div className="flex min-h-screen flex-col md:flex-row bg-slate-50 md:bg-gray-50 overflow-hidden font-sans">
       <div className="hidden md:flex">
         <Sidebar signOutAction={signOut} />
       </div>
-      <main className="flex-1 overflow-y-auto relative">
+
+      {/* Mobile Navigation (App-like) */}
+      <MobileNavigation signOutAction={signOut} />
+
+      <main className="flex-1 overflow-y-auto relative pb-16 md:pb-0 w-full">
         {/* We can add a top navbar here if needed later */}
         {children}
       </main>

@@ -159,3 +159,58 @@ export async function getSignedDniUrlAction(filePath: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function listPlayerDocumentsAction(playerId: string) {
+  try {
+    const supabaseAdmin = await createAdminClient();
+    
+    // Lista todos los archivos en la carpeta del jugador (asumiendo que la ruta es {playerId}/...)
+    const { data: files, error: listError } = await supabaseAdmin
+      .storage
+      .from('documentos-dni')
+      .list(playerId, {
+        limit: 100,
+        offset: 0,
+        sortBy: { column: 'name', order: 'asc' },
+      });
+
+    if (listError) {
+      throw listError;
+    }
+
+    if (!files || files.length === 0) {
+      return { success: true, documents: [] };
+    }
+
+    // Filtra las carpetas (Supabase a veces devuelve '.' como placeholder o subcarpetas)
+    const validFiles = files.filter(f => f.name !== '.emptyFolderPlaceholder' && f.metadata);
+
+    const documents = await Promise.all(
+      validFiles.map(async (file) => {
+        const filePath = `${playerId}/${file.name}`;
+        const { data: signedData, error: signedError } = await supabaseAdmin
+          .storage
+          .from('documentos-dni')
+          .createSignedUrl(filePath, 900); // 15 minutos
+
+        if (signedError || !signedData) {
+          return null; // Omitimos si falla
+        }
+
+        return {
+          name: file.name,
+          url: signedData.signedUrl,
+          size: file.metadata?.size || 0,
+          created_at: file.created_at
+        };
+      })
+    );
+
+    // Quitamos los nulos
+    const filteredDocuments = documents.filter(doc => doc !== null);
+
+    return { success: true, documents: filteredDocuments };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

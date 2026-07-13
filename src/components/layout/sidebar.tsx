@@ -29,7 +29,8 @@ import {
   Swords,
   Brain,
   Globe,
-  Timer
+  Timer,
+  FolderOpen
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -47,7 +48,8 @@ const IconMap: Record<string, React.ComponentType<any>> = {
   Wallet: Wallet,
   Brain: Brain,
   Globe: Globe,
-  Timer: Timer
+  Timer: Timer,
+  FolderOpen: FolderOpen
 }
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
@@ -245,6 +247,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         items: [
           { name: "Tesoreria", href: "/admin/tesoreria", icon: Wallet },
           { name: "Secretaria", href: "/admin/secretaria", icon: Settings },
+          { name: "Gestor Documental", href: "/dashboard/inscripciones/documentos", icon: FolderOpen },
           { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
           { name: "Configuracion de roles", href: "/admin/configuracion/roles", icon: Shield },
           { name: "Temporadas", href: "/admin/temporadas", icon: Timer },

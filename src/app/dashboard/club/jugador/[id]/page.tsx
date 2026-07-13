@@ -6,10 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
+import { DocumentManager } from "@/components/features/admin/DocumentManager";
 
 interface PlayerData {
   id: string;
@@ -51,7 +52,7 @@ export default function GlobalPlayerProfilePage() {
 
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos'>('info');
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -77,7 +78,7 @@ export default function GlobalPlayerProfilePage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab === 'info' || tab === 'medico' || tab === 'stats' || tab === 'asistencia' || tab === 'disciplina') {
+      if (tab === 'info' || tab === 'medico' || tab === 'stats' || tab === 'asistencia' || tab === 'disciplina' || tab === 'documentos') {
         setActiveTab(tab);
       }
       const view = params.get('view');
@@ -484,6 +485,7 @@ export default function GlobalPlayerProfilePage() {
             {!esEntrenador && <option value="stats">Estadísticas</option>}
             {!esEntrenador && <option value="asistencia">Asistencia</option>}
             {!esEntrenador && <option value="disciplina">Disciplina</option>}
+            {!esEntrenador && <option value="documentos">Documentos</option>}
           </select>
         </div>
 
@@ -530,6 +532,14 @@ export default function GlobalPlayerProfilePage() {
                 }`}
               >
                 <AlertTriangle size={18} /> Disciplina
+              </button>
+              <button 
+                onClick={() => setActiveTab('documentos')}
+                className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'documentos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <FolderOpen size={18} /> Documentos
               </button>
             </>
           )}
@@ -1342,6 +1352,24 @@ function DisciplineTab({ playerId }: { playerId: string }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* PESTAÑA: DOCUMENTOS */}
+        {activeTab === 'documentos' && !esEntrenador && (
+          <div className="space-y-6">
+            <div className="border-b pb-4 mb-4">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <FolderOpen className="w-6 h-6 text-blue-600" />
+                Documentación del Jugador
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Archivos y certificados asociados al expediente de {player.first_name}.</p>
+            </div>
+            
+            <DocumentManager 
+              playerId={player.id} 
+              playerName={`${player.first_name} ${player.last_name}`} 
+            />
           </div>
         )}
       </div>

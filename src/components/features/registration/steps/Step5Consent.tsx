@@ -124,7 +124,7 @@ export function Step5Consent() {
               }
             }}
             disabled={!legalRead[id]}
-            className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600 disabled:opacity-50" 
+            className="checked:bg-green-600 checked:border-green-600 disabled:opacity-50 cursor-pointer" 
           />
           {/* Hidden inputs to register with RHF */}
           <input type="hidden" {...register(fieldName)} />

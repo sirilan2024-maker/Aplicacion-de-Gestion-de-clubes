@@ -12,14 +12,14 @@ export interface CheckboxProps
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   ({ className, onCheckedChange, ...props }, ref) => {
     return (
-      <div className={cn("relative flex items-center justify-center", className)}>
+      <div className="relative flex items-center justify-center">
         <input
           type="checkbox"
           ref={ref}
           onChange={(e) => onCheckedChange?.(e.target.checked)}
           className={cn(
-            "peer h-4 w-4 shrink-0 rounded-sm border border-slate-200 border-slate-900 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-            "appearance-none",
+            "peer h-4 w-4 shrink-0 rounded-sm border border-slate-300 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "appearance-none checked:bg-blue-600 checked:border-blue-600 transition-colors cursor-pointer",
             className
           )}
           {...props}

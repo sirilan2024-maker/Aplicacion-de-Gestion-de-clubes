@@ -307,6 +307,14 @@ export async function updateUserRolesAction(userId: string, activeRole: string, 
     return { success: false, error: error.message }
   }
 
+  // FASE 3: Auditoría Interna de Control de Roles
+  await adminClient.from("auditoria_roles").insert({
+    admin_id: user.id,
+    usuario_afectado_id: userId,
+    rol_anterior: currentProfile?.role || 'unknown',
+    rol_nuevo: activeRole
+  })
+
   revalidatePath("/dashboard/club/miembros")
   return { success: true }
 }

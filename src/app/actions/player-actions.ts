@@ -431,3 +431,33 @@ export async function getClubStaffAction(clubId: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function revokeImageConsentAction(playerId: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "No autenticado" }
+
+    // Captura estricta legal RGPD para revocación
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'IP desconocida';
+    const timestamp = new Date().toISOString();
+
+    // Actualizar solo si el usuario actual es el tutor
+    const { error } = await supabase
+      .from('players')
+      .update({
+        consent_image: false,
+        consent_image_at: timestamp,
+        consent_ip: ip
+      })
+      .eq('id', playerId)
+      .eq('tutor_id', user.id);
+
+    if (error) throw error;
+    
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

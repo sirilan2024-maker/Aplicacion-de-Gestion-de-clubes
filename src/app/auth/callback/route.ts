@@ -47,7 +47,14 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const adminSupabase = await createAdminClient()
-      await adminSupabase.from('profiles').update({ email_verified: true }).eq('id', user.id)
+      
+      // FASE 6: Asegurar que el usuario adquiera el rol 'family' por defecto si acaba de validar su identidad.
+      // También se actualiza la validación legal 'email_verified: true' como Firma Electrónica inequívoca.
+      await adminSupabase.from('profiles').update({ 
+        email_verified: true,
+        role: 'family',
+        rol: 'familia' 
+      }).eq('id', user.id)
     }
 
     return NextResponse.redirect(

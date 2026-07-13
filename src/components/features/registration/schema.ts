@@ -43,13 +43,12 @@ export const registrationSchema = z.object({
   sponsorCompanyName: z.string().optional(),
   sponsorContactName: z.string().optional(),
   sponsorPhone: z.string().optional(),
-  // Firmas legales (timestamps se generarán en el servidor o onSubmit)
-  consentInscription: z.boolean().refine(val => val === true, "Debes aceptar la inscripción"),
+  // Firmas legales obligatorias
   consentRgpd: z.boolean().refine(val => val === true, "Debes aceptar la política de privacidad"),
-  consentImage: z.boolean().refine(val => val === true, "Debes aceptar la cesión de derechos de imagen"),
-  consentVideo: z.boolean().refine(val => val === true, "Debes aceptar la cesión de derechos de vídeo"),
-  consentWhatsapp: z.boolean().refine(val => val === true, "Debes aceptar las comunicaciones por WhatsApp"),
-  consentMedical: z.boolean().refine(val => val === true, "Debes aceptar la autorización médica"),
+  consentTutela: z.boolean().refine(val => val === true, "Debes firmar la declaración de tutela"),
+  consentMedical: z.boolean().refine(val => val === true, "Debes aceptar el tratamiento de datos médicos"),
+  // Firmas opcionales
+  consentImage: z.boolean().default(false),
 
 }).superRefine((data, ctx) => {
   // Lógica de validación dinámica: Si es menor, tutores son obligatorios

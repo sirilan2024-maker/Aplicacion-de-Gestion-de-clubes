@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LegalModal } from "@/components/ui/LegalModal";
+import { getSignedDniUrlAction } from "@/app/actions/secretaria-actions";
 
 // Tipos para el estado simulado
 type InscriptionStatus = 'pending_revision' | 'request_correction' | 'pending_payment' | 'formalized';
@@ -64,6 +65,22 @@ export function InscriptionsAdminPanel() {
     setRejectionModalOpen(false);
     setRejectionReason("");
     setSelectedPlayer(null);
+  };
+
+  const handleViewDni = async (playerId: string) => {
+    // Simulamos la ruta del archivo DNI por jugador. En la BD real estaría en player_documents.
+    const mockFilePath = `${playerId}/dni-frente.jpg`;
+    
+    try {
+      const res = await getSignedDniUrlAction(mockFilePath);
+      if (res.success && res.signedUrl) {
+        window.open(res.signedUrl, '_blank');
+      } else {
+        alert("Error al cargar DNI: " + res.error);
+      }
+    } catch (e) {
+      alert("Error de conexión");
+    }
   };
 
   const getStatusBadge = (status: InscriptionStatus) => {
@@ -130,6 +147,9 @@ export function InscriptionsAdminPanel() {
                     
                     {item.status === 'pending_revision' && (
                       <>
+                        <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleViewDni(item.id)}>
+                          <FileText className="w-4 h-4 mr-1" /> Ver DNI
+                        </Button>
                         <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => openRejection(item.id)}>
                           <XCircle className="w-4 h-4 mr-1" /> Rechazar Doc.
                         </Button>

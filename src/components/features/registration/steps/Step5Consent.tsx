@@ -1,69 +1,55 @@
 import React, { useState } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
-import { ShieldCheck, HeartHandshake, UploadCloud } from "lucide-react";
+import { useFormContext } from "react-hook-form";
+import { ShieldCheck, HeartHandshake, UploadCloud, Info } from "lucide-react";
 import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { LegalModal } from "@/components/ui/LegalModal";
 
-type LegalItem = 'inscripcion' | 'rgpd' | 'imagen' | 'video' | 'whatsapp' | 'sanitaria';
+type LegalItem = 'rgpd' | 'tutela' | 'medical' | 'imagen';
 
 const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }> = {
-  inscripcion: {
-    title: "Solicitud de Inscripción",
-    content: (
-      <div className="space-y-4 text-sm">
-        <p>Solicito la inscripción en el CLUB SPORTING SALADAR para la temporada actual, comprometiéndome a acatar los reglamentos y normativas de régimen interno del club.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
-      </div>
-    )
-  },
   rgpd: {
-    title: "Política de Privacidad (RGPD)",
+    title: "Política de Privacidad (RGPD y LOPDGDD)",
     content: (
       <div className="space-y-4 text-sm">
         <p><strong>Responsable:</strong> CLUB SPORTING SALADAR<br />
         <strong>CIF:</strong> G03671971<br />
         <strong>Domicilio:</strong> La Cruz, 7 - Saladar (Almoradí, Alicante, C.P. 03160)<br />
         <strong>Email:</strong> csportingsaladar@gmail.com | <strong>Tel:</strong> 672463398</p>
-        <p>De conformidad con el Reglamento (UE) 2016/679 y la LOPDGDD 3/2018, los datos personales recogidos serán tratados para la gestión deportiva, administrativa y contable del club.</p>
-        <p>Los datos no serán cedidos a terceros salvo obligación legal (Federaciones, Seguros Médicos). Puede ejercer sus derechos de acceso, rectificación, supresión y portabilidad escribiendo a nuestro email.</p>
+        <p>De conformidad con el Reglamento (UE) 2016/679 (RGPD) y la LOPDGDD 3/2018, los datos personales recogidos serán tratados de forma estrictamente confidencial para la gestión deportiva, administrativa, federativa y contable del club.</p>
+        <p>Los datos no serán cedidos a terceros salvo obligación legal (Federaciones deportivas, Mutuas o Seguros Médicos). Puede ejercer en cualquier momento sus derechos de acceso, rectificación, supresión, limitación y portabilidad escribiendo a nuestro email.</p>
+        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
+      </div>
+    )
+  },
+  tutela: {
+    title: "Declaración de Tutela y Aceptación Normativa",
+    content: (
+      <div className="space-y-4 text-sm">
+        <p>Declaro bajo mi responsabilidad que soy mayor de edad y ostento la patria potestad o tutela legal del menor inscrito, o bien soy el propio jugador mayor de edad.</p>
+        <p>Solicito formalmente la inscripción en el CLUB SPORTING SALADAR para la temporada en vigor. Al realizar esta solicitud, declaro conocer y aceptar íntegramente los estatutos, el reglamento de régimen interno y las normativas deportivas y disciplinarias del club.</p>
+        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
+      </div>
+    )
+  },
+  medical: {
+    title: "Tratamiento de Datos Médicos Especiales",
+    content: (
+      <div className="space-y-4 text-sm">
+        <p>Otorgo mi consentimiento expreso para que el club trate los datos de salud (alergias, enfermedades crónicas, lesiones) declarados, con la única finalidad de proteger la integridad física del jugador durante la práctica deportiva.</p>
+        <p>Asimismo, autorizo al cuerpo técnico y responsables del club a realizar el traslado urgente a un centro médico en caso de accidente o lesión, así como a consentir intervenciones médicas de urgencia extrema si no fuera posible localizar a los familiares de manera inmediata.</p>
         <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
       </div>
     )
   },
   imagen: {
-    title: "Cesión de Derechos de Imagen",
+    title: "Cesión de Derechos de Imagen (Opcional)",
     content: (
       <div className="space-y-4 text-sm">
-        <p>Autorizo al Club a la toma de fotografías durante la actividad deportiva (entrenamientos, partidos, torneos) para su publicación en medios oficiales (web, redes sociales, carteles) con el único fin de promocionar al club, sin fines comerciales hacia terceros.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
-      </div>
-    )
-  },
-  video: {
-    title: "Grabación y Difusión de Vídeo",
-    content: (
-      <div className="space-y-4 text-sm">
-        <p>Autorizo la grabación en vídeo de partidos y entrenamientos con fines técnicos, tácticos y promocionales, incluyendo posibles retransmisiones de eventos deportivos donde participe el jugador.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
-      </div>
-    )
-  },
-  whatsapp: {
-    title: "Comunicaciones Oficiales por WhatsApp",
-    content: (
-      <div className="space-y-4 text-sm">
-        <p>Autorizo la inclusión de mi número de teléfono móvil en las listas de difusión o grupos de WhatsApp gestionados por los entrenadores, coordinadores o directiva del club, exclusivamente para comunicaciones deportivas, horarios y avisos oficiales.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
-      </div>
-    )
-  },
-  sanitaria: {
-    title: "Autorización de Traslado Médico",
-    content: (
-      <div className="space-y-4 text-sm">
-        <p>Autorizo al cuerpo técnico y responsables del club a realizar el traslado urgente a un centro médico en caso de accidente o lesión durante la práctica deportiva, así como a consentir intervenciones médicas de urgencia extrema si no fuera posible localizar a los familiares de manera inmediata.</p>
+        <p>De acuerdo con la Ley Orgánica 1/1982 sobre protección del derecho al honor, a la intimidad personal y familiar y a la propia imagen, <strong>autorizo</strong> al Club a la captación de fotografías y vídeos del jugador durante la actividad deportiva oficial (entrenamientos, partidos, torneos).</p>
+        <p>Dichas imágenes podrán ser publicadas en los medios de comunicación oficiales del club (página web, redes sociales institucionales y cartelería) con el <strong>único y exclusivo fin de promocionar las actividades deportivas y sociales del club</strong>, sin fines lucrativos ni comerciales hacia terceros.</p>
+        <p>Este consentimiento es revocable en cualquier momento desde su perfil de usuario.</p>
         <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
       </div>
     )
@@ -76,40 +62,34 @@ export function Step5Consent() {
 
   // Estados locales para saber si se ha leído el modal y habilitar el checkbox
   const [legalRead, setLegalRead] = useState<Record<LegalItem, boolean>>({
-    inscripcion: false,
     rgpd: false,
-    imagen: false,
-    video: false,
-    whatsapp: false,
-    sanitaria: false
+    tutela: false,
+    medical: false,
+    imagen: false
   });
 
   const handleLegalAccept = () => {
     if (activeLegalModal) {
       setLegalRead(prev => ({...prev, [activeLegalModal]: true}));
       // Enlazar con React Hook Form
-      if (activeLegalModal === 'inscripcion') setValue("consentInscription", true, { shouldValidate: true });
       if (activeLegalModal === 'rgpd') setValue("consentRgpd", true, { shouldValidate: true });
+      if (activeLegalModal === 'tutela') setValue("consentTutela", true, { shouldValidate: true });
+      if (activeLegalModal === 'medical') setValue("consentMedical", true, { shouldValidate: true });
       if (activeLegalModal === 'imagen') setValue("consentImage", true, { shouldValidate: true });
-      if (activeLegalModal === 'video') setValue("consentVideo", true, { shouldValidate: true });
-      if (activeLegalModal === 'whatsapp') setValue("consentWhatsapp", true, { shouldValidate: true });
-      if (activeLegalModal === 'sanitaria') setValue("consentMedical", true, { shouldValidate: true });
       setActiveLegalModal(null);
     }
   };
 
   const getFieldId = (id: LegalItem) => {
     switch (id) {
-      case 'inscripcion': return 'consentInscription';
       case 'rgpd': return 'consentRgpd';
+      case 'tutela': return 'consentTutela';
+      case 'medical': return 'consentMedical';
       case 'imagen': return 'consentImage';
-      case 'video': return 'consentVideo';
-      case 'whatsapp': return 'consentWhatsapp';
-      case 'sanitaria': return 'consentMedical';
     }
   };
 
-  const renderConsentBox = (id: LegalItem, title: string, subtitle: string, error?: string) => {
+  const renderConsentBox = (id: LegalItem, title: string, subtitle: string, error?: string, optional = false) => {
     const fieldName = getFieldId(id) as keyof RegistrationFormData;
     const isChecked = watch(fieldName) === true;
     
@@ -131,19 +111,19 @@ export function Step5Consent() {
         </div>
         <div className="space-y-1 w-full">
           <p className="text-sm font-bold text-gray-900 flex flex-wrap items-center gap-2">
-            <span>{title} <span className="text-red-500">*</span></span>
+            <span>{title} {!optional && <span className="text-red-500">*</span>}</span>
             {!legalRead[id] && (
               <button type="button" onClick={() => setActiveLegalModal(id)} className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors">
                 Leer documento
               </button>
             )}
           </p>
-        <p className="text-xs text-gray-500">{subtitle}</p>
-        {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+          <p className="text-xs text-gray-500">{subtitle}</p>
+          {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -189,16 +169,39 @@ export function Step5Consent() {
             <ShieldCheck className="w-6 h-6 text-green-600" />
             Consentimientos y Legal
           </h3>
-          <p className="text-sm text-gray-500 mt-1">Lectura y aceptación obligatoria. Las firmas se registrarán con su respectiva marca de tiempo para cumplir el RGPD.</p>
+          <p className="text-sm text-gray-500 mt-1">Lectura y aceptación obligatoria. Las firmas se registrarán con su respectiva IP y marca de tiempo (Firma Electrónica Simple) para cumplir el RGPD.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {renderConsentBox('inscripcion', 'Solicitud de Inscripción', 'Acato la normativa del club', errors.consentInscription?.message)}
-          {renderConsentBox('rgpd', 'Política de Privacidad', 'Tratamiento de datos personales', errors.consentRgpd?.message)}
-          {renderConsentBox('imagen', 'Derechos de Imagen', 'Fotografías oficiales del club', errors.consentImage?.message)}
-          {renderConsentBox('video', 'Grabación de Vídeos', 'Partidos y retransmisiones', errors.consentVideo?.message)}
-          {renderConsentBox('whatsapp', 'Comunicaciones por WhatsApp', 'Avisos oficiales y horarios', errors.consentWhatsapp?.message)}
-          {renderConsentBox('sanitaria', 'Autorización Sanitaria', 'Traslado médico de urgencia', errors.consentMedical?.message)}
+          {renderConsentBox('rgpd', 'Política de Privacidad', 'Tratamiento de datos personales (RGPD)', errors.consentRgpd?.message)}
+          {renderConsentBox('tutela', 'Declaración de Tutela', 'Mayoría de edad y normativas', errors.consentTutela?.message)}
+          {renderConsentBox('medical', 'Tratamiento Médico Especial', 'Alergias y traslados de urgencia', errors.consentMedical?.message)}
+          {renderConsentBox('imagen', 'Derechos de Imagen', 'Consentimiento opcional para fotos', errors.consentImage?.message, true)}
+        </div>
+      </div>
+
+      {/* Información Básica sobre Protección de Datos */}
+      <div className="mt-8 bg-blue-50/50 p-4 rounded-lg border border-blue-100 text-xs text-blue-900">
+        <h4 className="font-bold flex items-center gap-1 mb-2">
+          <Info className="w-4 h-4 text-blue-600" /> 
+          Información Básica sobre Protección de Datos
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <div className="border border-blue-200 bg-white p-2 rounded">
+            <strong>Responsable:</strong><br />CLUB SPORTING SALADAR
+          </div>
+          <div className="border border-blue-200 bg-white p-2 rounded">
+            <strong>Finalidad:</strong><br />Gestión administrativa y deportiva de la inscripción.
+          </div>
+          <div className="border border-blue-200 bg-white p-2 rounded">
+            <strong>Legitimación:</strong><br />Ejecución de un contrato/acuerdo y consentimiento del interesado.
+          </div>
+          <div className="border border-blue-200 bg-white p-2 rounded">
+            <strong>Destinatarios:</strong><br />Federaciones deportivas, mutuas de seguros. No se cederán datos salvo obligación legal.
+          </div>
+          <div className="border border-blue-200 bg-white p-2 rounded">
+            <strong>Derechos:</strong><br />Acceder, rectificar y suprimir los datos, solicitándolo en csportingsaladar@gmail.com.
+          </div>
         </div>
       </div>
 

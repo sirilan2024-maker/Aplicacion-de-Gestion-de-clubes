@@ -14,34 +14,62 @@ interface PlayerBrief {
   last_name: string;
   status: string;
   category: string;
+  team_name?: string;
+  team_id?: string;
 }
 
 export default function DocumentManagementPage() {
   const [players, setPlayers] = useState<PlayerBrief[]>([]);
+  const [teams, setTeams] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerBrief | null>(null);
 
   useEffect(() => {
-    fetchPlayers();
+    fetchPlayersAndTeams();
   }, []);
 
-  const fetchPlayers = async () => {
+  const fetchPlayersAndTeams = async () => {
     const supabase = createClient();
     try {
+      // Obtener jugadores con su equipo asociado
       const { data, error } = await supabase
         .from('players')
-        .select('id, first_name, last_name, status')
+        .select(`
+          id, 
+          first_name, 
+          last_name, 
+          status,
+          teams (id, name)
+        `)
         .neq('status', 'inactive')
         .order('first_name', { ascending: true });
 
       if (error) throw error;
       
-      // Mapeo básico (en un sistema real 'category' podría venir de un join con team)
-      setPlayers((data || []).map(p => ({
-        ...p,
-        category: p.status === 'pending_revision' ? 'Inscripción Pdte' : 'Jugador Oficial'
-      })));
+      const parsedPlayers = (data || []).map(p => {
+        // En supabase si es 1 a 1 teams puede ser objeto, si es 1 a N es array
+        const teamObj = Array.isArray(p.teams) ? p.teams[0] : p.teams;
+        return {
+          ...p,
+          category: p.status === 'pending_revision' ? 'Inscripción Pdte' : 'Jugador Oficial',
+          team_name: teamObj?.name || 'Sin equipo',
+          team_id: teamObj?.id || 'none'
+        };
+      });
+
+      setPlayers(parsedPlayers);
+
+      // Extraer equipos únicos para el filtro
+      const uniqueTeams = new Map();
+      parsedPlayers.forEach(p => {
+        if (p.team_id !== 'none' && p.team_name) {
+          uniqueTeams.set(p.team_id, p.team_name);
+        }
+      });
+      setTeams(Array.from(uniqueTeams.entries()).map(([id, name]) => ({ id, name })));
+
     } catch (error) {
       console.error(error);
     } finally {
@@ -49,9 +77,11 @@ export default function DocumentManagementPage() {
     }
   };
 
-  const filteredPlayers = players.filter(p => 
-    `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPlayers = players.filter(p => {
+    const matchesSearch = `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTeam = selectedTeam === "all" || p.team_id === selectedTeam;
+    return matchesSearch && matchesTeam;
+  });
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -68,7 +98,7 @@ export default function DocumentManagementPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lado Izquierdo: Lista de Jugadores */}
         <Card className="lg:col-span-1 shadow-sm border border-gray-200 h-[calc(100vh-180px)] flex flex-col overflow-hidden">
-          <div className="p-4 border-b bg-gray-50">
+          <div className="p-4 border-b bg-gray-50 space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input 
@@ -77,6 +107,20 @@ export default function DocumentManagementPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            <div className="relative flex items-center">
+              <Filter className="absolute left-3 w-4 h-4 text-gray-400" />
+              <select
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+              >
+                <option value="all">Todos los equipos</option>
+                <option value="none">Sin equipo asignado</option>
+                {teams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -95,11 +139,16 @@ export default function DocumentManagementPage() {
                       <div className="bg-gray-100 p-2 rounded-full text-gray-500 shrink-0">
                         <Users className="w-5 h-5" />
                       </div>
-                      <div className="overflow-hidden">
+                      <div className="overflow-hidden w-full">
                         <p className="font-semibold text-gray-900 truncate">{player.first_name} {player.last_name}</p>
-                        <p className={`text-xs mt-0.5 ${player.status === 'pending_revision' ? 'text-yellow-600' : 'text-green-600'}`}>
-                          {player.category}
-                        </p>
+                        <div className="flex justify-between items-center mt-0.5">
+                          <p className={`text-xs ${player.status === 'pending_revision' ? 'text-yellow-600' : 'text-green-600'}`}>
+                            {player.category}
+                          </p>
+                          <p className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                            {player.team_name}
+                          </p>
+                        </div>
                       </div>
                     </button>
                   </li>
@@ -116,7 +165,7 @@ export default function DocumentManagementPage() {
               <div className="p-6 border-b flex justify-between items-center bg-white rounded-t-xl">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{selectedPlayer.first_name} {selectedPlayer.last_name}</h2>
-                  <p className="text-sm text-gray-500">Expediente del jugador</p>
+                  <p className="text-sm text-gray-500">{selectedPlayer.team_name}</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setSelectedPlayer(null)}>
                   <X className="w-5 h-5" />

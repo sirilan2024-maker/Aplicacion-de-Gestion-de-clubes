@@ -71,7 +71,7 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
 };
 
 export function Step5Consent() {
-  const { register, setValue, formState: { errors } } = useFormContext<RegistrationFormData>();
+  const { register, setValue, watch, formState: { errors } } = useFormContext<RegistrationFormData>();
   const [activeLegalModal, setActiveLegalModal] = useState<LegalItem | null>(null);
 
   // Estados locales para saber si se ha leído el modal y habilitar el checkbox
@@ -98,26 +98,46 @@ export function Step5Consent() {
     }
   };
 
-  const renderConsentBox = (id: LegalItem, title: string, subtitle: string, error?: string) => (
-    <div className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${legalRead[id] ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'} ${error ? 'border-red-500 ring-1 ring-red-500' : ''}`}>
-      <div className="mt-1">
-        <Checkbox 
-          checked={legalRead[id]}
-          disabled={!legalRead[id]}
-          className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600 disabled:opacity-50" 
-        />
-        {/* Hidden inputs to register with RHF */}
-        <input type="hidden" {...register(id === 'inscripcion' ? 'consentInscription' : id === 'rgpd' ? 'consentRgpd' : id === 'imagen' ? 'consentImage' : id === 'video' ? 'consentVideo' : id === 'whatsapp' ? 'consentWhatsapp' : 'consentMedical')} />
-      </div>
-      <div className="space-y-1 w-full">
-        <p className="text-sm font-bold text-gray-900 flex flex-wrap items-center gap-2">
-          <span>{title} <span className="text-red-500">*</span></span>
-          {!legalRead[id] && (
-            <button type="button" onClick={() => setActiveLegalModal(id)} className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors">
-              Leer documento
-            </button>
-          )}
-        </p>
+  const getFieldId = (id: LegalItem) => {
+    switch (id) {
+      case 'inscripcion': return 'consentInscription';
+      case 'rgpd': return 'consentRgpd';
+      case 'imagen': return 'consentImage';
+      case 'video': return 'consentVideo';
+      case 'whatsapp': return 'consentWhatsapp';
+      case 'sanitaria': return 'consentMedical';
+    }
+  };
+
+  const renderConsentBox = (id: LegalItem, title: string, subtitle: string, error?: string) => {
+    const fieldName = getFieldId(id) as keyof RegistrationFormData;
+    const isChecked = watch(fieldName) === true;
+    
+    return (
+      <div className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${isChecked ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'} ${error ? 'border-red-500 ring-1 ring-red-500' : ''}`}>
+        <div className="mt-1">
+          <Checkbox 
+            checked={isChecked}
+            onCheckedChange={(checked) => {
+              if (legalRead[id]) {
+                setValue(fieldName, checked === true, { shouldValidate: true });
+              }
+            }}
+            disabled={!legalRead[id]}
+            className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600 disabled:opacity-50" 
+          />
+          {/* Hidden inputs to register with RHF */}
+          <input type="hidden" {...register(fieldName)} />
+        </div>
+        <div className="space-y-1 w-full">
+          <p className="text-sm font-bold text-gray-900 flex flex-wrap items-center gap-2">
+            <span>{title} <span className="text-red-500">*</span></span>
+            {!legalRead[id] && (
+              <button type="button" onClick={() => setActiveLegalModal(id)} className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors">
+                Leer documento
+              </button>
+            )}
+          </p>
         <p className="text-xs text-gray-500">{subtitle}</p>
         {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
       </div>

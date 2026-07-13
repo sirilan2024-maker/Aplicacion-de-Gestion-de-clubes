@@ -14,12 +14,20 @@ export function Step2Documents() {
   const isSenior = birthDate ? new Date(birthDate).getFullYear() <= 2007 : false;
 
   const FileUploadField = ({ label, description }: { label: string, description?: string }) => (
-    <div className="border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative group">
-      <UploadCloud className="w-8 h-8 text-blue-500 mb-2 group-hover:scale-110 transition-transform" />
+    <div className="border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center bg-gray-50 transition-colors relative group">
+      <UploadCloud className="w-8 h-8 text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
       <span className="text-sm font-semibold text-gray-700 text-center">{label}</span>
-      {description && <span className="text-xs text-gray-500 text-center mt-1">{description}</span>}
-      {/* Input de archivo superpuesto invisible */}
-      <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.pdf" />
+      {description && <span className="text-xs text-gray-500 text-center mt-1 mb-2">{description}</span>}
+      <div className="flex gap-2 mt-4 w-full">
+        <div className="relative flex-1 bg-white border border-gray-300 rounded-md text-center py-2 text-xs font-semibold hover:bg-gray-100 cursor-pointer shadow-sm">
+          📁 Archivo
+          <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.pdf" />
+        </div>
+        <div className="relative flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-center py-2 text-xs font-semibold hover:bg-blue-100 cursor-pointer shadow-sm">
+          📷 Foto
+          <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" capture="environment" />
+        </div>
+      </div>
     </div>
   );
 

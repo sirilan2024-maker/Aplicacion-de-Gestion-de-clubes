@@ -1188,6 +1188,24 @@ export default function GlobalPlayerProfilePage() {
           <DisciplineTab playerId={playerId} />
         )}
 
+        {/* PESTAÑA: DOCUMENTOS */}
+        {activeTab === 'documentos' && !esEntrenador && player && (
+          <div className="space-y-6">
+            <div className="border-b pb-4 mb-4">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <FolderOpen className="w-6 h-6 text-blue-600" />
+                Documentación del Jugador
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Archivos y certificados asociados al expediente de {player.first_name}.</p>
+            </div>
+            
+            <DocumentManager 
+              playerId={player.id} 
+              playerName={`${player.first_name} ${player.last_name}`} 
+            />
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -1352,24 +1370,6 @@ function DisciplineTab({ playerId }: { playerId: string }) {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* PESTAÑA: DOCUMENTOS */}
-        {activeTab === 'documentos' && !esEntrenador && (
-          <div className="space-y-6">
-            <div className="border-b pb-4 mb-4">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <FolderOpen className="w-6 h-6 text-blue-600" />
-                Documentación del Jugador
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">Archivos y certificados asociados al expediente de {player.first_name}.</p>
-            </div>
-            
-            <DocumentManager 
-              playerId={player.id} 
-              playerName={`${player.first_name} ${player.last_name}`} 
-            />
           </div>
         )}
       </div>

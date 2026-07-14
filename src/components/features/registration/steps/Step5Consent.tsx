@@ -189,8 +189,15 @@ export function Step5Consent() {
           Información Básica sobre Protección de Datos
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-          <div className="border border-blue-200 bg-white p-2 rounded">
-            <strong>Responsable:</strong><br />CLUB SPORTING SALADAR
+          <div className="border border-blue-200 bg-white p-3 rounded shadow-sm">
+            <strong>Responsable:</strong><br />
+            CLUB SPORTING SALADAR<br />
+            CIF: G03671971<br />
+            La Cruz, 7 - Almoradí<br />
+            Provincia: Alicante<br />
+            C.P: 03160<br />
+            Email: csportingsaladar@gmail.com<br />
+            Teléfonos: 672463398
           </div>
           <div className="border border-blue-200 bg-white p-2 rounded">
             <strong>Finalidad:</strong><br />Gestión administrativa y deportiva de la inscripción.

@@ -308,7 +308,6 @@ export function Step5Consent() {
                   <p className="mt-2"><strong>Cláusula de Revocación "Easy-in/Easy-out":</strong> De acuerdo con el principio de transparencia, el club facilita que el consentimiento pueda ser revocado de forma tan sencilla como fue otorgado. Los tutores disponen de una acción técnica en su perfil de usuario para revocar los derechos de imagen en cualquier momento. Dicha revocación se procesará mediante un Server Action que registrará nuevamente la IP y la marca de tiempo de la solicitud, manteniendo una trazabilidad de auditoría completa que demuestra el cumplimiento inmediato de la voluntad del interesado.</p>
                 </div>
               </div>
-            </div>
           </Dialog>
         </div>
       </div>

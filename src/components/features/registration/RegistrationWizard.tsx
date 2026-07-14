@@ -82,36 +82,43 @@ export function RegistrationWizard() {
   const onSubmit = async (data: RegistrationFormData) => {
     setIsSubmitting(true);
     try {
-      // 0. Si elige tarjeta, simulamos el flujo de Stripe
+      // 1. Si elige tarjeta, simulamos el delay visual para el usuario
       if (data.paymentMethod === "Stripe") {
         setPaymentStatus("processing");
-        // Simular tiempo de validación de pago en pasarela
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Dejamos un pequeño delay visual simulado
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // 2. Enviar la inscripción real a nuestra nueva API (/api/register)
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...data,
+          // teamId: "Si se recogió de la URL, lo añadiríamos aquí"
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error de servidor al guardar la inscripción');
+      }
+
+      const result = await response.json();
+      console.log('Inscripción guardada correctamente:', result);
+      
+      if (data.paymentMethod === "Stripe") {
         setPaymentStatus("done");
       }
 
-      // 1. Aquí se generarán los timestamps:
-      const timestamp = new Date().toISOString();
-      const payload = {
-        ...data,
-        consentInscriptionAt: timestamp,
-        consentRgpdAt: timestamp,
-        consentImageAt: timestamp,
-        consentVideoAt: timestamp,
-        consentWhatsappAt: timestamp,
-        consentMedicalAt: timestamp,
-      };
-
-      console.log("Submitting payload to Supabase:", payload);
-      // Simular llamada a Server Action o Supabase API
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      // 3. Mostrar pantalla final
       setSubmittedData(data);
       setIsSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      console.error(error);
-      alert("Ocurrió un error al enviar el formulario.");
+      console.error('Error enviando formulario:', error);
+      alert("Ocurrió un error al enviar el formulario al servidor.");
     } finally {
       setIsSubmitting(false);
     }

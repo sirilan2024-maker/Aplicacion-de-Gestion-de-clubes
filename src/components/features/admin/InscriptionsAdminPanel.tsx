@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, Filter, CheckCircle, XCircle, Clock, FileText, AlertTriangle, Banknote } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search, Filter, CheckCircle, XCircle, Clock, FileText, AlertTriangle, Banknote, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LegalModal } from "@/components/ui/LegalModal";
 import { getSignedDniUrlAction } from "@/app/actions/secretaria-actions";
+import { getInscriptionsAction, approveInscriptionAction, requestCorrectionAction, rejectInscriptionAction } from "@/app/actions/inscriptions-actions";
+import { createClient } from "@/lib/supabase/client";
+import toast from "react-hot-toast";
 
 // Tipos para el estado simulado
-type InscriptionStatus = 'pending_revision' | 'request_correction' | 'pending_payment' | 'formalized';
+type InscriptionStatus = 'pending_revision' | 'request_correction' | 'pending_payment' | 'formalized' | 'rejected';
 
 interface PlayerInscription {
   id: string;
@@ -21,32 +23,48 @@ interface PlayerInscription {
   feeTotal: number;
 }
 
-const mockData: PlayerInscription[] = [
-  { id: "1", name: "Juan Pérez", category: "Infantil", date: "12/07/2026", status: "pending_revision", paymentMethod: "Stripe", feeTotal: 250 },
-  { id: "2", name: "Carlos López", category: "Senior", date: "11/07/2026", status: "pending_payment", paymentMethod: "Transferencia", feeTotal: 195 },
-  { id: "3", name: "Mario García", category: "Cadete", date: "10/07/2026", status: "request_correction", paymentMethod: "Contado", feeTotal: 145 },
-];
-
 export function InscriptionsAdminPanel() {
-  const [inscriptions, setInscriptions] = useState<PlayerInscription[]>(mockData);
+  const [inscriptions, setInscriptions] = useState<PlayerInscription[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<InscriptionStatus | 'all'>('all');
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  const fetchInscriptions = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const { data: clubData } = await supabase.from('clubs').select('id').limit(1).single();
+    if (clubData?.id) {
+      const res = await getInscriptionsAction(clubData.id);
+      if (res.success && res.data) {
+        setInscriptions(res.data as PlayerInscription[]);
+      }
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchInscriptions();
+  }, []);
+
   const filteredInscriptions = inscriptions.filter(
     (item) => filter === 'all' || item.status === filter
   );
 
-  const handleApprove = (id: string) => {
-    // Si se aprueba la revisión, pasa a pendiente de pago
-    setInscriptions(prev => prev.map(p => p.id === id ? { ...p, status: 'pending_payment' } : p));
+  const handleApprove = async (id: string) => {
+    const res = await approveInscriptionAction(id);
+    if (res.success) {
+      toast.success("Inscripción aprobada correctamente");
+      fetchInscriptions();
+    } else {
+      toast.error("Error al aprobar");
+    }
   };
 
   const handleValidatePayment = (id: string) => {
-    // Valida el pago manual (transferencia/contado) y formaliza la inscripción
-    setInscriptions(prev => prev.map(p => p.id === id ? { ...p, status: 'formalized' } : p));
-    alert("Pago validado. El jugador ha sido formalizado y se ha habilitado su pedido de utillería.");
+    // Para simplificar, usamos approveInscriptionAction que ahora lo marca como SUCCESS_MOCK
+    handleApprove(id);
   };
 
   const openRejection = (id: string) => {
@@ -54,14 +72,17 @@ export function InscriptionsAdminPanel() {
     setRejectionModalOpen(true);
   };
 
-  const submitRejection = () => {
+  const submitRejection = async () => {
     if (!selectedPlayer || !rejectionReason) return;
     
-    // Simula la llamada a la base de datos que dispara el Edge Function
-    console.log(`Rechazando documento para jugador ${selectedPlayer}. Motivo: ${rejectionReason}`);
-    alert("Se ha enviado un correo automático a la familia con el enlace de subsanación.");
+    const res = await requestCorrectionAction(selectedPlayer, rejectionReason);
+    if (res.success) {
+      toast.success("Aviso de subsanación enviado");
+      fetchInscriptions();
+    } else {
+      toast.error("Error al enviar el aviso");
+    }
     
-    setInscriptions(prev => prev.map(p => p.id === selectedPlayer ? { ...p, status: 'request_correction' } : p));
     setRejectionModalOpen(false);
     setRejectionReason("");
     setSelectedPlayer(null);
@@ -131,48 +152,56 @@ export function InscriptionsAdminPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredInscriptions.map(item => (
-                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{item.category}</td>
-                  <td className="px-6 py-4 text-gray-500">{item.date}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{item.feeTotal}€</span>
-                      <span className="text-xs text-gray-500">{item.paymentMethod}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">{getStatusBadge(item.status)}</td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    
-                    {item.status === 'pending_revision' && (
-                      <>
-                        <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleViewDni(item.id)}>
-                          <FileText className="w-4 h-4 mr-1" /> Ver DNI
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => openRejection(item.id)}>
-                          <XCircle className="w-4 h-4 mr-1" /> Rechazar Doc.
-                        </Button>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(item.id)}>
-                          <CheckCircle className="w-4 h-4 mr-1" /> Aprobar
-                        </Button>
-                      </>
-                    )}
-
-                    {item.status === 'pending_payment' && (item.paymentMethod === 'Transferencia' || item.paymentMethod === 'Contado') && (
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => handleValidatePayment(item.id)}>
-                        <Banknote className="w-4 h-4 mr-1" /> Validar Pago Manual
-                      </Button>
-                    )}
-
-                    {item.status === 'formalized' && (
-                      <Button size="sm" variant="outline" disabled>Completado</Button>
-                    )}
-
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <Loader2 className="w-8 h-8 mx-auto animate-spin text-blue-500 mb-2" />
+                    Cargando inscripciones...
                   </td>
                 </tr>
-              ))}
-              {filteredInscriptions.length === 0 && (
+              ) : filteredInscriptions.length > 0 ? (
+                filteredInscriptions.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
+                    <td className="px-6 py-4 text-gray-600">{item.category}</td>
+                    <td className="px-6 py-4 text-gray-500">{item.date}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{item.feeTotal}€</span>
+                        <span className="text-xs text-gray-500">{item.paymentMethod}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">{getStatusBadge(item.status)}</td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      
+                      {item.status === 'pending_revision' && (
+                        <>
+                          <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => handleViewDni(item.id)}>
+                            <FileText className="w-4 h-4 mr-1" /> Ver DNI
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => openRejection(item.id)}>
+                            <XCircle className="w-4 h-4 mr-1" /> Rechazar Doc.
+                          </Button>
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(item.id)}>
+                            <CheckCircle className="w-4 h-4 mr-1" /> Aprobar
+                          </Button>
+                        </>
+                      )}
+
+                      {item.status === 'pending_payment' && (item.paymentMethod === 'Transferencia' || item.paymentMethod === 'Contado') && (
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => handleValidatePayment(item.id)}>
+                          <Banknote className="w-4 h-4 mr-1" /> Validar Pago Manual
+                        </Button>
+                      )}
+
+                      {item.status === 'formalized' && (
+                        <Button size="sm" variant="outline" disabled>Completado</Button>
+                      )}
+
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     No hay inscripciones en este estado.

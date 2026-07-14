@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
 // Inicializar Stripe solo si existe la clave (para evitar fallos si no está configurada)
 import Stripe from 'stripe';
@@ -11,10 +11,11 @@ const stripe = new Stripe(stripeKey, {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const supabase = await createClient();
+    // Usamos admin client para ignorar RLS ya que es un endpoint público
+    const supabaseAdmin = await createAdminClient();
 
     // 1. Obtener el club_id base
-    const { data: clubData } = await supabase.from('clubs').select('id').limit(1).single();
+    const { data: clubData } = await supabaseAdmin.from('clubs').select('id').limit(1).single();
     const clubId = clubData?.id;
 
     if (!clubId) {
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     // 4. Guardar en Base de Datos (Tabla 'registrations')
-    const { data: registration, error } = await supabase
+    const { data: registration, error } = await supabaseAdmin
       .from('registrations')
       .insert({
         club_id: clubId,

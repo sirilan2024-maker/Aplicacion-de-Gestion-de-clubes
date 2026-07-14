@@ -5,13 +5,7 @@ import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { LegalModal } from "@/components/ui/LegalModal";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 
 type LegalItem = 'rgpd' | 'tutela' | 'medical' | 'imagen';
 
@@ -66,6 +60,7 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
 export function Step5Consent() {
   const { register, setValue, watch, formState: { errors } } = useFormContext<RegistrationFormData>();
   const [activeLegalModal, setActiveLegalModal] = useState<LegalItem | null>(null);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   // Estados locales para saber si se ha leído el modal y habilitar el checkbox
   const [legalRead, setLegalRead] = useState<Record<LegalItem, boolean>>({
@@ -212,19 +207,21 @@ export function Step5Consent() {
         </div>
         
         <div className="mt-6 text-center">
-          <Dialog>
-            <DialogTrigger asChild>
-              <button type="button" className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-sm transition-colors">
-                Ver Política de Privacidad Completa
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold border-b pb-4 text-blue-900">
-                  POLÍTICA DE PRIVACIDAD Y PROTECCIÓN DE DATOS – CLUB SPORTING SALADAR
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-5 text-sm text-gray-700 p-2 mt-2">
+          <button 
+            type="button" 
+            onClick={() => setIsPrivacyModalOpen(true)}
+            className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-sm transition-colors"
+          >
+            Ver Política de Privacidad Completa
+          </button>
+          
+          <Dialog 
+            isOpen={isPrivacyModalOpen} 
+            onClose={() => setIsPrivacyModalOpen(false)}
+            title="POLÍTICA DE PRIVACIDAD Y PROTECCIÓN DE DATOS – CLUB SPORTING SALADAR"
+            className="max-w-4xl max-h-[85vh] overflow-y-auto"
+          >
+            <div className="space-y-5 text-sm text-gray-700 p-2 mt-2 text-left">
                 <div>
                   <h4 className="font-bold text-gray-900 text-base mb-2">1. INFORMACIÓN DEL RESPONSABLE DEL TRATAMIENTO</h4>
                   <p>En cumplimiento de lo establecido en el Reglamento (UE) 2016/679 General de Protección de Datos (RGPD) y la Ley Orgánica 3/2018 de Protección de Datos Personales y Garantía de los Derechos Digitales (LOPDGDD), se informa a los interesados de la identidad del Responsable del tratamiento:</p>
@@ -311,7 +308,7 @@ export function Step5Consent() {
                   <p className="mt-2"><strong>Cláusula de Revocación "Easy-in/Easy-out":</strong> De acuerdo con el principio de transparencia, el club facilita que el consentimiento pueda ser revocado de forma tan sencilla como fue otorgado. Los tutores disponen de una acción técnica en su perfil de usuario para revocar los derechos de imagen en cualquier momento. Dicha revocación se procesará mediante un Server Action que registrará nuevamente la IP y la marca de tiempo de la solicitud, manteniendo una trazabilidad de auditoría completa que demuestra el cumplimiento inmediato de la voluntad del interesado.</p>
                 </div>
               </div>
-            </DialogContent>
+            </div>
           </Dialog>
         </div>
       </div>

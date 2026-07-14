@@ -1,10 +1,19 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
-export async function getInscriptionsAction(clubId: string) {
-  const supabase = await createClient();
+export async function getInscriptionsAction(frontendClubId?: string) {
+  const supabase = await createAdminClient();
+  
+  let clubId = frontendClubId;
+  if (!clubId) {
+    const { data: clubData } = await supabase.from('clubs').select('id').limit(1).single();
+    clubId = clubData?.id;
+  }
+  
+  if (!clubId) return { success: false, data: [] };
+
   const { data, error } = await supabase
     .from('registrations')
     .select(`
@@ -57,7 +66,7 @@ export async function getInscriptionsAction(clubId: string) {
 }
 
 export async function approveInscriptionAction(id: string) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   
   // 1. Marcar como APPROVED en la tabla registrations
   const { error: updateError } = await supabase
@@ -75,7 +84,7 @@ export async function approveInscriptionAction(id: string) {
 }
 
 export async function requestCorrectionAction(id: string, reason: string) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   
   const { error } = await supabase
     .from('registrations')
@@ -93,7 +102,7 @@ export async function requestCorrectionAction(id: string, reason: string) {
 }
 
 export async function rejectInscriptionAction(id: string) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   
   const { error } = await supabase
     .from('registrations')

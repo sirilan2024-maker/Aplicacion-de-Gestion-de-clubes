@@ -33,13 +33,9 @@ export function InscriptionsAdminPanel() {
 
   const fetchInscriptions = async () => {
     setLoading(true);
-    const supabase = createClient();
-    const { data: clubData } = await supabase.from('clubs').select('id').limit(1).single();
-    if (clubData?.id) {
-      const res = await getInscriptionsAction(clubData.id);
-      if (res.success && res.data) {
-        setInscriptions(res.data as PlayerInscription[]);
-      }
+    const res = await getInscriptionsAction();
+    if (res.success && res.data) {
+      setInscriptions(res.data as PlayerInscription[]);
     }
     setLoading(false);
   };

@@ -5,6 +5,13 @@ import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { LegalModal } from "@/components/ui/LegalModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type LegalItem = 'rgpd' | 'tutela' | 'medical' | 'imagen';
 
@@ -202,6 +209,110 @@ export function Step5Consent() {
           <div className="border border-blue-200 bg-white p-2 rounded">
             <strong>Derechos:</strong><br />Acceder, rectificar y suprimir los datos, solicitándolo en csportingsaladar@gmail.com.
           </div>
+        </div>
+        
+        <div className="mt-6 text-center">
+          <Dialog>
+            <DialogTrigger asChild>
+              <button type="button" className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-sm transition-colors">
+                Ver Política de Privacidad Completa
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold border-b pb-4 text-blue-900">
+                  POLÍTICA DE PRIVACIDAD Y PROTECCIÓN DE DATOS – CLUB SPORTING SALADAR
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-5 text-sm text-gray-700 p-2 mt-2">
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">1. INFORMACIÓN DEL RESPONSABLE DEL TRATAMIENTO</h4>
+                  <p>En cumplimiento de lo establecido en el Reglamento (UE) 2016/679 General de Protección de Datos (RGPD) y la Ley Orgánica 3/2018 de Protección de Datos Personales y Garantía de los Derechos Digitales (LOPDGDD), se informa a los interesados de la identidad del Responsable del tratamiento:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li><strong>Entidad:</strong> Club Sporting Saladar</li>
+                    <li><strong>NIF:</strong> G-03829144</li>
+                    <li><strong>Dirección:</strong> C/ La cruz, 7 Almoradi 03160 Alicante</li>
+                    <li><strong>Correo electrónico de contacto:</strong> csportingsaladar@gmail.com</li>
+                  </ul>
+                  <p className="mt-2">Como Consultoría Senior en Derecho Digital, certificamos que el Club ha implementado protocolos de "Privacidad desde el Diseño" para asegurar que el tratamiento de los datos de menores y sus tutores se realice bajo los más altos estándares de seguridad jurídica y técnica.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">2. FINALIDADES DEL TRATAMIENTO</h4>
+                  <p>El Club Deportivo Sporting Saladar tratará los datos facilitados con las siguientes finalidades específicas:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-2">
+                    <li><strong>Tramitación y gestión de licencias federativas:</strong> Comunicación de datos a las federaciones deportivas correspondientes para la inscripción y habilitación del deportista en competiciones oficiales.</li>
+                    <li><strong>Gestión administrativa y económica:</strong> Tramitación de altas y bajas, así como el control y cobro de las cuotas sociodeportivas y servicios asociados.</li>
+                    <li><strong>Control de actividad y asistencia:</strong> Gestión del control de asistencia a entrenamientos, partidos y eventos institucionales.</li>
+                    <li><strong>Comunicaciones oficiales:</strong> Envío de notificaciones relativas a la actividad del club, calendarios, convocatorias y avisos de interés para el desarrollo de la relación deportiva.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">3. LEGITIMACIÓN Y EVIDENCIA DIGITAL DEL CONSENTIMIENTO</h4>
+                  <p>La base legal para el tratamiento de los datos es el consentimiento expreso del interesado o de su tutor legal (Art. 6.1.a RGPD). En el caso de los Datos Médicos y Alergias, el tratamiento se legitima bajo el consentimiento explícito para categorías especiales de datos (Art. 9.2.a RGPD), garantizando su protección reforzada.</p>
+                  <p className="mt-2"><strong>Mecanismo de Firma Electrónica Inalterable</strong><br/>
+                  Para cumplir con el principio de responsabilidad proactiva (accountability), el club utiliza un sistema de Firma Electrónica Inalterable. Al marcar los checks obligatorios (RGPD, Tutela y Datos Médicos), el sistema genera una huella digital de la aceptación que incluye:</p>
+                  <ol className="list-decimal pl-5 mt-2 space-y-1">
+                    <li><strong>Dirección IP de origen:</strong> Capturada mediante la cabecera técnica x-forwarded-for para identificar el dispositivo desde el que se otorga el consentimiento.</li>
+                    <li><strong>Timestamp del Servidor:</strong> Registro de fecha y hora exacta sincronizado de forma universal (UTC) en el momento de la transacción.</li>
+                  </ol>
+                  <p className="mt-2">Este registro técnico constituye una prueba irrefutable de la voluntad del firmante, vinculando el consentimiento a un momento y dispositivo específicos.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">4. MEDIDAS DE SEGURIDAD Y ALMACENAMIENTO</h4>
+                  <p>La arquitectura de datos del Club Deportivo Sporting Saladar se fundamenta en la integridad y la confidencialidad:</p>
+                  <ul className="list-disc pl-5 mt-2 space-y-2">
+                    <li><strong>Soberanía de Datos:</strong> Toda la información se aloja exclusivamente en servidores seguros ubicados dentro del Territorio Económico Europeo.</li>
+                    <li><strong>Blindaje RLS (Row Level Security):</strong> Se aplican políticas de seguridad a nivel de registro en la base de datos. Esto garantiza un aislamiento técnico total, impidiendo que cualquier usuario acceda a datos que no le correspondan estrictamente por su rol.</li>
+                    <li><strong>Gestión de Documentación Sensible:</strong> Los archivos de identidad (DNI) se almacenan en contenedores (buckets) privados sin acceso público. El acceso a estos documentos se realiza mediante URLs firmadas con una caducidad de 15 minutos; una vez transcurrido este tiempo, el enlace queda inactivo, garantizando que los documentos no puedan ser filtrados ni indexados.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">5. DESTINATARIOS Y ACCESO RESTRINGIDO</h4>
+                  <p>En aplicación del principio de Minimización de Datos, el club aplica una política estricta de control de roles para que cada persona acceda únicamente a la información indispensable para su función:</p>
+                  <div className="overflow-x-auto mt-3">
+                    <table className="min-w-full border-collapse border border-gray-300">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="border border-gray-300 px-4 py-2 text-left w-1/3">Rol de Usuario</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left">Nivel de Acceso y Restricciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="border border-gray-300 px-4 py-2 font-medium">Tutores Legales</td>
+                          <td className="border border-gray-300 px-4 py-2">Acceso exclusivo a los datos personales y documentos de sus hijos o representados.</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-300 px-4 py-2 font-medium">Directiva y Coordinación</td>
+                          <td className="border border-gray-300 px-4 py-2">Acceso total para la gestión administrativa, federativa y económica del club.</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-300 px-4 py-2 font-medium">Entrenadores</td>
+                          <td className="border border-gray-300 px-4 py-2">Acceso limitado a la "Vista Segura": solo nombre, datos médicos/alergias y derechos de imagen. Tienen bloqueado por sistema cualquier acceso a copias de DNI o documentos de identidad.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">6. DERECHOS DE LOS INTERESADOS (ARCO+)</h4>
+                  <p>Los interesados podrán ejercer de forma gratuita sus derechos de Acceso, Rectificación, Supresión, Oposición, Limitación y Portabilidad.</p>
+                  <p className="mt-2">Para ello, deberán dirigir una comunicación escrita al correo electrónico privacidad@sportingsaladar.com, aportando fotocopia del DNI o documento equivalente del solicitante para verificar su identidad. El Club responderá a toda solicitud en los plazos legalmente establecidos.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base mb-2">7. DERECHOS DE IMAGEN Y REVOCACIÓN</h4>
+                  <p>El consentimiento para la captación de imágenes o vídeos durante la actividad deportiva es estrictamente opcional. La negativa a autorizar este uso no tendrá consecuencia alguna en la participación del menor en las actividades del club.</p>
+                  <p className="mt-2"><strong>Cláusula de Revocación "Easy-in/Easy-out":</strong> De acuerdo con el principio de transparencia, el club facilita que el consentimiento pueda ser revocado de forma tan sencilla como fue otorgado. Los tutores disponen de una acción técnica en su perfil de usuario para revocar los derechos de imagen en cualquier momento. Dicha revocación se procesará mediante un Server Action que registrará nuevamente la IP y la marca de tiempo de la solicitud, manteniendo una trazabilidad de auditoría completa que demuestra el cumplimiento inmediato de la voluntad del interesado.</p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

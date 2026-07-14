@@ -50,6 +50,12 @@ export function Step1PersonalData() {
         </div>
         
         <div className="space-y-2">
+          <label className="text-sm font-semibold text-gray-700">DNI/NIE del Jugador <span className="text-red-500">*</span></label>
+          <Input {...register("playerDni")} placeholder="12345678A" className={errors.playerDni ? "border-red-500" : ""} />
+          {errors.playerDni && <p className="text-xs text-red-500">{errors.playerDni.message}</p>}
+        </div>
+        
+        <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Fecha de Nacimiento <span className="text-red-500">*</span></label>
           <Input type="date" {...register("birthDate")} className={errors.birthDate ? "border-red-500" : ""} />
         </div>

@@ -160,16 +160,13 @@ export function Step2Documents() {
       {/* Identificación */}
       <div className="space-y-4">
         <h4 className="font-semibold text-gray-800 border-b pb-2">1. Identidad</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {!isSenior ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <FileUploadField label="DNI/NIE del Jugador (Anverso)" />
+          <FileUploadField label="DNI/NIE del Jugador (Reverso)" />
+          {!isSenior && (
             <>
               <FileUploadField label="DNI/NIE del Tutor (Anverso)" />
               <FileUploadField label="DNI/NIE del Tutor (Reverso)" />
-            </>
-          ) : (
-            <>
-              <FileUploadField label="DNI/NIE del Jugador (Anverso)" />
-              <FileUploadField label="DNI/NIE del Jugador (Reverso)" />
             </>
           )}
         </div>

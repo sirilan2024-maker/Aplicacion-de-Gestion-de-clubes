@@ -1,9 +1,29 @@
 import * as z from "zod";
 
+const isValidDniNie = (value: string) => {
+  if (!value) return true; // Si es opcional o vacío, no validar aquí (se encarga el required)
+  const dniNie = value.toUpperCase().replace(/[-_ ]/g, '');
+  if (!/^[XYZ]?\d{7,8}[A-Z]$/.test(dniNie)) return false;
+
+  const validLetters = "TRWAGMYFPDXBNJZSQVHLCKE";
+  const letter = dniNie.charAt(dniNie.length - 1);
+  let numbersStr = dniNie.substring(0, dniNie.length - 1);
+
+  if (numbersStr.startsWith('X')) numbersStr = numbersStr.replace('X', '0');
+  else if (numbersStr.startsWith('Y')) numbersStr = numbersStr.replace('Y', '1');
+  else if (numbersStr.startsWith('Z')) numbersStr = numbersStr.replace('Z', '2');
+
+  const numbers = parseInt(numbersStr, 10);
+  const calculatedLetter = validLetters.charAt(numbers % 23);
+
+  return letter === calculatedLetter;
+};
+
 export const registrationSchema = z.object({
   // STEP 1: Personal & Family Data
   playerFirstName: z.string().min(2, "El nombre es requerido"),
   playerLastName: z.string().min(2, "Los apellidos son requeridos"),
+  playerDni: z.string().min(5, "El DNI/NIE es requerido").refine(isValidDniNie, "DNI/NIE incorrecto (Letra no válida)"),
   birthDate: z.string().min(1, "La fecha de nacimiento es requerida"),
   nationality: z.string().min(2, "La nacionalidad es requerida"),
   isForeign: z.boolean().default(false),
@@ -14,7 +34,7 @@ export const registrationSchema = z.object({
   
   // Opcionales para Senior, requeridos para menores (lo validamos con superRefine)
   tutor1Name: z.string().optional(),
-  tutor1Dni: z.string().optional(),
+  tutor1Dni: z.string().optional().refine(val => !val || isValidDniNie(val), "DNI/NIE del tutor incorrecto (Letra no válida)"),
   tutor1Email: z.string().email("Email inválido").optional().or(z.literal('')),
   tutor1Phone: z.string().optional(),
   tutorRelation: z.string().optional(),

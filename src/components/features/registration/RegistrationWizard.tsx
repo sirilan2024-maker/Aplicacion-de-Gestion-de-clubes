@@ -52,7 +52,7 @@ export function RegistrationWizard() {
     let fieldsToValidate: (keyof RegistrationFormData)[] = [];
     
     if (currentStep === 1) {
-      fieldsToValidate = ['playerFirstName', 'playerLastName', 'birthDate', 'nationality', 'address', 'city', 'postalCode'];
+      fieldsToValidate = ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode'];
       // Also validate tutors if required
       const birthDate = methods.getValues('birthDate');
       if (birthDate) {

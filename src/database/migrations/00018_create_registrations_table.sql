@@ -40,16 +40,16 @@ ALTER TABLE public.registrations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins can view registrations for their club"
     ON public.registrations FOR SELECT
     USING (EXISTS (
-        SELECT 1 FROM user_roles
-        WHERE user_id = auth.uid() AND role IN ('admin', 'secretary')
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role IN ('admin', 'secretaria', 'entrenador')
         AND club_id = registrations.club_id
     ));
 
 CREATE POLICY "Admins can manage registrations for their club"
     ON public.registrations FOR ALL
     USING (EXISTS (
-        SELECT 1 FROM user_roles
-        WHERE user_id = auth.uid() AND role IN ('admin', 'secretary')
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid() AND role IN ('admin', 'secretaria', 'entrenador')
         AND club_id = registrations.club_id
     ));
 

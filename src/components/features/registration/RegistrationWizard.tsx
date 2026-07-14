@@ -227,41 +227,52 @@ export function RegistrationWizard() {
               </div>
             </CardContent>
             
-            <CardFooter className="bg-gray-50 border-t p-6 rounded-b-xl flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 1 || isSubmitting}
-                className="font-semibold"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" /> Atrás
-              </Button>
-              
-              {currentStep < STEPS.length ? (
-                <Button 
-                  type="button" 
-                  onClick={nextStep}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+            <CardFooter className="bg-gray-50 border-t p-6 rounded-b-xl">
+              <div className="flex justify-between items-center w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={prevStep}
+                  disabled={currentStep === 1 || isSubmitting}
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
                 >
-                  Siguiente Paso <ArrowRight className="w-4 h-4 ml-2" />
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Atrás
                 </Button>
-              ) : (
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting || !methods.formState.isValid}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold px-8 shadow-md"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" /> 
-                      {paymentStatus === "processing" ? "Procesando pago seguro..." : "Finalizando..."}
-                    </>
-                  ) : (
-                    <><Save className="w-5 h-5 mr-2" /> Completar Inscripción</>
+                
+                <div className="flex items-center gap-4">
+                  {currentStep === STEPS.length && !methods.formState.isValid && (
+                    <div className="text-xs text-red-500 max-w-xs text-right mr-2 hidden sm:block">
+                      Faltan campos obligatorios o hay errores (Ej: DNI incorrecto). Revisa los pasos anteriores.
+                    </div>
                   )}
-                </Button>
-              )}
+                  {currentStep < STEPS.length ? (
+                    <Button
+                      type="button"
+                      onClick={nextStep}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Siguiente
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting || !methods.formState.isValid}
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" /> 
+                          {paymentStatus === "processing" ? "Procesando pago seguro..." : "Finalizando..."}
+                        </>
+                      ) : (
+                        <><Save className="w-5 h-5 mr-2" /> Completar Inscripción</>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </CardFooter>
           </Card>
         </form>

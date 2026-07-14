@@ -107,8 +107,13 @@ export function Step1PersonalData() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">Nombre del Tutor <span className="text-red-500">*</span></label>
-              <Input {...register("tutor1Name")} placeholder="Nombre completo" className={errors.tutor1Name ? "border-red-500" : ""} />
+              <Input {...register("tutor1Name")} placeholder="Nombre" className={errors.tutor1Name ? "border-red-500" : ""} />
               {errors.tutor1Name && <p className="text-xs text-red-500">{errors.tutor1Name.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Apellidos del Tutor <span className="text-red-500">*</span></label>
+              <Input {...register("tutor1LastName")} placeholder="Apellidos" className={errors.tutor1LastName ? "border-red-500" : ""} />
+              {errors.tutor1LastName && <p className="text-xs text-red-500">{errors.tutor1LastName.message}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">DNI/NIE del Tutor <span className="text-red-500">*</span></label>

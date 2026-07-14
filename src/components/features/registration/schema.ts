@@ -34,6 +34,7 @@ export const registrationSchema = z.object({
   
   // Opcionales para Senior, requeridos para menores (lo validamos con superRefine)
   tutor1Name: z.string().optional(),
+  tutor1LastName: z.string().optional(),
   tutor1Dni: z.string().optional().refine(val => !val || isValidDniNie(val), "DNI/NIE del tutor incorrecto (Letra no válida)"),
   tutor1Email: z.string().email("Email inválido").optional().or(z.literal('')),
   tutor1Phone: z.string().optional(),
@@ -112,6 +113,13 @@ export const registrationSchema = z.object({
           code: z.ZodIssueCode.custom,
           message: "El nombre del tutor es requerido para menores",
           path: ["tutor1Name"]
+        });
+      }
+      if (!data.tutor1LastName || data.tutor1LastName.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Los apellidos del tutor son requeridos para menores",
+          path: ["tutor1LastName"]
         });
       }
       if (!data.tutor1Dni || data.tutor1Dni.length < 5) {

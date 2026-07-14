@@ -571,7 +571,8 @@ function ScreenEnlaceCodigo({
   }, [teamId]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://app.sportingsaladar.es";
-  const link = code === "Cargando..." ? "Cargando..." : `${origin}/register/${code}`;
+  // Usamos el flujo unificado nuevo pasando el teamId por parámetro URL
+  const link = code === "Cargando..." ? "Cargando..." : `${origin}/test-registro?team=${teamId}`;
 
   const handleCopy = (text: string, type: "link" | "code") => {
     if (text === "Cargando...") return;

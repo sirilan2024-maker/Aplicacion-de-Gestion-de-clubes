@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { PlayerRegistrationForm } from "@/components/forms/PlayerRegistrationForm";
 
 export default function TestRegistroPage() {
@@ -12,7 +13,9 @@ export default function TestRegistroPage() {
         </p>
       </div>
       
-      <PlayerRegistrationForm />
+      <Suspense fallback={<div className="text-center py-10">Cargando formulario...</div>}>
+        <PlayerRegistrationForm />
+      </Suspense>
     </div>
   );
 }

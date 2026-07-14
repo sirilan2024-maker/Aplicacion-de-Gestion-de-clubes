@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle, CreditCard, Lock } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { registrationSchema, RegistrationFormData } from "./schema";
@@ -22,6 +23,9 @@ const STEPS = [
 ];
 
 export function RegistrationWizard() {
+  const searchParams = useSearchParams();
+  const teamIdParam = searchParams?.get('team') || null;
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -97,7 +101,7 @@ export function RegistrationWizard() {
         },
         body: JSON.stringify({
           ...data,
-          // teamId: "Si se recogió de la URL, lo añadiríamos aquí"
+          teamId: teamIdParam || undefined
         }),
       });
 

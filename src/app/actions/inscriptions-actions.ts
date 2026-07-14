@@ -1,20 +1,17 @@
 'use server';
 
-import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
+export async function getInscriptionsAction() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, data: [] };
 
-export async function getInscriptionsAction(frontendClubId?: string) {
-  const supabase = await createAdminClient();
+  const adminSupabase = await createAdminClient();
+  const { data: profile } = await adminSupabase.from('profiles').select('club_id').eq('id', user.id).single();
   
-  let clubId = frontendClubId;
-  if (!clubId) {
-    const { data: clubData } = await supabase.from('clubs').select('id').limit(1).single();
-    clubId = clubData?.id;
-  }
-  
+  const clubId = profile?.club_id;
   if (!clubId) return { success: false, data: [] };
 
-  const { data, error } = await supabase
+  const { data, error } = await adminSupabase
     .from('registrations')
     .select(`
       id,

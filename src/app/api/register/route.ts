@@ -14,9 +14,15 @@ export async function POST(request: Request) {
     // Usamos admin client para ignorar RLS ya que es un endpoint público
     const supabaseAdmin = await createAdminClient();
 
-    // 1. Obtener el club_id base
-    const { data: clubData } = await supabaseAdmin.from('clubs').select('id').limit(1).single();
-    const clubId = clubData?.id;
+    // 1. Obtener el club_id base (Por defecto para este despliegue usamos el slug del club principal)
+    const { data: clubData } = await supabaseAdmin.from('clubs').select('id').eq('slug', 'club-sporting-saladar').single();
+    let clubId = clubData?.id;
+    
+    // Fallback por si no existe ese slug en desarrollo
+    if (!clubId) {
+      const { data: fallbackClub } = await supabaseAdmin.from('clubs').select('id').limit(1).single();
+      clubId = fallbackClub?.id;
+    }
 
     if (!clubId) {
       return NextResponse.json({ error: 'Club no encontrado' }, { status: 400 });

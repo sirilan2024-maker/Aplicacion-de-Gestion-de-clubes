@@ -8,6 +8,8 @@ export async function GET() {
   );
   
   const { data: registrations } = await supabase.from('registrations').select('*').order('created_at', { ascending: false }).limit(5);
+  const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5);
+  const { data: clubs } = await supabase.from('clubs').select('*').limit(5);
   
-  return NextResponse.json({ registrations });
+  return NextResponse.json({ registrations, profiles, clubs });
 }

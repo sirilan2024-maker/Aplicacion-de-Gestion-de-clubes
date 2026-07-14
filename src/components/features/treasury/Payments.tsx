@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getClubFeesAction, getClubFamiliesAction, createFeeAction } from "@/app/actions/treasury-actions";
+import { getClubFeesAction, getClubFamiliesAction, createFeeAction, getRegistrationPaymentsAction } from "@/app/actions/treasury-actions";
 
 // Badge helper for estados
 function EstadoBadge({ estado }: { estado: string }) {
@@ -31,8 +31,11 @@ export default function Payments() {
 
   const fetchFees = async () => {
     try {
-      const data = await getClubFeesAction();
-      setFees(data || []);
+      const [regularFees, registrationPayments] = await Promise.all([
+        getClubFeesAction(),
+        getRegistrationPaymentsAction()
+      ]);
+      setFees([...(regularFees || []), ...(registrationPayments || [])]);
     } catch (error) {
       console.error("Error fetching fees:", error);
     }

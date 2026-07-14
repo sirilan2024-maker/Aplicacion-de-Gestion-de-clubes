@@ -39,7 +39,7 @@ export const registrationSchema = z.object({
   tutor1Phone: z.string().optional(),
   tutorRelation: z.string().optional(),
   
-  // STEP 2: Documentos (En el form manejamos Files, pero aquí validamos que existan)
+  // STEP 2: Documentos
   // Las fotos obligatorias las manejaremos en el estado del componente para simplificar,
   // pero podemos requerir flags booleanas para saber si ya se subieron
   docsUploaded: z.boolean().default(false),
@@ -47,6 +47,32 @@ export const registrationSchema = z.object({
     centro: z.string().min(2, "El centro es requerido"),
     curso: z.string().min(4, "El curso es requerido"),
   })).optional(),
+
+  // EXTRAS DEL PASO 1 (MÉDICO, DEPORTIVO, FÍSICO)
+  playerSip: z.string().optional(),
+  
+  // Información Médica
+  medAlergias: z.string().optional(),
+  medEnfermedades: z.string().optional(),
+  medMedicacion: z.string().optional(),
+  medLesiones: z.string().optional(),
+  medOperaciones: z.string().optional(),
+  medRelevante: z.string().optional(),
+  medObservaciones: z.string().optional(),
+
+  // Perfil Deportivo
+  sportClubesAnteriores: z.string().optional(),
+  sportPosicionPrincipal: z.string().optional(),
+  sportPosicionSecundaria: z.string().optional(),
+  sportPosicionGustaria: z.string().optional(),
+  sportPieDominante: z.string().optional(),
+  sportAnosJugando: z.string().optional(),
+  sportObjetivo: z.string().optional(),
+
+  // Datos Físicos
+  fisicoAltura: z.string().optional(),
+  fisicoPeso: z.string().optional(),
+  fisicoTallaPie: z.string().optional(),
 
   // STEP 3: Cuotas
   wasInClub: z.boolean().default(false),

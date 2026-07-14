@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle, CreditCard } from "lucide-react";
+import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle, CreditCard, Lock } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { registrationSchema, RegistrationFormData } from "./schema";
@@ -27,6 +27,10 @@ export function RegistrationWizard() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "done">("idle");
   const [submittedData, setSubmittedData] = useState<RegistrationFormData | null>(null);
+  
+  // Estado para la simulación de Stripe
+  const [showStripeMock, setShowStripeMock] = useState(false);
+  const [stripePromiseResolver, setStripePromiseResolver] = useState<((value: unknown) => void) | null>(null);
 
   const methods = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema) as any,
@@ -85,8 +89,10 @@ export function RegistrationWizard() {
       // 0. Si elige tarjeta, simulamos el flujo de Stripe
       if (data.paymentMethod === "Stripe") {
         setPaymentStatus("processing");
-        // Simular llamada a pasarela de pago
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        setShowStripeMock(true);
+        // Esperamos a que el usuario "pague" en el modal
+        await new Promise(resolve => setStripePromiseResolver(() => resolve));
+        setShowStripeMock(false);
         setPaymentStatus("done");
       }
 
@@ -264,6 +270,66 @@ export function RegistrationWizard() {
               <li key={key}><strong>{key}:</strong> {error?.message?.toString()}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Stripe Mock Modal */}
+      {showStripeMock && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="bg-gray-50 border-b p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-blue-600 p-1.5 rounded text-white">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 leading-tight">SPORTING SALADAR</h3>
+                  <p className="text-xs text-gray-500">Pasarela de pago segura</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">A pagar</p>
+                <p className="font-bold text-lg text-gray-900">250,00 €</p>
+              </div>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700">Tarjeta</label>
+                <div className="flex h-10 w-full items-center rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-400">
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  <span>4242  4242  4242  4242</span>
+                  <div className="ml-auto flex gap-2">
+                    <span>12/34</span>
+                    <span>123</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-gray-700">Nombre en la tarjeta</label>
+                <div className="flex h-10 w-full items-center rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-400">
+                  {methods.getValues("tutor1Name") || methods.getValues("playerFirstName") || "Nombre Apellido"}
+                </div>
+              </div>
+              
+              <div className="pt-2 text-xs text-center flex items-center justify-center gap-1 text-gray-500">
+                <Lock className="w-3 h-3" /> Pagos procesados de forma segura por Stripe
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 pt-0">
+              <Button 
+                onClick={() => stripePromiseResolver && stripePromiseResolver(true)}
+                className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg font-bold"
+              >
+                Pagar 250,00 €
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

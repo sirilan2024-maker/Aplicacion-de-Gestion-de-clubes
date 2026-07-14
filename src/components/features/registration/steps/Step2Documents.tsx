@@ -195,13 +195,6 @@ export function Step2Documents() {
               El jugador tiene nacionalidad Extranjera
             </label>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox id="neverFederated" checked={neverFederated} onCheckedChange={(val) => register("neverFederated").onChange({ target: { value: val, name: "neverFederated" } })} />
-            <label htmlFor="neverFederated" className="text-sm font-medium text-gray-700 cursor-pointer">
-              El jugador NUNCA ha estado federado en España
-            </label>
-          </div>
         </div>
       </div>
 

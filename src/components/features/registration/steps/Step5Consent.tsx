@@ -132,7 +132,7 @@ export function Step5Consent() {
       <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
         <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-4">
           <HeartHandshake className="w-6 h-6 text-orange-500" />
-          Hospitality y Colaboración
+          Colaboración
         </h3>
         <p className="text-sm text-gray-600 mb-6">El club Sporting Saladar es una gran familia. ¿Te gustaría colaborar activamente?</p>
         

@@ -23,6 +23,10 @@ export const registrationSchema = z.object({
   // Las fotos obligatorias las manejaremos en el estado del componente para simplificar,
   // pero podemos requerir flags booleanas para saber si ya se subieron
   docsUploaded: z.boolean().default(false),
+  escolarizacion: z.array(z.object({
+    centro: z.string().min(2, "El centro es requerido"),
+    curso: z.string().min(4, "El curso es requerido"),
+  })).optional(),
 
   // STEP 3: Cuotas
   wasInClub: z.boolean().default(false),
@@ -38,7 +42,7 @@ export const registrationSchema = z.object({
   sizeCamisetaPaseo: z.string().min(1, "Requerido"),
   sizePantalonPaseo: z.string().min(1, "Requerido"),
 
-  // STEP 5: Hospitality & RGPD
+  // STEP 5: Colaboración & RGPD
   volunteerInterest: z.string().optional(),
   sponsorCompanyName: z.string().optional(),
   sponsorContactName: z.string().optional(),

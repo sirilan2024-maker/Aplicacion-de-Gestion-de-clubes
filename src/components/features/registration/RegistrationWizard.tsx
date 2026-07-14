@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft } from "lucide-react";
+import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle, CreditCard } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { registrationSchema, RegistrationFormData } from "./schema";
@@ -24,6 +24,9 @@ const STEPS = [
 export function RegistrationWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "done">("idle");
+  const [submittedData, setSubmittedData] = useState<RegistrationFormData | null>(null);
 
   const methods = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema) as any,
@@ -79,6 +82,14 @@ export function RegistrationWizard() {
   const onSubmit = async (data: RegistrationFormData) => {
     setIsSubmitting(true);
     try {
+      // 0. Si elige tarjeta, simulamos el flujo de Stripe
+      if (data.paymentMethod === "Stripe") {
+        setPaymentStatus("processing");
+        // Simular llamada a pasarela de pago
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        setPaymentStatus("done");
+      }
+
       // 1. Aquí se generarán los timestamps:
       const timestamp = new Date().toISOString();
       const payload = {
@@ -93,9 +104,11 @@ export function RegistrationWizard() {
 
       console.log("Submitting payload to Supabase:", payload);
       // Simular llamada a Server Action o Supabase API
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      alert("Inscripción enviada con éxito. Pasando a estado PENDIENTE DE REVISIÓN.");
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
+      setSubmittedData(data);
+      setIsSuccess(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error(error);
       alert("Ocurrió un error al enviar el formulario.");
@@ -103,6 +116,67 @@ export function RegistrationWizard() {
       setIsSubmitting(false);
     }
   };
+
+  if (isSuccess && submittedData) {
+    return (
+      <div className="w-full max-w-3xl mx-auto pb-12 animate-in fade-in zoom-in-95 duration-500">
+        <Card className="shadow-2xl border-0 overflow-hidden rounded-2xl">
+          <div className="bg-green-600 p-8 text-center text-white">
+            <CheckCircle className="w-20 h-20 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold mb-2">¡Inscripción Completada!</h2>
+          </div>
+          <CardContent className="p-8 space-y-6 bg-white text-center">
+            <p className="text-lg text-gray-700 font-medium">
+              La solicitud ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario realizar el primer pago de la cuota. Dicho pago permitirá confirmar la plaza del jugador, tramitar la licencia federativa y realizar el pedido de la equipación.
+            </p>
+
+            {submittedData.paymentMethod === "Stripe" && (
+              <div className="bg-green-50 text-green-800 p-6 rounded-xl border border-green-200 flex flex-col items-center gap-3 mt-6">
+                <CreditCard className="w-10 h-10 text-green-600" />
+                <div>
+                  <p className="font-bold text-lg">Pago completado con éxito mediante tarjeta.</p>
+                  <p className="text-sm mt-1">Hemos recibido tu primer pago correctamente. ¡Bienvenido al equipo!</p>
+                </div>
+              </div>
+            )}
+
+            {(submittedData.paymentMethod === "Transferencia" || submittedData.paymentMethod === "Contado") && (
+              <div className="bg-blue-50 text-left p-6 md:p-8 rounded-xl border border-blue-100 mt-6 shadow-inner">
+                <h3 className="text-blue-900 text-xl font-bold mb-4 flex items-center gap-2">
+                  <HeartPulse className="w-6 h-6 text-blue-600" /> Instrucciones para el Pago
+                </h3>
+                {submittedData.paymentMethod === "Transferencia" ? (
+                  <div className="space-y-4 text-sm text-blue-800">
+                    <p className="text-base">Por favor, realiza la transferencia bancaria a la siguiente cuenta:</p>
+                    <div className="bg-white p-4 rounded-lg border border-blue-200 text-center font-mono text-lg font-bold shadow-sm">
+                      ESXX XXXX XXXX XXXX XXXX
+                    </div>
+                    <ul className="list-disc pl-5 space-y-2 mt-4">
+                      <li><strong>Concepto:</strong> INSCRIPCION {submittedData.playerFirstName} {submittedData.playerLastName}</li>
+                      <li>Envía el justificante a <strong>secretaria@sportingsaladar.com</strong></li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="space-y-4 text-sm text-blue-800">
+                    <p className="text-base">Por favor, acude a las oficinas del club para realizar el pago en efectivo.</p>
+                    <ul className="list-disc pl-5 space-y-2 mt-4">
+                      <li><strong>Horario de Secretaría:</strong> Lunes a Jueves de 17:30 a 20:00.</li>
+                      <li>Indica el nombre del jugador ({submittedData.playerFirstName} {submittedData.playerLastName}) al realizar el pago.</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="bg-gray-50 p-6 border-t flex justify-center">
+            <Button className="bg-blue-600 hover:bg-blue-700 font-bold px-8" onClick={() => window.location.href = '/'}>
+              Volver al Inicio
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto pb-12">
@@ -168,7 +242,10 @@ export function RegistrationWizard() {
                   className="bg-green-600 hover:bg-green-700 text-white font-bold px-8 shadow-md"
                 >
                   {isSubmitting ? (
-                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Finalizando...</>
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" /> 
+                      {paymentStatus === "processing" ? "Procesando pago seguro..." : "Finalizando..."}
+                    </>
                   ) : (
                     <><Save className="w-5 h-5 mr-2" /> Completar Inscripción</>
                   )}

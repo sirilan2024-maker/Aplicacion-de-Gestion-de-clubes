@@ -214,15 +214,39 @@ export function Step1PersonalData() {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Posición principal</label>
-            <Input {...register("sportPosicionPrincipal")} placeholder="Ej. Defensa central, Mediocentro..." />
+            <select {...register("sportPosicionPrincipal")} className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+              <option value="">Seleccionar...</option>
+              <option value="Portero">Portero</option>
+              <option value="Defensa Central">Defensa Central</option>
+              <option value="Lateral">Lateral</option>
+              <option value="Mediocentro">Mediocentro</option>
+              <option value="Interior / Extremo">Interior / Extremo</option>
+              <option value="Delantero / Punta">Delantero / Punta</option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Posición secundaria</label>
-            <Input {...register("sportPosicionSecundaria")} placeholder="Otra posición donde rinda bien" />
+            <select {...register("sportPosicionSecundaria")} className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+              <option value="">Seleccionar...</option>
+              <option value="Portero">Portero</option>
+              <option value="Defensa Central">Defensa Central</option>
+              <option value="Lateral">Lateral</option>
+              <option value="Mediocentro">Mediocentro</option>
+              <option value="Interior / Extremo">Interior / Extremo</option>
+              <option value="Delantero / Punta">Delantero / Punta</option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Posición en la que le gustaría jugar</label>
-            <Input {...register("sportPosicionGustaria")} placeholder="Su preferencia personal" />
+            <select {...register("sportPosicionGustaria")} className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+              <option value="">Seleccionar...</option>
+              <option value="Portero">Portero</option>
+              <option value="Defensa Central">Defensa Central</option>
+              <option value="Lateral">Lateral</option>
+              <option value="Mediocentro">Mediocentro</option>
+              <option value="Interior / Extremo">Interior / Extremo</option>
+              <option value="Delantero / Punta">Delantero / Punta</option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Pie dominante</label>

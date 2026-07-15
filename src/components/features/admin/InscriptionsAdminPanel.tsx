@@ -33,9 +33,17 @@ export function InscriptionsAdminPanel() {
 
   const fetchInscriptions = async () => {
     setLoading(true);
-    const res = await getInscriptionsAction();
-    if (res.success && res.data) {
-      setInscriptions(res.data as PlayerInscription[]);
+    try {
+      const res = await getInscriptionsAction();
+      if (res.success && res.data) {
+        setInscriptions(res.data as PlayerInscription[]);
+      } else {
+        toast.error("Error al cargar las inscripciones (Revisa la consola)");
+        console.error("fetchInscriptions failed:", res);
+      }
+    } catch (e) {
+      toast.error("Error de conexión al cargar inscripciones");
+      console.error(e);
     }
     setLoading(false);
   };

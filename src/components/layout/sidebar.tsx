@@ -245,8 +245,9 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "GESTION",
         items: [
-          { name: "Tesoreria", href: "/admin/tesoreria", icon: Wallet },
-          { name: "Secretaria", href: "/admin/secretaria", icon: Settings },
+          { name: "Tesoreria", href: "/dashboard/treasury", icon: Wallet },
+          { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
+          { name: "Expedientes (Doc)", href: "/admin/secretaria", icon: FolderOpen },
           { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
           { name: "Configuracion de roles", href: "/admin/configuracion/roles", icon: Shield },
           { name: "Temporadas", href: "/admin/temporadas", icon: Timer },

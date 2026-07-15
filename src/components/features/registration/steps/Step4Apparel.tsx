@@ -48,17 +48,14 @@ export function Step4Apparel() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 bg-blue-50/30 p-6 rounded-xl border border-blue-100">
         {APPAREL_FIELDS.map((item) => (
           <div key={item.name} className="space-y-2">
-            <label className="text-sm font-semibold text-gray-800">{item.label} <span className="text-red-500">*</span></label>
+            <label className="text-sm font-semibold text-gray-800">{item.label} <span className="text-gray-400 text-xs font-normal">(Opcional)</span></label>
             <select 
               {...register(item.name)}
-              className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 shadow-sm transition-colors ${errors[item.name as keyof RegistrationFormData] ? 'border-red-500' : 'border-gray-300 hover:border-blue-400'}`}
+              className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 shadow-sm transition-colors border-gray-300 hover:border-blue-400`}
             >
               <option value="">Seleccionar Talla...</option>
               {CLOTHING_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
             </select>
-            {errors[item.name as keyof RegistrationFormData] && (
-              <p className="text-xs text-red-500">Requerido</p>
-            )}
           </div>
         ))}
       </div>

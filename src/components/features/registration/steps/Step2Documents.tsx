@@ -195,6 +195,12 @@ export function Step2Documents() {
               El jugador tiene nacionalidad Extranjera
             </label>
           </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="neverFederated" checked={neverFederated} onCheckedChange={(val) => register("neverFederated").onChange({ target: { value: val, name: "neverFederated" } })} />
+            <label htmlFor="neverFederated" className="text-sm font-medium text-gray-700 cursor-pointer">
+              El jugador nunca ha estado federado
+            </label>
+          </div>
         </div>
       </div>
 
@@ -212,18 +218,41 @@ export function Step2Documents() {
           </div>
 
           <div className="space-y-8">
-            {/* Bloque 1: Jugador */}
-            <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-              <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <UserCircle className="w-4 h-4 text-blue-500" /> A) Jugador
-              </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <FileUploadField label="Pasaporte" description="En vigor" />
-                <FileUploadField label="DNI/NIE" />
-                <FileUploadField label="Libro de familia" />
-                <FileUploadField label="Certificado de nacimiento" />
+            
+            {neverFederated && !isForeign && (
+              <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-blue-500" /> Documentación por primera vez
+                </h5>
+                <p className="text-xs text-gray-500 mb-4">Obligatorio al no haber estado federado nunca antes.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {isSenior || (birthDate && new Date().getFullYear() - new Date(birthDate).getFullYear() >= 14) ? (
+                    <FileUploadField label="DNI/NIE del Jugador" description="Obligatorio al tener 14 años o más" />
+                  ) : (
+                    <>
+                      <FileUploadField label="Libro de Familia" description="Si no tiene DNI" />
+                      <FileUploadField label="Certificado de nacimiento" description="Alternativa al Libro de Familia" />
+                    </>
+                  )}
+                  <FileUploadField label="Foto Carnet (Reciente)" description="Importante: tiene que ser actual" />
+                </div>
               </div>
-            </div>
+            )}
+
+            {isForeign && (
+              <>
+                {/* Bloque 1: Jugador */}
+                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                  <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <UserCircle className="w-4 h-4 text-blue-500" /> A) Jugador Extranjero
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <FileUploadField label="Pasaporte" description="En vigor" />
+                    <FileUploadField label="DNI/NIE" />
+                    <FileUploadField label="Libro de familia" />
+                    <FileUploadField label="Certificado de nacimiento" />
+                  </div>
+                </div>
 
             {/* Bloque 2: Escolarización */}
             <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
@@ -322,6 +351,8 @@ export function Step2Documents() {
                 <FileUploadField label="Carta Explicativa Firmada" />
               </div>
             </div>
+            </>
+            )}
 
           </div>
         </div>

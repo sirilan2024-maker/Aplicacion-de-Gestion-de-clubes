@@ -23,7 +23,7 @@ export const registrationSchema = z.object({
   // STEP 1: Personal & Family Data
   playerFirstName: z.string().min(2, "El nombre es requerido"),
   playerLastName: z.string().min(2, "Los apellidos son requeridos"),
-  playerDni: z.string().min(5, "El DNI/NIE es requerido").refine(isValidDniNie, "DNI/NIE incorrecto (Letra no válida)"),
+  playerDni: z.string().min(1, "El DNI/NIE es requerido"), // Eliminamos la validación estricta de letra
   birthDate: z.string().min(1, "La fecha de nacimiento es requerida"),
   nationality: z.string().min(2, "La nacionalidad es requerida"),
   isForeign: z.boolean().default(false),
@@ -35,7 +35,7 @@ export const registrationSchema = z.object({
   // Opcionales para Senior, requeridos para menores (lo validamos con superRefine)
   tutor1Name: z.string().optional(),
   tutor1LastName: z.string().optional(),
-  tutor1Dni: z.string().optional().refine(val => !val || isValidDniNie(val), "DNI/NIE del tutor incorrecto (Letra no válida)"),
+  tutor1Dni: z.string().optional(), // Eliminamos la validación estricta
   tutor1Email: z.string().email("Email inválido").optional().or(z.literal('')),
   tutor1Phone: z.string().optional(),
   tutorRelation: z.string().optional(),
@@ -82,12 +82,12 @@ export const registrationSchema = z.object({
   paymentPlan: z.enum(["Total", "Fraccionado", ""]).optional(),
 
   // STEP 4: Tallas
-  sizeCamisetaJuego: z.string().min(1, "Requerido"),
-  sizePantalonJuego: z.string().min(1, "Requerido"),
-  sizeChandal: z.string().min(1, "Requerido"),
-  sizeSudadera: z.string().min(1, "Requerido"),
-  sizeCamisetaPaseo: z.string().min(1, "Requerido"),
-  sizePantalonPaseo: z.string().min(1, "Requerido"),
+  sizeCamisetaJuego: z.string().optional(),
+  sizePantalonJuego: z.string().optional(),
+  sizeChandal: z.string().optional(),
+  sizeSudadera: z.string().optional(),
+  sizeCamisetaPaseo: z.string().optional(),
+  sizePantalonPaseo: z.string().optional(),
 
   // STEP 5: Colaboración & RGPD
   volunteerInterest: z.string().optional(),

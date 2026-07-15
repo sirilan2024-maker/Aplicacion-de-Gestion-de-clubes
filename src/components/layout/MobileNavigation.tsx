@@ -29,7 +29,8 @@ import {
   Globe,
   Timer,
   Menu,
-  X
+  X,
+  FolderOpen
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"

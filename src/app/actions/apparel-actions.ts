@@ -8,8 +8,10 @@ const DEFAULT_ITEMS = [
   'Pantalón de Juego',
   'Medias',
   'Chándal Oficial',
-  'Camiseta de Entrenamiento',
-  'Pantalón de Entrenamiento',
+  'Camiseta de Entrenamiento (1/2)',
+  'Camiseta de Entrenamiento (2/2)',
+  'Pantalón de Entrenamiento (1/2)',
+  'Pantalón de Entrenamiento (2/2)',
   'Sudadera',
   'Pantalón de paseo',
   'Camiseta de paseo',
@@ -170,23 +172,37 @@ export async function toggleApparelDeliveryAction(playerId: string, itemName: st
       .maybeSingle()
 
     if (!existing) {
-      // Si no existe, no se puede entregar (primero debe haber una talla asignada)
-      return { success: false, error: 'El jugador debe tener asignada una talla antes de marcarse como entregado.' }
+      if (['Medias', 'Mochila'].includes(itemName)) {
+        const { error: insertError } = await supabase
+          .from('player_apparel')
+          .insert({
+            player_id: playerId,
+            item_name: itemName,
+            size: '',
+            delivered: delivered,
+            delivered_at: delivered ? new Date().toISOString() : null
+          })
+        if (insertError) throw insertError
+      } else {
+        return { success: false, error: 'El jugador debe tener asignada una talla antes de marcarse como entregado.' }
+      }
+    } else {
+      const { error } = await supabase
+        .from('player_apparel')
+        .update({
+          delivered: delivered,
+          delivered_at: delivered ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+
+      if (error) throw error
     }
-
-    const { error } = await supabase
-      .from('player_apparel')
-      .update({
-        delivered: delivered,
-        delivered_at: delivered ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', existing.id)
-
-    if (error) throw error
 
     revalidatePath('/dashboard/utilleria')
     revalidatePath(`/dashboard/family/e/${playerId}/ropa`)
+    revalidatePath(`/dashboard/family/e/${playerId}/ficha`)
+    revalidatePath(`/dashboard/club/jugador/${playerId}`)
     return { success: true }
   } catch (error: any) {
     console.error('Error in toggleApparelDeliveryAction:', error.message)

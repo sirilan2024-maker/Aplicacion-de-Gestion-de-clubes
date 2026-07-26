@@ -35,7 +35,7 @@ export default function FamilyAttendancePage() {
       // Fetch attendance records for this player
       const { data: attData, error: attError } = await supabase
         .from('attendance')
-        .select('status, is_excused, notes, team_events(title, date, event_type)')
+        .select('status, notes, team_events(title, date, event_type)')
         .eq('player_id', playerId)
         .order('created_at', { ascending: false });
 
@@ -47,10 +47,8 @@ export default function FamilyAttendancePage() {
       let present = 0, absent = 0, excused = 0;
       records.forEach(r => {
         if (r.status === 'Presente') present++;
-        else if (r.status === 'Ausente' || r.status === 'Falta') {
-          if (r.is_excused) excused++;
-          else absent++;
-        }
+        else if (r.status === 'Justificada') excused++;
+        else if (r.status === 'Ausente' || r.status === 'Falta') absent++;
       });
       setStats({ present, absent, excused, total: records.length });
 
@@ -117,7 +115,7 @@ export default function FamilyAttendancePage() {
               let statusColor = "bg-gray-100 text-gray-600";
               let StatusIcon = Clock;
               if (record.status === 'Presente') { statusColor = "bg-green-100 text-green-700"; StatusIcon = CheckCircle2; }
-              else if (record.is_excused) { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
+              else if (record.status === 'Justificada') { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
               else if (record.status === 'Ausente' || record.status === 'Falta') { statusColor = "bg-red-100 text-red-700"; StatusIcon = XCircle; }
 
               return (
@@ -129,7 +127,7 @@ export default function FamilyAttendancePage() {
                   <div className="flex flex-col items-end">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase ${statusColor}`}>
                       <StatusIcon size={14} />
-                      {record.is_excused ? 'Justificada' : record.status}
+                      {record.status}
                     </span>
                     {record.notes && <span className="text-xs text-gray-400 mt-1">{record.notes}</span>}
                   </div>

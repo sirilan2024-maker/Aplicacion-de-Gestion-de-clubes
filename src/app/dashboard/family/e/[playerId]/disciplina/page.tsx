@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ShieldAlert, AlertTriangle } from "lucide-react";
+import { ShieldAlert, AlertTriangle, Eye } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { DisciplineModal } from "@/components/features/matches/DisciplineModal";
 
 export default function FamilyDisciplinePage() {
   const params = useParams();
@@ -14,6 +15,8 @@ export default function FamilyDisciplinePage() {
   const [playerInfo, setPlayerInfo] = useState<any>(null);
   const [cards, setCards] = useState<any[]>([]);
   const [stats, setStats] = useState({ yellow: 0, red: 0 });
+  const [showModal, setShowModal] = useState(false);
+  const [cardEvents, setCardEvents] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDiscipline();
@@ -59,8 +62,16 @@ export default function FamilyDisciplinePage() {
       // Sort by match date descending
       allCards.sort((a, b) => new Date(b.match?.fecha_hora || 0).getTime() - new Date(a.match?.fecha_hora || 0).getTime());
 
+      // Format for DisciplineModal
+      const formattedCardEvents = records.map(r => ({
+        match: r.partidos,
+        yellow: r.yellow_cards || 0,
+        red: r.red_cards || 0
+      })).sort((a, b) => new Date(b.match?.fecha_hora || 0).getTime() - new Date(a.match?.fecha_hora || 0).getTime());
+
       setStats({ yellow, red });
       setCards(allCards);
+      setCardEvents(formattedCardEvents);
 
     } catch (err: any) {
       toast.error("Error al cargar disciplina: " + err.message);
@@ -81,13 +92,20 @@ export default function FamilyDisciplinePage() {
     <div className="p-6 max-w-6xl mx-auto animate-in fade-in duration-500">
       <Toaster position="top-right" />
       
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-red-100 text-red-600 rounded-xl">
+      <div 
+        onClick={() => setShowModal(true)}
+        className="flex items-center gap-3 mb-8 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer group"
+      >
+        <div className="p-3 bg-red-100 text-red-600 rounded-xl group-hover:scale-105 transition-transform">
           <ShieldAlert size={24} />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Disciplina</h1>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">Disciplina</h1>
           <p className="text-gray-500 text-sm">Registro exclusivo de {playerInfo?.first_name}</p>
+        </div>
+        <div className="text-gray-400 group-hover:text-blue-500 flex items-center gap-2 px-3 py-1.5 bg-gray-50 group-hover:bg-blue-50 rounded-lg transition-colors">
+          <Eye size={16} />
+          <span className="text-sm font-semibold hidden sm:inline">Ver Estado del Ciclo</span>
         </div>
       </div>
 
@@ -143,6 +161,15 @@ export default function FamilyDisciplinePage() {
           </div>
         )}
       </div>
+
+      {showModal && (
+        <DisciplineModal 
+          player={{ id: playerId, first_name: playerInfo?.first_name, last_name: '' }}
+          cardEvents={cardEvents}
+          onClose={() => setShowModal(false)}
+          readOnly={true}
+        />
+      )}
     </div>
   );
 }

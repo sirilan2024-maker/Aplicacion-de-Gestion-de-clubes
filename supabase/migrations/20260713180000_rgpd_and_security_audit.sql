@@ -9,7 +9,7 @@ ALTER TABLE public.players ADD COLUMN IF NOT EXISTS consent_tutela_at TIMESTAMPT
 -- FASE 3: AUDITORÍA INTERNA DE CONTROL DE ROLES
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.auditoria_roles (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     usuario_afectado_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     rol_anterior TEXT,
@@ -70,7 +70,7 @@ SELECT
     birth_date,
     medical_info,
     allergies,
-    consent_image,
+    consent_image_at,
     consent_medical_at
 FROM public.players;
 
@@ -89,16 +89,14 @@ ON CONFLICT (id) DO UPDATE SET public = false;
 DO $$ 
 BEGIN
     -- Los padres pueden subir archivos solo a su propia carpeta (UID)
-    IF NOT EXISTS (SELECT 1 FROM storage.policies WHERE name = 'Padres suben DNI a su carpeta') THEN
-        INSERT INTO storage.policies (name, bucket_id, definition, role, action, check_expr)
-        VALUES ('Padres suben DNI a su carpeta', 'documentos-dni', 'auth.uid()::text = (storage.foldername(name))[1]', 'authenticated', 'INSERT', 'auth.uid()::text = (storage.foldername(name))[1]');
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Padres suben DNI a su carpeta' AND tablename = 'objects' AND schemaname = 'storage') THEN
+        CREATE POLICY "Padres suben DNI a su carpeta" ON storage.objects FOR INSERT TO authenticated
+        WITH CHECK (bucket_id = 'documentos-dni' AND auth.uid()::text = (storage.foldername(name))[1]);
     END IF;
 
     -- Los directivos ven todo, los padres ven lo suyo
-    IF NOT EXISTS (SELECT 1 FROM storage.policies WHERE name = 'Directivos y Padres leen DNI') THEN
-        INSERT INTO storage.policies (name, bucket_id, definition, role, action, check_expr)
-        VALUES ('Directivos y Padres leen DNI', 'documentos-dni', 
-        'auth.uid()::text = (storage.foldername(name))[1] OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN (''admin'',''coordinador'',''directivo''))', 
-        'authenticated', 'SELECT', null);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Directivos y Padres leen DNI' AND tablename = 'objects' AND schemaname = 'storage') THEN
+        CREATE POLICY "Directivos y Padres leen DNI" ON storage.objects FOR SELECT TO authenticated
+        USING (bucket_id = 'documentos-dni' AND (auth.uid()::text = (storage.foldername(name))[1] OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','coordinador','directivo'))));
     END IF;
 END $$;

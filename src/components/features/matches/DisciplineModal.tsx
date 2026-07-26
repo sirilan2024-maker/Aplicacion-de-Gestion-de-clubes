@@ -8,13 +8,16 @@ import { useRouter } from "next/navigation"
 interface DisciplineModalProps {
   player: any
   cardEvents: any[]
-  recentMatches: any[]
-  convocatorias: any[]
+  recentMatches?: any[]
+  convocatorias?: any[]
   onClose: () => void
   onCardsUpdated?: (yellowDelta: number, redDelta: number, matchId: string, yellows: number, reds: number) => void
+  readOnly?: boolean
 }
 
-export function DisciplineModal({ player, cardEvents, recentMatches, convocatorias, onClose, onCardsUpdated }: DisciplineModalProps) {
+const EMPTY_ARRAY: any[] = [];
+
+export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRAY, convocatorias = EMPTY_ARRAY, onClose, onCardsUpdated, readOnly = false }: DisciplineModalProps) {
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [savingCards, setSavingCards] = useState<string | null>(null)
@@ -250,26 +253,30 @@ export function DisciplineModal({ player, cardEvents, recentMatches, convocatori
         </div>
         
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center gap-4">
-          <button 
-            onClick={() => setIsEditing(!isEditing)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm ${
-              isEditing 
-                ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
-                : 'bg-white border border-slate-200 text-blue-600 hover:border-blue-200 hover:bg-blue-50 shadow-sm'
-            }`}
-          >
-            {isEditing ? (
-              <>Ver Historial</>
-            ) : (
-              <><Edit3 size={16} /> Gestionar Tarjetas</>
-            )}
-          </button>
+          {!readOnly ? (
+            <button 
+              onClick={() => setIsEditing(!isEditing)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm ${
+                isEditing 
+                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+                  : 'bg-white border border-slate-200 text-blue-600 hover:border-blue-200 hover:bg-blue-50 shadow-sm'
+              }`}
+            >
+              {isEditing ? (
+                <>Ver Historial</>
+              ) : (
+                <><Edit3 size={16} /> Gestionar Tarjetas</>
+              )}
+            </button>
+          ) : (
+            <div></div>
+          )}
           
           <button 
             onClick={onClose}
             className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all text-sm"
           >
-            Guardar
+            {readOnly ? 'Cerrar' : 'Guardar'}
           </button>
         </div>
       </div>

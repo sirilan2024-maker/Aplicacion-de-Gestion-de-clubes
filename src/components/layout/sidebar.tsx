@@ -54,6 +54,7 @@ const IconMap: Record<string, React.ComponentType<any>> = {
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { EditClubModal } from "@/components/features/admin/EditClubModal"
 
 type NavItem = {
   name: string;
@@ -74,10 +75,11 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
   const [collapsed, setCollapsed] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [availableRoles, setAvailableRoles] = useState<string[]>([])
-  const [clubName, setClubName] = useState<string>("Cargando...")
+  const [clubInfo, setClubInfo] = useState<{id: string, name: string, logo_url: string | null} | null>(null)
   const [equipos, setEquipos] = useState<any[]>([])
   const [linkedPlayers, setLinkedPlayers] = useState<any[]>([])
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
+  const [showEditClub, setShowEditClub] = useState(false)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
   const supabase = createClient()
 
@@ -114,11 +116,11 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           if (profile.club_id) {
             const { data: club } = await supabase
               .from("clubs")
-              .select("name")
+              .select("id, name, logo_url")
               .eq("id", profile.club_id)
               .single()
               
-            if (club) setClubName(club.name)
+            if (club) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
             // Fetch equipos
             let query = supabase.from('teams').select("id, name, category").eq("club_id", profile.club_id).order("name")
@@ -199,13 +201,35 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
                setGlobalNavItems(parsedNavs)
             }
           } else {
-            setClubName("Sin Club")
+            setClubInfo({ id: "", name: "Sin Club", logo_url: null })
           }
         }
       }
     }
     fetchData()
   }, [supabase])
+
+  // Effect to handle Admin impersonation of Family View
+  // If the URL has a player ID that isn't in linkedPlayers, fetch it directly
+  useEffect(() => {
+    if (activeFamilyPlayerId && !linkedPlayers.find(lp => lp.player_id === activeFamilyPlayerId)) {
+      const fetchSpecificPlayer = async () => {
+        const { data: specificPlayer } = await supabase
+          .from('players')
+          .select('id, first_name, last_name, status, teams(id, name)')
+          .eq('id', activeFamilyPlayerId)
+          .single();
+          
+        if (specificPlayer && specificPlayer.status !== 'inactive') {
+          setLinkedPlayers(prev => {
+            if (prev.some(p => p.player_id === specificPlayer.id)) return prev;
+            return [...prev, { player_id: specificPlayer.id, players: specificPlayer }];
+          });
+        }
+      };
+      fetchSpecificPlayer();
+    }
+  }, [activeFamilyPlayerId, linkedPlayers, supabase]);
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href)
@@ -245,7 +269,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "GESTION",
         items: [
-          { name: "Tesoreria", href: "/dashboard/treasury", icon: Wallet },
+          { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
           { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
           { name: "Expedientes (Doc)", href: "/admin/secretaria", icon: FolderOpen },
           { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
@@ -303,15 +327,20 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     ]
   } else if (activeFamilyPlayerId && activeFamilyPlayer) {
     // FAMILY PLAYER CONTEXT
+    const hasTeam = !!activeFamilyPlayer.players?.teams?.name;
+    const teamItems = hasTeam ? [
+      { name: "Plantilla",    href: `/dashboard/family/e/${activeFamilyPlayerId}/plantilla`, icon: Users },
+      { name: "Partidos",     href: `/dashboard/family/e/${activeFamilyPlayerId}/partidos`, icon: Trophy },
+      { name: "Eventos",      href: `/dashboard/family/e/${activeFamilyPlayerId}/eventos`, icon: CalendarDays },
+      { name: "Entrenamientos", href: `/dashboard/family/e/${activeFamilyPlayerId}/entrenamientos`, icon: Target },
+      { name: "Asistencia",   href: `/dashboard/family/e/${activeFamilyPlayerId}/asistencia`, icon: ClipboardCheck },
+    ] : [];
+
     navGroups = [
       {
-        label: `Mi Equipo: ${activeFamilyPlayer.players?.teams?.name || 'Sin equipo'}`,
+        label: hasTeam ? `Mi Equipo: ${activeFamilyPlayer.players.teams.name}` : 'Sin equipo',
         items: [
-          { name: "Plantilla",    href: `/dashboard/family/e/${activeFamilyPlayerId}/plantilla`, icon: Users },
-          { name: "Partidos",     href: `/dashboard/family/e/${activeFamilyPlayerId}/partidos`, icon: Trophy },
-          { name: "Eventos",      href: `/dashboard/family/e/${activeFamilyPlayerId}/eventos`, icon: CalendarDays },
-          { name: "Entrenamientos", href: `/dashboard/family/e/${activeFamilyPlayerId}/entrenamientos`, icon: Target },
-          { name: "Asistencia",   href: `/dashboard/family/e/${activeFamilyPlayerId}/asistencia`, icon: ClipboardCheck },
+          ...teamItems,
           { name: "Mensajes",     href: `/dashboard/family/e/${activeFamilyPlayerId}/mensajes`, icon: MessageSquare },
           { name: "Equipación/Ropa", href: `/dashboard/family/e/${activeFamilyPlayerId}/ropa`, icon: Shirt },
           { name: "Ficha Técnica",href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },
@@ -322,7 +351,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         label: "TEAMS CLUB",
         items: [
           { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
-          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+          { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]
       }
@@ -339,14 +368,22 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     );
     
     const isStaff = userRole === 'admin' || userRole === 'coordinador' || userRole === 'utillero';
+    const isPlayerOrFamily = userRole === 'jugador' || userRole === 'tutor' || userRole === 'familiar' || userRole === 'family' || userRole === 'familia';
+
+    const filteredNavItems = globalNavItems.filter(n => {
+      if (isPlayerOrFamily && (n.name.toLowerCase() === "directorio" || n.href.includes("/club/miembros"))) {
+        return false;
+      }
+      return true;
+    });
     
     navGroups = [
       {
         label: "General / Club",
         items: [
-          ...(globalNavItems.length > 0 ? globalNavItems : [
+          ...(filteredNavItems.length > 0 ? filteredNavItems : [
             { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
-            { name: "Directorio",   href: "/dashboard/club/miembros", icon: Users },
+            ...(!isPlayerOrFamily ? [{ name: "Directorio",   href: "/dashboard/club/miembros", icon: Users }] : []),
           ]),
           ...(isCoach && !hasMisEquipos ? [{ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield }] : []),
           ...(isStaff ? [{ name: "Utillería", href: "/dashboard/utilleria", icon: Shirt }] : []),
@@ -370,6 +407,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
   }
 
   return (
+    <>
     <aside
       className={cn(
         "sticky top-0 flex flex-col transition-all duration-300 ease-in-out shrink-0 h-screen",
@@ -380,25 +418,42 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {/* ── Brand ──────────────────────────────── */}
       <div
         className={cn(
-          "h-14 flex items-center justify-between overflow-hidden shrink-0",
-          isAdmin ? "border-b border-slate-800" : "border-b border-gray-100",
-          collapsed ? "justify-center" : "px-4"
+          "min-h-[84px] py-2 flex items-center justify-between overflow-hidden shrink-0",
+          isAdmin ? "border-b border-slate-800 cursor-pointer hover:bg-slate-800/10 transition-colors" : "border-b border-gray-100",
+          collapsed ? "justify-center" : "px-3"
         )}
+        onClick={() => {
+          if (isAdmin && clubInfo) setShowEditClub(true);
+        }}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 shadow-sm shadow-blue-200">
-            <Shield size={16} className="text-white" />
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden p-0.5 shadow-sm border border-slate-200">
+            {clubInfo?.logo_url ? (
+              <img src={clubInfo.logo_url} alt="Escudo" className="w-full h-full object-contain p-0" />
+            ) : (
+              <Shield size={36} className="text-slate-400" />
+            )}
           </div>
           {!collapsed && (
-            <div className="min-w-0">
-              <p className={cn("text-[14px] font-bold truncate leading-tight", isAdmin ? "text-slate-100" : "text-slate-900")}>
-                {clubName}
-              </p>
-              <p className={cn("text-[11px] truncate", isAdmin ? "text-slate-400" : "text-gray-400")}>Temp. 2024/25</p>
+            <div className="min-w-0 flex-1 flex flex-col justify-center">
+              {clubInfo ? (
+                <>
+                  <div className={cn("text-[12px] font-extrabold leading-tight uppercase tracking-tight flex flex-col", isAdmin ? "text-slate-100" : "text-slate-900")}>
+                    {clubInfo.name.split(' ').map((word, i) => (
+                      <span key={i} className="block leading-none py-[1px]">{word}</span>
+                    ))}
+                  </div>
+                  <p className={cn("text-[10px] font-semibold tracking-wide uppercase mt-1", isAdmin ? "text-slate-400" : "text-gray-400")}>
+                    Temp. 2024/25
+                  </p>
+                </>
+              ) : (
+                <span className="text-[12px] text-gray-400">Cargando...</span>
+              )}
             </div>
           )}
         </div>
-        {!collapsed && (userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') && (
+        {!collapsed && (
           <NotificationBell />
         )}
       </div>
@@ -485,7 +540,12 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
                   {linkedPlayers.map(lp => (
                     <button
                       key={lp.player_id}
-                      onClick={() => { setShowTeamDropdown(false); router.push(`/dashboard/family/e/${lp.player_id}/plantilla`); }}
+                      onClick={() => { 
+                        setShowTeamDropdown(false); 
+                        const isPlayerRoute = pathname.match(/^\/dashboard\/family\/e\/[^\/]+\/(.+)$/);
+                        const subroute = isPlayerRoute ? isPlayerRoute[1] : 'perfil';
+                        router.push(`/dashboard/family/e/${lp.player_id}/${subroute}`); 
+                      }}
                       className={cn(
                         "w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2",
                         activeFamilyPlayerId === lp.player_id ? "text-blue-700 font-bold bg-blue-50/50" : "text-gray-700 font-medium hover:bg-blue-50"
@@ -637,5 +697,22 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         }
       </button>
     </aside>
+
+    {clubInfo && isAdmin && (
+      <EditClubModal 
+        open={showEditClub} 
+        onClose={() => setShowEditClub(false)} 
+        clubId={clubInfo.id}
+        currentName={clubInfo.name}
+        currentLogoUrl={clubInfo.logo_url}
+        onSuccess={() => {
+          // Refetch simple club info
+          supabase.from('clubs').select('id, name, logo_url').eq('id', clubInfo.id).single().then(({data}) => {
+            if (data) setClubInfo({ id: data.id, name: data.name, logo_url: data.logo_url });
+          });
+        }}
+      />
+    )}
+    </>
   )
 }

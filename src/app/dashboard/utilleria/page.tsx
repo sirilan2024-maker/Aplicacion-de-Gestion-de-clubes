@@ -35,8 +35,10 @@ const APPAREL_ITEMS = [
   { key: 'Pantalón de Juego', label: '🩳 Pan. Juego' },
   { key: 'Medias', label: '🧦 Medias' },
   { key: 'Chándal Oficial', label: '🧥 Chándal' },
-  { key: 'Camiseta de Entrenamiento', label: '👕 Cam. Entr.' },
-  { key: 'Pantalón de Entrenamiento', label: '🩳 Pan. Entr.' },
+  { key: 'Camiseta de Entrenamiento (1/2)', label: '👕 Cam. Entr. (1/2)' },
+  { key: 'Camiseta de Entrenamiento (2/2)', label: '👕 Cam. Entr. (2/2)' },
+  { key: 'Pantalón de Entrenamiento (1/2)', label: '🩳 Pant. Entr. (1/2)' },
+  { key: 'Pantalón de Entrenamiento (2/2)', label: '🩳 Pant. Entr. (2/2)' },
   { key: 'Sudadera', label: '🧥 Sudadera' },
   { key: 'Camiseta de paseo', label: '👕 Cam. Paseo' },
   { key: 'Pantalón de paseo', label: '🩳 Pan. Paseo' },
@@ -586,25 +588,38 @@ export default function UtilleriaDashboardPage() {
                               >
                                 <div className="flex items-center justify-center gap-1 min-w-[95px] mx-auto">
                                   {/* SELECT DE TALLAS */}
-                                  <select
-                                    value={info.size || ''}
-                                    onChange={(e) => handleSizeChange(p.id, item.key, e.target.value)}
-                                    className={`px-1 py-0.5 text-[10px] font-black rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-16 text-center shadow-sm bg-white ${
-                                      isDelivered 
-                                        ? 'border-emerald-300 text-emerald-800' 
-                                        : info.size 
-                                          ? 'border-amber-250 text-amber-900 font-bold'
+                                  {['Medias', 'Mochila'].includes(item.key) ? (
+                                    <select
+                                      disabled
+                                      className={`px-1 py-0.5 text-[10px] font-black rounded-lg border w-16 text-center shadow-sm bg-white ${
+                                        isDelivered 
+                                          ? 'border-emerald-300 text-emerald-800' 
                                           : 'border-slate-200 text-slate-400'
-                                    }`}
-                                  >
-                                    <option value="">-</option>
-                                    {(item.key === 'Medias' ? SOCKS_SIZES : CLOTHING_SIZES).map(sz => (
-                                      <option key={sz} value={sz}>{sz}</option>
-                                    ))}
-                                  </select>
+                                      }`}
+                                    >
+                                      <option value="">-</option>
+                                    </select>
+                                  ) : (
+                                    <select
+                                      value={info.size || ''}
+                                      onChange={(e) => handleSizeChange(p.id, item.key, e.target.value)}
+                                      className={`px-1 py-0.5 text-[10px] font-black rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-16 text-center shadow-sm bg-white ${
+                                        isDelivered 
+                                          ? 'border-emerald-300 text-emerald-800' 
+                                          : info.size 
+                                            ? 'border-amber-250 text-amber-900 font-bold'
+                                            : 'border-slate-200 text-slate-400'
+                                      }`}
+                                    >
+                                      <option value="">-</option>
+                                      {CLOTHING_SIZES.map(sz => (
+                                        <option key={sz} value={sz}>{sz}</option>
+                                      ))}
+                                    </select>
+                                  )}
 
                                   {/* CHECKBOX DE ENTREGA */}
-                                  {info.size && (
+                                  {(info.size || ['Medias', 'Mochila'].includes(item.key)) && (
                                     <button
                                       onClick={() => handleToggleDelivery(p.id, item.key, isDelivered)}
                                       disabled={isToggling}
@@ -693,25 +708,38 @@ export default function UtilleriaDashboardPage() {
 
                             <div className="flex items-center gap-1.5 shrink-0">
                               {/* SELECT TALLA */}
-                              <select
-                                value={info.size || ''}
-                                onChange={(e) => handleSizeChange(p.id, item.key, e.target.value)}
-                                className={`px-1.5 py-1 text-[11px] font-black rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-20 text-center shadow-sm bg-white ${
-                                  isDelivered 
-                                    ? 'border-emerald-300 text-emerald-800' 
-                                    : info.size 
-                                      ? 'border-amber-250 text-amber-900 font-bold'
+                              {['Medias', 'Mochila'].includes(item.key) ? (
+                                <select
+                                  disabled
+                                  className={`px-1.5 py-1 text-[11px] font-black rounded-lg border w-20 text-center shadow-sm bg-white ${
+                                    isDelivered 
+                                      ? 'border-emerald-300 text-emerald-800' 
                                       : 'border-slate-200 text-slate-400'
-                                }`}
-                              >
-                                <option value="">-</option>
-                                {(item.key === 'Medias' ? SOCKS_SIZES : CLOTHING_SIZES).map(sz => (
-                                  <option key={sz} value={sz}>{sz}</option>
-                                ))}
-                              </select>
+                                  }`}
+                                >
+                                  <option value="">-</option>
+                                </select>
+                              ) : (
+                                <select
+                                  value={info.size || ''}
+                                  onChange={(e) => handleSizeChange(p.id, item.key, e.target.value)}
+                                  className={`px-1.5 py-1 text-[11px] font-black rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-20 text-center shadow-sm bg-white ${
+                                    isDelivered 
+                                      ? 'border-emerald-300 text-emerald-800' 
+                                      : info.size 
+                                        ? 'border-amber-250 text-amber-900 font-bold'
+                                        : 'border-slate-200 text-slate-400'
+                                  }`}
+                                >
+                                  <option value="">-</option>
+                                  {CLOTHING_SIZES.map(sz => (
+                                    <option key={sz} value={sz}>{sz}</option>
+                                  ))}
+                                </select>
+                              )}
 
                               {/* CHECKBOX ENTREGA */}
-                              {info.size && (
+                              {(info.size || ['Medias', 'Mochila'].includes(item.key)) && (
                                 <button
                                   onClick={() => handleToggleDelivery(p.id, item.key, isDelivered)}
                                   disabled={isToggling}

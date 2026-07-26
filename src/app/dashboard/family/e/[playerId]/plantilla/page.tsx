@@ -42,7 +42,7 @@ export default function FamilyTeamRosterPage() {
       // 2. Fetch all teammates (ONLY public fields: id, name, position, avatar, birth_date)
       const { data: roster, error: rosterError } = await supabase
         .from('players')
-        .select('id, first_name, last_name, nickname, avatar_url, posicion, dorsal, birth_date')
+        .select('id, first_name, last_name, nickname, avatar_url, posicion_principal, dorsal, birth_date')
         .eq('team_id', player.team_id)
         .order('first_name');
         
@@ -64,7 +64,7 @@ export default function FamilyTeamRosterPage() {
           memberType: 'staff'
         }));
         
-      const players = (roster || []).map(p => ({...p, memberType: 'player'}));
+      const players = (roster || []).map(p => ({...p, posicion: p.posicion_principal, memberType: 'player'}));
       setTeammates([...coaches, ...players]);
       
     } catch (err: any) {

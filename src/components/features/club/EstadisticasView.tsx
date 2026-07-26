@@ -58,7 +58,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           .from('player_season_history')
           .select(`
             team_id,
-            players!inner (id, first_name, last_name, height, weight, status, posicion, posicion_principal, dorsal)
+            players!inner (id, first_name, last_name, height, weight, status, posicion_principal, dorsal)
           `)
           .in('team_id', teamIds)
           .eq('season_id', activeSeason.id)

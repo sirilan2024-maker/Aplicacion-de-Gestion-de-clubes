@@ -1,32 +1,45 @@
 // src/components/features/treasury/Subscriptions.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
-
+import { Download, CreditCard, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useRouter } from "next/navigation";
-import { createCheckoutSession } from "@/actions/stripeActions"; // server action
-import { getFamilyFeesAction } from "@/app/actions/treasury-actions";
+import { createCheckoutSession } from "@/actions/stripeActions";
+import { getFamilyFeesAction, getPlayerFeesAction, getReceiptSignedUrlAction, downloadPaymentReceiptAction, downloadFeeReceiptAction } from "@/app/actions/treasury-actions";
 
-// Badge helper (reuse) – can be moved to a shared utils file later
 function EstadoBadge({ estado }: { estado: string }) {
   const colors: Record<string, string> = {
-    pagado: "bg-green-100 text-green-800",
-    pendiente: "bg-yellow-100 text-yellow-800",
-    fallido: "bg-red-100 text-red-800",
+    pagado: "bg-green-100 text-green-700 border border-green-200",
+    pendiente: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+    fallido: "bg-red-100 text-red-700 border border-red-200",
+    cancelado: "bg-red-100 text-red-700 border border-red-200",
   };
-  const className = colors[estado] ?? "bg-gray-100 text-gray-800";
+  const className = colors[estado] ?? "bg-gray-100 text-gray-700 border border-gray-200";
+  const icons: Record<string, string> = {
+    pagado: "✅",
+    pendiente: "⏳",
+    fallido: "❌",
+    cancelado: "❌",
+  };
+  const icon = icons[estado] ?? "•";
   const label = estado.charAt(0).toUpperCase() + estado.slice(1);
   return (
-    <span className={`px-2 py-1 text-xs font-medium rounded ${className}`}>{label}</span>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full ${className}`}>
+      <span className="text-sm leading-none flex items-center justify-center mb-[1px]">{icon}</span>
+      <span className="leading-none">{label}</span>
+    </span>
   );
 }
 
-export default function Subscriptions() {
+export default function Subscriptions({ playerId }: { playerId?: string } = {}) {
   const [fees, setFees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const router = useRouter();
+
   useEffect(() => {
     const status = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('status') : null;
     if (status === 'success') {
@@ -34,18 +47,21 @@ export default function Subscriptions() {
     }
   }, []);
 
-  // Load only the fees belonging to the logged‑in family (profile)
   useEffect(() => {
-    const fetchFamilyFees = async () => {
+    const fetchFees = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error("Usuario no autenticado");
         setLoading(false);
         return;
       }
       try {
-        const data = await getFamilyFeesAction(user.id);
+        let data;
+        if (playerId) {
+          data = await getPlayerFeesAction(playerId);
+        } else {
+          data = await getFamilyFeesAction(user.id);
+        }
         setFees(data || []);
       } catch (err) {
         console.error("Error cargando cuotas:", err);
@@ -53,8 +69,8 @@ export default function Subscriptions() {
         setLoading(false);
       }
     };
-    fetchFamilyFees();
-  }, []);
+    fetchFees();
+  }, [playerId]);
 
   const handlePayNow = async (feeId: string) => {
     try {
@@ -63,73 +79,230 @@ export default function Subscriptions() {
         successUrl: `${window.location.origin}/payments?status=success`,
         cancelUrl: `${window.location.origin}/payments?status=cancel`,
       });
+      if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+        alert("Falta la clave pública de Stripe (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY). Revisa tu configuración o avisa al administrador.");
+        return;
+      }
       const stripe = (await import("@stripe/stripe-js")).loadStripe(
-        process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+        process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
       );
       const stripeInstance = await stripe;
       if (stripeInstance) {
-        // redirectToCheckout was removed from @stripe/stripe-js types in v5 but still works at runtime
         await (stripeInstance as any).redirectToCheckout({ sessionId });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error creando checkout:", e);
+      alert(e.message || "Ocurrió un error al iniciar el pago.");
     }
   };
 
+  const handleDownloadReceipt = async (urlPath: string, isFullUrl: boolean = false) => {
+    setDownloadingId(urlPath);
+    try {
+      let url = urlPath;
+      if (!isFullUrl) {
+        const result = await getReceiptSignedUrlAction(urlPath);
+        if (typeof result === 'string') {
+          url = result;
+        } else {
+          throw new Error("Recibo no disponible");
+        }
+      } else {
+         const supabase = createClient();
+         const { data } = await supabase.storage.from('recibos_pagos').createSignedUrl(urlPath, 60 * 15, { download: true });
+         if (data?.signedUrl) {
+             url = data.signedUrl;
+         } else {
+             throw new Error("Recibo parcial no disponible");
+         }
+      }
+      window.open(url, '_blank');
+    } catch (e) {
+      console.error("Error obteniendo recibo:", e);
+      alert('No se pudo obtener el recibo. Inténtalo de nuevo.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadPaymentReceipt = async (paymentId: string) => {
+    setDownloadingId(paymentId);
+    try {
+      const res = await downloadPaymentReceiptAction(paymentId);
+      if (res?.url) {
+        window.open(res.url, '_blank');
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(e.message || "Error al generar o descargar el recibo.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadFeeReceipt = async (feeId: string) => {
+    setDownloadingId(feeId);
+    try {
+      const res = await downloadFeeReceiptAction(feeId);
+      if (res?.url) {
+        window.open(res.url, '_blank');
+      } else {
+        alert("No se pudo obtener el recibo.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(e.message || "Error al generar o descargar el recibo.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   if (loading) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="p-4 bg-white rounded-xl shadow-sm space-y-4">
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-1/3" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-      <h2 className="text-xl font-semibold">Mis Cuotas y Suscripciones</h2>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Concepto</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Importe</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {fees.map((fee) => (
-              <tr key={fee.id}>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{fee.concept}</td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                  {(fee.amount_cents / 100).toFixed(2)} {fee.currency?.toUpperCase()}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                  <EstadoBadge estado={fee.estado} />
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                  {fee.estado === "pendiente" && (
-                    <button
-                      onClick={() => handlePayNow(fee.id)}
-                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                    >
-                      Pagar ahora
-                    </button>
-                  )}
-                  {fee.estado !== "pendiente" && "-"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    return (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="p-4 bg-gray-50 rounded-xl space-y-2">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ))}
       </div>
+    );
+  }
+
+  const totalFacturado = fees.reduce((sum, f) => sum + (f.amount_cents / 100), 0);
+  const totalAbonado = fees.reduce((sum, f) => sum + (f.estado === 'pagado' ? (f.amount_cents / 100) : ((f.amount_paid_cents || 0) / 100)), 0);
+  const totalPendiente = totalFacturado - totalAbonado;
+
+  return (
+    <div className="space-y-6">
+      
+      {/* Resumen Analítico */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cuota Temporada</p>
+          <p className="text-2xl font-black text-slate-800">{totalFacturado.toFixed(2)} €</p>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+          <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Abonado</p>
+          <p className="text-2xl font-black text-emerald-700">{totalAbonado.toFixed(2)} €</p>
+        </div>
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
+          <p className="text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-1">Saldo Pendiente</p>
+          <p className="text-2xl font-black text-rose-700">{totalPendiente.toFixed(2)} €</p>
+        </div>
+      </div>
+
+      {fees.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium">No hay cuotas registradas aún.</p>
+          <p className="text-xs mt-1">Cuando Secretaría genere un cobro, aparecerá aquí.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Concepto</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Importe</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pendiente</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Método</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Fecha</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {fees.map((fee) => (
+                <Fragment key={fee.id}>
+                  <tr className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 flex items-center gap-2">
+                      {fee.payments && fee.payments.length > 0 && (
+                        <button onClick={() => toggleRow(fee.id)} className="text-gray-400 hover:text-gray-700">
+                          {expandedRows[fee.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      )}
+                      {fee.concept}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-gray-800">
+                      {(fee.amount_cents / 100).toFixed(2)} €
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-rose-600">
+                      {((fee.amount_cents - (fee.amount_paid_cents || 0)) / 100).toFixed(2)} €
+                    </td>
+                    <td className="px-4 py-3">
+                      <EstadoBadge estado={fee.estado || 'pendiente'} />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 font-medium">
+                      {fee.payment_method || (fee.payments && fee.payments.length > 0 ? fee.payments[0].payment_method : '–')}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : '–'}
+                    </td>
+                    <td className="px-4 py-3 text-sm flex gap-2">
+                      {fee.estado === 'pendiente' && (
+                        <button
+                          onClick={() => handlePayNow(fee.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                          <CreditCard size={13} />
+                          Pagar ahora
+                        </button>
+                      )}
+                      {fee.estado === 'pagado' && (
+                         <button
+                           onClick={() => handleDownloadFeeReceipt(fee.id)}
+                           disabled={downloadingId === fee.id}
+                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                         >
+                           <Download size={13} />
+                           {downloadingId === fee.id ? "Generando..." : "Recibo PDF"}
+                         </button>
+                      )}
+                    </td>
+                  </tr>
+                  
+                  {/* Fila expandida de historial de pagos */}
+                  {expandedRows[fee.id] && fee.payments && fee.payments.length > 0 && (
+                    <tr className="bg-slate-50/50">
+                      <td colSpan={7} className="px-8 py-4">
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Historial de Entregas (Recibos Parciales)</h4>
+                          <table className="min-w-full divide-y divide-gray-100">
+                            <tbody>
+                              {fee.payments.map((payment: any) => (
+                                <tr key={payment.id} className="text-sm">
+                                  <td className="py-2 text-gray-600">{new Date(payment.created_at).toLocaleDateString('es-ES')}</td>
+                                  <td className="py-2 text-gray-600">{payment.payment_method}</td>
+                                  <td className="py-2 font-bold text-emerald-600">{(payment.amount_cents / 100).toFixed(2)} €</td>
+                                  <td className="py-2 text-right">
+                                     <button 
+                                       onClick={() => handleDownloadPaymentReceipt(payment.id)}
+                                       disabled={downloadingId === payment.id}
+                                       className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                     >
+                                       <FileText size={14} /> {downloadingId === payment.id ? "Generando PDF..." : "Descargar PDF"}
+                                     </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

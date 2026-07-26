@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSignedDniUrlAction } from "@/app/actions/secretaria-actions";
-import { getInscriptionsAction, approveInscriptionAction, requestCorrectionAction, rejectInscriptionAction } from "@/app/actions/inscriptions-actions";
+import { getInscriptionsAction, approveInscriptionAction, requestCorrectionAction, rejectInscriptionAction, updateRegistrationEmailAction, resetPasswordAction } from "@/app/actions/inscriptions-actions";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 
@@ -21,6 +21,8 @@ interface PlayerInscription {
   status: InscriptionStatus;
   paymentMethod: string;
   feeTotal: number;
+  userId?: string;
+  raw_form_data?: any;
 }
 
 export function InscriptionsAdminPanel() {
@@ -30,6 +32,10 @@ export function InscriptionsAdminPanel() {
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+
+  const [editEmailModalOpen, setEditEmailModalOpen] = useState(false);
+  const [selectedRegForEmail, setSelectedRegForEmail] = useState<PlayerInscription | null>(null);
+  const [newEmail, setNewEmail] = useState("");
 
   const fetchInscriptions = async () => {
     setLoading(true);
@@ -103,8 +109,44 @@ export function InscriptionsAdminPanel() {
       } else {
         alert("Error al cargar DNI: " + res.error);
       }
-    } catch (e) {
-      alert("Error de conexión");
+    } catch (error) {
+      toast.error("Error al obtener la imagen");
+      console.error(error);
+    }
+  };
+
+  const openEditEmail = (item: PlayerInscription) => {
+    setSelectedRegForEmail(item);
+    setNewEmail(item.raw_form_data?.tutor1Email || "");
+    setEditEmailModalOpen(true);
+  };
+
+  const submitEditEmail = async () => {
+    if (!selectedRegForEmail || !newEmail) return;
+    
+    const res = await updateRegistrationEmailAction(selectedRegForEmail.id, newEmail, selectedRegForEmail.userId);
+    if (res.success) {
+      toast.success("Email actualizado correctamente");
+      fetchInscriptions();
+    } else {
+      toast.error("Error al actualizar el email");
+    }
+    
+    setEditEmailModalOpen(false);
+    setSelectedRegForEmail(null);
+  };
+
+  const handleResetPassword = async (item: PlayerInscription) => {
+    const email = item.raw_form_data?.tutor1Email;
+    if (!email) return toast.error("No hay email configurado para esta inscripción");
+
+    if (!confirm(`¿Enviar enlace de reseteo de contraseña a ${email}?`)) return;
+
+    const res = await resetPasswordAction(email);
+    if (res.success) {
+      toast.success("Enlace de reseteo enviado");
+    } else {
+      toast.error("Error al enviar el enlace");
     }
   };
 
@@ -201,6 +243,15 @@ export function InscriptionsAdminPanel() {
                       {item.status === 'formalized' && (
                         <Button size="sm" variant="outline" disabled>Completado</Button>
                       )}
+                      
+                      <div className="flex gap-2 mt-2 justify-end">
+                        <Button size="sm" variant="outline" className="text-gray-600 h-7 text-xs" onClick={() => openEditEmail(item)}>
+                          Editar Email
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-gray-600 h-7 text-xs" onClick={() => handleResetPassword(item)}>
+                          Reset Password
+                        </Button>
+                      </div>
 
                     </td>
                   </tr>
@@ -245,6 +296,37 @@ export function InscriptionsAdminPanel() {
               <Button variant="outline" onClick={() => setRejectionModalOpen(false)}>Cancelar</Button>
               <Button className="bg-red-600 hover:bg-red-700 text-white" disabled={!rejectionReason} onClick={submitRejection}>
                 Enviar Aviso de Subsanación
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal Editar Email */}
+      {editEmailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md shadow-2xl animate-in zoom-in-95">
+            <CardHeader>
+              <CardTitle className="text-blue-600">Editar Email de Contacto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Si la familia se equivocó al escribir el email durante la inscripción, puedes corregirlo aquí. 
+                Esto actualizará su usuario para que puedan iniciar sesión.
+              </p>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Nuevo Email <span className="text-red-500">*</span></label>
+                <Input 
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                />
+              </div>
+            </CardContent>
+            <div className="p-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+              <Button variant="outline" onClick={() => setEditEmailModalOpen(false)}>Cancelar</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white" disabled={!newEmail} onClick={submitEditEmail}>
+                Guardar Cambios
               </Button>
             </div>
           </Card>

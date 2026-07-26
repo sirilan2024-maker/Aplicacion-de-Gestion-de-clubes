@@ -59,14 +59,17 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
           .from("player_season_history")
           .select(`
             status,
-            players!inner (id, first_name, last_name, posicion, birth_date, email, parent_contact, dorsal, height, weight, phone)
+            players!inner (id, first_name, last_name, posicion_principal, birth_date, email, parent_contact, dorsal, height, weight, phone)
           `)
           .eq("team_id", teamId)
           .eq("season_id", activeSeason.id)
           .neq("status", "inactive");
           
         if (historyData) {
-          playersData = historyData.map((h: any) => h.players);
+          playersData = historyData.map((h: any) => ({
+            ...h.players,
+            posicion: h.players.posicion_principal
+          }));
         }
       }
 

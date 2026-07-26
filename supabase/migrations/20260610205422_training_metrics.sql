@@ -50,7 +50,7 @@ CREATE POLICY "Users can view their club's player training metrics"
     USING (
         EXISTS (
             SELECT 1 FROM public.players p
-            JOIN public.equipos e ON p.team_id = e.id
+            JOIN public.teams e ON p.team_id = e.id
             JOIN public.profiles pr ON pr.club_id = e.club_id
             WHERE p.id = player_training_metrics.player_id
             AND pr.id = auth.uid()
@@ -62,7 +62,7 @@ CREATE POLICY "Coaches and Admins can manage training metrics"
     USING (
         EXISTS (
             SELECT 1 FROM public.players p
-            JOIN public.equipos e ON p.team_id = e.id
+            JOIN public.teams e ON p.team_id = e.id
             JOIN public.profiles pr ON pr.club_id = e.club_id
             WHERE p.id = player_training_metrics.player_id
             AND pr.id = auth.uid()

@@ -4,19 +4,17 @@ import { Input } from "@/components/ui/input";
 import { User, Users, Stethoscope, Trophy, Activity, CreditCard } from "lucide-react";
 import { RegistrationFormData } from "../schema";
 
-export function Step1PersonalData() {
+export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
   const { register, formState: { errors }, control } = useFormContext<RegistrationFormData>();
   
   const birthDate = useWatch({ control, name: "birthDate" });
   
   let category = "";
-  let isSenior = false;
   
   if (birthDate) {
     const year = new Date(birthDate).getFullYear();
     if (year <= 2007) {
       category = "Senior";
-      isSenior = true;
     } else if (year >= 2008 && year <= 2010) {
       category = "Juvenil";
     } else if (year >= 2011 && year <= 2012) {
@@ -47,6 +45,7 @@ export function Step1PersonalData() {
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Apellidos <span className="text-red-500">*</span></label>
           <Input {...register("playerLastName")} placeholder="Apellidos" className={errors.playerLastName ? "border-red-500" : ""} />
+          {errors.playerLastName && <p className="text-xs text-red-500">{errors.playerLastName.message}</p>}
         </div>
         
         <div className="space-y-2">
@@ -64,6 +63,7 @@ export function Step1PersonalData() {
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Fecha de Nacimiento <span className="text-red-500">*</span></label>
           <Input type="date" {...register("birthDate")} className={errors.birthDate ? "border-red-500" : ""} />
+          {errors.birthDate && <p className="text-xs text-red-500">{errors.birthDate.message}</p>}
         </div>
         
         <div className="space-y-2">
@@ -75,26 +75,30 @@ export function Step1PersonalData() {
 
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Nacionalidad <span className="text-red-500">*</span></label>
-          <Input {...register("nationality")} placeholder="Ej. Española" defaultValue="Española" />
+          <Input {...register("nationality")} placeholder="Ej. Española" defaultValue="Española" className={errors.nationality ? "border-red-500" : ""} />
+          {errors.nationality && <p className="text-xs text-red-500">{errors.nationality.message}</p>}
         </div>
         
         <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-semibold text-gray-700">Domicilio Completo <span className="text-red-500">*</span></label>
-          <Input {...register("address")} placeholder="Calle, número, piso..." />
+          <Input {...register("address")} placeholder="Calle, número, piso..." className={errors.address ? "border-red-500" : ""} />
+          {errors.address && <p className="text-xs text-red-500">{errors.address.message}</p>}
         </div>
         
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Localidad <span className="text-red-500">*</span></label>
-          <Input {...register("city")} placeholder="Ej. Almoradí" />
+          <Input {...register("city")} placeholder="Ej. Almoradí" className={errors.city ? "border-red-500" : ""} />
+          {errors.city && <p className="text-xs text-red-500">{errors.city.message}</p>}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Código Postal <span className="text-red-500">*</span></label>
-          <Input {...register("postalCode")} placeholder="03160" />
+          <Input {...register("postalCode")} placeholder="03160" className={errors.postalCode ? "border-red-500" : ""} />
+          {errors.postalCode && <p className="text-xs text-red-500">{errors.postalCode.message}</p>}
         </div>
       </div>
 
       {/* Conditional Parent Section */}
-      {!isSenior && (
+      {!isAdult ? (
         <div className="mt-10 pt-8 border-t">
           <div className="mb-6 border-b pb-4">
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -118,14 +122,17 @@ export function Step1PersonalData() {
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">DNI/NIE del Tutor <span className="text-red-500">*</span></label>
               <Input {...register("tutor1Dni")} placeholder="12345678A" className={errors.tutor1Dni ? "border-red-500" : ""} />
+              {errors.tutor1Dni && <p className="text-xs text-red-500">{errors.tutor1Dni.message}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">Email <span className="text-red-500">*</span></label>
               <Input type="email" {...register("tutor1Email")} placeholder="correo@ejemplo.com" className={errors.tutor1Email ? "border-red-500" : ""} />
+              {errors.tutor1Email && <p className="text-xs text-red-500">{errors.tutor1Email.message}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">Teléfono</label>
-              <Input type="tel" {...register("tutor1Phone")} placeholder="+34 600..." />
+              <Input type="tel" {...register("tutor1Phone")} placeholder="+34 600..." className={errors.tutor1Phone ? "border-red-500" : ""} />
+              {errors.tutor1Phone && <p className="text-xs text-red-500">{errors.tutor1Phone.message}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">Relación</label>
@@ -137,9 +144,30 @@ export function Step1PersonalData() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* BLOQUE ADICIONAL: INFORMACIÓN MÉDICA */}
+      ) : (
+        <div className="mt-10 pt-8 border-t">
+          <div className="mb-6 border-b pb-4">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Users className="w-6 h-6 text-blue-600" />
+              Datos de Contacto (Mayor de edad)
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Al ser mayor de edad, introduce tus propios datos de contacto.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Email <span className="text-red-500">*</span></label>
+              <Input type="email" {...register("tutor1Email")} placeholder="correo@ejemplo.com" className={errors.tutor1Email ? "border-red-500" : ""} />
+              {errors.tutor1Email && <p className="text-xs text-red-500">{errors.tutor1Email.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Teléfono</label>
+              <Input type="tel" {...register("tutor1Phone")} placeholder="+34 600..." className={errors.tutor1Phone ? "border-red-500" : ""} />
+              {errors.tutor1Phone && <p className="text-xs text-red-500">{errors.tutor1Phone.message}</p>}
+            </div>
+          </div>
+        </div>
+      )}      {/* BLOQUE ADICIONAL: INFORMACIÓN MÉDICA */}
       <div className="mt-10 pt-8 border-t">
         <div className="mb-6 border-b pb-4">
           <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -283,7 +311,7 @@ export function Step1PersonalData() {
           <p className="text-sm text-gray-500 mt-1">Útil para el control de crecimiento y gestión de utillería especial.</p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-green-50/30 p-6 rounded-xl border border-green-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-green-50/30 p-6 rounded-xl border border-green-100">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-gray-700">Altura (cm)</label>
             <Input type="number" {...register("fisicoAltura")} placeholder="Ej. 165" />
@@ -292,10 +320,7 @@ export function Step1PersonalData() {
             <label className="text-sm font-semibold text-gray-700">Peso (kg)</label>
             <Input type="number" step="0.1" {...register("fisicoPeso")} placeholder="Ej. 55.5" />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Número de pie (calzado)</label>
-            <Input type="number" {...register("fisicoTallaPie")} placeholder="Ej. 42" />
-          </div>
+
         </div>
       </div>
 

@@ -444,7 +444,7 @@ export default function EntrenamientoDetailPage() {
                             {player.first_name} {player.last_name}
                           </td>
                           <td className="p-4">
-                            <div className="flex bg-gray-100 rounded-lg p-1 w-full max-w-sm mx-auto shadow-inner">
+                            <div className="flex bg-gray-100 rounded-lg p-1 w-full max-w-md mx-auto shadow-inner">
                               <button
                                 onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Presente' }))}
                                 className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
@@ -452,6 +452,14 @@ export default function EntrenamientoDetailPage() {
                                 }`}
                               >
                                 Presente
+                              </button>
+                              <button
+                                onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Retraso' }))}
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                  currentStatus === 'Retraso' ? 'bg-white text-orange-500 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                              >
+                                Retraso
                               </button>
                               <button
                                 onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Ausente' }))}
@@ -467,7 +475,7 @@ export default function EntrenamientoDetailPage() {
                                   currentStatus === 'Lesionado' ? 'bg-white text-amber-600 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'
                                 }`}
                               >
-                                Lesión/Permiso
+                                Permiso/Lesión
                               </button>
                             </div>
                           </td>

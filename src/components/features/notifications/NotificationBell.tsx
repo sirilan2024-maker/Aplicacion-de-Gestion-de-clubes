@@ -23,7 +23,15 @@ export function NotificationBell() {
     const res = await getUnreadNotificationsAction()
     if (res.success && res.data) {
       setNotifications(res.data)
-      setHasUnread(res.data.length > 0)
+      const hasUnreadNotifs = res.data.length > 0;
+      setHasUnread(hasUnreadNotifs)
+      
+      if (hasUnreadNotifs) {
+        // Automatically pop open the bell or show a toast on first load if there are unread notifications
+        setTimeout(() => {
+          setIsOpen(true);
+        }, 500);
+      }
     }
   }
 
@@ -69,14 +77,11 @@ export function NotificationBell() {
             await markAllNotificationsAsReadAction();
           }
         }}
-        className="relative p-2 transition-transform hover:scale-105 rounded-full hover:bg-white/10"
+        className="relative p-2 transition-transform hover:scale-105 rounded-full hover:bg-slate-100 flex items-center justify-center"
       >
-        {/* Tarjeta amarilla */}
-        <div className="w-[18px] h-[24px] bg-[#fcd34d] rounded-[3px] border border-[#d97706] shadow-sm flex items-center justify-center">
-          <div className="w-[6px] h-[6px] rounded-full bg-white/40"></div>
-        </div>
+        <Bell className="w-5 h-5 text-slate-700" />
         {hasUnread && (
-          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-600 rounded-full animate-pulse border-2 border-slate-900"></span>
+          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse border-2 border-white"></span>
         )}
       </button>
 

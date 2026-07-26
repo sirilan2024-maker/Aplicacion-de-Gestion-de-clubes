@@ -31,15 +31,20 @@ export async function createCheckoutSession(params: {
   const supabase = await createClient();
   const { data: fee, error: feeErr } = await supabase
     .from('fees')
-    .select('id, amount_cents, currency, status, family_id, concept')
+    .select('id, amount_cents, amount_paid_cents, estado, profile_id, concept')
     .eq('id', feeId)
     .single();
 
   if (feeErr) {
     throw new Error(`Fee not found: ${feeErr.message}`);
   }
-  if (fee.status !== 'pending') {
+  if (fee.estado !== 'pendiente') {
     throw new Error('Only pending fees can be paid');
+  }
+
+  const pendingAmount = fee.amount_cents - (fee.amount_paid_cents || 0);
+  if (pendingAmount <= 0) {
+    throw new Error('This fee is already fully paid');
   }
 
   // Create a Checkout Session – we embed feeId as metadata for later reconciliation
@@ -50,18 +55,18 @@ export async function createCheckoutSession(params: {
     line_items: [
       {
         price_data: {
-          currency: fee.currency,
+          currency: 'eur',
           product_data: {
             name: fee.concept,
           },
-          unit_amount: fee.amount_cents,
+          unit_amount: pendingAmount,
         },
         quantity: 1,
       },
     ],
     metadata: {
       fee_id: fee.id,
-      family_id: fee.family_id,
+      family_id: fee.profile_id,
     },
     success_url: successUrl,
     cancel_url: cancelUrl,

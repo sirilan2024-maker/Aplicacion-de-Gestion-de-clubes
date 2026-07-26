@@ -24,7 +24,7 @@ export function EmailVerificationGuard() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("email_verified, role")
+        .select("role")
         .eq("id", user.id)
         .single();
 
@@ -33,7 +33,7 @@ export function EmailVerificationGuard() {
         return;
       }
 
-      if (profile?.email_verified) {
+      if (user?.email_confirmed_at) {
         setStatus("verified");
         return;
       }

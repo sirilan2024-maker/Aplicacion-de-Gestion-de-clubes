@@ -4,7 +4,7 @@
 
 -- 1. Ficha Familiar (Agrupa a los jugadores de una misma unidad)
 CREATE TABLE IF NOT EXISTS public.families (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     tutor_1_profile_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     tutor_1_dni_url TEXT,
     tutor_2_name TEXT,
@@ -42,6 +42,8 @@ ALTER TABLE public.players ADD COLUMN IF NOT EXISTS is_foreign BOOLEAN DEFAULT f
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS never_federated BOOLEAN DEFAULT false;
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS whatsapp_opt_in BOOLEAN DEFAULT false;
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS volunteer_interest TEXT;
+ALTER TABLE public.players ADD COLUMN IF NOT EXISTS medical_info TEXT;
+ALTER TABLE public.players ADD COLUMN IF NOT EXISTS allergies TEXT;
 
 -- Estados de inscripción y pago
 ALTER TABLE public.players ADD COLUMN IF NOT EXISTS registration_status TEXT DEFAULT 'draft' CHECK (registration_status IN ('draft', 'pending_revision', 'request_correction', 'pending_payment', 'formalized'));
@@ -58,7 +60,7 @@ ALTER TABLE public.players ADD COLUMN IF NOT EXISTS consent_medical_at TIMESTAMP
 
 -- 3. Tabla Documentos FFCV e Identidad (player_documents)
 CREATE TABLE IF NOT EXISTS public.player_documents (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     player_id UUID REFERENCES public.players(id) ON DELETE CASCADE,
     document_type TEXT NOT NULL CHECK (document_type IN ('foto_carnet', 'foto_medio_cuerpo', 'foto_cuerpo_entero', 'foto_horizontal', 'pasaporte', 'empadronamiento', 'contrato_laboral', 'certificado_escolar', 'carta_explicativa')),
     status TEXT DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'recibido', 'validado', 'rechazado', 'caducado')),
@@ -100,7 +102,7 @@ END $$;
 
 -- 4. Patrocinadores (Hospitality)
 CREATE TABLE IF NOT EXISTS public.family_sponsors (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     family_id UUID REFERENCES public.families(id) ON DELETE CASCADE,
     company_name TEXT NOT NULL,
     contact_name TEXT,

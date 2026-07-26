@@ -8,7 +8,7 @@ import { RegistrationFormData } from "../schema";
 import imageCompression from "browser-image-compression";
 
 export function Step2Documents() {
-  const { register, control } = useFormContext<RegistrationFormData>();
+  const { register, control, setValue, getValues } = useFormContext<RegistrationFormData>();
   
   const isForeign = useWatch({ control, name: "isForeign" });
   const neverFederated = useWatch({ control, name: "neverFederated" });
@@ -59,11 +59,56 @@ export function Step2Documents() {
           fileName: label
         });
         
+        // Convert to base64 to send in JSON payload
+        const reader = new FileReader();
+        reader.readAsDataURL(compressedFile);
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          
+          // Update the array of uploaded files
+          const currentFiles = getValues("uploadedFiles") || [];
+          // Replace if label already exists, else push
+          const existingIndex = currentFiles.findIndex(f => f.label === label);
+          if (existingIndex >= 0) {
+            currentFiles[existingIndex] = { label, base64: base64data };
+          } else {
+            currentFiles.push({ label, base64: base64data });
+          }
+          setValue("uploadedFiles", currentFiles);
+          setValue("docsUploaded", true);
+          
+          // Mantener los campos originales para retrocompatibilidad
+          if (label.includes("DNI") || label.includes("NIE") || label.includes("Pasaporte") || label.includes("Libro")) {
+             setValue("dniFileBase64", base64data);
+          } else if (label.includes("Foto Carnet")) {
+             setValue("photoFileBase64", base64data);
+          }
+        };
       } catch (error) {
         console.error("Error comprimiendo imagen:", error);
       } finally {
         setIsCompressing(false);
       }
+    } else {
+      // Para PDFs y otros documentos no-imagen: leer directamente como base64 sin compresión
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        
+        const currentFiles = getValues("uploadedFiles") || [];
+        const existingIndex = currentFiles.findIndex(f => f.label === label);
+        if (existingIndex >= 0) {
+          currentFiles[existingIndex] = { label, base64: base64data };
+        } else {
+          currentFiles.push({ label, base64: base64data });
+        }
+        setValue("uploadedFiles", currentFiles);
+        setValue("docsUploaded", true);
+      };
+      reader.onerror = () => {
+        console.error("Error leyendo el archivo:", file.name);
+      };
     }
   };
 

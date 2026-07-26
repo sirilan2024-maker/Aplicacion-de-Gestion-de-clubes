@@ -13,6 +13,7 @@ import { Step2Documents } from "./steps/Step2Documents";
 import { Step3Fees } from "./steps/Step3Fees";
 import { Step4Apparel } from "./steps/Step4Apparel";
 import { Step5Consent } from "./steps/Step5Consent";
+import toast from "react-hot-toast";
 
 const STEPS = [
   { id: 1, title: "Datos Personales", icon: <User className="w-5 h-5" /> },
@@ -22,7 +23,15 @@ const STEPS = [
   { id: 5, title: "Consentimientos", icon: <ShieldCheck className="w-5 h-5" /> },
 ];
 
-export function RegistrationWizard() {
+export function RegistrationWizard({ 
+  isInternalForm = false,
+  initialData = {},
+  isSeniorTeam = false
+}: { 
+  isInternalForm?: boolean;
+  initialData?: Partial<RegistrationFormData>;
+  isSeniorTeam?: boolean;
+}) {
   const searchParams = useSearchParams();
   const teamIdParam = searchParams?.get('team') || null;
 
@@ -46,10 +55,15 @@ export function RegistrationWizard() {
       sizeSudadera: "",
       sizeCamisetaPaseo: "",
       sizePantalonPaseo: "",
+      ...initialData,
     } as any
   });
 
   const { handleSubmit, trigger, formState: { errors } } = methods;
+
+  const birthDateValue = useWatch({ control: methods.control, name: 'birthDate' });
+  // Consider adult if playing for senior team or born in 2007 or earlier
+  const isAdult = isSeniorTeam || (birthDateValue ? new Date(birthDateValue).getFullYear() <= 2007 : false);
 
   const nextStep = async () => {
     // Validate current step fields before proceeding
@@ -57,13 +71,8 @@ export function RegistrationWizard() {
     
     if (currentStep === 1) {
       fieldsToValidate = ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode'];
-      // Also validate tutors if required
-      const birthDate = methods.getValues('birthDate');
-      if (birthDate) {
-         const isSenior = new Date(birthDate).getFullYear() <= 2007;
-         if (!isSenior) {
-            fieldsToValidate.push('tutor1Name', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation');
-         }
+      if (!isAdult) {
+        fieldsToValidate.push('tutor1Name', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation');
       }
     } else if (currentStep === 3) {
       fieldsToValidate = ['paymentMethod'];
@@ -73,13 +82,23 @@ export function RegistrationWizard() {
     
     const isStepValid = await trigger(fieldsToValidate);
     if (isStepValid) {
-      setCurrentStep(prev => prev + 1);
+      // Si el paso siguiente es el 3 (Cuotas) y es isSeniorTeam, nos lo saltamos y vamos al 4
+      if (currentStep === 2 && isSeniorTeam) {
+        setCurrentStep(prev => prev + 2);
+      } else {
+        setCurrentStep(prev => prev + 1);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => prev - 1);
+    // Si estamos en el paso 4 y venimos del 2 porque somos senior, volvemos al 2
+    if (currentStep === 4 && isSeniorTeam) {
+      setCurrentStep(prev => prev - 2);
+    } else {
+      setCurrentStep(prev => prev - 1);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -106,7 +125,8 @@ export function RegistrationWizard() {
       });
 
       if (!response.ok) {
-        throw new Error('Error de servidor al guardar la inscripción');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error de servidor al guardar la inscripción');
       }
 
       const result = await response.json();
@@ -120,11 +140,40 @@ export function RegistrationWizard() {
       setSubmittedData(data);
       setIsSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error enviando formulario:', error);
-      alert("Ocurrió un error al enviar el formulario al servidor.");
+      alert(error.message || "Ocurrió un error al enviar el formulario al servidor.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onError = (errors: any) => {
+    // Definimos qué campos pertenecen a qué paso
+    const stepFields: Record<number, string[]> = {
+      1: ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode', 'tutor1Name', 'tutor1LastName', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation', 'isSeniorSelection'],
+      2: ['docsUploaded', 'escolarizacion'],
+      3: isSeniorTeam ? [] : ['paymentMethod', 'paymentPlan', 'wasInClub', 'paidReservation'],
+      4: ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo'],
+      5: !isAdult ? ['consentRgpd', 'consentTutela', 'consentMedical', 'password', 'confirmPassword'] : ['consentRgpd', 'consentMedical', 'password', 'confirmPassword']
+    };
+
+    const errorFields = Object.keys(errors);
+    
+    // Buscar el primer paso que tenga un error y saltar a él
+    for (let step = 1; step <= 5; step++) {
+      if (stepFields[step].some(field => errorFields.includes(field))) {
+        setCurrentStep(step);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        toast.error(`Revisa los campos marcados en rojo en el Paso ${step}.`);
+        return;
+      }
+    }
+    
+    // Si no mapeó a ningún paso (safety net)
+    if (errorFields.length > 0) {
+      console.error("Form errors that didn't match any step:", errors);
+      toast.error(`Revisa los campos con error: ${errorFields.join(", ")}`);
     }
   };
 
@@ -138,7 +187,7 @@ export function RegistrationWizard() {
           </div>
           <CardContent className="p-8 space-y-6 bg-white text-center">
             <p className="text-lg text-gray-700 font-medium">
-              La solicitud ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario realizar el primer pago de la cuota. Dicho pago permitirá confirmar la plaza del jugador, tramitar la licencia federativa y realizar el pedido de la equipación.
+              La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario realizar el primer pago de la cuota. Dicho pago permitirá confirmar la plaza del jugador, tramitar la licencia federativa y realizar el pedido de la equipación
             </p>
 
             {submittedData.paymentMethod === "Stripe" && (
@@ -180,8 +229,8 @@ export function RegistrationWizard() {
             )}
           </CardContent>
           <CardFooter className="bg-gray-50 p-6 border-t flex justify-center">
-            <Button className="bg-blue-600 hover:bg-blue-700 font-bold px-8" onClick={() => window.location.href = '/'}>
-              Volver al Inicio
+            <Button className="bg-blue-600 hover:bg-blue-700 font-bold px-8" onClick={() => window.location.href = '/login'}>
+              Ir a Iniciar Sesión
             </Button>
           </CardFooter>
         </Card>
@@ -215,15 +264,25 @@ export function RegistrationWizard() {
       </div>
 
       <FormProvider {...methods}>
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6">
           <Card className="shadow-lg border-0 ring-1 ring-gray-200">
             <CardContent className="p-0">
               <div className="p-6 md:p-10">
-                {currentStep === 1 && <Step1PersonalData />}
-                {currentStep === 2 && <Step2Documents />}
-                {currentStep === 3 && <Step3Fees />}
-                {currentStep === 4 && <Step4Apparel />}
-                {currentStep === 5 && <Step5Consent />}
+                <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
+                  <Step1PersonalData isAdult={isAdult} />
+                </div>
+                <div style={{ display: currentStep === 2 ? 'block' : 'none' }}>
+                  <Step2Documents />
+                </div>
+                <div style={{ display: currentStep === 3 ? 'block' : 'none' }}>
+                  <Step3Fees />
+                </div>
+                <div style={{ display: currentStep === 4 ? 'block' : 'none' }}>
+                  <Step4Apparel />
+                </div>
+                <div style={{ display: currentStep === 5 ? 'block' : 'none' }}>
+                  <Step5Consent isInternalForm={isInternalForm} isAdult={isAdult} />
+                </div>
               </div>
             </CardContent>
             
@@ -241,11 +300,6 @@ export function RegistrationWizard() {
                 </Button>
                 
                 <div className="flex items-center gap-4">
-                  {currentStep === STEPS.length && !methods.formState.isValid && (
-                    <div className="text-xs text-red-500 max-w-xs text-right mr-2 hidden sm:block">
-                      Faltan campos obligatorios o hay errores (Ej: DNI incorrecto). Revisa los pasos anteriores.
-                    </div>
-                  )}
                   {currentStep < STEPS.length ? (
                     <Button
                       type="button"

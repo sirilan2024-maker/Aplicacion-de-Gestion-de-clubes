@@ -15,9 +15,9 @@ export function Step3Fees() {
   let feeTotal = 250;
   if (wasInClub) {
     feeTotal = 195;
-    if (paidReservation) {
-      feeTotal -= 50; // 145
-    }
+  }
+  if (paidReservation) {
+    feeTotal -= 50;
   }
 
   return (
@@ -34,27 +34,37 @@ export function Step3Fees() {
       <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
         <h4 className="font-semibold text-gray-800 mb-4">Determinación de Cuota Base</h4>
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-            <div className="flex items-center space-x-3">
+          <div className={`p-4 rounded-xl border-2 transition-all ${wasInClub ? 'border-green-600 bg-green-50' : 'border-gray-200'}`}>
+            <div className="flex items-start gap-3">
               <Checkbox id="wasInClub" {...register("wasInClub")} />
-              <label htmlFor="wasInClub" className="text-sm font-medium text-gray-700 cursor-pointer">
-                ¿Perteneció al club en la temporada 25/26?
-              </label>
+              <div className="flex flex-col">
+                <label htmlFor="wasInClub" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Sí, pertenecí al club la temporada pasada
+                </label>
+                {wasInClub && (
+                  <>
+                    <span className="text-sm font-bold text-green-600 mt-1">Aplica descuento renovación</span>
+                    <span className="text-xs text-gray-600 mt-1">En este caso solo se te entregará ropa de juego y entrenamiento</span>
+                  </>
+                )}
+              </div>
             </div>
-            {wasInClub && <span className="text-sm font-bold text-green-600">Aplica descuento renovación</span>}
           </div>
 
-          {wasInClub && (
-            <div className="flex items-center justify-between p-3 bg-white rounded-lg border ml-6 animate-in slide-in-from-left-2">
-              <div className="flex items-center space-x-3">
+          <div className={`p-4 rounded-xl border-2 transition-all ${paidReservation ? 'border-orange-600 bg-orange-50' : 'border-gray-200 bg-white'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
                 <Checkbox id="paidReservation" {...register("paidReservation")} />
-                <label htmlFor="paidReservation" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  ¿Pagó reserva de plaza (50€)?
-                </label>
+                <div className="flex flex-col">
+                  <label htmlFor="paidReservation" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    ¿Pagó reserva de plaza (50€)?
+                  </label>
+                  <span className="text-xs text-gray-500 mt-1">Marca esta casilla si ya abonaste los 50€ de reserva.</span>
+                </div>
               </div>
               {paidReservation && <span className="text-sm font-bold text-orange-600">- 50€ descontados</span>}
             </div>
-          )}
+          </div>
         </div>
 
         <div className="mt-6 pt-6 border-t flex justify-between items-center">

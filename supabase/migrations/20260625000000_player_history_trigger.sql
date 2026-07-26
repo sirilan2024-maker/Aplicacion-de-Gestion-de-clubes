@@ -1,3 +1,15 @@
+-- Crear tabla de historial si no existe
+CREATE TABLE IF NOT EXISTS public.player_season_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id UUID NOT NULL REFERENCES public.players(id) ON DELETE CASCADE,
+    club_id UUID NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
+    season_id UUID NOT NULL REFERENCES public.seasons(id) ON DELETE CASCADE,
+    team_id UUID REFERENCES public.teams(id) ON DELETE SET NULL,
+    status TEXT DEFAULT 'activo',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    UNIQUE(player_id, season_id)
+);
+
 CREATE OR REPLACE FUNCTION sync_player_season_history()
 RETURNS TRIGGER AS $$
 DECLARE

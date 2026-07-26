@@ -11,6 +11,84 @@ import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
 
+// --- Modal para Invitar Miembro (Jugador) ---
+function InviteMemberModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/inscripcion` : '';
+
+  if (!open) return null;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    toast.success("Enlace copiado al portapapeles");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareWhatsApp = () => {
+    const text = encodeURIComponent(`¡Únete a nuestro club! Completa la inscripción aquí: ${inviteLink}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  };
+
+  const shareEmail = () => {
+    const subject = encodeURIComponent("Inscripción en el Club");
+    const body = encodeURIComponent(`Hola,\n\nPara inscribirte en nuestro club, por favor completa el siguiente formulario:\n\n${inviteLink}\n\n¡Te esperamos!`);
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Invitar a Miembro</h2>
+          <button onClick={onClose} className="rounded-full p-1 hover:bg-gray-200">
+            <X className="h-5 w-5 text-gray-800" />
+          </button>
+        </div>
+        
+        <p className="text-sm text-gray-600 mb-6">
+          Comparte el enlace de inscripción pública con las familias para que puedan registrar a sus hijos.
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <input readOnly value={inviteLink} className="flex-1 border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-sm outline-none" />
+            <button 
+              onClick={copyToClipboard}
+              className="p-2.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0"
+              title="Copiar enlace"
+            >
+              {copied ? <Check size={20} /> : <Copy size={20} />}
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button 
+              onClick={shareWhatsApp}
+              className="bg-[#25D366] text-white font-medium py-2.5 rounded-lg hover:bg-[#22bf5b] transition-colors flex items-center justify-center gap-2"
+            >
+              WhatsApp
+            </button>
+            <button 
+              onClick={shareEmail}
+              className="bg-gray-800 text-white font-medium py-2.5 rounded-lg hover:bg-gray-900 transition-colors flex items-center justify-center gap-2"
+            >
+              Email
+            </button>
+          </div>
+
+          <button 
+            onClick={onClose} 
+            className="w-full bg-gray-100 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200 transition-colors mt-2"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Modal para Alta Manual Asistida (Plan B) ---
 function AltaAsistidaModal({ open, onClose, clubId }: { open: boolean; onClose: () => void; clubId: string }) {
   const [email, setEmail] = useState("");
@@ -708,6 +786,7 @@ export default function GlobalMembersPage() {
 
   // Modal States
   const [showInviteStaff, setShowInviteStaff] = useState(false)
+  const [showInviteMember, setShowInviteMember] = useState(false)
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showAltaAsistida, setShowAltaAsistida] = useState(false);
   const [managingMember, setManagingMember] = useState<Member | null>(null)
@@ -742,11 +821,18 @@ export default function GlobalMembersPage() {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("club_id")
+          .select("club_id, role")
           .eq("id", user.id)
           .single()
 
         if (!profile?.club_id) throw new Error("Usuario sin club asignado")
+        
+        const role = profile?.role?.toLowerCase() || '';
+        if (role === 'jugador' || role === 'tutor' || role === 'familiar' || role === 'family' || role === 'familia') {
+          toast.error("No tienes permisos para ver el directorio del club");
+          router.push("/dashboard/mi-perfil");
+          return;
+        }
         
         setClubId(profile.club_id)
 
@@ -780,19 +866,19 @@ export default function GlobalMembersPage() {
         const { data: rawPlayers } = await supabase
           .from("players")
           .select(`
-            id, first_name, last_name, email, posicion, team_id,
+            id, first_name, last_name, parent1_email, posicion_principal, team_id, registration_status, status,
             teams (name, color, club_id)
           `)
           .eq("club_id", profile.club_id)
-          .neq("status", "inactive")
+          .in("status", ["active", "activo", "pending"])
           
         if (rawPlayers) {
           playersData = rawPlayers.map((p: any) => ({
             id: p.id,
             first_name: p.first_name,
             last_name: p.last_name,
-            email: p.email,
-            posicion: p.posicion,
+            email: p.parent1_email,
+            posicion: p.posicion_principal,
             team_id: p.team_id,
             equipos: Array.isArray(p.teams) ? p.teams[0] : p.teams
           }))
@@ -871,8 +957,16 @@ export default function GlobalMembersPage() {
           })
         }
 
-        // Sort alphabetical
-        allMembers.sort((a, b) => a.last_name.localeCompare(b.last_name))
+        // Sort: Members without a team first, then alphabetical by last name
+        allMembers.sort((a, b) => {
+          const aNoTeam = !a.team_id;
+          const bNoTeam = !b.team_id;
+          
+          if (aNoTeam && !bNoTeam) return -1;
+          if (!aNoTeam && bNoTeam) return 1;
+          
+          return a.last_name.localeCompare(b.last_name);
+        })
         setMembers(allMembers)
         
         setStats({
@@ -971,11 +1065,19 @@ export default function GlobalMembersPage() {
     return searchMatch && roleMatch && teamMatch;
   })
 
-  // Sort so Staff is always at the top, then alphabetically by first name
+  // Sort so Staff is always at the top, then players without team, then alphabetically by first name
   filteredMembers.sort((a, b) => {
     if (a.type === 'staff' && b.type !== 'staff') return -1;
     if (a.type !== 'staff' && b.type === 'staff') return 1;
-    return a.first_name.localeCompare(b.first_name);
+    
+    if (a.type === 'player' && b.type === 'player') {
+      const aSinEquipo = !a.team_name;
+      const bSinEquipo = !b.team_name;
+      if (aSinEquipo && !bSinEquipo) return -1;
+      if (!aSinEquipo && bSinEquipo) return 1;
+    }
+
+    return (a.first_name || '').localeCompare(b.first_name || '');
   });
 
   // Extract unique teams for the dropdown
@@ -1001,45 +1103,52 @@ export default function GlobalMembersPage() {
       <Toaster />
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col items-center justify-center text-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Directorio del Club</h1>
           <p className="text-gray-500 mt-1">Gestión global de todos los miembros y permisos.</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
           <button
             onClick={handleExportRgpd}
             disabled={exportingRgpd}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-white border border-gray-200 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm font-medium"
+            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-red-600 border border-transparent px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-red-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
           >
-            <Shield size={18} className="text-gray-500" />
-            <span>{exportingRgpd ? "Exportando..." : "Auditoría RGPD"}</span>
+            <Shield size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="truncate">{exportingRgpd ? "Exportando..." : "Auditoría RGPD"}</span>
           </button>
-          <Link href="/dashboard/club/miembros/archivo" className="inline-flex items-center justify-center gap-2 rounded-md bg-white border border-gray-200 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm font-medium">
-            <Archive size={18} />
-            <span>Archivo Histórico</span>
+          <Link href="/dashboard/club/miembros/archivo" className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-yellow-500 border border-transparent px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-yellow-600 transition-colors shadow-sm text-[11px] sm:text-sm font-medium">
+            <Archive size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="truncate">Archivo Histórico</span>
           </Link>
           <button 
             onClick={() => setShowAltaAsistida(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-600 px-4 py-2.5 text-white hover:bg-amber-700 transition-colors shadow-sm font-medium"
+            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-orange-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-orange-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
           >
-            <Edit3 size={18} />
-            <span>Alta Manual Asistida</span>
+            <Edit3 size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="truncate">Alta Manual</span>
           </button>
           <button 
             onClick={() => setShowAddPlayer(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-white hover:bg-emerald-700 transition-colors shadow-sm font-medium"
+            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-emerald-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-emerald-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
           >
-            <UserIcon size={18} />
-            <span>Añadir Jugador</span>
+            <UserIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="truncate">Añadir Jugador</span>
+          </button>
+          <button 
+            onClick={() => setShowInviteMember(true)}
+            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-purple-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-purple-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
+          >
+            <LinkIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="truncate">Invitar Miembro</span>
           </button>
           <button 
             onClick={() => setShowInviteStaff(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700 transition-colors shadow-sm font-medium"
+            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-blue-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-blue-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
           >
-            <Mail size={18} />
-            <span>Invitar Staff</span>
+            <Mail size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="truncate">Invitar Staff</span>
           </button>
         </div>
       </div>
@@ -1161,6 +1270,8 @@ export default function GlobalMembersPage() {
                         )}
                         <span className="font-medium text-gray-700">{member.team_name}</span>
                       </div>
+                    ) : member.type === 'player' ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase tracking-wider shadow-sm">Sin Equipo</span>
                     ) : (
                       <span className="text-gray-400 text-xs italic">Global / Sin asignar</span>
                     )}
@@ -1264,6 +1375,32 @@ export default function GlobalMembersPage() {
                         <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                           {member.team_name}
                         </span>
+                      ) : member.type === 'player' ? (
+                        <div className="flex flex-col gap-1.5 items-start">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase tracking-wider shadow-sm">Sin Equipo</span>
+                          <select 
+                            onClick={(e) => e.stopPropagation()}
+                          onChange={async (e) => {
+                            e.stopPropagation();
+                            if (e.target.value) {
+                              const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
+                              const res = await assignPlayerToTeamAction(member.id, e.target.value);
+                              if (res.success) {
+                                toast.success("Equipo asignado");
+                                fetchMembers();
+                              } else {
+                                toast.error("Error al asignar");
+                              }
+                            }
+                          }}
+                          className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-700"
+                        >
+                          <option value="">Asignar equipo...</option>
+                          {allTeams.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-500 italic">Sin equipo</span>
                       )}
@@ -1314,6 +1451,7 @@ export default function GlobalMembersPage() {
         </div>
       </div>
       <InviteStaffModal open={showInviteStaff} onClose={() => { setShowInviteStaff(false); fetchMembers(); }} />
+      <InviteMemberModal open={showInviteMember} onClose={() => setShowInviteMember(false)} />
       <AddPlayerModal open={showAddPlayer} onClose={() => setShowAddPlayer(false)} onSuccess={fetchMembers} clubId={clubId} teams={allTeams} />
       <AltaAsistidaModal open={showAltaAsistida} onClose={() => { setShowAltaAsistida(false); fetchMembers(); }} clubId={clubId} />
       <ManageStaffModal open={!!managingMember} onClose={() => setManagingMember(null)} member={managingMember} teams={allTeams} onSuccess={fetchMembers} />

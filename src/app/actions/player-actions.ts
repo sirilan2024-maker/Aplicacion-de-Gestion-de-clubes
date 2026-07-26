@@ -188,22 +188,21 @@ export async function exportRgpdAction(clubId: string) {
     const adminClient = await createAdminClient()
     const { data: players, error } = await adminClient
       .from('players')
-      .select('first_name, last_name, gdpr_consent, gdpr_consent_date, gdpr_consent_ip, gdpr_consent_user_agent, gdpr_consent_version')
+      .select('first_name, last_name, consent_rgpd_at, consent_ip, consent_user_agent')
       .eq('club_id', clubId)
       .order('first_name')
       
     if (error) throw error
     
     // Generate CSV
-    const headers = ['Nombre', 'Apellidos', 'Consentimiento', 'Fecha y Hora', 'IP', 'Dispositivo', 'Version']
+    const headers = ['Nombre', 'Apellidos', 'Consentimiento', 'Fecha y Hora', 'IP', 'Dispositivo']
     const rows = players.map(p => [
       `"${(p.first_name || '').replace(/"/g, '""')}"`,
       `"${(p.last_name || '').replace(/"/g, '""')}"`,
-      p.gdpr_consent ? 'SI' : 'NO',
-      p.gdpr_consent_date ? new Date(p.gdpr_consent_date).toLocaleString('es-ES') : '',
-      p.gdpr_consent_ip || '',
-      `"${(p.gdpr_consent_user_agent || '').replace(/"/g, '""')}"`,
-      p.gdpr_consent_version || ''
+      p.consent_rgpd_at ? 'SI' : 'NO',
+      p.consent_rgpd_at ? new Date(p.consent_rgpd_at).toLocaleString('es-ES') : '',
+      p.consent_ip || '',
+      `"${(p.consent_user_agent || '').replace(/"/g, '""')}"`
     ])
     
     const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n')
@@ -461,3 +460,30 @@ export async function revokeImageConsentAction(playerId: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function assignPlayerToTeamAction(playerId: string, teamId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: { message: "No autenticado" } }
+    }
+
+    const { error } = await supabase
+      .from('players')
+      .update({ team_id: teamId || null })
+      .eq('id', playerId)
+
+    if (error) {
+      return { success: false, error }
+    }
+
+    revalidatePath('/dashboard/club/miembros')
+    
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: { message: err.message } }
+  }
+}
+

@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
+import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 
 interface PlayerData {
   id: string;
@@ -43,6 +46,54 @@ interface PlayerData {
   parent2_last_name: string | null;
   parent2_email: string | null;
   parent2_phone: string | null;
+  
+  // Nuevos campos Médicos / Físicos
+  altura: number | null;
+  peso: number | null;
+  talla_pie: string | null;
+  allergies: string | null;
+  enfermedades: string | null;
+  medicacion: string | null;
+  lesiones: string | null;
+  operaciones: string | null;
+  medical_info: string | null;
+  observaciones_medicas: string | null;
+  sip: string | null;
+
+  // Perfil Deportivo
+  posicion_principal: string | null;
+  posicion_secundaria: string | null;
+  posicion_gustaria: string | null;
+  pie_dominante: string | null;
+  anos_jugando: string | null;
+  objetivo_temporada: string | null;
+  clubes_anteriores: string | null;
+  is_foreign: boolean;
+  never_federated: boolean;
+
+  // Facturación e Inscripción
+  payment_method: string | null;
+  payment_plan: string | null;
+  registration_status: string | null;
+
+  // Consentimientos RGPD
+  consent_rgpd_at: string | null;
+  consent_tutela_at: string | null;
+  consent_medical_at: string | null;
+  consent_image_at: string | null;
+  consent_ip: string | null;
+  consent_user_agent: string | null;
+
+  // Identificación
+  dni: string | null;
+  parent1_dni: string | null;
+  nationality: string | null;
+  address: string | null;
+
+  // Relaciones
+  tutor_id: string | null;
+  user_auth_id: string | null;
+  family_id: string | null;
 }
 
 export default function GlobalPlayerProfilePage() {
@@ -52,7 +103,7 @@ export default function GlobalPlayerProfilePage() {
 
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -78,7 +129,7 @@ export default function GlobalPlayerProfilePage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab === 'info' || tab === 'medico' || tab === 'stats' || tab === 'asistencia' || tab === 'disciplina' || tab === 'documentos') {
+      if (tab === 'info' || tab === 'medico' || tab === 'stats' || tab === 'asistencia' || tab === 'disciplina') {
         setActiveTab(tab);
       }
       const view = params.get('view');
@@ -102,6 +153,8 @@ export default function GlobalPlayerProfilePage() {
     }
   }, [activeTab, playerId]);
 
+  const [playerDocs, setPlayerDocs] = useState<any[]>([]);
+
   const fetchPlayer = async () => {
     setLoading(true);
     const supabase = createClient();
@@ -115,6 +168,13 @@ export default function GlobalPlayerProfilePage() {
       if (error) throw error;
       setPlayer(data);
       setEditData(data);
+
+      const { data: docs } = await supabase
+        .from('player_documents')
+        .select('*')
+        .eq('player_id', playerId);
+      
+      if (docs) setPlayerDocs(docs);
     } catch (err: any) {
       toast.error("Error al cargar jugador: " + err.message);
     } finally {
@@ -125,31 +185,24 @@ export default function GlobalPlayerProfilePage() {
   const fetchPlayerACWR = async () => {
     const supabase = createClient();
     try {
-      // For global profile, fetch all matches across all teams
+      const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
+      const teamId = pData?.team_id;
+
+      // Partidos y Convocatorias
       const { data: convocatoriasData } = await supabase
         .from('convocatorias')
         .select('*, partidos:partido_id(*)')
         .eq('player_id', playerId);
 
-      // Fetch all attendance for global profile
-      const { data: attData } = await supabase
-        .from('attendance')
-        .select('event_id, status, events:event_id(date, title, event_type, start_time)')
-        .eq('player_id', playerId);
-
-      // Arrays for History
-      const tHistory: any[] = [];
-      const mHistory: any[] = [];
-
-      if (attData) {
-        attData.forEach((a: any) => {
-          if (a.events && a.events.event_type === 'Entrenamiento') {
-            tHistory.push({ ...a.events, id: a.event_id, attendance: a.status });
-          }
-        });
-        tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      let teamMatches = [];
+      if (teamId) {
+        const { data: tm } = await supabase.from('partidos').select('*').eq('equipo_id', teamId);
+        if (tm) teamMatches = tm;
       }
 
+      const mHistory: any[] = [];
+      const processedMatches = new Set();
+      
       if (convocatoriasData) {
         convocatoriasData.forEach(c => {
           if (c.partidos) {
@@ -157,19 +210,71 @@ export default function GlobalPlayerProfilePage() {
               id: c.partido_id,
               date: c.partidos.fecha_hora,
               title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar})`,
-              attendance: c.estado_asistencia,
-              minutes: c.minutes_played,
-              goles: c.goals,
-              asistencias: c.assists,
-              coach_rating: c.coach_rating,
-              actitud: c.actitud,
-              amarillas: c.yellow_cards,
-              rojas: c.red_cards
+              attendance: c.estado_asistencia || 'Pendiente',
+              minutes: c.minutes_played || 0,
+              goals: c.goals || 0,
+              asistencias: c.assists || 0,
+              coach_rating: c.coach_rating || 0,
+              actitud: c.actitud || 0,
+              amarillas: c.yellow_cards || 0,
+              rojas: c.red_cards || 0
             });
+            processedMatches.add(c.partido_id);
           }
         });
-        mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       }
+
+      teamMatches.forEach(m => {
+        if (!processedMatches.has(m.id)) {
+          mHistory.push({
+            id: m.id,
+            date: m.fecha_hora,
+            title: `vs ${m.rival_nombre} (${m.lugar})`,
+            attendance: 'No convocado',
+            minutes: 0,
+            goles: 0,
+            asistencias: 0,
+            coach_rating: 0,
+            actitud: 0,
+            amarillas: 0,
+            rojas: 0
+          });
+          processedMatches.add(m.id);
+        }
+      });
+      mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Entrenamientos y Asistencia
+      const { data: attData } = await supabase
+        .from('attendance')
+        .select('*, events:event_id(*)')
+        .eq('player_id', playerId);
+
+      let teamEvents = [];
+      if (teamId) {
+        const { data: te } = await supabase.from('team_events').select('*').eq('team_id', teamId).eq('event_type', 'Entrenamiento');
+        if (te) teamEvents = te;
+      }
+
+      const tHistory: any[] = [];
+      const processedEvents = new Set();
+
+      if (attData) {
+        attData.forEach((a) => {
+          if (a.events && a.events.event_type === 'Entrenamiento') {
+            tHistory.push({ ...a.events, id: a.event_id, attendance: a.status });
+            processedEvents.add(a.event_id);
+          }
+        });
+      }
+
+      teamEvents.forEach(e => {
+        if (!processedEvents.has(e.id)) {
+          tHistory.push({ ...e, id: e.id, attendance: 'Pendiente' });
+          processedEvents.add(e.id);
+        }
+      });
+      tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       setTrainingHistory(tHistory);
       setMatchHistory(mHistory);
@@ -183,9 +288,15 @@ export default function GlobalPlayerProfilePage() {
     setAttendanceLoading(true);
     const supabase = createClient();
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Fetch attendance records specifically for this player
+      const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
+      const teamId = pData?.team_id;
+
+      let allEvents = [];
+      if (teamId) {
+        const { data: tEvents } = await supabase.from('team_events').select('*').eq('team_id', teamId);
+        if (tEvents) allEvents = [...tEvents];
+      }
+
       const { data: atts } = await supabase
         .from('attendance')
         .select('*, events:event_id(*)')
@@ -194,9 +305,15 @@ export default function GlobalPlayerProfilePage() {
       setPlayerAttendance(atts || []);
 
       if (atts) {
-        const events = atts.map(a => a.events).filter(e => e);
-        setPlayerEvents(events);
+        atts.forEach(a => {
+          if (a.events && !allEvents.find(e => e.id === a.event_id)) {
+            allEvents.push(a.events);
+          }
+        });
       }
+      
+      allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setPlayerEvents(allEvents);
     } catch (err) {
       console.error(err);
     } finally {
@@ -226,9 +343,19 @@ export default function GlobalPlayerProfilePage() {
     setSaving(true);
     const supabase = createClient();
     try {
+      const payload = { ...editData };
+
+      // Si el jugador estaba pendiente de revisión y se le acaba de asignar equipo, activamos la ficha automáticamente
+      if (player.registration_status === 'pending_revision' && payload.team_id) {
+        payload.registration_status = 'pending_payment';
+        if (!payload.status || payload.status === 'inactive') {
+          payload.status = 'active';
+        }
+      }
+
       const { error } = await supabase
         .from('players')
-        .update(editData)
+        .update(payload)
         .eq('id', player.id);
         
       if (error) throw error;
@@ -274,8 +401,9 @@ export default function GlobalPlayerProfilePage() {
       }
 
       toast.success("Información guardada correctamente");
-      setPlayer({ ...player, ...editData } as PlayerData);
+      setPlayer({ ...player, ...payload });
       setIsEditing(false);
+      toast.success("Perfil actualizado");
     } catch (err: any) {
       toast.error("Error al guardar: " + err.message);
     } finally {
@@ -534,12 +662,12 @@ export default function GlobalPlayerProfilePage() {
                 <AlertTriangle size={18} /> Disciplina
               </button>
               <button 
-                onClick={() => setActiveTab('documentos')}
+                onClick={() => setActiveTab('utileria')}
                 className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === 'documentos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                  activeTab === 'utileria' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <FolderOpen size={18} /> Documentos
+                <FolderOpen size={18} /> Utilería
               </button>
             </>
           )}
@@ -596,6 +724,18 @@ export default function GlobalPlayerProfilePage() {
                   {isEditing ? (
                     <input type="number" value={editData.dorsal || ''} onChange={e => setEditData({...editData, dorsal: Number(e.target.value)})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
                   ) : <div className="text-gray-900 font-medium">{player.dorsal || '-'}</div>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Posición Principal</label>
+                  {isEditing ? (
+                    <input type="text" value={editData.posicion_principal || ''} onChange={e => setEditData({...editData, posicion_principal: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
+                  ) : <div className="text-gray-900 font-medium">{player.posicion_principal || '-'}</div>}
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Clubes Anteriores</label>
+                  {isEditing ? (
+                    <input type="text" value={editData.clubes_anteriores || ''} onChange={e => setEditData({...editData, clubes_anteriores: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
+                  ) : <div className="text-gray-900 font-medium">{player.clubes_anteriores || '-'}</div>}
                 </div>
               </div>
             </div>
@@ -683,6 +823,147 @@ export default function GlobalPlayerProfilePage() {
             <div className="md:col-span-2 border-t pt-8 mt-4">
               <HistoricalTeamsEditor playerId={player.id} clubId={player.club_id} />
             </div>
+
+            {/* ── FASE 5: Bloque Datos Médicos (resumen) ── */}
+            <div className="md:col-span-2 border-t pt-8 mt-4">
+              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
+                <HeartPulse size={18} className="text-red-500" />
+                Datos Médicos
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { label: 'SIP / Tarjeta Sanitaria', value: (player as any).sip },
+                  { label: 'Alergias', value: (player as any).allergies, highlight: true },
+                  { label: 'Enfermedades Crónicas', value: (player as any).enfermedades, highlight: true },
+                  { label: 'Medicación Habitual', value: (player as any).medicacion },
+                  { label: 'Lesiones Previas', value: (player as any).lesiones },
+                  { label: 'Operaciones', value: (player as any).operaciones },
+                  { label: 'Info Médica Relevante', value: (player as any).medical_info },
+                  { label: 'Observaciones Médicas', value: (player as any).observaciones_medicas },
+                ].map(({ label, value, highlight }) => (
+                  <div key={label} className={`p-3 rounded-lg border ${highlight && value ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+                    <span className={`block text-xs font-bold uppercase tracking-wider mb-1 ${highlight && value ? 'text-red-600' : 'text-gray-500'}`}>{label}</span>
+                    <span className={`text-sm font-medium ${value ? 'text-gray-900' : 'text-gray-400 italic'}`}>{value || 'No indicado'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── FASE 5: Bloque Consentimientos y Legal ── */}
+            <div className="md:col-span-2 border-t pt-8 mt-4">
+              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
+                <CheckCircle size={18} className="text-emerald-500" />
+                Consentimientos y Legal (RGPD)
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: 'Política de Privacidad (RGPD)', field: 'consent_rgpd_at' },
+                  { label: 'Declaración de Tutela', field: 'consent_tutela_at' },
+                  { label: 'Tratamiento Médico Especial', field: 'consent_medical_at' },
+                  { label: 'Derechos de Imagen', field: 'consent_image_at' },
+                ].map(({ label, field }) => {
+                  const timestamp = (player as any)[field];
+                  return (
+                    <div key={field} className={`flex items-start gap-3 p-3 rounded-lg border ${timestamp ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`mt-0.5 shrink-0 ${timestamp ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {timestamp ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold ${timestamp ? 'text-emerald-900' : 'text-red-800'}`}>{label}</p>
+                        {timestamp ? (
+                          <p className="text-xs text-emerald-700 mt-0.5">
+                            Aceptado: {new Date(timestamp).toLocaleString('es-ES')}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-red-600 mt-0.5">No aceptado</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {(player as any).consent_ip && (
+                  <div className="sm:col-span-2 flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
+                    <span className="font-bold text-gray-600">IP de firma:</span>
+                    <code className="font-mono">{(player as any).consent_ip}</code>
+                    <span className="text-gray-400">·</span>
+                    <span className="truncate">{(player as any).consent_user_agent}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── FASE 5: Bloque de Facturación ── */}
+            <div className="md:col-span-2 border-t pt-8 mt-4">
+              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
+                <FileText size={18} className="text-blue-500" />
+                Facturación y Pago
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Método de Pago</span>
+                  <span className="text-lg font-bold text-blue-900">{(player as any).payment_method || '—'}</span>
+                </div>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Plan de Pago</span>
+                  <span className="text-lg font-bold text-blue-900">
+                    {(player as any).payment_plan === 'Fraccionado' ? '2 cuotas de 125€' : (player as any).payment_plan === 'Total' ? 'Pago total de 250€' : (player as any).payment_plan || '—'}
+                  </span>
+                </div>
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <span className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estado Inscripción</span>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-bold ${
+                    (player as any).registration_status === 'formalized' ? 'bg-emerald-100 text-emerald-800' :
+                    (player as any).registration_status === 'pending_revision' ? 'bg-amber-100 text-amber-800' :
+                    (player as any).registration_status === 'pending_payment' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {(player as any).registration_status === 'formalized' ? '✅ Formalizado' :
+                     (player as any).registration_status === 'pending_revision' ? '⏳ Pendiente revisión' :
+                     (player as any).registration_status === 'pending_payment' ? '💳 Pendiente de pago' :
+                     (player as any).registration_status || 'Sin estado'}
+                  </span>
+                  
+                  {(player as any).registration_status === 'pending_revision' && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { validatePlayerRegistrationAction } = await import('@/app/actions/secretaria-actions');
+                          const res = await validatePlayerRegistrationAction(playerId);
+                          if (res.success) {
+                            toast.success("Inscripción validada. Cuotas generadas en Tesorería.");
+                            fetchPlayer();
+                          } else {
+                            toast.error("Error al validar: " + res.error);
+                          }
+                        } catch (err) {
+                          toast.error("Error de conexión");
+                        }
+                      }}
+                      className="mt-3 w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle size={16} />
+                      Validar Inscripción
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Documentos Subidos */}
+              {playerDocs.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Documentos Aportados</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {playerDocs.map((doc, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl">
+                        <FileText size={18} className="text-blue-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-800">{doc.document_type.toUpperCase()}</span>
+                        <CheckCircle size={16} className="text-emerald-500 ml-auto flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -691,27 +972,41 @@ export default function GlobalPlayerProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-1 space-y-6">
               <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Antropometría</h3>
-              <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <div className="flex-1">
-                  <span className="block text-xs font-bold text-gray-500 uppercase">Altura</span>
-                  {isEditing ? (
-                    <input type="number" step="0.01" value={editData.height || ''} onChange={e => setEditData({...editData, height: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
-                  ) : <span className="text-2xl font-bold text-gray-900">{player.height ? `${player.height}m` : '-'}</span>}
+              <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Altura (m)</span>
+                    {isEditing ? (
+                      <input type="number" step="0.01" value={editData.altura || ''} onChange={e => setEditData({...editData, altura: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
+                    ) : <span className="text-2xl font-bold text-gray-900">{player.altura ? `${player.altura}m` : '-'}</span>}
+                  </div>
+                  <div className="w-px h-12 bg-gray-200"></div>
+                  <div className="flex-1 pl-2">
+                    <span className="block text-xs font-bold text-gray-500 uppercase">Peso (kg)</span>
+                    {isEditing ? (
+                      <input type="number" step="0.1" value={editData.peso || ''} onChange={e => setEditData({...editData, peso: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
+                    ) : <span className="text-2xl font-bold text-gray-900">{player.peso ? `${player.peso}kg` : '-'}</span>}
+                  </div>
                 </div>
-                <div className="w-px h-12 bg-gray-200"></div>
-                <div className="flex-1 pl-2">
-                  <span className="block text-xs font-bold text-gray-500 uppercase">Peso</span>
-                  {isEditing ? (
-                    <input type="number" step="0.1" value={editData.weight || ''} onChange={e => setEditData({...editData, weight: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
-                  ) : <span className="text-2xl font-bold text-gray-900">{player.weight ? `${player.weight}kg` : '-'}</span>}
-                </div>
-                <div className="w-px h-12 bg-gray-200"></div>
-                <div className="flex-1 pl-2">
-                  <span className="block text-xs font-bold text-gray-500 uppercase">IMC</span>
-                  <span className="text-2xl font-bold text-gray-900">
-                    {player.weight && player.height && player.height > 0 ? (player.weight / (player.height * player.height)).toFixed(1) : '-'}
-                  </span>
-                </div>
+                
+                {/* IMC Calculado automáticamente */}
+                {(!isEditing && player.altura && player.peso && player.altura > 0) && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <span className="block text-xs font-bold text-gray-500 uppercase mb-1">IMC (Índice de Masa Corporal)</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl font-bold text-gray-900">
+                        {(player.peso / (player.altura * player.altura)).toFixed(1)}
+                      </span>
+                      {(() => {
+                        const imc = player.peso / (player.altura * player.altura);
+                        if (imc < 18.5) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-yellow-100 text-yellow-800">Infrapeso</span>;
+                        if (imc < 25) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-800">Normal</span>;
+                        if (imc < 30) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-800">Sobrepeso</span>;
+                        return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800">Obesidad</span>;
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -740,21 +1035,83 @@ export default function GlobalPlayerProfilePage() {
                 Historial y Notas Médicas
               </h3>
               {isEditing ? (
-                <textarea 
-                  value={editData.medical_notes || ''} 
-                  onChange={e => setEditData({...editData, medical_notes: e.target.value})} 
-                  className="w-full h-48 border border-gray-300 rounded-xl p-4 bg-gray-50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
-                  placeholder="Alergias, lesiones previas, operaciones, observaciones del fisio..."
-                />
-              ) : (
-                <div className="w-full min-h-[192px] bg-yellow-50/50 border border-yellow-200 rounded-xl p-6">
-                  {player.medical_notes ? (
-                    <p className="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed">{player.medical_notes}</p>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                      <HeartPulse className="w-10 h-10 mb-2 opacity-50" />
-                      <p>No hay notas médicas registradas.</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">SIP</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.sip || ''} onChange={e => setEditData({...editData, sip: e.target.value})} />
                     </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Talla de Pie</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.talla_pie || ''} onChange={e => setEditData({...editData, talla_pie: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Alergias</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.allergies || ''} onChange={e => setEditData({...editData, allergies: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Enfermedades</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.enfermedades || ''} onChange={e => setEditData({...editData, enfermedades: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Medicación</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.medicacion || ''} onChange={e => setEditData({...editData, medicacion: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Lesiones</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.lesiones || ''} onChange={e => setEditData({...editData, lesiones: e.target.value})} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Operaciones</label>
+                      <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.operaciones || ''} onChange={e => setEditData({...editData, operaciones: e.target.value})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Notas Médicas / Observaciones</label>
+                    <textarea 
+                      value={editData.medical_notes || ''} 
+                      onChange={e => setEditData({...editData, medical_notes: e.target.value})} 
+                      className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900"
+                      rows={4}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                    <div>
+                      <span className="block text-xs text-gray-500 mb-1">SIP</span>
+                      <span className="font-medium text-gray-900">{player.sip || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-500 mb-1">Talla de Pie</span>
+                      <span className="font-medium text-gray-900">{player.talla_pie || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-500 mb-1 text-red-500 font-semibold">Alergias</span>
+                      <span className="font-medium text-gray-900">{player.allergies || 'Ninguna'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-500 mb-1 text-red-500 font-semibold">Enfermedades</span>
+                      <span className="font-medium text-gray-900">{player.enfermedades || 'Ninguna'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-500 mb-1">Medicación</span>
+                      <span className="font-medium text-gray-900">{player.medicacion || 'Ninguna'}</span>
+                    </div>
+                    <div className="md:col-span-2">
+                      <span className="block text-xs text-gray-500 mb-1">Lesiones / Operaciones</span>
+                      <span className="font-medium text-gray-900">
+                        {player.lesiones || player.operaciones ? `${player.lesiones || ''} ${player.operaciones ? `(${player.operaciones})` : ''}` : 'Ninguna'}
+                      </span>
+                    </div>
+                  </div>
+                  {player.medical_notes ? (
+                    <div className="bg-yellow-50/50 border border-yellow-200 rounded-xl p-4">
+                      <p className="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed">{player.medical_notes}</p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 italic text-sm">Sin notas médicas adicionales.</p>
                   )}
                 </div>
               )}
@@ -1052,10 +1409,11 @@ export default function GlobalPlayerProfilePage() {
               const filteredEventIds = filteredEvents.map(e => e.id);
               const filteredAttendance = playerAttendance.filter(a => filteredEventIds.includes(a.event_id));
 
-              const presents = filteredAttendance.filter(a => a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present').length;
-              const absents = filteredAttendance.filter(a => a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent').length;
+              const presents = filteredAttendance.filter(a => ['presente', 'present', 'justificado', 'excused', 'lesionado'].includes(a.status?.toLowerCase())).length;
+              const retrasos = filteredAttendance.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
+              const absents = filteredAttendance.filter(a => ['ausente', 'absent'].includes(a.status?.toLowerCase())).length;
               const excused = filteredAttendance.filter(a => a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused').length;
-              const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 0;
+              const pct = totalEvents > 0 ? Math.round(((presents + retrasos) / totalEvents) * 100) : 0;
 
               const faltasDetalle = filteredEvents.filter(ev => {
                 const rec = filteredAttendance.find(a => a.event_id === ev.id || a.date === ev.date);
@@ -1099,22 +1457,26 @@ export default function GlobalPlayerProfilePage() {
                   </div>
 
                   {/* Resumen General */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-slate-900">{totalEvents}</div>
-                      <div className="text-xs font-bold text-slate-500 uppercase mt-1">Sesiones</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mt-1">Sesiones</div>
                     </div>
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-emerald-700">{pct}%</div>
-                      <div className="text-xs font-bold text-emerald-600 uppercase mt-1">Asistencia</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-emerald-600 uppercase mt-1">Asistencia</div>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 text-center">
+                      <div className="text-4xl font-black text-orange-600">{retrasos}</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-orange-600 uppercase mt-1">Retrasos</div>
                     </div>
                     <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-red-600">{absents}</div>
-                      <div className="text-xs font-bold text-red-600 uppercase mt-1">Faltas</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-red-600 uppercase mt-1">Faltas</div>
                     </div>
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-amber-600">{excused}</div>
-                      <div className="text-xs font-bold text-amber-600 uppercase mt-1">Lesiones</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-amber-600 uppercase mt-1">Lesiones</div>
                     </div>
                   </div>
 
@@ -1160,11 +1522,13 @@ export default function GlobalPlayerProfilePage() {
                                 <div className="text-xs text-slate-500">{new Date(ev.date).toLocaleDateString()}</div>
                               </div>
                             </div>
-                            <div>
+                            <div className="flex flex-col sm:flex-row items-end gap-2 shrink-0">
                               {!status ? (
                                 <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-md">Sin registrar</span>
                               ) : status === 'presente' || status === 'present' ? (
                                 <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md">Presente</span>
+                              ) : status === 'retraso' || status === 'late' ? (
+                                <span className="text-xs font-bold text-orange-700 bg-orange-100 px-2.5 py-1 rounded-md">Retraso</span>
                               ) : status === 'ausente' || status === 'absent' ? (
                                 <span className="text-xs font-bold text-red-700 bg-red-100 px-2.5 py-1 rounded-md">Ausente</span>
                               ) : (
@@ -1188,22 +1552,9 @@ export default function GlobalPlayerProfilePage() {
           <DisciplineTab playerId={playerId} />
         )}
 
-        {/* PESTAÑA: DOCUMENTOS */}
-        {activeTab === 'documentos' && !esEntrenador && player && (
-          <div className="space-y-6">
-            <div className="border-b pb-4 mb-4">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <FolderOpen className="w-6 h-6 text-blue-600" />
-                Documentación del Jugador
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">Archivos y certificados asociados al expediente de {player.first_name}.</p>
-            </div>
-            
-            <DocumentManager 
-              playerId={player.id} 
-              playerName={`${player.first_name} ${player.last_name}`} 
-            />
-          </div>
+        {/* PESTAÑA: UTILERIA */}
+        {activeTab === 'utileria' && (
+          <UtileriaTab playerId={player.id} />
         )}
 
       </div>
@@ -1222,118 +1573,42 @@ function DisciplineTab({ playerId }: { playerId: string }) {
   useEffect(() => {
     const fetchDiscipline = async () => {
       const supabase = createClient()
-
-      // Obtener convocatorias con los partidos relacionados para este jugador
-      const { data: convs } = await supabase
-        .from('convocatorias')
-        .select('*, partidos:partido_id(*)')
+      
+      const { data, error } = await supabase
+        .from('discipline_cards')
+        .select(`
+          id, card_type, reason, created_at,
+          partidos:match_id (
+            id, date, opponent
+          )
+        `)
         .eq('player_id', playerId)
+        .order('created_at', { ascending: false })
 
-      if (!convs || convs.length === 0) {
-        setLoading(false)
-        return
+      if (!error && data) {
+        setData(data)
+        
+        let y = 0, r = 0
+        data.forEach(c => {
+          if (c.card_type === 'Amarilla') y++
+          if (c.card_type === 'Roja') r++
+        })
+        
+        const cyclesComp = Math.floor(y / 5)
+        const cycleC = y % 5
+        setTotals({ yellows: y, reds: r, cycleCards: cycleC, cyclesCompleted: cyclesComp })
       }
-
-      const history: any[] = []
-      let tAma = 0, tRoj = 0
-
-      convs.forEach(c => {
-        const pAma = c.yellow_cards || 0
-        const pRoj = c.red_cards || 0
-
-        if (pAma > 0 || pRoj > 0) {
-          tAma += pAma
-          tRoj += pRoj
-          if (c.partidos) {
-            history.push({
-              id: c.partido_id,
-              date: c.partidos.fecha_hora,
-              title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar || 'Visitante'})`,
-              type: 'Partido',
-              yellows: pAma,
-              reds: pRoj
-            })
-          }
-        }
-      })
-
-      // Calcular ciclos cronológicamente
-      let cycleCards = 0;
-      let cyclesCompleted = 0;
-      const chronological = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      chronological.forEach(evt => {
-        if (evt.yellows === 1) {
-          cycleCards += 1;
-          if (cycleCards === 5) {
-            cyclesCompleted += 1;
-            cycleCards = 0;
-          }
-        }
-      });
-
-      history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-      setData(history)
-      setTotals({ yellows: tAma, reds: tRoj, cycleCards, cyclesCompleted })
       setLoading(false)
     }
 
     fetchDiscipline()
   }, [playerId])
-
   if (loading) {
-    return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2"><Activity className="animate-spin text-red-500" /> Cargando historial disciplinario...</div>
+    return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">Cargando historial disciplinario...</div>
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center gap-3 border-b pb-4">
-        <div className="bg-red-50 p-2 rounded-lg text-red-600">
-          <AlertTriangle size={24} />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">Historial Disciplinario</h2>
-          <p className="text-sm text-slate-500">Resumen y registro de tarjetas del jugador en partidos.</p>
-        </div>
-      </div>
-
-      {totals.cycleCards === 4 && (
-        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3 shadow-sm">
-          <AlertCircle className="text-orange-500 mt-0.5 shrink-0" size={20} />
-          <div>
-            <h3 className="font-bold text-orange-800">Jugador Apercibido</h3>
-            <p className="text-sm text-orange-700">Este jugador acumula 4 tarjetas amarillas en el ciclo actual. La próxima tarjeta amarilla acarreará un partido de sanción.</p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 flex flex-col items-center justify-center">
-          <p className="text-xs font-bold text-yellow-800 uppercase tracking-wide">Tarjetas Amarillas (Total)</p>
-          <div className="mt-2 text-4xl font-black text-yellow-600">
-            {totals.yellows}
-          </div>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex flex-col items-center justify-center">
-          <p className="text-xs font-bold text-red-800 uppercase tracking-wide">Tarjetas Rojas</p>
-          <div className="mt-2 text-4xl font-black text-red-600">
-            {totals.reds}
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col justify-center">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 text-center">Estado del Ciclo</p>
-          <div className="flex gap-1 mb-2 w-full">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className={`h-2 flex-1 rounded-sm ${i <= totals.cycleCards ? (totals.cycleCards === 4 ? 'bg-orange-400' : 'bg-amber-400') : 'bg-slate-100'}`}></div>
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-slate-500 font-medium px-1">
-            <span>{totals.cycleCards}/5 Amarillas</span>
-            <span>{totals.cyclesCompleted} Sanciones</span>
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-6">
       <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-white">
           <h3 className="font-bold text-slate-800">Registro de Partidos con Amonestación</h3>
@@ -1420,6 +1695,17 @@ function HistoricalTeamsEditor({ playerId, clubId }: { playerId: string, clubId:
       toast.error("Error al actualizar el equipo histórico")
     } else {
       toast.success("Equipo histórico actualizado")
+      
+      // Si estamos actualizando la temporada actual (la más reciente), actualizamos también la ficha activa
+      if (seasons.length > 0 && seasons[0].id === seasonId) {
+         const { error: pError } = await supabase.from('players').update({ team_id: teamId }).eq('id', playerId);
+         if (!pError) {
+           toast.success("Equipo actual actualizado");
+           setTimeout(() => window.location.reload(), 1000);
+           return;
+         }
+      }
+      
       fetchData()
     }
   }

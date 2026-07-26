@@ -358,3 +358,42 @@ export async function switchActiveRoleAction(selectedRole: string) {
   return { success: true }
 }
 
+export async function updateClubSettingsAction(clubId: string, formData: FormData) {
+  const { createAdminClient } = await import('@/lib/supabase/admin');
+  const adminClient = createAdminClient();
+  const name = formData.get('name') as string;
+  const file = formData.get('logo') as File | null;
+  let logo_url = formData.get('currentLogoUrl') as string | null;
+
+  if (file && file.size > 0) {
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const fileExt = file.name.split('.').pop() || 'png';
+    const fileName = `club-${clubId}-${Date.now()}.${fileExt}`;
+    const filePath = `clubs/${fileName}`;
+    
+    const { error: uploadError } = await adminClient.storage
+      .from('avatars')
+      .upload(filePath, buffer, { contentType: file.type, upsert: true });
+      
+    if (uploadError) return { success: false, error: 'Error subiendo archivo: ' + uploadError.message };
+    
+    const { data: { publicUrl } } = adminClient.storage.from('avatars').getPublicUrl(filePath);
+    logo_url = publicUrl;
+  }
+  
+  const updateData: any = { name: name };
+  if (logo_url) updateData.logo_url = logo_url;
+  
+  const { error } = await adminClient.from('clubs').update(updateData).eq('id', clubId);
+  if (error) return { success: false, error: 'Error actualizando club: ' + error.message };
+  
+  return { success: true, logo_url };
+}
+export async function getClubInfoAction(clubId: string) {
+  const { createAdminClient } = await import('@/lib/supabase/admin');
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient.from('clubs').select('id, name, logo_url').eq('id', clubId).single();
+  if (error) return null;
+  return data;
+}

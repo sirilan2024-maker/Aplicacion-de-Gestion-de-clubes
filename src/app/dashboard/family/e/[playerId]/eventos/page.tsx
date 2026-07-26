@@ -32,12 +32,11 @@ export default function FamilyEventsPage() {
       setTeamName((pData.teams as any)?.name || "Equipo");
 
       if (pData.team_id) {
-        const { data: tData, error: tError } = await supabase
-          .from('team_events')
-          .select('*')
-          .eq('team_id', pData.team_id)
-          .in('event_type', ['Otro', 'Reunión'])
-          .order('date', { ascending: false });
+          const { data: tData, error: tError } = await supabase
+            .from('team_events')
+            .select('*')
+            .eq('team_id', pData.team_id)
+            .order('date', { ascending: false });
 
         if (tError) throw tError;
         setEvents(tData || []);

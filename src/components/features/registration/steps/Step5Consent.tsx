@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { ShieldCheck, HeartHandshake, UploadCloud, Info } from "lucide-react";
+import { ShieldCheck, HeartHandshake, UploadCloud, Info, Eye, EyeOff } from "lucide-react";
 import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -57,10 +57,11 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
   }
 };
 
-export function Step5Consent() {
+export function Step5Consent({ isInternalForm = false, isAdult = false }: { isInternalForm?: boolean; isAdult?: boolean }) {
   const { register, setValue, watch, formState: { errors } } = useFormContext<RegistrationFormData>();
   const [activeLegalModal, setActiveLegalModal] = useState<LegalItem | null>(null);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Estados locales para saber si se ha leído el modal y habilitar el checkbox
   const [legalRead, setLegalRead] = useState<Record<LegalItem, boolean>>({
@@ -143,7 +144,6 @@ export function Step5Consent() {
             <label className="text-sm font-semibold text-gray-700">Opciones de Voluntariado</label>
             <select {...register("volunteerInterest")} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:ring-blue-600">
               <option value="">No, en este momento no puedo</option>
-              <option value="delegado">Me ofrezco como Delegado de equipo</option>
               <option value="eventos">Ayuda puntual en eventos/torneos</option>
               <option value="mantenimiento">Ayuda en mantenimiento o logística</option>
             </select>
@@ -151,9 +151,9 @@ export function Step5Consent() {
           
           <div className="space-y-4 border-l pl-6">
             <label className="text-sm font-semibold text-gray-700">¿Deseas aportar un Patrocinador?</label>
-            <Input {...register("sponsorCompanyName")} placeholder="Nombre de la empresa" />
-            <Input {...register("sponsorContactName")} placeholder="Persona de contacto" />
-            <Input {...register("sponsorPhone")} placeholder="Teléfono" />
+            <Input {...register("sponsorCompanyName")} placeholder="Nombre de la empresa" autoComplete="off" />
+            <Input {...register("sponsorContactName")} placeholder="Persona de contacto" autoComplete="off" />
+            <Input {...register("sponsorPhone")} placeholder="Teléfono" autoComplete="off" />
             
             <div className="border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition-colors cursor-pointer relative mt-2">
               <UploadCloud className="w-6 h-6 text-gray-400 mb-1" />
@@ -176,7 +176,7 @@ export function Step5Consent() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderConsentBox('rgpd', 'Política de Privacidad', 'Tratamiento de datos personales (RGPD)', errors.consentRgpd?.message)}
-          {renderConsentBox('tutela', 'Declaración de Tutela', 'Mayoría de edad y normativas', errors.consentTutela?.message)}
+          {!isAdult && renderConsentBox('tutela', 'Declaración de Tutela', 'Mayoría de edad y normativas', errors.consentTutela?.message)}
           {renderConsentBox('medical', 'Tratamiento Médico Especial', 'Alergias y traslados de urgencia', errors.consentMedical?.message)}
           {renderConsentBox('imagen', 'Derechos de Imagen', 'Consentimiento opcional para fotos', errors.consentImage?.message, true)}
         </div>
@@ -318,6 +318,70 @@ export function Step5Consent() {
           </Dialog>
         </div>
       </div>
+
+      {/* Creación de Contraseña para la Familia (Solo público) */}
+      {!isInternalForm && (
+        <div className="mt-8">
+          <div className="mb-6 border-b pb-4">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-indigo-600" />
+              Acceso al Portal de Familia
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Crea una contraseña. La usarás junto con tu email para acceder a tu zona privada, ver el estado de la inscripción, hacer pagos y añadir a otros hijos si lo necesitas.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/50 p-6 rounded-xl border border-indigo-100">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-800">Contraseña <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <Input 
+                  type={showPassword ? "text" : "password"} 
+                  {...register("password")} 
+                  placeholder="Mínimo 6 caracteres"
+                  className={`${errors.password ? "border-red-500" : ""} pr-10`}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-800">Repetir Contraseña <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <Input 
+                  type={showPassword ? "text" : "password"} 
+                  {...register("confirmPassword")} 
+                  placeholder="Vuelve a escribirla"
+                  className={`${errors.confirmPassword ? "border-red-500" : ""} pr-10`}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       <LegalModal 
         isOpen={activeLegalModal !== null} 

@@ -32,9 +32,11 @@ DROP POLICY IF EXISTS "Permitir acceso a attendance a usuarios autenticados" ON 
 
 CREATE POLICY "Users can manage attendance in their club"
 ON public.attendance FOR ALL TO authenticated USING (
-    team_id IN (SELECT id FROM public.equipos WHERE club_id IN (SELECT club_id FROM public.profiles WHERE id = auth.uid()))
-    OR
-    session_id IN (SELECT id FROM public.training_sessions WHERE club_id IN (SELECT club_id FROM public.profiles WHERE id = auth.uid()))
+    session_id IN (
+        SELECT ts.id FROM public.training_sessions ts
+        JOIN public.teams t ON t.id = ts.team_id
+        WHERE t.club_id IN (SELECT club_id FROM public.profiles WHERE id = auth.uid())
+    )
 );
 
 -- Tabla clubs
@@ -44,9 +46,9 @@ DROP POLICY IF EXISTS "Permitir crear clubes" ON public.clubs;
 CREATE POLICY "Users can insert club" ON public.clubs FOR INSERT TO authenticated WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Tabla equipos
-DROP POLICY IF EXISTS "allow_authenticated_inserts" ON public.equipos;
+DROP POLICY IF EXISTS "allow_authenticated_inserts" ON public.teams;
 
-CREATE POLICY "Club members can insert teams" ON public.equipos FOR INSERT TO authenticated WITH CHECK (
+CREATE POLICY "Club members can insert teams" ON public.teams FOR INSERT TO authenticated WITH CHECK (
     club_id IN (SELECT club_id FROM public.profiles WHERE id = auth.uid())
 );
 

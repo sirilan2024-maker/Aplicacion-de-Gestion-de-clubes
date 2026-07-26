@@ -21,16 +21,17 @@ const isValidDniNie = (value: string) => {
 
 export const registrationSchema = z.object({
   // STEP 1: Personal & Family Data
-  playerFirstName: z.string().min(2, "El nombre es requerido"),
-  playerLastName: z.string().min(2, "Los apellidos son requeridos"),
-  playerDni: z.string().min(1, "El DNI/NIE es requerido"), // Eliminamos la validación estricta de letra
+  playerFirstName: z.string().min(1, "El nombre del jugador es requerido"),
+  playerLastName: z.string().min(1, "Los apellidos del jugador son requeridos"),
+  playerDni: z.string().optional(), // Puede ser opcional si es muy pequeño, o validarlo si es senior
   birthDate: z.string().min(1, "La fecha de nacimiento es requerida"),
-  nationality: z.string().min(2, "La nacionalidad es requerida"),
+  nationality: z.string().optional(),
   isForeign: z.boolean().default(false),
   neverFederated: z.boolean().default(false),
-  address: z.string().min(5, "El domicilio completo es requerido"),
-  city: z.string().min(2, "La localidad es requerida"),
-  postalCode: z.string().min(4, "El código postal es requerido"),
+  isSeniorSelection: z.enum(["senior", "minor"]).default("minor"),
+  address: z.string().min(1, "La dirección es requerida"),
+  city: z.string().min(1, "La localidad es requerida"),
+  postalCode: z.string().min(1, "El código postal es requerido"),
   
   // Opcionales para Senior, requeridos para menores (lo validamos con superRefine)
   tutor1Name: z.string().optional(),
@@ -44,10 +45,16 @@ export const registrationSchema = z.object({
   // Las fotos obligatorias las manejaremos en el estado del componente para simplificar,
   // pero podemos requerir flags booleanas para saber si ya se subieron
   docsUploaded: z.boolean().default(false),
+  uploadedFiles: z.array(z.object({
+    label: z.string(),
+    base64: z.string()
+  })).default([]),
   escolarizacion: z.array(z.object({
     centro: z.string().min(2, "El centro es requerido"),
     curso: z.string().min(4, "El curso es requerido"),
   })).optional(),
+  dniFileBase64: z.string().optional(),
+  photoFileBase64: z.string().optional(),
 
   // EXTRAS DEL PASO 1 (MÉDICO, DEPORTIVO, FÍSICO)
   playerSip: z.string().optional(),
@@ -101,14 +108,16 @@ export const registrationSchema = z.object({
   // Firmas opcionales
   consentImage: z.boolean().default(false),
 
+  // Autenticación (Opcional en el esquema para permitir reutilizar el form desde dentro)
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
+
 }).superRefine((data, ctx) => {
   // Lógica de validación dinámica: Si es menor, tutores son obligatorios
-  if (data.birthDate) {
-    const birthYear = new Date(data.birthDate).getFullYear();
-    const isSenior = birthYear <= 2007;
+  const isSenior = data.isSeniorSelection === "senior";
 
-    if (!isSenior) {
-      if (!data.tutor1Name || data.tutor1Name.length < 2) {
+  if (!isSenior) {
+    if (!data.tutor1Name || data.tutor1Name.length < 2) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "El nombre del tutor es requerido para menores",
@@ -136,16 +145,38 @@ export const registrationSchema = z.object({
           path: ["tutor1Email"]
         });
       }
-    }
-  }
-
-  // Validación de métodos de pago
+      if (!data.tutor1Phone || data.tutor1Phone.length < 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El teléfono del tutor es requerido para menores",
+          path: ["tutor1Phone"]
+        });
+      }
+    }  // Validación de métodos de pago
   if (!data.paymentMethod) {
      ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Debe seleccionar un método de pago",
         path: ["paymentMethod"]
      });
+  }
+
+  // Validación de contraseñas
+  if (data.password) {
+    if (data.password.length < 6) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La contraseña debe tener al menos 6 caracteres",
+        path: ["password"]
+      });
+    }
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Las contraseñas no coinciden",
+        path: ["confirmPassword"]
+      });
+    }
   }
 });
 

@@ -36,6 +36,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { NotificationBell } from "@/components/features/notifications/NotificationBell"
 import { switchActiveRoleAction } from "@/app/actions/club-actions"
+import { EditClubModal } from "@/components/features/admin/EditClubModal"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
   Home: LayoutDashboard,
@@ -68,7 +69,9 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [availableRoles, setAvailableRoles] = useState<string[]>([])
   const [equipos, setEquipos] = useState<any[]>([])
+  const [clubInfo, setClubInfo] = useState<{id: string, name: string, logo_url: string | null} | null>(null)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
+  const [showEditClub, setShowEditClub] = useState(false)
   const supabase = createClient()
 
   // Detect active team context
@@ -94,6 +97,9 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           setAvailableRoles(profile.roles || [])
           
           if (profile.club_id) {
+            const { data: club } = await supabase.from('clubs').select('id, name, logo_url').eq('id', profile.club_id).single()
+            if (club) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
+
             let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id).order("name")
             if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
               const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
@@ -219,7 +225,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
         { name: "Disciplina", href: getHref("Disciplina", "/dashboard/matches?view=disciplina"), icon: AlertTriangle },
         { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
-        { name: "Tesoreria", href: "/dashboard/treasury", icon: Wallet },
+        { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
         { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
         { name: "Expedientes", href: "/admin/secretaria", icon: FolderOpen },
         { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
@@ -251,20 +257,46 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   return (
     <div className="md:hidden">
       {/* Top Header */}
-      <header className="h-14 bg-slate-900 text-white flex items-center justify-between px-4 fixed top-0 w-full z-40 shadow-md">
-        <div className="flex items-center gap-2 font-bold text-lg">
-          <Trophy className="w-5 h-5 text-emerald-400" />
-          <span>ClubManager</span>
+      <header className="h-22 min-h-[88px] py-2 bg-slate-900 text-white flex items-center justify-between px-4 fixed top-0 w-full z-40 shadow-md">
+        <div 
+          className="flex items-center gap-3 font-bold min-w-0 cursor-pointer flex-1 mr-2"
+          onClick={() => {
+            if (clubInfo) setShowEditClub(true);
+          }}
+        >
+          <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden p-0.5 shadow-sm border border-slate-200">
+            {clubInfo?.logo_url ? (
+              <img src={clubInfo.logo_url} alt="Escudo" className="w-full h-full object-contain p-0" />
+            ) : (
+              <Trophy className="w-8 h-8 text-emerald-600 shrink-0" />
+            )}
+          </div>
+          <div className="flex flex-col justify-center min-w-0 flex-1">
+            {clubInfo ? (
+              <>
+                <div className="text-[11px] font-extrabold leading-tight uppercase tracking-tight flex flex-col text-slate-100">
+                  {clubInfo.name.split(' ').map((word, i) => (
+                    <span key={i} className="block leading-none py-[1px]">{word}</span>
+                  ))}
+                </div>
+                <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-400 mt-1">
+                  Temp. 2024/25
+                </p>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">Cargando...</span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {(userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') && <NotificationBell />}
+        <div className="flex items-center gap-3 shrink-0">
+          <NotificationBell />
           <Link href="/dashboard/mi-perfil" className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
             U
           </Link>
         </div>
       </header>
 
-      <div className="h-14" />
+      <div className="h-22 min-h-[88px]" />
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 flex justify-around items-center h-16 pb-safe z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.5)]">
@@ -381,6 +413,21 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             </div>
           </div>
         </div>
+      )}
+
+      {clubInfo && (
+        <EditClubModal 
+          open={showEditClub} 
+          onClose={() => setShowEditClub(false)} 
+          clubId={clubInfo.id}
+          currentName={clubInfo.name}
+          currentLogoUrl={clubInfo.logo_url}
+          onSuccess={() => {
+            supabase.from('clubs').select('id, name, logo_url').eq('id', clubInfo.id).single().then(({data}) => {
+              if (data) setClubInfo({ id: data.id, name: data.name, logo_url: data.logo_url });
+            });
+          }}
+        />
       )}
     </div>
   )

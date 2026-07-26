@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Payments from "@/components/features/treasury/Payments";
+import TreasuryDashboard from "@/components/features/treasury/TreasuryDashboard";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TreasuryPage() {
@@ -16,14 +16,12 @@ export default function TreasuryPage() {
         setAuthorized(false);
         return;
       }
-      // Attempt to read role from JWT claims first
       const roleFromJwt = (data.user as any)?.app_metadata?.role;
       if (roleFromJwt) {
         setAuthorized(roleFromJwt === "admin" || roleFromJwt === "entrenador");
         return;
       }
-      // Fallback: fetch role from profiles table
-      const { data: profile, error: profErr } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user?.id)
@@ -34,14 +32,10 @@ export default function TreasuryPage() {
   }, []);
 
   useEffect(() => {
-    if (authorized === false) {
-      router.replace("/dashboard");
-    }
+    if (authorized === false) router.replace("/dashboard");
   }, [authorized, router]);
 
-  if (authorized === null) {
-    return <div className="p-6 text-center">Cargando...</div>;
-  }
+  if (authorized === null) return <div className="p-6 text-center">Cargando...</div>;
 
-  return <Payments />;
+  return <TreasuryDashboard />;
 }

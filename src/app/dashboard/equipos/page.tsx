@@ -559,7 +559,7 @@ export default function EquiposPage() {
           player_season_history(
             status,
             season_id,
-            players(posicion)
+            players(posicion_principal)
           )
         `)
         .eq("club_id", profile.club_id);
@@ -658,7 +658,7 @@ export default function EquiposPage() {
       const { data, error } = await supabase
         .from('player_season_history')
         .select(`
-          players!inner (id, first_name, last_name, posicion, dorsal)
+          players!inner (id, first_name, last_name, posicion_principal)
         `)
         .eq('team_id', teamId)
         .neq('status', 'inactive');
@@ -734,12 +734,10 @@ export default function EquiposPage() {
     const { data: insertedPlayer, error } = await supabase.from("players").insert({
       first_name: player.name.split(' ')[0] || "",
       last_name: player.name.split(' ').slice(1).join(' ') || "",
-      posicion: player.position,
-      dorsal: player.dorsal,
+      posicion_principal: player.position,
       team_id: selectedTeamId,
       club_id: club_id,
       birth_date: "2010-01-01",
-      parent_contact: "Pendiente de rellenar",
     }).select("id").single();
     
     if (error) {

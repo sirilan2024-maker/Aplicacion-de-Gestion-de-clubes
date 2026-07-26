@@ -23,6 +23,10 @@ ALTER TABLE public.clubs ADD COLUMN IF NOT EXISTS pais           TEXT NOT NULL D
 ALTER TABLE public.clubs ADD COLUMN IF NOT EXISTS email_contacto TEXT;
 ALTER TABLE public.clubs ADD COLUMN IF NOT EXISTS logo_url       TEXT;
 
+-- 2. TABLA PROFILES — asegurar columnas necesarias antes de usarlas en políticas de clubs
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email      TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS club_id    UUID REFERENCES public.clubs(id) ON DELETE SET NULL;
+
 -- RLS clubs
 ALTER TABLE public.clubs ENABLE ROW LEVEL SECURITY;
 
@@ -50,18 +54,16 @@ CREATE POLICY "Allow club creation during registration"
   ON public.clubs FOR INSERT TO anon, authenticated
   WITH CHECK (true);
 
--- 2. TABLA PROFILES — asegurar columnas necesarias ──────────
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email      TEXT;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS club_id    UUID REFERENCES public.clubs(id) ON DELETE SET NULL;
-
 -- Ampliar el CHECK de role para incluir 'metodologo' y 'familia'
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 ALTER TABLE public.profiles
   ADD CONSTRAINT profiles_role_check
   CHECK (role IN ('admin', 'coach', 'metodologo', 'familia'));
 
--- 3. TABLA TEAMS — asegurar club_id ─────────────────────────
+-- 3. TABLA TEAMS Y PLAYERS — asegurar club_id y status ──────────
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS club_id UUID REFERENCES public.clubs(id) ON DELETE CASCADE;
+ALTER TABLE public.players ADD COLUMN IF NOT EXISTS club_id UUID REFERENCES public.clubs(id) ON DELETE CASCADE;
+ALTER TABLE public.players ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'activo';
 
 -- 4. TRIGGER: handle_new_user actualizado para incluir club_id y email ──
 CREATE OR REPLACE FUNCTION public.handle_new_user()

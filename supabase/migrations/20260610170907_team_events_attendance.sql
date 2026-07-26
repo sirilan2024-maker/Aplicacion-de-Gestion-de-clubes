@@ -1,7 +1,7 @@
 -- Crear tabla de eventos de equipo
 CREATE TABLE IF NOT EXISTS public.team_events (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    team_id UUID REFERENCES public.equipos(id) ON DELETE CASCADE,
+    team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     event_type TEXT NOT NULL CHECK (event_type IN ('Entrenamiento', 'Partido', 'Reunión', 'Otro')),
     date DATE NOT NULL,
@@ -20,7 +20,7 @@ CREATE POLICY "Users can view team_events for their club"
     ON public.team_events FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM public.equipos e
+            SELECT 1 FROM public.teams e
             JOIN public.profiles p ON p.club_id = e.club_id
             WHERE e.id = team_events.team_id
             AND p.id = auth.uid()
@@ -31,7 +31,7 @@ CREATE POLICY "Users can manage team_events for their club"
     ON public.team_events FOR ALL
     USING (
         EXISTS (
-            SELECT 1 FROM public.equipos e
+            SELECT 1 FROM public.teams e
             JOIN public.profiles p ON p.club_id = e.club_id
             WHERE e.id = team_events.team_id
             AND p.id = auth.uid()

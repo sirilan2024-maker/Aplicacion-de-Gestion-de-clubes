@@ -27,15 +27,15 @@ CREATE POLICY "Admins can manage their club's seasons"
         )
     );
 
--- Add season_id to equipos
-ALTER TABLE public.equipos ADD COLUMN IF NOT EXISTS season_id UUID REFERENCES public.seasons(id) ON DELETE SET NULL;
+-- Add season_id to teams
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS season_id UUID REFERENCES public.seasons(id) ON DELETE SET NULL;
 
 -- Create player_season_teams to track player history
 CREATE TABLE IF NOT EXISTS public.player_season_teams (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     player_id UUID NOT NULL REFERENCES public.players(id) ON DELETE CASCADE,
     season_id UUID NOT NULL REFERENCES public.seasons(id) ON DELETE CASCADE,
-    team_id UUID NOT NULL REFERENCES public.equipos(id) ON DELETE CASCADE,
+    team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
     club_id UUID NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     UNIQUE(player_id, season_id)

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Fragment } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Check, X, Stethoscope, Loader2, Calendar as CalendarIcon, ArrowLeft, BarChart2, ListChecks, ChevronDown, ChevronUp, Save } from "lucide-react";
+import { Check, X, Stethoscope, Loader2, Calendar as CalendarIcon, ArrowLeft, BarChart2, ListChecks, ChevronDown, ChevronUp, Save, Clock } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Player {
@@ -208,7 +208,7 @@ export default function AsistenciaEquipoPage() {
     const presents = summaryData.filter(a => 
       a.player_id === playerId && 
       (eventsToUse.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
-      (a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present')
+      (a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'retraso' || a.status?.toLowerCase() === 'late')
     ).length;
     
     const absents = summaryData.filter(a => 
@@ -227,6 +227,7 @@ export default function AsistenciaEquipoPage() {
     if (!status) return 'bg-gray-100 text-gray-400';
     const s = status.toLowerCase();
     if (s === 'presente' || s === 'present') return 'bg-emerald-500 text-white shadow-sm';
+    if (s === 'retraso' || s === 'late') return 'bg-orange-500 text-white shadow-sm';
     if (s === 'ausente' || s === 'absent') return 'bg-red-500 text-white shadow-sm';
     if (s === 'lesionado' || s === 'excused') return 'bg-amber-500 text-white shadow-sm';
     return 'bg-gray-100 text-gray-400';
@@ -307,18 +308,30 @@ export default function AsistenciaEquipoPage() {
                     
                     {/* Status selectors */}
                     <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-auto relative border border-gray-200/50 shadow-inner">
-                      <button
-                        onClick={() => handleStatusChange(player.id, 'present')}
-                        disabled={isSaving}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
-                          currentStatus === 'present'
-                            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
-                            : 'text-gray-600 hover:bg-gray-200/60'
-                        }`}
-                      >
-                        {isSaving && currentStatus === 'present' ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Check className="w-3.5 h-3.5" />}
-                        Presente
-                      </button>
+                        <button
+                          onClick={() => handleStatusChange(player.id, 'present')}
+                          disabled={isSaving}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+                            currentStatus === 'present' || currentStatus === 'Presente'
+                              ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
+                              : 'text-gray-600 hover:bg-gray-200/60'
+                          }`}
+                        >
+                          {isSaving && (currentStatus === 'present' || currentStatus === 'Presente') ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Check className="w-3.5 h-3.5" />}
+                          Presente
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(player.id, 'retraso')}
+                          disabled={isSaving}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+                            currentStatus === 'retraso' || currentStatus === 'Retraso'
+                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-100'
+                              : 'text-gray-600 hover:bg-gray-200/60'
+                          }`}
+                        >
+                          {isSaving && (currentStatus === 'retraso' || currentStatus === 'Retraso') ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Clock className="w-3.5 h-3.5" />}
+                          Retraso
+                        </button>
                       <button
                         onClick={() => handleStatusChange(player.id, 'absent')}
                         disabled={isSaving}
@@ -482,6 +495,7 @@ export default function AsistenciaEquipoPage() {
                             <div className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center shadow-sm border border-black/5 ${getStatusColor(stat)}`}>
                               {!stat && <span className="text-gray-300">-</span>}
                               {(stat?.toLowerCase() === 'presente' || stat?.toLowerCase() === 'present') && <Check className="w-4 h-4" />}
+                              {(stat?.toLowerCase() === 'retraso' || stat?.toLowerCase() === 'late') && <Clock className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'ausente' || stat?.toLowerCase() === 'absent') && <X className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'lesionado' || stat?.toLowerCase() === 'excused') && <Stethoscope className="w-4 h-4" />}
                             </div>
@@ -517,7 +531,7 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
   if (events.length === 0) return <div className="p-8 text-center text-slate-500">No hay eventos para mostrar.</div>;
 
   const totalEvents = events.length;
-  const presents = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present')).length;
+  const presents = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && ['presente', 'present', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
   const absents = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent')).length;
   const excused = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused')).length;
 

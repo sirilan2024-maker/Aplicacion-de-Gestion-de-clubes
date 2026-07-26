@@ -218,7 +218,9 @@ export async function registerWithInviteCode(
           parent1_phone: phone,
           parent1_email: email,
           parent_contact: `${firstName} ${lastName} - ${phone || 'Sin teléfono'}`,
-          gdpr_consent: true,
+          consent_rgpd_at: new Date().toISOString(),
+          consent_ip: headers().get('x-forwarded-for') || '0.0.0.0',
+          consent_user_agent: headers().get('user-agent') || 'Unknown',
         })
         .select('id')
         .single()
@@ -251,7 +253,9 @@ export async function registerWithInviteCode(
         last_name:    lastName,
         team_id:      team.id,
         club_id:      team.club_id,
-        gdpr_consent: true,
+        consent_rgpd_at: new Date().toISOString(),
+        consent_ip: headers().get('x-forwarded-for') || '0.0.0.0',
+        consent_user_agent: headers().get('user-agent') || 'Unknown',
         birth_date:   new Date().toISOString().split('T')[0],
         user_auth_id: userId,
       })

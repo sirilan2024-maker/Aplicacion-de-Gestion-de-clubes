@@ -66,14 +66,17 @@ export default function PlantillaEquipoPage() {
           .from("player_season_history")
           .select(`
             status,
-            players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code)
+            players!inner (id, first_name, last_name, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code)
           `)
           .eq("team_id", teamId)
         .neq("status", "inactive");
 
       if (playersError) throw playersError;
 
-      const playersData = historyData?.map((h: any) => h.players) || [];
+      const playersData = historyData?.map((h: any) => ({
+        ...h.players,
+        posicion: h.players.posicion_principal
+      })) || [];
 
       // 2. Fetch assigned coaches from team_coaches using the server action to bypass RLS
       const coachesData = await getTeamCoachesProfilesAction(teamId);
@@ -229,6 +232,14 @@ export default function PlantillaEquipoPage() {
           >
             <FileText className="w-4 h-4" />
             <span>Exportar PINs</span>
+          </button>
+          
+          <button 
+            onClick={() => router.push(`/dashboard/club/miembros`)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl border border-emerald-700 transition-colors shadow-sm text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Asignar Miembro del Club</span>
           </button>
         </div>
       </div>

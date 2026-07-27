@@ -595,10 +595,10 @@ export default function PlayerDashboardPage() {
           </div>
           <div className="p-5 flex-1 flex flex-col w-full h-full text-left">
           <div className="flex-1 space-y-3 w-full mb-4">
-            <div className={`flex items-center justify-between p-3 rounded-xl border ${!acwrData ? 'bg-gray-50 border-gray-200 text-gray-700' :
-              acwrData.acwr >= 0.8 && acwrData.acwr <= 1.3 ? 'bg-green-50 border-green-200 text-green-700' :
-              acwrData.acwr > 1.3 && acwrData.acwr <= 1.5 ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
-              acwrData.acwr > 1.5 || acwrData.acwr < 0.8 ? 'bg-red-50 border-red-200 text-red-700' :
+            <div className={`flex items-center justify-between p-3 rounded-xl border ${!acwrData || typeof acwrData?.acwr !== 'number' ? 'bg-gray-50 border-gray-200 text-gray-700' :
+              acwrData?.acwr >= 0.8 && acwrData?.acwr <= 1.3 ? 'bg-green-50 border-green-200 text-green-700' :
+              acwrData?.acwr > 1.3 && acwrData?.acwr <= 1.5 ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
+              acwrData?.acwr > 1.5 || acwrData?.acwr < 0.8 ? 'bg-red-50 border-red-200 text-red-700' :
               'bg-gray-50 border-gray-200 text-gray-700'
             }`}>
               <div className="flex items-center gap-2">
@@ -606,7 +606,7 @@ export default function PlayerDashboardPage() {
                 <span className="text-xs font-bold uppercase">ACWR</span>
               </div>
               <div className="font-black">
-                {acwrData?.acwr > 0 ? acwrData.acwr.toFixed(2) : '-'}
+                {acwrData?.acwr && typeof acwrData.acwr === 'number' && acwrData.acwr > 0 ? acwrData.acwr.toFixed(2) : '-'}
               </div>
             </div>
 

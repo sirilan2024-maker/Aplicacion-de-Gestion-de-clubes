@@ -291,7 +291,7 @@ export default function GlobalPlayerProfilePage() {
       const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
       const teamId = pData?.team_id;
 
-      let allEvents = [];
+      let allEvents: any[] = [];
       if (teamId) {
         const { data: tEvents } = await supabase.from('team_events').select('*').eq('team_id', teamId);
         if (tEvents) allEvents = [...tEvents];
@@ -355,7 +355,8 @@ export default function GlobalPlayerProfilePage() {
         (editData.weight && editData.weight !== player.weight) ||
         (editData.height && editData.height !== player.height)
       ) {
-        const h = editData.height || player.height;
+        const payload: any = { ...editData };
+        const h = payload.height || player.height;
         const w = editData.weight || player.weight;
         let bmi = null;
         if (h && w && h > 0) {

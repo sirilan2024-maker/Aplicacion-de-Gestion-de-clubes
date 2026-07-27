@@ -49,13 +49,14 @@ export default function FamilyDisciplinePage() {
       const allCards: any[] = [];
 
       records.forEach(r => {
+        const match = Array.isArray(r.partidos) ? r.partidos[0] : r.partidos;
         if (r.yellow_cards > 0) {
           yellow += r.yellow_cards;
-          allCards.push({ type: 'yellow', count: r.yellow_cards, match: r.partidos });
+          allCards.push({ type: 'yellow', count: r.yellow_cards, match });
         }
         if (r.red_cards > 0) {
           red += r.red_cards;
-          allCards.push({ type: 'red', count: r.red_cards, match: r.partidos });
+          allCards.push({ type: 'red', count: r.red_cards, match });
         }
       });
 
@@ -64,7 +65,7 @@ export default function FamilyDisciplinePage() {
 
       // Format for DisciplineModal
       const formattedCardEvents = records.map(r => ({
-        match: r.partidos,
+        match: Array.isArray(r.partidos) ? r.partidos[0] : r.partidos,
         yellow: r.yellow_cards || 0,
         red: r.red_cards || 0
       })).sort((a, b) => new Date(b.match?.fecha_hora || 0).getTime() - new Date(a.match?.fecha_hora || 0).getTime());

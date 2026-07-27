@@ -208,7 +208,7 @@ export function RegistrationWizard({
             <h2 className="text-3xl font-bold mb-2">¡Inscripción Completada!</h2>
           </div>
           <CardContent className="p-8 space-y-6 bg-white text-center">
-            { (submittedData.isSeniorTeam === true || submittedData.isSeniorTeam === "true" || submittedData.isSeniorSelection === "senior") ? (
+            { (submittedData.isSeniorTeam === true || submittedData.isSeniorSelection === "senior") ? (
               <p className="text-lg text-gray-700 font-medium">
                 La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar ya puedes entrar en tu cuenta pero hasta que no se verifique por el administrador no tendras acceso total a tu cuenta de usuario.
               </p>

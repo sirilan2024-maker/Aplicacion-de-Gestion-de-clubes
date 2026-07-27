@@ -170,7 +170,7 @@ export default function DocumentManagementPage() {
                   <h2 className="text-xl font-bold text-gray-900 truncate">{selectedPlayer.first_name} {selectedPlayer.last_name}</h2>
                   <p className="text-sm text-gray-500 truncate">{selectedPlayer.team_name}</p>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => setSelectedPlayer(null)} className="shrink-0 rounded-full w-10 h-10 p-0 flex items-center justify-center">
+                <Button variant="outline" size="sm" onClick={() => setSelectedPlayer(null)} className="shrink-0 rounded-full w-10 h-10 p-0 flex items-center justify-center">
                   <X className="w-5 h-5" />
                 </Button>
               </div>

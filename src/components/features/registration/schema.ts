@@ -115,7 +115,7 @@ export const registrationSchema = z.object({
 
 }).superRefine((data, ctx) => {
   const year = data.birthDate ? new Date(data.birthDate).getFullYear() : 9999;
-  const isSenior = data.isSeniorTeam === true || data.isSeniorTeam === "true" || data.isSeniorSelection === "senior";
+  const isSenior = data.isSeniorTeam === true || data.isSeniorSelection === "senior";
   const isAdult = isSenior || year <= 2007;
 
   if (!data.tutor1Email) {

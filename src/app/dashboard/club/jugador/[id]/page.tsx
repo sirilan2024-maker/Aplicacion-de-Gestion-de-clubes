@@ -291,7 +291,7 @@ export default function GlobalPlayerProfilePage() {
       const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
       const teamId = pData?.team_id;
 
-      let allEvents = [];
+      let allEvents: any[] = [];
       if (teamId) {
         const { data: tEvents } = await supabase.from('team_events').select('*').eq('team_id', teamId);
         if (tEvents) allEvents = [...tEvents];
@@ -343,7 +343,7 @@ export default function GlobalPlayerProfilePage() {
     setSaving(true);
     const supabase = createClient();
     try {
-      const payload = { ...editData };
+      const payload: any = { ...editData };
 
       // Si el jugador estaba pendiente de revisión y se le acaba de asignar equipo, activamos la ficha automáticamente
       if (player.registration_status === 'pending_revision' && payload.team_id) {

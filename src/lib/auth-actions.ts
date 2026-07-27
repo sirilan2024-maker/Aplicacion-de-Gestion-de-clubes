@@ -2,6 +2,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 
 // ─── Existing: Login ──────────────────────────────────────────────────────────
 export async function login(formData: FormData) {
@@ -219,8 +220,8 @@ export async function registerWithInviteCode(
           parent1_email: email,
           parent_contact: `${firstName} ${lastName} - ${phone || 'Sin teléfono'}`,
           consent_rgpd_at: new Date().toISOString(),
-          consent_ip: headers().get('x-forwarded-for') || '0.0.0.0',
-          consent_user_agent: headers().get('user-agent') || 'Unknown',
+          consent_ip: (await headers()).get('x-forwarded-for') || '0.0.0.0',
+          consent_user_agent: (await headers()).get('user-agent') || 'Unknown',
         })
         .select('id')
         .single()
@@ -254,8 +255,8 @@ export async function registerWithInviteCode(
         team_id:      team.id,
         club_id:      team.club_id,
         consent_rgpd_at: new Date().toISOString(),
-        consent_ip: headers().get('x-forwarded-for') || '0.0.0.0',
-        consent_user_agent: headers().get('user-agent') || 'Unknown',
+        consent_ip: (await headers()).get('x-forwarded-for') || '0.0.0.0',
+        consent_user_agent: (await headers()).get('user-agent') || 'Unknown',
         birth_date:   new Date().toISOString().split('T')[0],
         user_auth_id: userId,
       })

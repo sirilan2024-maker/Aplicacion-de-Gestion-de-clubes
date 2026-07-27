@@ -1,16 +1,7 @@
 // Redirect to the unified discipline view in /dashboard/matches
 import { redirect } from "next/navigation"
 
-export default function DisciplinaRedirectPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ teamId?: string }>
-}) {
-  // We need to handle this as an async server component for Next.js 16
-  return <DisciplinaRedirect searchParams={searchParams} />
-}
-
-async function DisciplinaRedirect({
+export default async function DisciplinaRedirectPage({
   searchParams,
 }: {
   searchParams: Promise<{ teamId?: string }>

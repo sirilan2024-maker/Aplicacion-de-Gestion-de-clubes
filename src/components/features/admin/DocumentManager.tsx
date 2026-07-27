@@ -273,8 +273,8 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
       const res = await getPlayerExpedienteAction(playerId);
       if (res.success) {
         setDocuments(res.documents as PlayerDocument[]);
-        setTutorDniUrl(res.tutorDniUrl);
-        setSipNumber(res.sipNumber);
+        setTutorDniUrl(res.tutorDniUrl || null);
+        setSipNumber(res.sipNumber || null);
       } else {
         setError(res.error || "Error al cargar documentos");
       }

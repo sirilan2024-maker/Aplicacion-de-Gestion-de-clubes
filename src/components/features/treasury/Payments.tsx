@@ -63,6 +63,10 @@ export default function Payments() {
   const [partialAmount, setPartialAmount] = useState<number>(0);
   const [partialMethod, setPartialMethod] = useState("Contado");
 
+  // Generic Income Modal state
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split("T")[0]);
+
   const fetchFees = async () => {
     try {
       const data = await getClubFeesAction();
@@ -117,6 +121,30 @@ export default function Payments() {
       setIsPagado(false);
       setPaymentMethod("Transferencia");
       setEditingFeeId(null);
+    } catch (error: any) {
+      toast.error("Error: " + error.message);
+    }
+  };
+
+  const handleCreateIncome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createFeeAction({
+        player_id: null,
+        concept: concepto,
+        amount_cents: Math.round(importe * 100),
+        currency: "eur",
+        estado: "pagado",
+        tipo_cargo: "one_time",
+        payment_method: paymentMethod,
+        fecha_pago: new Date(incomeDate).toISOString()
+      });
+      toast.success("Ingreso registrado correctamente");
+      fetchFees();
+      setShowIncomeModal(false);
+      setConcepto("");
+      setImporte(0);
+      setPaymentMethod("Transferencia");
     } catch (error: any) {
       toast.error("Error: " + error.message);
     }
@@ -233,6 +261,15 @@ export default function Payments() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => {
+            setConcepto("");
+            setImporte(0);
+            setIncomeDate(new Date().toISOString().split("T")[0]);
+            setPaymentMethod("Transferencia");
+            setShowIncomeModal(true);
+          }} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-xs font-medium">
+            + Añadir Ingreso Extra
+          </button>
+          <button onClick={() => {
             setEditingFeeId(null);
             setSelectedPlayer("");
             setConcepto("");
@@ -247,7 +284,7 @@ export default function Payments() {
 
       <div className="p-4">
         {/* Unified Global Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
           <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Facturado</p>
             <p className="text-xl font-black text-slate-900">{totalFacturado.toFixed(2)} €</p>
@@ -262,8 +299,8 @@ export default function Payments() {
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto w-full rounded-lg border border-gray-200">
+          <table className="min-w-[700px] w-full divide-y divide-gray-200 whitespace-nowrap">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jugador</th>
@@ -363,6 +400,44 @@ export default function Payments() {
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-300 rounded text-slate-700 hover:bg-slate-50 transition">Cancelar</button>
                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
                   {editingFeeId ? "Guardar Cambios" : "Crear Cuota"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showIncomeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md text-slate-800">
+            <h3 className="text-lg font-semibold mb-4 text-slate-900">Registrar Ingreso Extra</h3>
+            <form onSubmit={handleCreateIncome} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-slate-700">Concepto (Ej: Subvención)</label>
+                <input type="text" required value={concepto} onChange={e => setConcepto(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-slate-900 placeholder-slate-400" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-slate-700">Importe (€)</label>
+                  <input type="number" min="0.01" step="0.01" required value={importe} onChange={e => setImporte(parseFloat(e.target.value))} className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-slate-900" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-slate-700">Fecha del Ingreso</label>
+                  <input type="date" required value={incomeDate} onChange={e => setIncomeDate(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-slate-900" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-slate-700">Método de Cobro</label>
+                <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 bg-white text-slate-900">
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Efectivo">Contado / Efectivo</option>
+                  <option value="Tarjeta">Tarjeta</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button type="button" onClick={() => setShowIncomeModal(false)} className="px-4 py-2 border border-gray-300 rounded text-slate-700 hover:bg-slate-50 transition">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition">
+                  Registrar Ingreso
                 </button>
               </div>
             </form>

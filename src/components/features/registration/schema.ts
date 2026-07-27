@@ -21,18 +21,18 @@ const isValidDniNie = (value: string) => {
 
 export const registrationSchema = z.object({
   // STEP 1: Personal & Family Data
-  playerFirstName: z.string().min(1, "El nombre del jugador es requerido"),
-  playerLastName: z.string().min(1, "Los apellidos del jugador son requeridos"),
+  playerFirstName: z.string().optional(),
+  playerLastName: z.string().optional(),
   playerDni: z.string().optional(), // Puede ser opcional si es muy pequeño, o validarlo si es senior
-  birthDate: z.string().min(1, "La fecha de nacimiento es requerida"),
+  birthDate: z.string().optional(),
   nationality: z.string().optional(),
   isForeign: z.boolean().default(false),
   neverFederated: z.boolean().default(false),
   isSeniorSelection: z.enum(["senior", "minor"]).default("minor"), // Kept for backwards compatibility
-  isSeniorTeam: z.boolean().default(false), // Flag from the form wrapper
-  address: z.string().min(1, "La dirección es requerida"),
-  city: z.string().min(1, "La localidad es requerida"),
-  postalCode: z.string().min(1, "El código postal es requerido"),
+  isSeniorTeam: z.any().transform(val => val === true || val === "true"), // Flag from the form wrapper
+  address: z.string().optional(),
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
   
   // Opcionales para Senior, requeridos para menores (lo validamos con superRefine)
   tutor1Name: z.string().optional(),
@@ -86,8 +86,8 @@ export const registrationSchema = z.object({
   // STEP 3: Cuotas
   wasInClub: z.boolean().default(false),
   paidReservation: z.boolean().default(false),
-  paymentMethod: z.enum(["Stripe", "Transferencia", "Contado", ""]).optional(),
-  paymentPlan: z.enum(["Total", "Fraccionado", ""]).optional(),
+  paymentMethod: z.enum(["Stripe", "Transferencia", "Contado", ""]).optional().nullable(),
+  paymentPlan: z.enum(["Total", "Fraccionado", ""]).optional().nullable(),
 
   // STEP 4: Tallas
   sizeCamisetaJuego: z.string().optional(),
@@ -114,33 +114,27 @@ export const registrationSchema = z.object({
   confirmPassword: z.string().optional(),
 
 }).superRefine((data, ctx) => {
-  // Lógica de validación dinámica: Si es menor, tutores son obligatorios
   const year = data.birthDate ? new Date(data.birthDate).getFullYear() : 9999;
-  const isAdult = data.isSeniorTeam || year <= 2007;
+  const isSenior = data.isSeniorTeam === true || data.isSeniorTeam === "true" || data.isSeniorSelection === "senior";
+  const isAdult = isSenior || year <= 2007;
+
+  if (!data.tutor1Email) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El email es requerido", path: ["tutor1Email"] });
+  }
 
   if (!isAdult) {
-    if (!data.tutor1Name || data.tutor1Name.length < 2) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del tutor es requerido para menores", path: ["tutor1Name"] });
-    }
-    if (!data.tutor1LastName || data.tutor1LastName.length < 2) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Los apellidos del tutor son requeridos para menores", path: ["tutor1LastName"] });
-    }
-    if (!data.tutor1Dni || data.tutor1Dni.length < 5) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El DNI del tutor es requerido para menores", path: ["tutor1Dni"] });
-    }
-    if (!data.tutor1Email) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El email del tutor es requerido para menores", path: ["tutor1Email"] });
-    }
-    if (!data.tutor1Phone || data.tutor1Phone.length < 6) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del tutor es requerido para menores", path: ["tutor1Phone"] });
-    }
-    if (!data.consentTutela) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes firmar la declaración de tutela", path: ["consentTutela"] });
-    }
+      if (!data.consentTutela) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes firmar la declaración de tutela", path: ["consentTutela"] });
+      }
+  }
+
+  // Si no es senior, obligamos la fecha de nacimiento
+  if (!isSenior && (!data.birthDate || data.birthDate.length < 4)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La fecha de nacimiento es requerida", path: ["birthDate"] });
   }
 
   // Validación de métodos de pago (solo si no es senior team)
-  if (!data.isSeniorTeam && !data.paymentMethod) {
+  if (!isSenior && !data.paymentMethod) {
      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe seleccionar un método de pago", path: ["paymentMethod"] });
   }
 

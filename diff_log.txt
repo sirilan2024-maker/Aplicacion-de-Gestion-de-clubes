@@ -1,0 +1,102 @@
+commit e219131af67bcfcba6d5d48e639085c64d50d07c
+Author: sirilan2024-maker <sirilan2024@gmail.com>
+Date:   Sun Jul 12 21:06:20 2026 +0200
+
+    feat: Módulo de Inscripciones Inteligente V2
+
+diff --git a/src/app/dashboard/family/e/[playerId]/perfil/page.tsx b/src/app/dashboard/family/e/[playerId]/perfil/page.tsx
+index 41ce7ab..4c8aa1b 100644
+--- a/src/app/dashboard/family/e/[playerId]/perfil/page.tsx
++++ b/src/app/dashboard/family/e/[playerId]/perfil/page.tsx
+@@ -20,6 +20,7 @@ export default function PlayerDashboardPage() {
+   const [stats, setStats] = useState({
+     asistencia: 0,
+     faltas: 0,
++    ratio: 0,
+     yellowCards: 0,
+     redCards: 0,
+     goals: 0,
+@@ -115,9 +116,16 @@ export default function PlayerDashboardPage() {
+           minutes = matchStats.reduce((sum, stat) => sum + (stat.minutes_played || 0), 0);
+         }
+ 
++        let ratio = 0;
++        const totalAttendance = asisteCount + faltasCount;
++        if (totalAttendance > 0) {
++          ratio = Math.round((asisteCount / totalAttendance) * 100);
++        }
++
+         setStats({
+           asistencia: asisteCount || 0,
+           faltas: faltasCount || 0,
++          ratio,
+           yellowCards,
+           redCards,
+           goals,
+@@ -262,30 +270,51 @@ export default function PlayerDashboardPage() {
+           </div>
+         </div>
+ 
+-        {/* WIDGET 3: ENTRENAMIENTOS (ASISTENCIA) */}
++        {/* WIDGET 3: ASISTENCIA Y ENTRENAMIENTOS */}
+         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+           <div className="bg-gradient-to-r from-purple-600 to-fuchsia-600 p-4">
+             <h2 className="text-white font-bold text-lg flex items-center gap-2">
+               <Target className="text-purple-200" />
+-              Entrenamientos
++              Asistencia y Entrenamientos
+             </h2>
+           </div>
+-          <div className="p-6 flex-1">
+-            <div className="flex items-center justify-between mb-6">
+-              <div>
+-                <p className="text-4xl font-black text-gray-900">{stats.asistencia}</p>
+-                <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">Completados</p>
++          <div className="p-6 flex-1 flex flex-col justify-between">
++            <div>
++              <div className="flex items-center justify-between mb-4">
++                <div>
++                  <p className="text-4xl font-black text-gray-900">{stats.ratio}%</p>
++                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ratio de Asistencia</p>
++                </div>
++                <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
++                  <Calendar className="text-purple-600 w-6 h-6" />
++                </div>
+               </div>
+-              <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center transform rotate-12">
+-                <Calendar className="text-purple-600 w-8 h-8" />
++              
++              {/* Progress bar */}
++              <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden mb-5">
++                <div 
++                  className="bg-purple-600 h-full rounded-full transition-all duration-500" 
++                  style={{ width: `${stats.ratio}%` }} 
++                />
++              </div>
++
++              <div className="grid grid-cols-2 gap-3 mb-4">
++                <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-2.5 text-center">
++                  <span className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-0.5">Asistidos</span>
++                  <span className="text-lg font-black text-purple-700">{stats.asistencia}</span>
++                </div>
++                <div className="bg-red-50/50 border border-red-100 rounded-lg p-2.5 text-center">
++                  <span className="block text-xs font-bold text-red-600 uppercase tracking-wider mb-0.5">Faltas</span>
++                  <span className="text-lg font-black text-red-700">{stats.faltas}</span>
++                </div>
+               </div>
+             </div>
+-            <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex justify-between items-center">
+-              <span className="text-red-700 font-semibold text-sm">Faltas de asistencia</span>
+-              <span className="text-red-700 font-black text-lg">{stats.faltas}</span>
+-            </div>
+-            <button onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha?tab=asistencia`)} className="w-full mt-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+-              Ver Gráficas de Asistencia
++
++            <button 
++              onClick={() => router.push(`/dashboard/family/e/${playerId}/asistencia`)} 
++              className="w-full py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm mt-auto"
++            >
++              Ver Detalle de Asistencia
+             </button>
+           </div>
+         </div>

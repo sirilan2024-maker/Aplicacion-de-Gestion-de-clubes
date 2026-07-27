@@ -49,14 +49,15 @@ export async function POST(request: Request) {
         user_metadata: {
           role: 'tutor',
           rol: 'familia',
-          first_name: formData.tutor1Name || formData.playerFirstName,
-          last_name: formData.tutor1LastName || formData.playerLastName,
+          first_name: formData.tutor1Name || formData.playerFirstName || email.split('@')[0],
+          last_name: formData.tutor1LastName || formData.playerLastName || "-",
         }
       });
 
       if (authError) {
         console.error('Error creando usuario Auth:', authError);
-        if (authError.message.toLowerCase().includes('already registered') || authError.message.toLowerCase().includes('already exists')) {
+        const errorStr = authError.message.toLowerCase();
+        if (errorStr.includes('already registered') || errorStr.includes('already been registered') || errorStr.includes('already exists')) {
           return NextResponse.json({ 
             error: 'Este email ya está registrado. Por favor, inicia sesión con tu cuenta y usa la opción "Inscribir a otro jugador" desde el Portal de Familia.' 
           }, { status: 409 });
@@ -73,8 +74,8 @@ export async function POST(request: Request) {
           email: email,
           role: 'familia',
           club_id: clubId,
-          first_name: formData.tutor1Name || formData.playerFirstName,
-          last_name: formData.tutor1LastName || formData.playerLastName,
+          first_name: formData.tutor1Name || formData.playerFirstName || email.split('@')[0],
+          last_name: formData.tutor1LastName || formData.playerLastName || "-",
         });
       }
     } else {
@@ -222,14 +223,16 @@ export async function POST(request: Request) {
       }
     }
 
+    const isSenior = formData.isSeniorTeam === true || formData.isSeniorTeam === "true" || formData.isSeniorSelection === "senior";
+
     // ──────────────────────────────────────────────────────────────────────────
     // FASE 1 (cont.): Inserción directa en players con TODOS los campos
     // tutor_id = auth.uid() para que el RLS funcione desde el minuto 0
     // ──────────────────────────────────────────────────────────────────────────
     const { data: player, error: playerError } = await supabaseAdmin.from('players').insert({
       // Datos personales del jugador
-      first_name: formData.playerFirstName || null,
-      last_name: formData.playerLastName || null,
+      first_name: formData.playerFirstName || formData.tutor1Name || email.split('@')[0],
+      last_name: formData.playerLastName || formData.tutor1LastName || "-",
       birth_date: formData.birthDate || null,
       dni: formData.playerDni || null,
       sip: formData.playerSip || null,
@@ -241,6 +244,7 @@ export async function POST(request: Request) {
       // Identificación del club y equipo
       club_id: clubId,
       team_id: teamId || null,
+      is_senior: isSenior,
       
       // Datos del tutor/padre (desnormalizados para acceso rápido)
       parent1_name: formData.tutor1Name || null,
@@ -389,8 +393,8 @@ export async function POST(request: Request) {
     // FASE 6: Generación de Cuotas y Stripe PaymentIntent
     // ──────────────────────────────────────────────────────────────────────────
     
-    // 1. Crear las cuotas contables automáticamente
-    if (player) {
+    // 1. Crear las cuotas contables automáticamente (Omitir si es Senior)
+    if (player && !isSenior) {
       try {
         await createAdminFeeForPlayerAction(player.id, formData.wasInClub || false);
       } catch (err) {
@@ -398,11 +402,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Crear Stripe PaymentIntent si eligió Stripe
+    // 2. Crear Stripe PaymentIntent si eligió Stripe (Omitir si es Senior)
     let clientSecret = null;
     let stripeIntentId = null;
 
-    if (paymentMethod === 'Stripe' && player) {
+    if (paymentMethod === 'Stripe' && player && !isSenior) {
       const isFraccionado = paymentPlan === 'Fraccionado';
       const isRenewal = formData.wasInClub;
       const isReserved = formData.paidReservation;

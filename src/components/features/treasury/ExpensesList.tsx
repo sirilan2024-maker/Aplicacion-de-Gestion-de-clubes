@@ -134,45 +134,47 @@ export default function ExpensesList({ refreshBalances }: { refreshBalances: () 
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
-            <tr>
-              <th className="p-4 font-semibold">Fecha</th>
-              <th className="p-4 font-semibold">Concepto</th>
-              <th className="p-4 font-semibold">Categoría</th>
-              <th className="p-4 font-semibold text-right">Importe</th>
-              <th className="p-4 font-semibold text-center w-24">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {expenses.length === 0 ? (
-              <tr><td colSpan={5} className="p-6 text-center text-gray-500">No hay gastos registrados</td></tr>
-            ) : expenses.map(exp => (
-              <tr key={exp.id} className="hover:bg-gray-50">
-                <td className="p-4 text-gray-600">{new Date(exp.date).toLocaleDateString()}</td>
-                <td className="p-4 font-medium text-gray-800">{exp.concept}</td>
-                <td className="p-4">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    <Tag className="w-3 h-3" /> {exp.category}
-                  </span>
-                </td>
-                <td className="p-4 text-right font-bold text-red-600">
-                  -{(exp.amount_cents / 100).toFixed(2)} €
-                </td>
-                <td className="p-4 text-center">
-                  <div className="flex justify-center gap-2">
-                    <button onClick={() => handleEditClick(exp)} className="text-gray-400 hover:text-blue-600 transition" title="Editar">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(exp.id)} className="text-gray-400 hover:text-red-600 transition" title="Eliminar">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
+              <tr>
+                <th className="p-4 font-semibold">Fecha</th>
+                <th className="p-4 font-semibold">Concepto</th>
+                <th className="p-4 font-semibold">Categoría</th>
+                <th className="p-4 font-semibold text-right">Importe</th>
+                <th className="p-4 font-semibold text-center w-24">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {expenses.length === 0 ? (
+                <tr><td colSpan={5} className="p-6 text-center text-gray-500">No hay gastos registrados</td></tr>
+              ) : expenses.map(exp => (
+                <tr key={exp.id} className="hover:bg-gray-50">
+                  <td className="p-4 text-gray-600">{new Date(exp.date).toLocaleDateString()}</td>
+                  <td className="p-4 font-medium text-gray-800 truncate max-w-[150px]">{exp.concept}</td>
+                  <td className="p-4">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      <Tag className="w-3 h-3" /> {exp.category}
+                    </span>
+                  </td>
+                  <td className="p-4 text-right font-bold text-red-600">
+                    -{(exp.amount_cents / 100).toFixed(2)} €
+                  </td>
+                  <td className="p-4 text-center">
+                    <div className="flex justify-center gap-2 flex-col md:flex-row">
+                      <button onClick={() => handleEditClick(exp)} className="text-gray-400 hover:text-blue-600 transition" title="Editar">
+                        <Pencil className="w-4 h-4 mx-auto" />
+                      </button>
+                      <button onClick={() => handleDelete(exp.id)} className="text-gray-400 hover:text-red-600 transition" title="Eliminar">
+                        <Trash2 className="w-4 h-4 mx-auto" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showModal && (

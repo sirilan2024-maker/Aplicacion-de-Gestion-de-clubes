@@ -27,7 +27,7 @@ export default function DashboardLayout({
       <MobileNavigation signOutAction={signOut} />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col md:overflow-hidden relative pb-16 md:pb-0">
+      <main className="flex-1 flex flex-col md:overflow-hidden overflow-x-hidden relative pb-16 md:pb-0">
         <EmailVerificationGuard />
         <GlobalAdminNotifications />
         <RgpdGuard />

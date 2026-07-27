@@ -225,6 +225,8 @@ function InviteStaffModal({ open, onClose }: { open: boolean; onClose: () => voi
                 <option value="secretario">Secretario</option>
                 <option value="tesorero">Tesorero</option>
                 <option value="delegado">Delegado</option>
+                <option value="utillero">Utillero</option>
+                <option value="directivo">Miembro Directivo</option>
               </select>
             </div>
             <button 
@@ -657,7 +659,12 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                 { val: 'coordinador', label: 'Coordinador' },
                 { val: 'entrenador', label: 'Entrenador' },
                 { val: 'jugador', label: 'Jugador' },
-                { val: 'tutor', label: 'Padre/Madre/Tutor' }
+                { val: 'tutor', label: 'Padre/Madre/Tutor' },
+                { val: 'secretario', label: 'Secretario' },
+                { val: 'tesorero', label: 'Tesorero' },
+                { val: 'delegado', label: 'Delegado' },
+                { val: 'utillero', label: 'Utillero' },
+                { val: 'directivo', label: 'Miembro Directivo' }
               ].map(r => {
                 const checked = assignedRoles.includes(r.val);
                 return (
@@ -702,7 +709,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
               >
                 {assignedRoles.map(r => (
                   <option key={r} value={r}>
-                    {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r}
+                    {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r === 'directivo' ? 'Miembro Directivo' : r.charAt(0).toUpperCase() + r.slice(1)}
                   </option>
                 ))}
               </select>

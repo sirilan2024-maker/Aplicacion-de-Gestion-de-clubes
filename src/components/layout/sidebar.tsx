@@ -259,13 +259,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Utillería", href: "/dashboard/utilleria", icon: Shirt },
         ]
       },
-      {
-        label: "ENTRENADORES",
-        items: [
-          { name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield },
-          { name: "Mi Perfil", href: "/dashboard/settings", icon: User },
-        ]
-      },
+
       {
         label: "GESTION",
         items: [

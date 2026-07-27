@@ -139,6 +139,17 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     fetchData()
   }, [supabase])
 
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
+
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href)
 
@@ -219,7 +230,6 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       secondaryLinks = [
         { name: "Inicio", href: getHref("Inicio", "/dashboard"), icon: LayoutDashboard },
         { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
-        { name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield },
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
         { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
         { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
@@ -326,19 +336,22 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         </button>
       </nav>
 
-      {/* Fullscreen Overlay Menu */}
+      {/* Fullscreen Overlay Drawer Menu */}
       {menuOpen && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-50 animate-in fade-in duration-200 flex flex-col">
-          <div className="flex justify-end p-4">
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="p-2 bg-slate-800 text-white rounded-full hover:bg-slate-700"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto px-6 pb-24">
+        <>
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 animate-in fade-in duration-200" onClick={() => setMenuOpen(false)}></div>
+          <div className="fixed top-0 right-0 bottom-0 w-[80%] max-w-sm bg-slate-900 z-50 animate-in slide-in-from-right duration-300 flex flex-col shadow-2xl border-l border-slate-800">
+            <div className="flex justify-end p-4">
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="p-3 w-12 h-12 flex items-center justify-center bg-slate-800 text-white rounded-full hover:bg-slate-700 active:scale-95 transition-transform"
+                aria-label="Cerrar menú"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto px-6 pb-24">
             {availableRoles.length > 1 && (
               <div className="mb-6 p-4 bg-slate-800/80 rounded-xl border border-slate-700/50">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">
@@ -412,7 +425,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {clubInfo && (

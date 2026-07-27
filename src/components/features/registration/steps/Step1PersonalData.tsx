@@ -38,18 +38,18 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Nombre <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Nombre</label>
           <Input {...register("playerFirstName")} placeholder="Nombre del jugador" className={errors.playerFirstName ? "border-red-500" : ""} />
           {errors.playerFirstName && <p className="text-xs text-red-500">{errors.playerFirstName.message}</p>}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Apellidos <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Apellidos</label>
           <Input {...register("playerLastName")} placeholder="Apellidos" className={errors.playerLastName ? "border-red-500" : ""} />
           {errors.playerLastName && <p className="text-xs text-red-500">{errors.playerLastName.message}</p>}
         </div>
         
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">DNI/NIE del Jugador <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">DNI/NIE del Jugador</label>
           <Input {...register("playerDni")} placeholder="12345678A" className={errors.playerDni ? "border-red-500" : ""} />
           {errors.playerDni && <p className="text-xs text-red-500">{errors.playerDni.message}</p>}
         </div>
@@ -61,7 +61,7 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
         </div>
         
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Fecha de Nacimiento <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Fecha de Nacimiento {!isAdult && <span className="text-red-500">*</span>}</label>
           <Input type="date" {...register("birthDate")} className={errors.birthDate ? "border-red-500" : ""} />
           {errors.birthDate && <p className="text-xs text-red-500">{errors.birthDate.message}</p>}
         </div>
@@ -74,24 +74,24 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Nacionalidad <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Nacionalidad</label>
           <Input {...register("nationality")} placeholder="Ej. Española" defaultValue="Española" className={errors.nationality ? "border-red-500" : ""} />
           {errors.nationality && <p className="text-xs text-red-500">{errors.nationality.message}</p>}
         </div>
         
         <div className="space-y-2 md:col-span-2">
-          <label className="text-sm font-semibold text-gray-700">Domicilio Completo <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Domicilio Completo</label>
           <Input {...register("address")} placeholder="Calle, número, piso..." className={errors.address ? "border-red-500" : ""} />
           {errors.address && <p className="text-xs text-red-500">{errors.address.message}</p>}
         </div>
         
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Localidad <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Localidad</label>
           <Input {...register("city")} placeholder="Ej. Almoradí" className={errors.city ? "border-red-500" : ""} />
           {errors.city && <p className="text-xs text-red-500">{errors.city.message}</p>}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Código Postal <span className="text-red-500">*</span></label>
+          <label className="text-sm font-semibold text-gray-700">Código Postal</label>
           <Input {...register("postalCode")} placeholder="03160" className={errors.postalCode ? "border-red-500" : ""} />
           {errors.postalCode && <p className="text-xs text-red-500">{errors.postalCode.message}</p>}
         </div>
@@ -110,17 +110,17 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Nombre del Tutor <span className="text-red-500">*</span></label>
+              <label className="text-sm font-semibold text-gray-700">Nombre del Tutor</label>
               <Input {...register("tutor1Name")} placeholder="Nombre" className={errors.tutor1Name ? "border-red-500" : ""} />
               {errors.tutor1Name && <p className="text-xs text-red-500">{errors.tutor1Name.message}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Apellidos del Tutor <span className="text-red-500">*</span></label>
+              <label className="text-sm font-semibold text-gray-700">Apellidos del Tutor</label>
               <Input {...register("tutor1LastName")} placeholder="Apellidos" className={errors.tutor1LastName ? "border-red-500" : ""} />
               {errors.tutor1LastName && <p className="text-xs text-red-500">{errors.tutor1LastName.message}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">DNI/NIE del Tutor <span className="text-red-500">*</span></label>
+              <label className="text-sm font-semibold text-gray-700">DNI/NIE del Tutor</label>
               <Input {...register("tutor1Dni")} placeholder="12345678A" className={errors.tutor1Dni ? "border-red-500" : ""} />
               {errors.tutor1Dni && <p className="text-xs text-red-500">{errors.tutor1Dni.message}</p>}
             </div>
@@ -149,9 +149,8 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
           <div className="mb-6 border-b pb-4">
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <Users className="w-6 h-6 text-blue-600" />
-              Datos de Contacto (Mayor de edad)
+              Datos de Contacto
             </h3>
-            <p className="text-sm text-gray-500 mt-1">Al ser mayor de edad, introduce tus propios datos de contacto.</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

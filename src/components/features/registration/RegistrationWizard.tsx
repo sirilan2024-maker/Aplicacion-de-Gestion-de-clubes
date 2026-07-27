@@ -56,11 +56,19 @@ export function RegistrationWizard({
       sizeCamisetaPaseo: "",
       sizePantalonPaseo: "",
       isSeniorTeam: isSeniorTeam,
+      isSeniorSelection: isSeniorTeam ? "senior" : "minor",
       ...initialData,
     } as any
   });
 
   const { handleSubmit, trigger, formState: { errors } } = methods;
+
+  useEffect(() => {
+    methods.register("isSeniorTeam");
+    methods.register("isSeniorSelection");
+    methods.setValue("isSeniorTeam", isSeniorTeam);
+    methods.setValue("isSeniorSelection", isSeniorTeam ? "senior" : "minor");
+  }, [isSeniorTeam, methods]);
 
   const birthDateValue = useWatch({ control: methods.control, name: 'birthDate' });
   // Consider adult if playing for senior team or born in 2007 or earlier
@@ -185,7 +193,8 @@ export function RegistrationWizard({
     
     // Si no mapeó a ningún paso (safety net)
     if (errorFields.length > 0) {
-      console.error("Form errors that didn't match any step:", errors);
+      console.warn("Form errors that didn't match any step:", errors);
+      alert("CAMPOS QUE FALLAN: " + errorFields.join(", "));
       toast.error(`Revisa los campos con error: ${errorFields.join(", ")}`);
     }
   };
@@ -199,9 +208,15 @@ export function RegistrationWizard({
             <h2 className="text-3xl font-bold mb-2">¡Inscripción Completada!</h2>
           </div>
           <CardContent className="p-8 space-y-6 bg-white text-center">
-            <p className="text-lg text-gray-700 font-medium">
-              La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario realizar el primer pago de la cuota. Dicho pago permitirá confirmar la plaza del jugador, tramitar la licencia federativa y realizar el pedido de la equipación
-            </p>
+            { (submittedData.isSeniorTeam === true || submittedData.isSeniorTeam === "true" || submittedData.isSeniorSelection === "senior") ? (
+              <p className="text-lg text-gray-700 font-medium">
+                La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar ya puedes entrar en tu cuenta pero hasta que no se verifique por el administrador no tendras acceso total a tu cuenta de usuario.
+              </p>
+            ) : (
+              <p className="text-lg text-gray-700 font-medium">
+                La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario realizar el primer pago de la cuota. Dicho pago permitirá confirmar la plaza del jugador, tramitar la licencia federativa y realizar el pedido de la equipación
+              </p>
+            )}
 
             {submittedData.paymentMethod === "Stripe" && (
               <div className="bg-green-50 text-green-800 p-6 rounded-xl border border-green-200 flex flex-col items-center gap-3 mt-6">
@@ -278,7 +293,7 @@ export function RegistrationWizard({
 
       <FormProvider {...methods}>
         <form onSubmit={methods.handleSubmit(onSubmit, onError)} className="space-y-8">
-          <input type="checkbox" {...methods.register("isSeniorTeam")} className="hidden" />
+          <input type="hidden" value={isSeniorTeam ? "true" : "false"} {...methods.register("isSeniorTeam")} />
           <Card className="shadow-2xl border-0 overflow-hidden rounded-2xl">
             <CardContent className="p-0">
               <div className="p-6 md:p-10">

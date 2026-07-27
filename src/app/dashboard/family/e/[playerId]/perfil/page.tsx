@@ -818,6 +818,7 @@ export default function PlayerDashboardPage() {
       )}
 
       {/* WIDGET: CUOTAS (SUBSCRIPTIONS) */}
+      {!(player as any).is_senior && (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
         <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -837,6 +838,7 @@ export default function PlayerDashboardPage() {
           <Subscriptions playerId={playerId} />
         </div>
       </div>
+      )}
 
       {showPerformanceDrawer && (
         <PlayerPerformanceDrawer 

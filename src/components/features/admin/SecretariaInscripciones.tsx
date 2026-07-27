@@ -266,24 +266,24 @@ function ExpedienteModal({
                 rows={3}
                 className="w-full border border-red-200 rounded-xl p-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 resize-none"
               />
-              <div className="flex gap-2">
-                <button onClick={() => setShowRejectInput(false)} className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors">
+              <div className="flex flex-col md:flex-row gap-2">
+                <button onClick={() => setShowRejectInput(false)} className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors w-full">
                   Cancelar
                 </button>
-                <button onClick={handleReject} disabled={loadingReject} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                <button onClick={handleReject} disabled={loadingReject} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 w-full">
                   {loadingReject && <Loader2 size={14} className="animate-spin" />} Confirmar Rechazo
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex gap-3">
-              <button onClick={() => setShowRejectInput(true)} className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
+            <div className="flex flex-col md:flex-row gap-3">
+              <button onClick={() => setShowRejectInput(true)} className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition-colors flex items-center justify-center gap-2 w-full">
                 <XCircle size={15} /> Rechazar
               </button>
               <button
                 onClick={handleApprove}
                 disabled={loadingApprove}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm"
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 shadow-sm w-full"
               >
                 {loadingApprove ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={15} />}
                 Aprobar Inscripción
@@ -411,7 +411,7 @@ export function SecretariaInscripciones() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button onClick={() => setStatusFilter("pending_revision")} className={`p-4 rounded-xl border shadow-sm text-left transition-all hover:shadow-md ${statusFilter === "pending_revision" ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-white hover:border-amber-300"}`}>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Pendientes</span>
           <span className="text-2xl font-black text-amber-600">{pendingCount}</span>
@@ -458,8 +458,8 @@ export function SecretariaInscripciones() {
             <p className="text-slate-500 font-medium">No hay inscripciones que coincidan</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="px-4 py-3">Jugador</th>

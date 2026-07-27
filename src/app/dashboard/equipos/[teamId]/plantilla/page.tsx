@@ -33,6 +33,7 @@ export default function PlantillaEquipoPage() {
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Edit Modal State
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -61,6 +62,12 @@ export default function PlantillaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (profile) setUserRole(profile.role);
+      }
+
       // 1. Fetch players via history
         const { data: historyData, error: playersError } = await supabase
           .from("player_season_history")
@@ -215,32 +222,36 @@ export default function PlantillaEquipoPage() {
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Plantilla Actual</h2>
         <div className="flex gap-3">
-          <button 
-            onClick={() => {
-              const csvContent = "data:text/csv;charset=utf-8," 
-                + "Jugador,PIN de Registro\n"
-                + players.filter(p => p.posicion !== 'Entrenador').map(e => `${e.first_name} ${e.last_name},${e.link_code || 'SIN PIN'}`).join("\n");
-              const encodedUri = encodeURI(csvContent);
-              const link = document.createElement("a");
-              link.setAttribute("href", encodedUri);
-              link.setAttribute("download", "PINs_Registro_Familiares.csv");
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-xl border border-indigo-200 transition-colors shadow-sm text-sm"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Exportar PINs</span>
-          </button>
-          
-          <button 
-            onClick={() => router.push(`/dashboard/club/miembros`)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl border border-emerald-700 transition-colors shadow-sm text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Asignar Miembro del Club</span>
-          </button>
+          {(!userRole || !['entrenador', 'coach', 'coordinador'].includes(userRole.toLowerCase())) && (
+            <>
+              <button 
+                onClick={() => {
+                  const csvContent = "data:text/csv;charset=utf-8," 
+                    + "Jugador,PIN de Registro\n"
+                    + players.filter(p => p.posicion !== 'Entrenador').map(e => `${e.first_name} ${e.last_name},${e.link_code || 'SIN PIN'}`).join("\n");
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", "PINs_Registro_Familiares.csv");
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-xl border border-indigo-200 transition-colors shadow-sm text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Exportar PINs</span>
+              </button>
+              
+              <button 
+                onClick={() => router.push(`/dashboard/club/miembros`)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl border border-emerald-700 transition-colors shadow-sm text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Asignar Miembro del Club</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

@@ -14,7 +14,7 @@ interface NavItem {
   sort_order: number
 }
 
-const ROLES = ['admin', 'coordinador', 'entrenador', 'jugador', 'tutor']
+const ROLES = ['admin', 'coordinador', 'entrenador', 'jugador', 'tutor', 'utillero', 'directivo', 'secretario', 'tesorero', 'delegado']
 
 export default function ConfigRolesPage() {
   const [navItems, setNavItems] = useState<NavItem[]>([])

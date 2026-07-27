@@ -182,7 +182,7 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
     <div className="space-y-6">
       
       {/* Resumen Analítico */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cuota Temporada</p>
           <p className="text-2xl font-black text-slate-800">{totalFacturado.toFixed(2)} €</p>
@@ -204,8 +204,8 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
           <p className="text-xs mt-1">Cuando Secretaría genere un cobro, aparecerá aquí.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto w-full rounded-xl border border-gray-200 bg-white">
+          <table className="min-w-[700px] w-full divide-y divide-gray-200 whitespace-nowrap">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Concepto</th>
@@ -273,7 +273,8 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
                       <td colSpan={7} className="px-8 py-4">
                         <div className="bg-white border border-slate-200 rounded-lg p-3">
                           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Historial de Entregas (Recibos Parciales)</h4>
-                          <table className="min-w-full divide-y divide-gray-100">
+                          <div className="overflow-x-auto w-full">
+                            <table className="min-w-full divide-y divide-gray-100 whitespace-nowrap">
                             <tbody>
                               {fee.payments.map((payment: any) => (
                                 <tr key={payment.id} className="text-sm">
@@ -292,7 +293,8 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
                                 </tr>
                               ))}
                             </tbody>
-                          </table>
+                            </table>
+                          </div>
                         </div>
                       </td>
                     </tr>

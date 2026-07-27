@@ -1,0 +1,13 @@
+- [x] 1. Comportamiento del Menú Hamburguesa en `MobileNavigation.tsx`
+  - [x] Añadir `useEffect` para `document.body.style.overflow = 'hidden'` cuando esté abierto.
+  - [x] Transformar Overlay en Drawer (slide de derecha a izquierda).
+  - [x] Mejorar tamaño táctil del botón de cierre.
+- [x] 2. Prevención de Desbordamiento (Overflow)
+  - [x] Modificar `layout.tsx` (Dashboard) añadiendo `overflow-x-hidden` al `<main>`.
+- [x] 3. Tablas Complejas (Tesorería y Expedientes)
+  - [x] Modificar `SecretariaInscripciones.tsx` para envolver la tabla en `overflow-x-auto w-full`.
+  - [x] Modificar `TreasuryManagement.tsx` para envolver la tabla en `overflow-x-auto w-full`.
+- [x] 4. Botones, Formularios y Grids (General)
+  - [x] Buscar grids problemáticos de 2 columnas en móvil y convertirlos a 1.
+  - [x] Convertir grupos de botones horizontales a `flex-col md:flex-row w-full`.
+  - [x] Tipografía (Truncamiento) en elementos clave.

@@ -181,7 +181,7 @@ export async function createFeeAction(feeData: any) {
     amount_cents: feeData.amount_cents,
     amount_paid_cents: feeData.estado === 'pagado' ? feeData.amount_cents : 0,
     estado: feeData.estado || 'pendiente',
-    fecha_pago: feeData.estado === 'pagado' ? new Date().toISOString() : null,
+    fecha_pago: feeData.estado === 'pagado' ? (feeData.fecha_pago || new Date().toISOString()) : null,
     tipo_cargo: feeData.tipo_cargo || 'one_time',
     club_id: profile.club_id,
     payment_method: feeData.payment_method || null

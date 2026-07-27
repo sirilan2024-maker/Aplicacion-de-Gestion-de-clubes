@@ -894,6 +894,8 @@ export default function GlobalPlayerProfilePage() {
 
             {/* ── FASE 5: Bloque de Facturación ── */}
             <div className="md:col-span-2 border-t pt-8 mt-4">
+              {!(player as any).is_senior && (
+              <>
               <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
                 <FileText size={18} className="text-blue-500" />
                 Facturación y Pago
@@ -947,6 +949,8 @@ export default function GlobalPlayerProfilePage() {
                   )}
                 </div>
               </div>
+              </>
+              )}
 
               {/* Documentos Subidos */}
               {playerDocs.length > 0 && (
@@ -995,10 +999,14 @@ export default function GlobalPlayerProfilePage() {
                     <span className="block text-xs font-bold text-gray-500 uppercase mb-1">IMC (Índice de Masa Corporal)</span>
                     <div className="flex items-center gap-3">
                       <span className="text-xl font-bold text-gray-900">
-                        {(player.peso / (player.altura * player.altura)).toFixed(1)}
+                        {(() => {
+                          const alt = player.altura > 3 ? player.altura / 100 : player.altura;
+                          return (player.peso / (alt * alt)).toFixed(1);
+                        })()}
                       </span>
                       {(() => {
-                        const imc = player.peso / (player.altura * player.altura);
+                        const alt = player.altura > 3 ? player.altura / 100 : player.altura;
+                        const imc = player.peso / (alt * alt);
                         if (imc < 18.5) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-yellow-100 text-yellow-800">Infrapeso</span>;
                         if (imc < 25) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-800">Normal</span>;
                         if (imc < 30) return <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-800">Sobrepeso</span>;

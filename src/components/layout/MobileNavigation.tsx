@@ -425,7 +425,8 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
               </button>
             </div>
           </div>
-        </>
+        </div>
+      </>
       )}
 
       {clubInfo && (

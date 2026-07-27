@@ -131,38 +131,6 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Hospitality / Colaboración */}
-      <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-        <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-4">
-          <HeartHandshake className="w-6 h-6 text-orange-500" />
-          Colaboración
-        </h3>
-        <p className="text-sm text-gray-600 mb-6">El club Sporting Saladar es una gran familia. ¿Te gustaría colaborar activamente?</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Opciones de Voluntariado</label>
-            <select {...register("volunteerInterest")} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:ring-blue-600">
-              <option value="">No, en este momento no puedo</option>
-              <option value="eventos">Ayuda puntual en eventos/torneos</option>
-              <option value="mantenimiento">Ayuda en mantenimiento o logística</option>
-            </select>
-          </div>
-          
-          <div className="space-y-4 border-l pl-6">
-            <label className="text-sm font-semibold text-gray-700">¿Deseas aportar un Patrocinador?</label>
-            <Input {...register("sponsorCompanyName")} placeholder="Nombre de la empresa" autoComplete="off" />
-            <Input {...register("sponsorContactName")} placeholder="Persona de contacto" autoComplete="off" />
-            <Input {...register("sponsorPhone")} placeholder="Teléfono" autoComplete="off" />
-            
-            <div className="border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition-colors cursor-pointer relative mt-2">
-              <UploadCloud className="w-6 h-6 text-gray-400 mb-1" />
-              <span className="text-xs font-semibold text-gray-600 text-center">Subir Logotipo de Empresa</span>
-              <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Consentimientos Legales (RGPD) */}
       <div>
@@ -325,7 +293,7 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
           <div className="mb-6 border-b pb-4">
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <ShieldCheck className="w-6 h-6 text-indigo-600" />
-              Acceso al Portal de Familia
+              Acceso al portal
             </h3>
             <p className="text-sm text-gray-500 mt-1">Crea una contraseña. La usarás junto con tu email para acceder a tu zona privada, ver el estado de la inscripción, hacer pagos y añadir a otros hijos si lo necesitas.</p>
           </div>

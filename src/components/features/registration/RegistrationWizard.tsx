@@ -106,8 +106,20 @@ export function RegistrationWizard({
   const onSubmit = async (data: RegistrationFormData) => {
     setIsSubmitting(true);
     try {
+      // Transform all string fields to uppercase (except emails and passwords)
+      const dataToSubmit = { ...data } as Record<string, any>;
+      for (const key in dataToSubmit) {
+        if (typeof dataToSubmit[key] === 'string' && dataToSubmit[key]) {
+          const skipKeys = ['email', 'password', 'paymentmethod', 'paymentplan', 'isseniorselection', 'size'];
+          const isSkip = skipKeys.some(sk => key.toLowerCase().includes(sk));
+          if (!isSkip) {
+            dataToSubmit[key] = dataToSubmit[key].toUpperCase();
+          }
+        }
+      }
+
       // 1. Si elige tarjeta, simulamos el delay visual para el usuario
-      if (data.paymentMethod === "Stripe") {
+      if (dataToSubmit.paymentMethod === "Stripe") {
         setPaymentStatus("processing");
         // Dejamos un pequeño delay visual simulado
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -120,7 +132,7 @@ export function RegistrationWizard({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...data,
+          ...dataToSubmit,
           teamId: teamIdParam || undefined
         }),
       });
@@ -313,7 +325,7 @@ export function RegistrationWizard({
                   ) : (
                     <Button
                       type="submit"
-                      disabled={isSubmitting || !methods.formState.isValid}
+                      disabled={isSubmitting}
                       className="bg-green-600 hover:bg-green-700 text-white font-bold"
                     >
                       {isSubmitting ? (

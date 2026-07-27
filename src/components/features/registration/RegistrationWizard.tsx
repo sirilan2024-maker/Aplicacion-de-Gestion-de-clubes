@@ -55,6 +55,7 @@ export function RegistrationWizard({
       sizeSudadera: "",
       sizeCamisetaPaseo: "",
       sizePantalonPaseo: "",
+      isSeniorTeam: isSeniorTeam,
       ...initialData,
     } as any
   });

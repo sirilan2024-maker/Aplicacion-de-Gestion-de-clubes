@@ -28,7 +28,8 @@ export const registrationSchema = z.object({
   nationality: z.string().optional(),
   isForeign: z.boolean().default(false),
   neverFederated: z.boolean().default(false),
-  isSeniorSelection: z.enum(["senior", "minor"]).default("minor"),
+  isSeniorSelection: z.enum(["senior", "minor"]).default("minor"), // Kept for backwards compatibility
+  isSeniorTeam: z.boolean().default(false), // Flag from the form wrapper
   address: z.string().min(1, "La dirección es requerida"),
   city: z.string().min(1, "La localidad es requerida"),
   postalCode: z.string().min(1, "El código postal es requerido"),
@@ -103,7 +104,7 @@ export const registrationSchema = z.object({
   sponsorPhone: z.string().optional(),
   // Firmas legales obligatorias
   consentRgpd: z.boolean().refine(val => val === true, "Debes aceptar la política de privacidad"),
-  consentTutela: z.boolean().refine(val => val === true, "Debes firmar la declaración de tutela"),
+  consentTutela: z.boolean().optional(), // Validado en superRefine para menores
   consentMedical: z.boolean().refine(val => val === true, "Debes aceptar el tratamiento de datos médicos"),
   // Firmas opcionales
   consentImage: z.boolean().default(false),
@@ -114,51 +115,33 @@ export const registrationSchema = z.object({
 
 }).superRefine((data, ctx) => {
   // Lógica de validación dinámica: Si es menor, tutores son obligatorios
-  const isSenior = data.isSeniorSelection === "senior";
+  const year = data.birthDate ? new Date(data.birthDate).getFullYear() : 9999;
+  const isAdult = data.isSeniorTeam || year <= 2007;
 
-  if (!isSenior) {
+  if (!isAdult) {
     if (!data.tutor1Name || data.tutor1Name.length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El nombre del tutor es requerido para menores",
-          path: ["tutor1Name"]
-        });
-      }
-      if (!data.tutor1LastName || data.tutor1LastName.length < 2) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Los apellidos del tutor son requeridos para menores",
-          path: ["tutor1LastName"]
-        });
-      }
-      if (!data.tutor1Dni || data.tutor1Dni.length < 5) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El DNI del tutor es requerido para menores",
-          path: ["tutor1Dni"]
-        });
-      }
-      if (!data.tutor1Email) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El email del tutor es requerido para menores",
-          path: ["tutor1Email"]
-        });
-      }
-      if (!data.tutor1Phone || data.tutor1Phone.length < 6) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "El teléfono del tutor es requerido para menores",
-          path: ["tutor1Phone"]
-        });
-      }
-    }  // Validación de métodos de pago
-  if (!data.paymentMethod) {
-     ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Debe seleccionar un método de pago",
-        path: ["paymentMethod"]
-     });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del tutor es requerido para menores", path: ["tutor1Name"] });
+    }
+    if (!data.tutor1LastName || data.tutor1LastName.length < 2) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Los apellidos del tutor son requeridos para menores", path: ["tutor1LastName"] });
+    }
+    if (!data.tutor1Dni || data.tutor1Dni.length < 5) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El DNI del tutor es requerido para menores", path: ["tutor1Dni"] });
+    }
+    if (!data.tutor1Email) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El email del tutor es requerido para menores", path: ["tutor1Email"] });
+    }
+    if (!data.tutor1Phone || data.tutor1Phone.length < 6) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del tutor es requerido para menores", path: ["tutor1Phone"] });
+    }
+    if (!data.consentTutela) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes firmar la declaración de tutela", path: ["consentTutela"] });
+    }
+  }
+
+  // Validación de métodos de pago (solo si no es senior team)
+  if (!data.isSeniorTeam && !data.paymentMethod) {
+     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe seleccionar un método de pago", path: ["paymentMethod"] });
   }
 
   // Validación de contraseñas

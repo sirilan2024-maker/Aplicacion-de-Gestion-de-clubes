@@ -18,7 +18,7 @@ export default function SeniorRegistrationPage() {
       </div>
       
       <Suspense fallback={<div className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div></div>}>
-        <RegistrationWizard isInternalForm={false} formType="senior" />
+        <RegistrationWizard isInternalForm={false} isSeniorTeam={true} />
       </Suspense>
     </div>
   );

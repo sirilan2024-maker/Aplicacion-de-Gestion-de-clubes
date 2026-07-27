@@ -272,7 +272,10 @@ export function Step2Documents() {
                 <p className="text-xs text-gray-500 mb-4">Obligatorio al no haber estado federado nunca antes.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {isSenior || (birthDate && new Date().getFullYear() - new Date(birthDate).getFullYear() >= 14) ? (
-                    <FileUploadField label="DNI/NIE del Jugador" description="Obligatorio al tener 14 años o más" />
+                    <>
+                      <FileUploadField label="DNI/NIE del Jugador (Anverso)" description="Obligatorio al tener 14 años o más" />
+                      <FileUploadField label="DNI/NIE del Jugador (Reverso)" description="Obligatorio al tener 14 años o más" />
+                    </>
                   ) : (
                     <>
                       <FileUploadField label="Libro de Familia" description="Si no tiene DNI" />

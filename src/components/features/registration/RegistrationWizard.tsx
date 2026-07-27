@@ -277,8 +277,9 @@ export function RegistrationWizard({
       </div>
 
       <FormProvider {...methods}>
-        <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6">
-          <Card className="shadow-lg border-0 ring-1 ring-gray-200">
+        <form onSubmit={methods.handleSubmit(onSubmit, onError)} className="space-y-8">
+          <input type="checkbox" {...methods.register("isSeniorTeam")} className="hidden" />
+          <Card className="shadow-2xl border-0 overflow-hidden rounded-2xl">
             <CardContent className="p-0">
               <div className="p-6 md:p-10">
                 <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>

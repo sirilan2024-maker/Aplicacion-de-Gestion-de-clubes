@@ -819,7 +819,7 @@ function EquiposPageContent() {
               age_group: updated.age_group,
               format: updated.format,
               color: updated.color,
-              ffcv_url: updated.ffcv_url,
+              // ffcv_url is intentionally omitted to avoid schema cache error
             })
             .eq('id', updated.id);
           if (error) {

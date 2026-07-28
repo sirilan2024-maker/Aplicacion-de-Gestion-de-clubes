@@ -199,21 +199,21 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
       </div>
 
       {/* TABLA */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="pb-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700 whitespace-nowrap">
-            <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-xs">
+          <table className="w-full text-left text-sm text-gray-700 whitespace-nowrap border-separate border-spacing-y-3">
+            <thead className="text-gray-500 font-semibold uppercase tracking-wider text-[11px] px-2">
               <tr>
-                <th className="px-6 py-4">Dorsal</th>
-                <th className="px-6 py-4">Jugador</th>
-                <th className="px-6 py-4">Posición</th>
-                <th className="px-6 py-4 hidden sm:table-cell">Rol</th>
-                <th className="px-6 py-4 hidden md:table-cell">Edad / Físico</th>
-                <th className="px-6 py-4 hidden lg:table-cell">Contacto</th>
-                {canEdit && <th className="px-6 py-4 text-center">Acciones</th>}
+                <th className="px-6 py-2">Dorsal</th>
+                <th className="px-6 py-2">Jugador</th>
+                <th className="px-6 py-2">Posición</th>
+                <th className="px-6 py-2 hidden sm:table-cell">Rol</th>
+                <th className="px-6 py-2 hidden md:table-cell">Edad / Físico</th>
+                <th className="px-6 py-2 hidden lg:table-cell">Contacto</th>
+                {canEdit && <th className="px-6 py-2 text-center">Acciones</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={canEdit ? 7 : 6} className="px-6 py-16 text-center">
@@ -235,8 +235,8 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                 players.map((player) => {
                   const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
                   return (
-                    <tr key={player.id} className="hover:bg-gray-50/80 transition-colors group">
-                      <td className="px-6 py-4">
+                    <tr key={player.id} className="bg-white shadow-sm hover:shadow-md hover:border-blue-300 transition-all group outline outline-1 outline-slate-200 hover:outline-blue-300 rounded-xl">
+                      <td className="px-6 py-4 rounded-l-xl">
                         {player.dorsal ? (
                           <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-gray-700">
                             {player.dorsal}
@@ -288,15 +288,18 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                         </div>
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-4 text-center rounded-r-xl">
                           <button
                             onClick={() => setEditingPlayer(player)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex"
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex bg-gray-50"
                             title="Editar Jugador"
                           >
                             <Pencil size={18} />
                           </button>
                         </td>
+                      )}
+                      {!canEdit && (
+                        <td className="p-0 rounded-r-xl"></td>
                       )}
                     </tr>
                   );

@@ -256,21 +256,21 @@ export default function PlantillaEquipoPage() {
       </div>
 
       {/* TABLA DESKTOP */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hidden md:block">
+      <div className="hidden md:block pb-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-xs">
+          <table className="w-full text-left text-sm text-gray-700 border-separate border-spacing-y-3">
+            <thead className="text-slate-500 font-semibold uppercase tracking-wider text-[11px] px-2">
               <tr>
-                <th className="px-6 py-4">Dorsal</th>
-                <th className="px-6 py-4">Jugador</th>
-                <th className="px-6 py-4">Posición</th>
-                <th className="px-6 py-4">Rol</th>
-                <th className="px-6 py-4">Edad / Físico</th>
-                <th className="px-6 py-4">Contacto</th>
-                <th className="px-6 py-4 text-center">Acciones</th>
+                <th className="px-6 py-2">Dorsal</th>
+                <th className="px-6 py-2">Jugador</th>
+                <th className="px-6 py-2">Posición</th>
+                <th className="px-6 py-2">Rol</th>
+                <th className="px-6 py-2">Edad / Físico</th>
+                <th className="px-6 py-2">Contacto</th>
+                <th className="px-6 py-2 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
@@ -301,9 +301,9 @@ export default function PlantillaEquipoPage() {
                           router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                         }
                       }}
-                      className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                      className="bg-white shadow-sm hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer outline outline-1 outline-slate-200 hover:outline-blue-300 rounded-xl"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 rounded-l-xl">
                         {player.dorsal ? (
                           <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-slate-700">
                             {player.dorsal}
@@ -353,9 +353,9 @@ export default function PlantillaEquipoPage() {
                           {player.phone && <span className="text-xs text-slate-500">{player.phone}</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center rounded-r-xl">
                         <div className="flex items-center justify-center gap-2">
-                          <div className="p-2 text-slate-300 group-hover:text-emerald-500 transition-colors">
+                          <div className="p-2 text-slate-300 group-hover:text-blue-500 transition-colors bg-slate-50 rounded-full group-hover:bg-blue-50">
                             <ChevronRight size={18} />
                           </div>
                         </div>
@@ -370,14 +370,14 @@ export default function PlantillaEquipoPage() {
       </div>
 
       {/* TARJETAS MÓVIL */}
-      <div className="md:hidden flex flex-col gap-4">
+      <div className="md:hidden flex flex-col gap-5 pb-10">
         {loading ? (
-          <div className="py-16 text-center bg-white rounded-xl border border-slate-200">
+          <div className="py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
             <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
             <p className="text-slate-500 font-medium">Cargando plantilla...</p>
           </div>
         ) : players.length === 0 ? (
-          <div className="py-16 text-center bg-white rounded-xl border border-slate-200">
+          <div className="py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
             <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4 border border-slate-100">
               <Users className="w-8 h-8 text-slate-400" />
             </div>
@@ -397,18 +397,18 @@ export default function PlantillaEquipoPage() {
                     router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                   }
                 }}
-                className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+                className={`bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:border-blue-300 hover:shadow-md relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all border-l-[6px] ${esEntrenador ? 'border-l-blue-500' : 'border-l-emerald-500'}`}
               >
-                <div className="absolute top-0 right-0 p-4 opacity-5">
-                  <span className="text-6xl font-black text-slate-900 italic">
+                <div className="absolute top-0 right-0 p-3 opacity-[0.03]">
+                  <span className="text-7xl font-black text-slate-900 italic">
                     {player.dorsal || '-'}
                   </span>
                 </div>
                 
                 <div className="flex items-start justify-between relative z-10">
                   <div className="flex gap-4 items-center">
-                    <div className="w-14 h-14 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center text-slate-700 text-xl font-bold">
-                      {player.dorsal || <User size={24} className="text-slate-400" />}
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shadow-sm ${esEntrenador ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      {player.dorsal || <User size={24} />}
                     </div>
                     <div className="flex-1 min-w-0 pr-8">
                       <h3 className="text-slate-900 font-bold text-lg leading-tight truncate">

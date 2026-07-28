@@ -199,7 +199,7 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
       </div>
 
       {/* TABLA */}
-      <div className="pb-10">
+      <div className="pb-10 bg-slate-50/80 p-6 rounded-2xl border border-slate-200 shadow-inner">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700 whitespace-nowrap border-separate border-spacing-y-3">
             <thead className="text-gray-500 font-semibold uppercase tracking-wider text-[11px] px-2">
@@ -235,8 +235,8 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                 players.map((player) => {
                   const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
                   return (
-                    <tr key={player.id} className="bg-white shadow-sm hover:shadow-md hover:border-blue-300 transition-all group outline outline-1 outline-slate-200 hover:outline-blue-300 rounded-xl">
-                      <td className="px-6 py-4 rounded-l-xl">
+                    <tr key={player.id} className="bg-white shadow-md hover:shadow-lg transition-all group cursor-pointer">
+                      <td className="px-6 py-4 rounded-l-xl border-y border-l border-slate-200 group-hover:border-blue-400">
                         {player.dorsal ? (
                           <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-gray-700">
                             {player.dorsal}
@@ -245,18 +245,18 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                           <span className="text-gray-400 text-xs ml-2">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 border-y border-slate-200 group-hover:border-blue-400">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
+                          <span className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-base">
                             {player.first_name} {player.last_name}
                           </span>
-                          <span className="text-xs text-gray-500 lg:hidden mt-0.5">{getDisplayEmail(player)}</span>
+                          <span className="text-xs font-semibold text-gray-500 lg:hidden mt-0.5">{getDisplayEmail(player)}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="capitalize font-medium text-gray-700">{player.posicion || '-'}</span>
+                      <td className="px-6 py-4 border-y border-slate-200 group-hover:border-blue-400">
+                        <span className="capitalize font-bold text-gray-700">{player.posicion || '-'}</span>
                       </td>
-                      <td className="px-6 py-4 hidden sm:table-cell">
+                      <td className="px-6 py-4 hidden sm:table-cell border-y border-slate-200 group-hover:border-blue-400">
                         {esEntrenador ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
                             Entrenador
@@ -267,12 +267,12 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 hidden md:table-cell text-gray-900">
+                      <td className="px-6 py-4 hidden md:table-cell text-gray-900 border-y border-slate-200 group-hover:border-blue-400">
                         {player.birth_date ? (
                           <div className="flex flex-col">
-                            <span className="font-medium">{calcularEdad(player.birth_date)}</span>
+                            <span className="font-bold">{calcularEdad(player.birth_date)}</span>
                             {player.height && player.weight && (
-                              <span className="text-xs text-gray-500 mt-0.5">
+                              <span className="text-sm font-semibold text-gray-500 mt-0.5">
                                 {player.height}m / {player.weight}kg
                               </span>
                             )}
@@ -281,14 +281,14 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 hidden lg:table-cell text-gray-600 font-medium">
+                      <td className="px-6 py-4 hidden lg:table-cell text-gray-600 font-medium border-y border-slate-200 group-hover:border-blue-400">
                         <div className="flex flex-col">
-                          <span>{getDisplayEmail(player)}</span>
-                          {player.phone && <span className="text-xs text-gray-500">{player.phone}</span>}
+                          <span className="font-bold">{getDisplayEmail(player)}</span>
+                          {player.phone && <span className="text-sm font-semibold text-gray-500">{player.phone}</span>}
                         </div>
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-4 text-center rounded-r-xl">
+                        <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-slate-200 group-hover:border-blue-400">
                           <button
                             onClick={() => setEditingPlayer(player)}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex bg-gray-50"
@@ -299,7 +299,7 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                         </td>
                       )}
                       {!canEdit && (
-                        <td className="p-0 rounded-r-xl"></td>
+                        <td className="p-0 rounded-r-xl border-y border-r border-slate-200 group-hover:border-blue-400"></td>
                       )}
                     </tr>
                   );

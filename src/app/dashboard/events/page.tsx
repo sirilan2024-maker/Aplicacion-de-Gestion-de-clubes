@@ -359,16 +359,19 @@ export default function EventsPage() {
             </div>
 
             {/* Equipos */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 max-h-64 overflow-y-auto">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-gray-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </span>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Equipo</p>
-              </div>
-              <div className="space-y-2">
+            <details className="bg-white rounded-2xl border border-gray-100 shadow-sm group [&_summary::-webkit-details-marker]:hidden">
+              <summary className="flex items-center justify-between p-4 cursor-pointer outline-none">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </span>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Filtro de Equipos</p>
+                </div>
+                <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="px-4 pb-4 space-y-2 max-h-64 overflow-y-auto border-t border-gray-50 pt-3">
                 {dbTeams.map((team) => (
                   <label key={team.id} className="flex items-center gap-2.5 cursor-pointer group">
                     <input
@@ -389,7 +392,7 @@ export default function EventsPage() {
                   </label>
                 ))}
               </div>
-            </div>
+            </details>
 
             {/* Mini stats */}
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-4 text-white shadow-sm shadow-blue-200">
@@ -458,8 +461,8 @@ export default function EventsPage() {
                   />
                 </div>
 
-                {/* View toggle */}
-                <div className="flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                {/* View toggle (Desktop only) */}
+                <div className="hidden md:flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                   <button
                     onClick={() => setViewMode("month")}
                     className={[
@@ -489,22 +492,34 @@ export default function EventsPage() {
             </div>
 
             {/* Calendar body */}
-            {viewMode === "month" ? (
-              <CalendarGridView
-                year={year}
-                month={month}
-                events={filteredEvents}
-                today={today}
-                onEventClick={handleOpenEditModal}
-              />
-            ) : (
+            <div className="hidden md:block">
+              {viewMode === "month" ? (
+                <CalendarGridView
+                  year={year}
+                  month={month}
+                  events={filteredEvents}
+                  today={today}
+                  onEventClick={handleOpenEditModal}
+                />
+              ) : (
+                <CalendarListView
+                  events={filteredEvents}
+                  selectedTeams={selectedTeams}
+                  selectedTypes={selectedTypes}
+                  onEventClick={handleOpenEditModal}
+                />
+              )}
+            </div>
+            
+            {/* Mobile Calendar Body (Cards List forced) */}
+            <div className="block md:hidden pb-12">
               <CalendarListView
                 events={filteredEvents}
                 selectedTeams={selectedTeams}
                 selectedTypes={selectedTypes}
                 onEventClick={handleOpenEditModal}
               />
-            )}
+            </div>
           </div>
         </div>
       </div>

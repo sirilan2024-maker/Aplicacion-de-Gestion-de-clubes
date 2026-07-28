@@ -42,7 +42,9 @@ export function CalendarListView({ events, selectedTeams, selectedTypes, onEvent
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="flex flex-col gap-6">
+      {/* ── DESKTOP VIEW (TABLE) ── */}
+      <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100">
@@ -155,6 +157,47 @@ export function CalendarListView({ events, selectedTeams, selectedTypes, onEvent
           ))}
         </tbody>
       </table>
+      </div>
+
+      {/* ── MOBILE VIEW (CARDS) ── */}
+      <div className="md:hidden flex flex-col gap-5">
+        {sortedKeys.map((weekKey) => (
+          <div key={`mob-${weekKey}`} className="flex flex-col gap-3">
+             <h3 className="text-[13px] font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg w-max shadow-sm border border-gray-200 capitalize">
+               {formatWeekLabel(grouped[weekKey][0].date)}
+             </h3>
+             <div className="flex flex-col gap-2.5">
+               {grouped[weekKey]
+                  .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+                  .map(ev => (
+                    <div 
+                       key={`mob-ev-${ev.id}`}
+                       onClick={() => onEventClick && onEventClick(ev)}
+                       className="bg-white border border-gray-100 rounded-xl p-3.5 shadow-sm flex items-center gap-3.5 active:scale-[0.98] transition-transform cursor-pointer"
+                     >
+                        <div className="w-2.5 h-full min-h-[44px] rounded-full shrink-0" style={{ backgroundColor: ev.teamHex }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-1.5">
+                            <span className="text-[11px] font-black tracking-wide text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">
+                              {ev.time}
+                            </span>
+                            <span className="text-xl leading-none shrink-0">{ev.type === "Partido" ? "⚽" : ev.type === "Entrenamiento" ? "🏃" : "📅"}</span>
+                          </div>
+                          <h4 className="font-bold text-gray-900 text-sm truncate leading-tight">{ev.title}</h4>
+                          <div className="flex items-center gap-2 mt-2">
+                             <span className="text-[11px] font-bold text-gray-600 bg-blue-50/50 px-2 py-0.5 rounded border border-blue-100/50 truncate flex items-center gap-1.5">
+                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ev.teamHex }} />
+                               {ev.teamName}
+                             </span>
+                             <span className="text-[11px] font-medium text-gray-500 truncate">{ev.location || "Instalaciones del Club"}</span>
+                          </div>
+                        </div>
+                     </div>
+                 ))}
+             </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

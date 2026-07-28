@@ -199,9 +199,9 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
       </div>
 
       {/* TABLA */}
-      <div className="pb-10 bg-slate-50/80 p-6 rounded-2xl border-2 border-slate-700 shadow-inner">
+      <div className="pb-10">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700 whitespace-nowrap border-separate border-spacing-y-4">
+          <table className="w-full text-left text-sm text-gray-700 whitespace-nowrap border-separate border-spacing-y-3">
             <thead className="text-gray-500 font-semibold uppercase tracking-wider text-[11px] px-2">
               <tr>
                 <th className="px-6 py-2">Dorsal</th>
@@ -235,17 +235,17 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                 players.map((player) => {
                   const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
                   return (
-                    <tr key={player.id} className="bg-white shadow-md hover:shadow-xl transition-all group cursor-pointer">
-                      <td className="px-6 py-4 rounded-l-xl border-y-2 border-l-2 border-slate-700 group-hover:border-blue-600">
+                    <tr key={player.id} className="bg-white shadow-sm hover:shadow-md transition-all group cursor-pointer">
+                      <td className="px-6 py-4 rounded-l-xl border-y border-l border-gray-200 group-hover:border-gray-300">
                         {player.dorsal ? (
-                          <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border-2 border-slate-700">
+                          <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border-2 border-gray-700">
                             {player.dorsal}
                           </div>
                         ) : (
                           <span className="text-gray-400 text-xs ml-2">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 border-y-2 border-slate-700 group-hover:border-blue-600">
+                      <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-base">
                             {player.first_name} {player.last_name}
@@ -253,21 +253,21 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                           <span className="text-xs font-semibold text-gray-500 lg:hidden mt-0.5">{getDisplayEmail(player)}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 border-y-2 border-slate-700 group-hover:border-blue-600">
+                      <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">
                         <span className="capitalize font-bold text-gray-700">{player.posicion || '-'}</span>
                       </td>
-                      <td className="px-6 py-4 hidden sm:table-cell border-y-2 border-slate-700 group-hover:border-blue-600">
+                      <td className="px-6 py-4 hidden sm:table-cell border-y border-gray-200 group-hover:border-gray-300">
                         {esEntrenador ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border-2 border-slate-700 shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 shadow-sm border border-blue-200">
                             Entrenador
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border-2 border-slate-700">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
                             Jugador
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 hidden md:table-cell text-gray-900 border-y-2 border-slate-700 group-hover:border-blue-600">
+                      <td className="px-6 py-4 hidden md:table-cell text-gray-900 border-y border-gray-200 group-hover:border-gray-300">
                         {player.birth_date ? (
                           <div className="flex flex-col">
                             <span className="font-bold">{calcularEdad(player.birth_date)}</span>
@@ -281,17 +281,17 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 hidden lg:table-cell text-gray-600 font-medium border-y-2 border-slate-700 group-hover:border-blue-600">
+                      <td className="px-6 py-4 hidden lg:table-cell text-gray-600 font-medium border-y border-gray-200 group-hover:border-gray-300">
                         <div className="flex flex-col">
                           <span className="font-bold">{getDisplayEmail(player)}</span>
                           {player.phone && <span className="text-sm font-semibold text-gray-500">{player.phone}</span>}
                         </div>
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-4 text-center rounded-r-xl border-y-2 border-r-2 border-slate-700 group-hover:border-blue-600">
+                        <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300">
                           <button
                             onClick={() => setEditingPlayer(player)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex bg-gray-50 border-2 border-slate-200"
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex bg-gray-50 border border-gray-200"
                             title="Editar Jugador"
                           >
                             <Pencil size={18} />
@@ -299,7 +299,7 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                         </td>
                       )}
                       {!canEdit && (
-                        <td className="p-0 rounded-r-xl border-y-2 border-r-2 border-slate-700 group-hover:border-blue-600"></td>
+                        <td className="p-0 rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300"></td>
                       )}
                     </tr>
                   );

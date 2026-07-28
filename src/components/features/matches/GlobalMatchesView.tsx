@@ -311,7 +311,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
       )}
 
       {/* Banner de Apercibidos */}
-      {viewMode === 'partidos' && apercibidosCount > 0 && (
+      {viewMode === 'partidos' && apercibidosCount > 0 && !fixedTeamId && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-4 animate-in fade-in slide-in-from-top-2 mb-6">
           <div className="flex items-center gap-3">
             <div className="bg-orange-100 p-2 rounded-full">

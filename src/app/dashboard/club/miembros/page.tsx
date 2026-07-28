@@ -1312,7 +1312,8 @@ export default function GlobalMembersPage() {
                   </div>
                 </div>
               </div>
-            ))
+            );
+            })
           )}
       </div>
 

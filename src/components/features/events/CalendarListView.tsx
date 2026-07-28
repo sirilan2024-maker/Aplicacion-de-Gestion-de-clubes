@@ -178,16 +178,18 @@ export function CalendarListView({ events, selectedTeams, selectedTypes, onEvent
                      >
                         <div className="w-2.5 h-full min-h-[44px] rounded-full shrink-0" style={{ backgroundColor: ev.teamHex }} />
                         <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start mb-1.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-bold tracking-wide text-gray-700 bg-white px-2 py-0.5 rounded border border-gray-200 shadow-sm capitalize">
-                                {formatDate(ev.date)}
+                          <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-50">
+                            <div className="flex flex-col">
+                              <span className="text-[13px] font-black text-gray-900 capitalize tracking-tight">
+                                {formatFullDate(ev.date)}
                               </span>
-                              <span className="text-[11px] font-black tracking-wide text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">
+                              <span className="text-[16px] font-black text-blue-600 mt-0.5">
                                 {ev.time}
                               </span>
                             </div>
-                            <span className="text-xl leading-none shrink-0">{ev.type === "Partido" ? "⚽" : ev.type === "Entrenamiento" ? "🏃" : "📅"}</span>
+                            <span className="text-2xl leading-none shrink-0 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                              {ev.type === "Partido" ? "⚽" : ev.type === "Entrenamiento" ? "🏃" : "📅"}
+                            </span>
                           </div>
                           <h4 className="font-bold text-gray-900 text-sm truncate leading-tight">{ev.title}</h4>
                           <div className="flex items-center gap-2 mt-2">
@@ -221,6 +223,11 @@ function getWeekNumber(d: Date): number {
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00") // avoid timezone shift
   return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })
+}
+
+function formatFullDate(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00")
+  return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })
 }
 
 function formatWeekLabel(dateStr: string): string {

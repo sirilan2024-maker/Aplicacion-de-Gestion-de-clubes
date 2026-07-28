@@ -1245,11 +1245,10 @@ export default function GlobalMembersPage() {
             </div>
           ) : (
             filteredMembers.map((member) => {
-              const roleBadgeClass = member.role === 'jugador' ? 'border-l-emerald-500' : 'border-l-purple-500';
               return (
               <div 
                 key={member.id} 
-                className={`bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 relative overflow-hidden cursor-pointer transition-all border-l-4 ${roleBadgeClass}`}
+                className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 relative overflow-hidden cursor-pointer transition-all"
                 onClick={() => {
                   if (member.type === 'staff') router.push(`/dashboard/club/miembros/staff/${member.id}`)
                   else if (member.type === 'player') router.push(`/dashboard/club/jugador/${member.id}`)

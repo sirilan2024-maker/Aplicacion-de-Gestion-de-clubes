@@ -397,7 +397,7 @@ export default function PlantillaEquipoPage() {
                     router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                   }
                 }}
-                className={`bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:border-gray-300 hover:shadow-md relative overflow-hidden cursor-pointer transition-all border-l-4 ${esEntrenador ? 'border-l-blue-500' : 'border-l-emerald-500'}`}
+                className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:border-gray-300 hover:shadow-md relative overflow-hidden cursor-pointer transition-all"
               >
                 <div className="absolute top-0 right-0 p-3 opacity-[0.03]">
                   <span className="text-7xl font-black text-slate-900 italic">
@@ -410,8 +410,8 @@ export default function PlantillaEquipoPage() {
                     <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shadow-sm ${esEntrenador ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
                       {player.dorsal || <User size={24} />}
                     </div>
-                    <div className="flex-1 min-w-0 pr-8">
-                      <h3 className="text-slate-900 font-bold text-lg leading-tight truncate">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <h3 className="text-slate-900 font-bold text-lg leading-tight break-words">
                         {player.first_name} {player.last_name}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">

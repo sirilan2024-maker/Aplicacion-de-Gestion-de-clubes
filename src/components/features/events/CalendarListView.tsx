@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { CalendarEvent } from "./mock-data"
 import { MapPin, Clock, MoreHorizontal, Dumbbell, Trophy } from "lucide-react"
 
@@ -68,7 +69,7 @@ export function CalendarListView({ events, selectedTeams, selectedTypes, onEvent
         </thead>
         <tbody>
           {sortedKeys.map((weekKey) => (
-            <>
+            <React.Fragment key={`frag-${weekKey}`}>
               {/* Week separator row */}
               <tr key={`sep-${weekKey}`} className="bg-gray-50/70">
                 <td colSpan={6} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -153,7 +154,7 @@ export function CalendarListView({ events, selectedTeams, selectedTypes, onEvent
                     </td>
                   </tr>
                 ))}
-            </>
+            </React.Fragment>
           ))}
         </tbody>
       </table>

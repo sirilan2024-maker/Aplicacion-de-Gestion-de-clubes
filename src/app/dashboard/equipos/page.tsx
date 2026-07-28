@@ -45,6 +45,13 @@ function CreateTeamModal({
   const [ffcvUrl, setFfcvUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (open) {
+      const palette = ["#EF4444", "#F97316", "#F59E0B", "#84CC16", "#22C55E", "#10B981", "#14B8A6", "#06B6D4", "#0EA5E9", "#3B82F6", "#6366F1", "#8B5CF6", "#A855F7", "#D946EF", "#F43F5E"];
+      setColor(palette[Math.floor(Math.random() * palette.length)]);
+    }
+  }, [open]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !category) return;
@@ -837,13 +844,16 @@ export default function EquiposPage() {
             <div
               key={team.id}
               onClick={() => router.push(`/dashboard/equipos/${team.id}/plantilla`)}
-              className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-lg shadow-sm border-l-4 cursor-pointer hover:bg-gray-50 transition-colors relative"
+              className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-xl shadow-sm border-l-[12px] cursor-pointer hover:bg-gray-50 transition-colors relative"
               style={{ borderLeftColor: team.color || '#1E40AF' }}
             >
               {/* ── Bloque 1: Logo + Info ── */}
               <div className="flex items-center flex-1 min-w-0 mb-3 sm:mb-0">
-                <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center mr-4 shrink-0 group-hover:bg-blue-50 transition-colors">
-                  <User className="w-6 h-6 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                <div 
+                  className="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shrink-0 shadow-sm opacity-90 group-hover:opacity-100 transition-opacity"
+                  style={{ backgroundColor: team.color || '#1E40AF' }}
+                >
+                  <User className="w-6 h-6 text-white" />
                 </div>
                 <div className="min-w-0 pr-2">
                   <h2 className="text-black font-bold uppercase text-base leading-tight truncate group-hover:text-blue-700 transition-colors">

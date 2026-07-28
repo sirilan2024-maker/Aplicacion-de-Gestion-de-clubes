@@ -171,13 +171,13 @@ export function CalendarListView({ events, selectedTeams, selectedTypes, onEvent
                {grouped[weekKey]
                   .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
                   .map(ev => (
-                    <div 
+                     <div 
                        key={`mob-ev-${ev.id}`}
                        onClick={() => onEventClick && onEventClick(ev)}
-                       className="bg-white border border-gray-100 rounded-xl p-3.5 shadow-sm flex items-center gap-3.5 active:scale-[0.98] transition-transform cursor-pointer"
+                       className="bg-white border border-gray-100 rounded-xl p-3.5 shadow-sm flex items-center gap-3.5 active:scale-[0.98] transition-transform cursor-pointer relative overflow-hidden"
                      >
-                        <div className="w-2.5 h-full min-h-[44px] rounded-full shrink-0" style={{ backgroundColor: ev.teamHex }} />
-                        <div className="flex-1 min-w-0">
+                        <div className="w-3 absolute left-0 top-0 bottom-0 shrink-0" style={{ backgroundColor: ev.teamHex }} />
+                        <div className="flex-1 min-w-0 pl-1.5">
                           <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-50">
                             <div className="flex flex-col">
                               <span className="text-[13px] font-black text-gray-900 capitalize tracking-tight">

@@ -40,6 +40,7 @@ function CreateTeamModal({
   const [category, setCategory] = useState("");
   const [members, setMembers] = useState("");
   const [coaches, setCoaches] = useState("");
+  const [color, setColor] = useState(COLORS[0].value);
   const [ffcvUrl, setFfcvUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -56,7 +57,7 @@ function CreateTeamModal({
       gender: GENDERS[0],
       age_group: AGE_GROUPS[0],
       format: FORMATS[0],
-      color: COLORS[0].value,
+      color: color,
       ffcv_url: ffcvUrl,
     });
     // Reset form
@@ -122,6 +123,18 @@ function CreateTeamModal({
                 onChange={(e) => setCoaches(e.target.value)}
                 className="mt-1 w-full rounded-md bg-white text-slate-900 border border-gray-300 placeholder-gray-400"
               />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-900">Color del Equipo</label>
+            <div className="mt-1 flex items-center gap-3">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-10 w-14 rounded cursor-pointer border border-gray-300"
+              />
+              <span className="text-sm text-gray-500 font-mono uppercase">{color}</span>
             </div>
           </div>
           <div>
@@ -368,18 +381,16 @@ function EditTeamModal({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-900">Color</label>
-            <select
-              value={color}
-              onChange={e => setColor(e.target.value)}
-              className="mt-1 w-full rounded-md bg-white text-slate-900 border border-gray-300"
-            >
-              {COLORS.map((c) => (
-                <option key={c.value} value={c.value} className="text-slate-900">
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-slate-900">Color del Equipo</label>
+            <div className="mt-1 flex items-center gap-3">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-10 w-14 rounded cursor-pointer border border-gray-300"
+              />
+              <span className="text-sm text-gray-500 font-mono uppercase">{color}</span>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-900">Enlace Público FFCV (Opcional)</label>

@@ -136,70 +136,132 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
         <div className="space-y-3">
           <h4 className="text-xs font-bold text-slate-550 uppercase tracking-wider">Estadísticas Individuales de la Plantilla</h4>
           <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <th className="py-3 px-3 text-center w-12">#</th>
-                  <th className="py-3 px-4">Jugador</th>
-                  <th className="py-3 px-3 text-center">Asistencia</th>
-                  <th className="py-3 px-3 text-center">Nota (1-10)</th>
-                  <th className="py-3 px-3 text-center">Actitud (1-10)</th>
-                  <th className="py-3 px-3 text-center">Minutos</th>
-                  <th className="py-3 px-3 text-center">Goles</th>
-                  <th className="py-3 px-3 text-center">Asistencias</th>
-                  <th className="py-3 px-3 text-center">Amarillas</th>
-                  <th className="py-3 px-3 text-center">Rojas</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {mappedPlayers.map((player: any, idx: number) => {
-                  return (
-                    <tr key={player.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-400">{player.number}</td>
-                      <td className="py-2.5 px-4 font-bold text-slate-800">
-                        <Link 
-                          href={`/dashboard/equipos/${teamId}/jugador/${player.id}?view=partidos&tab=stats`}
-                          className="flex items-center gap-2 hover:bg-slate-50/80 p-1 -m-1 rounded-lg transition-colors group cursor-pointer"
-                        >
-                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
-                            {player.avatar}
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-3 px-3 text-center w-12">#</th>
+                    <th className="py-3 px-4">Jugador</th>
+                    <th className="py-3 px-3 text-center">Asistencia</th>
+                    <th className="py-3 px-3 text-center">Nota (1-10)</th>
+                    <th className="py-3 px-3 text-center">Actitud (1-10)</th>
+                    <th className="py-3 px-3 text-center">Minutos</th>
+                    <th className="py-3 px-3 text-center">Goles</th>
+                    <th className="py-3 px-3 text-center">Asistencias</th>
+                    <th className="py-3 px-3 text-center">Amarillas</th>
+                    <th className="py-3 px-3 text-center">Rojas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {mappedPlayers.map((player: any, idx: number) => {
+                    return (
+                      <tr key={player.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-400">{player.number}</td>
+                        <td className="py-2.5 px-4 font-bold text-slate-800">
+                          <div className="flex items-center gap-2 p-1 -m-1">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
+                              {player.avatar}
+                            </div>
+                            <span className="text-slate-800">{player.name}</span>
                           </div>
-                          <span className="group-hover:text-blue-600 transition-colors">{player.name}</span>
-                        </Link>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <div className="flex items-center justify-center">
-                          {player.status === 'Presente' ? (
-                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-700 rounded-md">Asiste</span>
-                          ) : player.status === 'Ausente' ? (
-                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-red-100 text-red-700 rounded-md">No Asiste</span>
-                          ) : player.status === 'Justificado' ? (
-                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md">Justificado</span>
-                          ) : (
-                            <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-500 rounded-md">-</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-blue-50 text-blue-700 rounded-md">
-                          {player.coachRating.toFixed(1)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-purple-50 text-purple-700 rounded-md">
-                          {player.actitud.toFixed(1)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-700">{player.minutes > 0 ? `${player.minutes}'` : "0"}</td>
-                      <td className="py-2.5 px-3 text-center font-black text-emerald-600">{player.goals || "0"}</td>
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-700">{player.assists || "0"}</td>
-                      <td className="py-2.5 px-3 text-center font-bold text-amber-500">{player.yellowCards || "0"}</td>
-                      <td className="py-2.5 px-3 text-center font-bold text-red-500">{player.redCards || "0"}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center">
+                            {player.status === 'Presente' ? (
+                              <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-700 rounded-md">Asiste</span>
+                            ) : player.status === 'Ausente' ? (
+                              <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-red-100 text-red-700 rounded-md">No Asiste</span>
+                            ) : player.status === 'Justificado' ? (
+                              <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md">Justificado</span>
+                            ) : (
+                              <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-500 rounded-md">-</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-blue-50 text-blue-700 rounded-md">
+                            {player.coachRating.toFixed(1)}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-block px-1.5 py-0.5 text-xs font-black bg-purple-50 text-purple-700 rounded-md">
+                            {player.actitud.toFixed(1)}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-700">{player.minutes > 0 ? `${player.minutes}'` : "0"}</td>
+                        <td className="py-2.5 px-3 text-center font-black text-emerald-600">{player.goals || "0"}</td>
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-700">{player.assists || "0"}</td>
+                        <td className="py-2.5 px-3 text-center font-bold text-amber-500">{player.yellowCards || "0"}</td>
+                        <td className="py-2.5 px-3 text-center font-bold text-red-500">{player.redCards || "0"}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="block md:hidden space-y-3 p-3 bg-slate-50/50">
+              {mappedPlayers.map((player: any) => (
+                <div key={player.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-black text-blue-700 shrink-0">
+                        {player.avatar}
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-900 text-base block">{player.name}</span>
+                        <span className="text-xs font-semibold text-slate-400">#{player.number} • {player.position}</span>
+                      </div>
+                    </div>
+                    <div>
+                      {player.status === 'Presente' ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-700 rounded-md">Asiste</span>
+                      ) : player.status === 'Ausente' ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-red-100 text-red-700 rounded-md">No Asiste</span>
+                      ) : player.status === 'Justificado' ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md">Justificado</span>
+                      ) : (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-500 rounded-md">-</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase">Minutos</span>
+                      <span className="font-bold text-slate-600">{player.minutes > 0 ? `${player.minutes}'` : "0"}</span>
+                    </div>
+                    <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
+                      <span className="block text-[10px] font-bold text-emerald-500 uppercase">Goles</span>
+                      <span className="font-black text-emerald-600">{player.goals || "0"}</span>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase">Asist.</span>
+                      <span className="font-bold text-slate-600">{player.assists || "0"}</span>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
+                      <span className="block text-[10px] font-bold text-blue-500 uppercase">Nota</span>
+                      <span className="font-black text-blue-700">{player.coachRating.toFixed(1)}</span>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-2 border border-purple-100">
+                      <span className="block text-[10px] font-bold text-purple-500 uppercase">Actitud</span>
+                      <span className="font-black text-purple-700">{player.actitud.toFixed(1)}</span>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2 border border-slate-100 flex items-center justify-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-3 bg-amber-400 rounded-sm"></div>
+                        <span className="font-bold text-amber-500">{player.yellowCards || "0"}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-3 bg-red-500 rounded-sm"></div>
+                        <span className="font-bold text-red-500">{player.redCards || "0"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -220,8 +282,9 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
       </div>
 
       <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 <th className="py-3.5 px-3 text-center w-12">#</th>
@@ -243,22 +306,19 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
                     {player.number}
                   </td>
                   <td className="py-3 px-4">
-                    <Link 
-                      href={`/dashboard/equipos/${teamId}/jugador/${player.id}?view=partidos&tab=stats`}
-                      className="flex items-center gap-3 hover:bg-slate-50/80 p-1 -m-1 rounded-lg transition-colors group cursor-pointer"
-                    >
+                    <div className="flex items-center gap-3 p-1 -m-1">
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
                         {player.avatar}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                        <p className="text-xs font-bold text-slate-900 truncate">
                           {player.name}
                         </p>
                         <p className="text-[9px] text-slate-400 font-semibold">
                           {player.position}
                         </p>
                       </div>
-                    </Link>
+                    </div>
                   </td>
                   <td className="py-3 px-3 text-center">
                     <div className="flex items-center justify-center">
@@ -302,6 +362,68 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards (View Only version for Coach/Admin before they click Edit) */}
+        <div className="block md:hidden space-y-3 p-3 bg-slate-50/50">
+          {mappedPlayers.map((player: any) => (
+            <div key={player.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-black text-blue-700 shrink-0">
+                    {player.avatar}
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 text-base block">{player.name}</span>
+                    <span className="text-xs font-semibold text-slate-400">#{player.number} • {player.position}</span>
+                  </div>
+                </div>
+                <div>
+                  {player.status === 'Presente' ? (
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-emerald-100 text-emerald-700 rounded-md">Asiste</span>
+                  ) : player.status === 'Ausente' ? (
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-red-100 text-red-700 rounded-md">No Asiste</span>
+                  ) : player.status === 'Justificado' ? (
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-amber-100 text-amber-700 rounded-md">Justificado</span>
+                  ) : (
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-500 rounded-md">-</span>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Minutos</span>
+                  <span className="font-bold text-slate-600">{player.minutes > 0 ? `${player.minutes}'` : "0"}</span>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
+                  <span className="block text-[10px] font-bold text-emerald-500 uppercase">Goles</span>
+                  <span className="font-black text-emerald-600">{player.goals || "0"}</span>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Asist.</span>
+                  <span className="font-bold text-slate-600">{player.assists || "0"}</span>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
+                  <span className="block text-[10px] font-bold text-blue-500 uppercase">Nota</span>
+                  <span className="font-black text-blue-700">{player.coachRating.toFixed(1)}</span>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-2 border border-purple-100">
+                  <span className="block text-[10px] font-bold text-purple-500 uppercase">Actitud</span>
+                  <span className="font-black text-purple-700">{player.actitud.toFixed(1)}</span>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100 flex items-center justify-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-3 bg-amber-400 rounded-sm"></div>
+                    <span className="font-bold text-amber-500">{player.yellowCards || "0"}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-3 bg-red-500 rounded-sm"></div>
+                    <span className="font-bold text-red-500">{player.redCards || "0"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

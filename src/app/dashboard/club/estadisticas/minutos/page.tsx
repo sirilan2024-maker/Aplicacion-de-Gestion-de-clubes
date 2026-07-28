@@ -274,7 +274,8 @@ function MinutosPageContent() {
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Vista Desktop (Tabla) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr>
@@ -301,10 +302,8 @@ function MinutosPageContent() {
               <tbody className="divide-y divide-gray-100">
                 {sortedAndFilteredData.map((row) => (
                   <tr key={row.playerId} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                      <Link href={`/dashboard/equipos/${row.teamId}/jugador/${row.playerId}`}>
-                        {row.playerName}
-                      </Link>
+                    <td className="p-4 font-semibold text-slate-800">
+                      {row.playerName}
                     </td>
                     <td className="p-4 text-slate-600 font-medium">
                       {row.teamName}
@@ -323,6 +322,33 @@ function MinutosPageContent() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Vista Móvil (Tarjetas) */}
+          <div className="block md:hidden space-y-3 p-3 bg-slate-50/50">
+            {sortedAndFilteredData.map((row) => (
+              <div key={row.playerId} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="font-bold text-slate-900 text-base block">
+                      {row.playerName}
+                    </span>
+                    <div className="text-xs text-slate-500 mt-1">
+                      {row.teamName}
+                    </div>
+                  </div>
+                  <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 text-center flex flex-col items-center justify-center min-w-[70px]">
+                    <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-0.5">Minutos</span>
+                    <span className="font-black text-indigo-700 text-lg">{row.matchMinutes}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {sortedAndFilteredData.length === 0 && (
+              <div className="p-8 text-center text-slate-500">
+                Este equipo no tiene jugadores con minutos de partidos registrados.
+              </div>
+            )}
           </div>
         </div>
       )}

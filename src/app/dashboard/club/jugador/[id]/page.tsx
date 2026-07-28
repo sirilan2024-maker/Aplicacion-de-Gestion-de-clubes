@@ -518,9 +518,9 @@ export default function GlobalPlayerProfilePage() {
         )}
         <div className="h-32 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
         <div className="px-4 sm:px-8 pb-8">
-          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-end -mt-12 mb-4 gap-4">
-            <div className="flex items-end gap-4 sm:gap-6">
-              <div className="relative group min-w-24 w-24 h-24 sm:min-w-28 sm:w-28 sm:h-28 bg-white rounded-2xl shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
+          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-end mb-4 gap-4">
+            <div className="flex items-end gap-4 sm:gap-6 w-full">
+              <div className="relative group min-w-24 w-24 h-24 sm:min-w-28 sm:w-28 sm:h-28 bg-white rounded-2xl shadow-lg border-4 border-white flex items-center justify-center overflow-hidden -mt-12">
                 {player.avatar_url ? (
                   <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover" />
                 ) : (
@@ -536,7 +536,7 @@ export default function GlobalPlayerProfilePage() {
                   <input type="file" className="hidden" accept="image/*" onChange={uploadPhoto} />
                 </label>
               </div>
-              <div className="pb-2">
+              <div className="pb-2 flex-1 min-w-0">
                 <div className="flex items-center gap-3">
                   <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
                     {player.first_name} {player.last_name}
@@ -613,7 +613,7 @@ export default function GlobalPlayerProfilePage() {
             {!esEntrenador && <option value="stats">Estadísticas</option>}
             {!esEntrenador && <option value="asistencia">Asistencia</option>}
             {!esEntrenador && <option value="disciplina">Disciplina</option>}
-            {!esEntrenador && <option value="documentos">Documentos</option>}
+            {!esEntrenador && <option value="utileria">Utillería</option>}
           </select>
         </div>
 
@@ -741,7 +741,12 @@ export default function GlobalPlayerProfilePage() {
             </div>
 
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Información de Contacto</h3>
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 cursor-pointer list-none flex items-center justify-between hover:text-blue-600 transition-colors">
+                  Información de Contacto
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="mt-4">
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono</label>
@@ -817,6 +822,8 @@ export default function GlobalPlayerProfilePage() {
                   </div>
                 )}
               </div>
+                </div>
+              </details>
             </div>
 
             {/* COMPONENTE DE EDICIÓN DE HISTORIAL DE EQUIPOS */}
@@ -825,12 +832,16 @@ export default function GlobalPlayerProfilePage() {
             </div>
 
             {/* ── FASE 5: Bloque Datos Médicos (resumen) ── */}
-            <div className="md:col-span-2 border-t pt-8 mt-4">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                <HeartPulse size={18} className="text-red-500" />
-                Datos Médicos
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 border-t pt-6 mt-4">
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <HeartPulse size={18} className="text-red-500" />
+                    Datos Médicos
+                  </div>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                 {[
                   { label: 'SIP / Tarjeta Sanitaria', value: (player as any).sip },
                   { label: 'Alergias', value: (player as any).allergies, highlight: true },
@@ -847,15 +858,20 @@ export default function GlobalPlayerProfilePage() {
                   </div>
                 ))}
               </div>
+              </details>
             </div>
 
             {/* ── FASE 5: Bloque Consentimientos y Legal ── */}
-            <div className="md:col-span-2 border-t pt-8 mt-4">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                <CheckCircle size={18} className="text-emerald-500" />
-                Consentimientos y Legal (RGPD)
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="md:col-span-2 border-t pt-6 mt-4">
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={18} className="text-emerald-500" />
+                    Consentimientos y Legal (RGPD)
+                  </div>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                 {[
                   { label: 'Política de Privacidad (RGPD)', field: 'consent_rgpd_at' },
                   { label: 'Declaración de Tutela', field: 'consent_tutela_at' },
@@ -890,17 +906,22 @@ export default function GlobalPlayerProfilePage() {
                   </div>
                 )}
               </div>
+              </details>
             </div>
 
             {/* ── FASE 5: Bloque de Facturación ── */}
-            <div className="md:col-span-2 border-t pt-8 mt-4">
+            <div className="md:col-span-2 border-t pt-6 mt-4">
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <FileText size={18} className="text-blue-500" />
+                    Facturación y Pago
+                  </div>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
               {!(player as any).is_senior && (
               <>
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                <FileText size={18} className="text-blue-500" />
-                Facturación y Pago
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Método de Pago</span>
                   <span className="text-lg font-bold text-blue-900">{(player as any).payment_method || '—'}</span>
@@ -967,6 +988,7 @@ export default function GlobalPlayerProfilePage() {
                   </div>
                 </div>
               )}
+              </details>
             </div>
           </div>
         )}
@@ -1245,42 +1267,76 @@ export default function GlobalPlayerProfilePage() {
                 {trainingHistory.length === 0 ? (
                   <div className="text-center text-slate-500 py-8">No hay entrenamientos registrados.</div>
                 ) : (
-                  <table className="w-full min-w-max text-left text-sm text-slate-600 whitespace-nowrap">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
-                      <tr>
-                        <th className="px-6 py-3">Fecha</th>
-                        <th className="px-6 py-3">Sesión</th>
-                        <th className="px-6 py-3 text-center">Asistencia</th>
-                        <th className="px-6 py-3 text-center">Minutos</th>
-                        <th className="px-6 py-3 text-center">RPE</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
+                  <>
+                    {/* Vista Desktop (Tabla) */}
+                    <div className="hidden md:block">
+                      <table className="w-full min-w-max text-left text-sm text-slate-600 whitespace-nowrap">
+                        <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
+                          <tr>
+                            <th className="px-6 py-3">Fecha</th>
+                            <th className="px-6 py-3">Sesión</th>
+                            <th className="px-6 py-3 text-center">Asistencia</th>
+                            <th className="px-6 py-3 text-center">Minutos</th>
+                            <th className="px-6 py-3 text-center">RPE</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map(t => (
+                            <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-4 font-medium text-slate-900">{new Date(t.date).toLocaleDateString()}</td>
+                              <td className="px-6 py-4">{t.title}</td>
+                              <td className="px-6 py-4 text-center">
+                                {t.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Presente</span> : 
+                                 t.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Ausente</span> : 
+                                 <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
+                              </td>
+                              <td className="px-6 py-4 text-center font-bold">{t.minutes ?? '-'}</td>
+                              <td className="px-6 py-4 text-center font-bold text-emerald-600">{t.rpe ?? '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Vista Móvil (Tarjetas) */}
+                    <div className="block md:hidden divide-y divide-slate-100">
                       {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map(t => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 font-medium text-slate-900">{new Date(t.date).toLocaleDateString()}</td>
-                          <td className="px-6 py-4">{t.title}</td>
-                          <td className="px-6 py-4 text-center">
-                            {t.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Presente</span> : 
-                             t.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Ausente</span> : 
-                             <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
-                          </td>
-                          <td className="px-6 py-4 text-center font-bold">{t.minutes ?? '-'}</td>
-                          <td className="px-6 py-4 text-center font-bold text-emerald-600">{t.rpe ?? '-'}</td>
-                        </tr>
+                        <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-bold text-slate-900">{t.title}</div>
+                              <div className="text-xs text-slate-500">{new Date(t.date).toLocaleDateString()}</div>
+                            </div>
+                            <div>
+                              {t.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Presente</span> : 
+                               t.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Ausente</span> : 
+                               <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
+                            </div>
+                          </div>
+                          <div className="flex gap-4 mt-3">
+                            <div className="bg-slate-50 p-2 rounded flex-1 text-center border border-slate-100">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase">Minutos</div>
+                              <div className="font-bold text-slate-700">{t.minutes ?? '-'}</div>
+                            </div>
+                            <div className="bg-emerald-50 p-2 rounded flex-1 text-center border border-emerald-100">
+                              <div className="text-[10px] font-bold text-emerald-600 uppercase">RPE</div>
+                              <div className="font-bold text-emerald-700">{t.rpe ?? '-'}</div>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                )}
-                {trainingHistory.length > 10 && (
-                  <div className="p-4 border-t border-slate-100 bg-slate-50 text-center">
-                    <button 
-                      onClick={() => setShowAllTrainings(!showAllTrainings)}
-                      className="text-sm font-bold text-blue-600 hover:text-blue-800"
-                    >
-                      {showAllTrainings ? "Mostrar menos" : `Cargar historial completo (${trainingHistory.length})`}
-                    </button>
-                  </div>
+                    </div>
+                    {trainingHistory.length > 10 && (
+                      <div className="p-4 border-t border-slate-100 bg-slate-50 text-center">
+                        <button 
+                          onClick={() => setShowAllTrainings(!showAllTrainings)}
+                          className="text-sm font-bold text-blue-600 hover:text-blue-800"
+                        >
+                          {showAllTrainings ? "Mostrar menos" : `Cargar historial completo (${trainingHistory.length})`}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1334,53 +1390,96 @@ export default function GlobalPlayerProfilePage() {
                     {matchHistory.length === 0 ? (
                       <div className="text-center text-slate-500 py-8">No hay partidos registrados.</div>
                     ) : (
-                      <table className="w-full min-w-max text-left text-sm text-slate-600 whitespace-nowrap">
-                        <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
-                          <tr>
-                            <th className="px-6 py-3">Fecha</th>
-                            <th className="px-6 py-3">Partido</th>
-                            <th className="px-6 py-3 text-center">Asistencia</th>
-                            <th className="px-6 py-3 text-center">Nota (1-10)</th>
-                            <th className="px-6 py-3 text-center">Actitud (1-10)</th>
-                            <th className="px-6 py-3 text-center">Minutos</th>
-                            <th className="px-6 py-3 text-center">Goles</th>
-                            <th className="px-6 py-3 text-center">Asistencias</th>
-                            <th className="px-6 py-3 text-center">Amarillas</th>
-                            <th className="px-6 py-3 text-center">Rojas</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
+                      <>
+                        {/* Vista Desktop (Tabla) */}
+                        <div className="hidden md:block">
+                          <table className="w-full min-w-max text-left text-sm text-slate-600 whitespace-nowrap">
+                            <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
+                              <tr>
+                                <th className="px-6 py-3">Fecha</th>
+                                <th className="px-6 py-3">Partido</th>
+                                <th className="px-6 py-3 text-center">Asistencia</th>
+                                <th className="px-6 py-3 text-center">Nota (1-10)</th>
+                                <th className="px-6 py-3 text-center">Actitud (1-10)</th>
+                                <th className="px-6 py-3 text-center">Minutos</th>
+                                <th className="px-6 py-3 text-center">Goles</th>
+                                <th className="px-6 py-3 text-center">Asistencias</th>
+                                <th className="px-6 py-3 text-center">Amarillas</th>
+                                <th className="px-6 py-3 text-center">Rojas</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map(m => (
+                                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-6 py-4 font-medium text-slate-900">{new Date(m.date).toLocaleDateString()}</td>
+                                  <td className="px-6 py-4">{m.title}</td>
+                                  <td className="px-6 py-4 text-center">
+                                    {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Asiste</span> : 
+                                     m.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">No Asiste</span> : 
+                                     m.attendance === 'Justificado' ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">Justificado</span> : 
+                                     <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
+                                  </td>
+                                  <td className="px-6 py-4 text-center font-bold text-blue-600">{m.coach_rating || '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-purple-600">{m.actitud || '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-indigo-600">{m.minutes > 0 ? `${m.minutes}'` : '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-slate-700">{m.goles || '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-slate-700">{m.asistencias || '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-amber-500">{m.amarillas || '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-red-500">{m.rojas || '0'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Vista Móvil (Tarjetas) */}
+                        <div className="block md:hidden divide-y divide-slate-100">
                           {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map(m => (
-                            <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-6 py-4 font-medium text-slate-900">{new Date(m.date).toLocaleDateString()}</td>
-                              <td className="px-6 py-4">{m.title}</td>
-                              <td className="px-6 py-4 text-center">
-                                {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Asiste</span> : 
-                                 m.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">No Asiste</span> : 
-                                 m.attendance === 'Justificado' ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">Justificado</span> : 
-                                 <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
-                              </td>
-                              <td className="px-6 py-4 text-center font-bold text-blue-600">{m.coach_rating || '0'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-purple-600">{m.actitud || '0'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-indigo-600">{m.minutes > 0 ? `${m.minutes}'` : '0'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-slate-700">{m.goles || '0'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-slate-700">{m.asistencias || '0'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-amber-500">{m.amarillas || '0'}</td>
-                              <td className="px-6 py-4 text-center font-bold text-red-500">{m.rojas || '0'}</td>
-                            </tr>
+                            <div key={m.id} className="p-4 hover:bg-slate-50 transition-colors">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <div className="font-bold text-slate-900">{m.title}</div>
+                                  <div className="text-xs text-slate-500">{new Date(m.date).toLocaleDateString()}</div>
+                                </div>
+                                <div>
+                                  {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Asiste</span> : 
+                                   m.attendance === 'Ausente' ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">No Asiste</span> : 
+                                   m.attendance === 'Justificado' ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">Justificado</span> : 
+                                   <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">-</span>}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-4 gap-2 mt-3">
+                                <div className="bg-slate-50 p-2 rounded flex flex-col items-center justify-center border border-slate-100">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Min</div>
+                                  <div className="font-bold text-indigo-600">{m.minutes > 0 ? `${m.minutes}'` : '0'}</div>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded flex flex-col items-center justify-center border border-slate-100">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Nota</div>
+                                  <div className="font-bold text-blue-600">{m.coach_rating || '0'}</div>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded flex flex-col items-center justify-center border border-slate-100">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Goles</div>
+                                  <div className="font-bold text-slate-700">{m.goles || '0'}</div>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded flex flex-col items-center justify-center border border-slate-100">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Asis</div>
+                                  <div className="font-bold text-slate-700">{m.asistencias || '0'}</div>
+                                </div>
+                              </div>
+                            </div>
                           ))}
-                        </tbody>
-                      </table>
-                    )}
-                    {matchHistory.length > 10 && (
-                      <div className="p-4 border-t border-slate-100 bg-slate-50 text-center">
-                        <button 
-                          onClick={() => setShowAllMatches(!showAllMatches)}
-                          className="text-sm font-bold text-blue-600 hover:text-blue-800"
-                        >
-                          {showAllMatches ? "Mostrar menos" : `Cargar historial completo (${matchHistory.length})`}
-                        </button>
-                      </div>
+                        </div>
+                        {matchHistory.length > 10 && (
+                          <div className="p-4 border-t border-slate-100 bg-slate-50 text-center">
+                            <button 
+                              onClick={() => setShowAllMatches(!showAllMatches)}
+                              className="text-sm font-bold text-blue-600 hover:text-blue-800"
+                            >
+                              {showAllMatches ? "Mostrar menos" : `Cargar historial completo (${matchHistory.length})`}
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

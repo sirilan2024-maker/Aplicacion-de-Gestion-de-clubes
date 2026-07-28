@@ -215,96 +215,171 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
         </div>
       )}
 
-      <div className="p-0 overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap min-w-[500px]">
-          <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
-            <tr>
-              <th className="px-6 py-4">Jugador</th>
-              <th className="px-6 py-4 text-center w-32">
-                <div className="flex justify-center items-center gap-1">
-                  <div className="w-3 h-4 bg-amber-400 rounded-sm"></div>
-                  <span>Amarillas</span>
-                </div>
-              </th>
-              <th className="px-6 py-4 text-center w-32">
-                <div className="flex justify-center items-center gap-1">
-                  <div className="w-3 h-4 bg-red-500 rounded-sm"></div>
-                  <span>Rojas</span>
-                </div>
-              </th>
-              <th className="px-6 py-4 text-right">Detalle</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredData.map(d => (
-              <tr 
-                key={d.player.id} 
-                onClick={() => handleOpenModal(d.player.id)}
-                className={`transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    {d.player.avatar_url ? (
-                      <img src={d.player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shadow-sm" />
-                    ) : (
-                      <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-xs">
-                        {d.player.first_name.charAt(0)}{d.player.last_name.charAt(0)}
+      <div className="p-0">
+        {/* Vista Desktop (Tabla) */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap min-w-[500px]">
+            <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
+              <tr>
+                <th className="px-6 py-4">Jugador</th>
+                <th className="px-6 py-4 text-center w-32">
+                  <div className="flex justify-center items-center gap-1">
+                    <div className="w-3 h-4 bg-amber-400 rounded-sm"></div>
+                    <span>Amarillas</span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-center w-32">
+                  <div className="flex justify-center items-center gap-1">
+                    <div className="w-3 h-4 bg-red-500 rounded-sm"></div>
+                    <span>Rojas</span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-right">Detalle</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredData.map(d => (
+                <tr 
+                  key={d.player.id} 
+                  onClick={() => handleOpenModal(d.player.id)}
+                  className={`transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {d.player.avatar_url ? (
+                        <img src={d.player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shadow-sm" />
+                      ) : (
+                        <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-xs">
+                          {d.player.first_name.charAt(0)}{d.player.last_name.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                          {d.player.first_name} {d.player.last_name}
+                          {d.cycleCards === 4 && (
+                            <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                              <AlertCircle size={10} className="mr-1"/> Apercibido
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center font-bold text-slate-700">
+                    {d.totalYellow > 0 ? d.totalYellow : '-'}
+                    {d.cyclesCompleted > 0 && (
+                      <div className="text-[10px] text-slate-400 font-normal mt-0.5" title="Sanciones cumplidas (Ciclos de 5)">
+                        ({d.cyclesCompleted} ciclos)
                       </div>
                     )}
-                    <div>
-                      <div className="font-bold text-slate-900 flex items-center gap-2">
-                        {d.player.first_name} {d.player.last_name}
-                        {d.cycleCards === 4 && (
-                          <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
-                            <AlertCircle size={10} className="mr-1"/> Apercibido
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`font-black ${d.totalRed > 0 ? 'text-red-500' : 'text-slate-300'}`}>
+                      {d.totalRed}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      {canSendAlerts && d.cycleCards === 4 && (
+                        <button
+                          onClick={(e) => handleAvisarEntrenador(e, d.player)}
+                          disabled={alertingId === d.player.id}
+                          className="text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-50 p-1.5 hover:bg-blue-50 rounded-full"
+                          title="Avisar al entrenador"
+                        >
+                          <Bell size={16} className={alertingId === d.player.id ? "animate-pulse" : ""} />
+                        </button>
+                      )}
+                      <span className="text-blue-600 font-bold text-xs uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-1">
+                        Ver <ArrowLeft size={14} className="rotate-180" />
+                      </span>
                     </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredData.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                    No se encontraron jugadores.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Vista Móvil (Tarjetas) */}
+        <div className="block md:hidden space-y-3 p-3 bg-slate-50/50">
+          {filteredData.map(d => (
+            <div 
+              key={d.player.id} 
+              onClick={() => handleOpenModal(d.player.id)}
+              className={`p-4 rounded-xl shadow-sm border transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100 border-orange-200' : 'bg-white hover:bg-slate-50 border-slate-200'}`}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                {d.player.avatar_url ? (
+                  <img src={d.player.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shadow-sm" />
+                ) : (
+                  <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold text-sm">
+                    {d.player.first_name.charAt(0)}{d.player.last_name.charAt(0)}
                   </div>
-                </td>
-                <td className="px-6 py-4 text-center font-bold text-slate-700">
-                  {d.totalYellow > 0 ? d.totalYellow : '-'}
+                )}
+                <div className="flex-1">
+                  <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                    {d.player.first_name} {d.player.last_name}
+                    {d.cycleCards === 4 && (
+                      <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                        <AlertCircle size={10} className="mr-1"/> Apercibido
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
+                </div>
+                {canSendAlerts && d.cycleCards === 4 && (
+                  <button
+                    onClick={(e) => handleAvisarEntrenador(e, d.player)}
+                    disabled={alertingId === d.player.id}
+                    className="text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-50 p-1.5 hover:bg-blue-50 rounded-full"
+                    title="Avisar al entrenador"
+                  >
+                    <Bell size={16} className={alertingId === d.player.id ? "animate-pulse" : ""} />
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-4">
+                <div className="bg-white p-2 rounded-lg flex-1 text-center border border-slate-200 flex flex-col items-center justify-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm"></div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Amarillas</span>
+                  </div>
+                  <div className="font-bold text-slate-700">
+                    {d.totalYellow > 0 ? d.totalYellow : '-'}
+                  </div>
                   {d.cyclesCompleted > 0 && (
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5" title="Sanciones cumplidas (Ciclos de 5)">
+                    <div className="text-[10px] text-slate-400 font-normal">
                       ({d.cyclesCompleted} ciclos)
                     </div>
                   )}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span className={`font-black ${d.totalRed > 0 ? 'text-red-500' : 'text-slate-300'}`}>
-                    {d.totalRed}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-3">
-                    {canSendAlerts && d.cycleCards === 4 && (
-                      <button
-                        onClick={(e) => handleAvisarEntrenador(e, d.player)}
-                        disabled={alertingId === d.player.id}
-                        className="text-slate-400 hover:text-blue-600 transition-colors disabled:opacity-50 p-1.5 hover:bg-blue-50 rounded-full"
-                        title="Avisar al entrenador"
-                      >
-                        <Bell size={16} className={alertingId === d.player.id ? "animate-pulse" : ""} />
-                      </button>
-                    )}
-                    <span className="text-blue-600 font-bold text-xs uppercase opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-1">
-                      Ver <ArrowLeft size={14} className="rotate-180" />
-                    </span>
+                </div>
+                <div className="bg-white p-2 rounded-lg flex-1 text-center border border-slate-200 flex flex-col items-center justify-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <div className="w-2.5 h-3.5 bg-red-500 rounded-sm"></div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Rojas</span>
                   </div>
-                </td>
-              </tr>
-            ))}
-            {filteredData.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                  No se encontraron jugadores.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  <div className={`font-black ${d.totalRed > 0 ? 'text-red-500' : 'text-slate-300'}`}>
+                    {d.totalRed}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filteredData.length === 0 && (
+            <div className="p-8 text-center text-slate-500">
+              No se encontraron jugadores.
+            </div>
+          )}
+        </div>
       </div>
 
       {selectedPlayer && (

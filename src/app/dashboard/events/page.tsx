@@ -327,65 +327,70 @@ export default function EventsPage() {
           <aside className="w-full md:w-52 shrink-0 space-y-4">
 
             {/* Tipos de evento */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CalendarDays className="w-4 h-4 text-gray-400" />
-                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Eventos</p>
-              </div>
-              <div className="space-y-2">
+            <details className="bg-white rounded-2xl border-2 border-blue-100 shadow-sm group [&_summary::-webkit-details-marker]:hidden hover:border-blue-300 transition-colors">
+              <summary className="flex items-center justify-between p-4 cursor-pointer outline-none bg-blue-50/30 rounded-t-2xl group-open:bg-blue-50/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <CalendarDays className="w-4 h-4" />
+                  </div>
+                  <p className="text-[13px] font-black uppercase tracking-wider text-blue-900">Eventos</p>
+                </div>
+                <span className="text-blue-400 group-open:rotate-180 transition-transform font-bold">▼</span>
+              </summary>
+              <div className="px-5 pb-5 space-y-3 pt-3">
                 {(["Entrenamiento", "Partido", "Reunión", "Otro"]).map((type) => (
-                  <label key={type} className="flex items-center gap-2.5 cursor-pointer group">
+                  <label key={type} className="flex items-center gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
                       checked={selectedTypes.includes(type)}
                       onChange={() => toggleType(type)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                     <div className="flex items-center gap-2">
                       {type === "Entrenamiento" ? (
-                        <Dumbbell className="w-3.5 h-3.5 text-emerald-500" />
+                        <Dumbbell className="w-4 h-4 text-emerald-500" />
                       ) : type === "Partido" ? (
-                        <Trophy className="w-3.5 h-3.5 text-blue-500" />
+                        <Trophy className="w-4 h-4 text-blue-500" />
                       ) : (
-                        <CalendarDays className="w-3.5 h-3.5 text-slate-500" />
+                        <CalendarDays className="w-4 h-4 text-slate-500" />
                       )}
-                      <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900 transition-colors">
+                      <span className="text-sm text-gray-700 font-bold group-hover:text-blue-700 transition-colors">
                         {type}
                       </span>
                     </div>
                   </label>
                 ))}
               </div>
-            </div>
+            </details>
 
             {/* Equipos */}
-            <details className="bg-white rounded-2xl border border-gray-100 shadow-sm group [&_summary::-webkit-details-marker]:hidden">
-              <summary className="flex items-center justify-between p-4 cursor-pointer outline-none">
+            <details className="bg-white rounded-2xl border-2 border-blue-100 shadow-sm group [&_summary::-webkit-details-marker]:hidden hover:border-blue-300 transition-colors">
+              <summary className="flex items-center justify-between p-4 cursor-pointer outline-none bg-blue-50/30 rounded-t-2xl group-open:bg-blue-50/50 transition-colors">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                  </span>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Filtro de Equipos</p>
+                  </div>
+                  <p className="text-[13px] font-black uppercase tracking-wider text-blue-900">Equipos</p>
                 </div>
-                <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                <span className="text-blue-400 group-open:rotate-180 transition-transform font-bold">▼</span>
               </summary>
-              <div className="px-4 pb-4 space-y-2 max-h-64 overflow-y-auto border-t border-gray-50 pt-3">
+              <div className="px-5 pb-5 space-y-3 max-h-64 overflow-y-auto pt-3">
                 {dbTeams.map((team) => (
-                  <label key={team.id} className="flex items-center gap-2.5 cursor-pointer group">
+                  <label key={team.id} className="flex items-center gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
                       checked={selectedTeams.includes(team.id)}
                       onChange={() => toggleTeam(team.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        className="w-3 h-3 rounded-full shrink-0 shadow-sm"
                         style={{ backgroundColor: team.hex }}
                       />
-                      <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900 transition-colors truncate">
+                      <span className="text-sm text-gray-700 font-bold group-hover:text-blue-700 transition-colors truncate">
                         {team.name}
                       </span>
                     </div>

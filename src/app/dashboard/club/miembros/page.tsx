@@ -1232,10 +1232,8 @@ export default function GlobalMembersPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        {/* VISTA MÓVIL (Cards) */}
-        <div className="md:hidden divide-y divide-gray-100">
+      {/* VISTA MÓVIL (Cards) */}
+      <div className="md:hidden flex flex-col gap-5 pb-10">
           {loading ? (
             <div className="p-8 text-center">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
@@ -1246,10 +1244,12 @@ export default function GlobalMembersPage() {
               No se encontraron miembros con esos filtros.
             </div>
           ) : (
-            filteredMembers.map((member) => (
+            filteredMembers.map((member) => {
+              const roleBadgeClass = member.role === 'jugador' ? 'border-l-emerald-500' : 'border-l-blue-500';
+              return (
               <div 
                 key={member.id} 
-                className="p-4 hover:bg-blue-50/50 transition-colors cursor-pointer"
+                className={`bg-white rounded-2xl p-6 shadow-md border-2 border-slate-700 hover:border-blue-600 hover:shadow-xl relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all border-l-8 ${roleBadgeClass}`}
                 onClick={() => {
                   if (member.type === 'staff') router.push(`/dashboard/club/miembros/staff/${member.id}`)
                   else if (member.type === 'player') router.push(`/dashboard/club/jugador/${member.id}`)
@@ -1314,20 +1314,21 @@ export default function GlobalMembersPage() {
               </div>
             ))
           )}
-        </div>
+      </div>
 
-        {/* VISTA ESCRITORIO (Table) */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-xs">
+      {/* VISTA ESCRITORIO (Table) */}
+      <div className="hidden md:block pb-10 bg-slate-50/80 p-6 rounded-2xl border-2 border-slate-700 shadow-inner">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-700 border-separate border-spacing-y-4">
+            <thead className="text-gray-500 font-semibold uppercase tracking-wider text-[11px] px-2">
               <tr>
-                <th className="px-6 py-4">Usuario</th>
-                <th className="px-6 py-4">Rol en Club</th>
-                <th className="px-6 py-4">Equipo Asignado</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-6 py-2">Usuario</th>
+                <th className="px-6 py-2">Rol en Club</th>
+                <th className="px-6 py-2">Equipo Asignado</th>
+                <th className="px-6 py-2 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-16 text-center">
@@ -1345,7 +1346,7 @@ export default function GlobalMembersPage() {
                 filteredMembers.map((member) => (
                   <tr 
                     key={member.id} 
-                    className="group border-b border-gray-100 hover:bg-blue-50/50 transition-colors cursor-pointer"
+                    className="bg-white shadow-md hover:shadow-xl transition-all group cursor-pointer"
                     onClick={() => {
                       if (member.type === 'staff') {
                         router.push(`/dashboard/club/miembros/staff/${member.id}`)
@@ -1354,7 +1355,7 @@ export default function GlobalMembersPage() {
                       }
                     }}
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 rounded-l-xl border-y-2 border-l-2 border-slate-700 group-hover:border-blue-600">
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-900">{member.first_name} {member.last_name}</span>
                         {member.email?.includes('/register/staff/') ? (
@@ -1366,10 +1367,10 @@ export default function GlobalMembersPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 border-y-2 border-slate-700 group-hover:border-blue-600">
                       {getRoleBadge(member.role)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap border-y-2 border-slate-700 group-hover:border-blue-600">
                       {member.teams && member.teams.length > 1 ? (
                         <div className="flex flex-wrap gap-1">
                           {member.teams.map((t, idx) => (
@@ -1412,7 +1413,7 @@ export default function GlobalMembersPage() {
                         <span className="text-sm text-gray-500 italic">Sin equipo</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right rounded-r-xl border-y-2 border-r-2 border-slate-700 group-hover:border-blue-600">
                       <div className="flex items-center justify-end gap-2">
                         {member.email?.includes('/register/staff/') ? (
                           <button 

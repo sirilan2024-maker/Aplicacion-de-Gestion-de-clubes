@@ -256,7 +256,7 @@ export default function PlantillaEquipoPage() {
       </div>
 
       {/* TABLA DESKTOP */}
-      <div className="hidden md:block pb-10 bg-slate-50/80 p-6 rounded-2xl border border-slate-200 shadow-inner">
+      <div className="hidden md:block pb-10 bg-slate-50/80 p-6 rounded-2xl border border-slate-300 shadow-inner">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700 border-separate border-spacing-y-3">
             <thead className="text-slate-500 font-semibold uppercase tracking-wider text-[11px] px-2">
@@ -303,7 +303,7 @@ export default function PlantillaEquipoPage() {
                       }}
                       className="bg-white shadow-md hover:shadow-lg transition-all group cursor-pointer"
                     >
-                      <td className="px-6 py-4 rounded-l-xl border-y border-l border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 rounded-l-xl border-y border-l border-slate-300 group-hover:border-blue-500">
                         {player.dorsal ? (
                           <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border border-slate-700">
                             {player.dorsal}
@@ -312,17 +312,17 @@ export default function PlantillaEquipoPage() {
                           <span className="text-slate-400 text-xs ml-2">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 border-y border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 border-y border-slate-300 group-hover:border-blue-500">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors flex items-center gap-2 text-base">
                             {player.first_name} {player.last_name}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 border-y border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 border-y border-slate-300 group-hover:border-blue-500">
                         <span className="capitalize font-bold text-slate-700">{player.posicion_principal || '-'}</span>
                       </td>
-                      <td className="px-6 py-4 border-y border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 border-y border-slate-300 group-hover:border-blue-500">
                         <span
                           className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center capitalize ${
                             esEntrenador ? 'bg-emerald-50 text-emerald-700' :
@@ -333,7 +333,7 @@ export default function PlantillaEquipoPage() {
                           {player.posicion ? player.posicion : 'Jugador'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-900 border-y border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 text-slate-900 border-y border-slate-300 group-hover:border-blue-500">
                         {player.birth_date ? (
                           <div className="flex flex-col">
                             <span className="font-bold">{calcularEdad(player.birth_date)}</span>
@@ -347,13 +347,13 @@ export default function PlantillaEquipoPage() {
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-slate-600 font-medium border-y border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 text-slate-600 font-medium border-y border-slate-300 group-hover:border-blue-500">
                         <div className="flex flex-col">
                           <span className="font-bold">{getDisplayEmail(player)}</span>
                           {player.phone && <span className="text-sm font-semibold text-slate-500">{player.phone}</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-slate-200 group-hover:border-blue-400">
+                      <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-slate-300 group-hover:border-blue-500">
                         <div className="flex items-center justify-center gap-2">
                           <div className="p-2 text-slate-300 group-hover:text-blue-500 transition-colors bg-slate-50 rounded-full group-hover:bg-blue-50">
                             <ChevronRight size={18} />
@@ -397,7 +397,7 @@ export default function PlantillaEquipoPage() {
                     router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                   }
                 }}
-                className={`bg-white rounded-2xl p-6 shadow-md border-2 border-slate-200 hover:border-blue-400 hover:shadow-xl relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all border-l-8 ${esEntrenador ? 'border-l-blue-500' : 'border-l-emerald-500'}`}
+                className={`bg-white rounded-2xl p-6 shadow-md border border-slate-300 hover:border-blue-500 hover:shadow-xl relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all border-l-8 ${esEntrenador ? 'border-l-blue-500' : 'border-l-emerald-500'}`}
               >
                 <div className="absolute top-0 right-0 p-3 opacity-[0.03]">
                   <span className="text-7xl font-black text-slate-900 italic">

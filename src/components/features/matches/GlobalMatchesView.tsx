@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck } from "lucide-react"
+import { Swords, Calendar, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck, ChevronRight, ClipboardCheck } from "lucide-react"
 import { deleteMatchAction } from "@/app/actions/match-actions"
 import { ManageMatchModal } from "./ManageMatchModal"
 import { QuickConvocatoriaModal } from "./QuickConvocatoriaModal"
@@ -16,9 +16,10 @@ interface GlobalMatchesViewProps {
   players?: any[];
   convocatorias?: any[];
   fixedTeamId?: string;
+  isReadOnly?: boolean;
 }
 
-export function GlobalMatchesView({ initialMatches, teams, players = [], convocatorias = [], fixedTeamId }: GlobalMatchesViewProps) {
+export function GlobalMatchesView({ initialMatches, teams, players = [], convocatorias = [], fixedTeamId, isReadOnly = false }: GlobalMatchesViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialView = (searchParams.get('view') as 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo') || 'partidos'
@@ -155,9 +156,9 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
           <h1 className="text-3xl font-extrabold text-slate-900">
             Partidos
           </h1>
-          <p className="text-slate-500 mt-1">Gestiona el calendario de competición, convocatorias y resultados.</p>
+          <p className="text-slate-500 mt-1">Aqui tienes toda la informacion de calendarios, partidos y clasificaciones de los equipos tu club.</p>
         </div>
-        {!fixedTeamId && (
+        {!fixedTeamId && !isReadOnly && (
           <button
             onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors self-start sm:self-auto shadow-sm"
@@ -291,27 +292,30 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
             >
               Clasificación
             </button>
-            <button
-              onClick={() => setViewMode('disciplina')}
-              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
-                viewMode === 'disciplina'
-                  ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <AlertCircle size={16} /> Disciplina
-              {apercibidosCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                  !
-                </span>
-              )}
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={() => setViewMode('disciplina')}
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+                  viewMode === 'disciplina'
+                    ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <AlertCircle size={15} />
+                Disciplina
+                {apercibidosCount > 0 && viewMode !== 'disciplina' && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white border-2 border-slate-100">
+                    {apercibidosCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* Banner de Apercibidos */}
-      {viewMode === 'partidos' && apercibidosCount > 0 && !fixedTeamId && (
+      {viewMode === 'partidos' && apercibidosCount > 0 && !fixedTeamId && !isReadOnly && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-4 animate-in fade-in slide-in-from-top-2 mb-6">
           <div className="flex items-center gap-3">
             <div className="bg-orange-100 p-2 rounded-full">
@@ -455,83 +459,88 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
                       <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400" />
                       <span className="truncate max-w-[120px]">{match.lugar || 'Visitante'}</span>
                     </div>
-                  </div>
+                    {isReadOnly ? (
+                    <div className="flex justify-between items-center w-full">
+                      <span className="text-xs font-bold text-[#22c55e] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                        Entrar al Directo <ChevronRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  ) : (
+                    <div 
+                      className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 w-full justify-between"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <div className="relative">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdownId(openDropdownId === match.id ? null : match.id);
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg transition-colors border border-slate-200 shadow-sm"
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          Convocatoria
+                          <span className="ml-0.5 text-[8px]">▼</span>
+                        </button>
+                        
+                        {/* Dropdown flotante con la lista de jugadores */}
+                        {openDropdownId === match.id && (
+                          <div className="absolute left-0 bottom-full mb-1 w-56 max-h-60 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-xl shadow-xl z-50 flex flex-col">
+                            <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 font-bold text-[10px] uppercase text-slate-500 sticky top-0">
+                              Jugadores Convocados
+                            </div>
+                          <div className="flex flex-col py-1">
+                            {(() => {
+                              const matchConvs = convocatorias.filter(c => c.partido_id === match.id && c.status === 'convocado');
+                              if (matchConvs.length === 0) {
+                                return <span className="px-3 py-2 text-xs text-slate-400 italic">No hay convocados</span>;
+                              }
+                              const matchTeamName = teams.find(t => t.id === match.equipo_id)?.name;
+                              const oldEquipoId = teams.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
+                              
+                              return matchConvs.map(c => {
+                                const p = players.find(player => player.id === c.player_id);
+                                if (!p) return null;
+                                const pos = p.posicion?.toLowerCase() || '';
+                                if (pos.includes('entrenador') || pos.includes('delegado')) return null;
 
-                  {/* Botonera de Acción */}
-                  <div 
-                    className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 w-full justify-between"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <div className="relative">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenDropdownId(openDropdownId === match.id ? null : match.id);
-                        }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg transition-colors border border-slate-200 shadow-sm"
-                      >
-                        <Users className="w-3.5 h-3.5" />
-                        Convocatoria
-                        <span className="ml-0.5 text-[8px]">▼</span>
-                      </button>
-                      
-                      {/* Dropdown flotante con la lista de jugadores */}
-                      {openDropdownId === match.id && (
-                        <div className="absolute left-0 bottom-full mb-1 w-56 max-h-60 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded-xl shadow-xl z-50 flex flex-col">
-                          <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 font-bold text-[10px] uppercase text-slate-500 sticky top-0">
-                            Jugadores Convocados
+                                return (
+                                  <div key={c.id} className="px-3 py-1.5 text-xs font-medium text-slate-700 flex items-center gap-2 hover:bg-slate-50">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                    {`${p.first_name} ${p.last_name || ''}`.trim()}
+                                  </div>
+                                );
+                              });
+                            })()}
                           </div>
-                        <div className="flex flex-col py-1">
-                          {(() => {
-                            const matchConvs = convocatorias.filter(c => c.partido_id === match.id && c.status === 'convocado');
-                            if (matchConvs.length === 0) {
-                              return <span className="px-3 py-2 text-xs text-slate-400 italic">No hay convocados</span>;
-                            }
-                            const matchTeamName = teams.find(t => t.id === match.equipo_id)?.name;
-                            const oldEquipoId = teams.find(e => e.name?.toLowerCase() === matchTeamName?.toLowerCase())?.id;
-                            
-                            return matchConvs.map(c => {
-                              const p = players.find(player => player.id === c.player_id);
-                              if (!p) return null;
-                              const pos = p.posicion?.toLowerCase() || '';
-                              if (pos.includes('entrenador') || pos.includes('delegado')) return null;
-
-                              return (
-                                <div key={c.id} className="px-3 py-1.5 text-xs font-medium text-slate-700 flex items-center gap-2 hover:bg-slate-50">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                  {`${p.first_name} ${p.last_name || ''}`.trim()}
-                                </div>
-                              );
-                            });
-                          })()}
                         </div>
+                        )}
                       </div>
-                      )}
+                      <div className="flex gap-1.5">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setConvocatoriaMatch(match) }}
+                          className="p-1.5 bg-white hover:bg-slate-100 text-[#22c55e] rounded-lg transition-colors border border-slate-200 shadow-sm"
+                          title="Gestionar Asistencia"
+                        >
+                          <ClipboardCheck className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setEditingMatch(match) }}
+                          className="p-1.5 bg-white hover:bg-slate-100 text-blue-600 rounded-lg transition-colors border border-slate-200 shadow-sm"
+                          title="Editar partido"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setDeletingMatch(match) }}
+                          className="p-1.5 bg-white hover:bg-rose-50 text-rose-600 rounded-lg transition-colors border border-slate-200 shadow-sm"
+                          title="Eliminar partido"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-1.5">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setConvocatoriaMatch(match) }}
-                        className="p-1.5 bg-white hover:bg-slate-100 text-[#22c55e] rounded-lg transition-colors border border-slate-200 shadow-sm"
-                        title="Gestionar Asistencia"
-                      >
-                        <User className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setEditingMatch(match) }}
-                        className="p-1.5 bg-white hover:bg-slate-100 text-amber-500 rounded-lg transition-colors border border-slate-200 shadow-sm"
-                        title="Gestionar Partido"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={(e) => handleDelete(e, match.id, match.equipo_id)}
-                        disabled={isDeleting === match.id}
-                        className="p-1.5 bg-white hover:bg-red-50 text-red-500 rounded-lg transition-colors border border-slate-200 shadow-sm disabled:opacity-50"
-                        title="Eliminar Partido"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  )}
                   </div>
                 </div>
               </div>

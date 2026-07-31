@@ -44,6 +44,8 @@ export default async function DashboardPage() {
       }
     }
   }
+  else if (role === 'utillero') redirect('/dashboard/utilleria');
   
-  redirect("/dashboard/mi-perfil");
+  // Para directivo, secretario, tesorero, delegado, socio, etc.
+  redirect("/dashboard/global-club");
 }

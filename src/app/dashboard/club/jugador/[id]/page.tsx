@@ -910,6 +910,7 @@ export default function GlobalPlayerProfilePage() {
             </div>
 
             {/* ── FASE 5: Bloque de Facturación ── */}
+            {!(player as any).is_senior && (
             <div className="md:col-span-2 border-t pt-6 mt-4">
               <details className="group">
                 <summary className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
@@ -919,8 +920,6 @@ export default function GlobalPlayerProfilePage() {
                   </div>
                   <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                 </summary>
-              {!(player as any).is_senior && (
-              <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Método de Pago</span>
@@ -970,8 +969,6 @@ export default function GlobalPlayerProfilePage() {
                   )}
                 </div>
               </div>
-              </>
-              )}
 
               {/* Documentos Subidos */}
               {playerDocs.length > 0 && (
@@ -990,6 +987,7 @@ export default function GlobalPlayerProfilePage() {
               )}
               </details>
             </div>
+            )}
           </div>
         )}
 

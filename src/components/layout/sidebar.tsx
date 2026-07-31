@@ -123,18 +123,22 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             if (club) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
             // Fetch equipos
-            let query = supabase.from('teams').select("id, name, category").eq("club_id", profile.club_id).order("name")
-            if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-              const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
-              const teamIds = coachTeams?.map(ct => ct.team_id) || [];
-              if (teamIds.length > 0) {
-                query = query.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
-              } else {
-                query = query.eq('coach_id', user.id);
+            if (profile.role === 'admin' || profile.role === 'coordinador' || profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
+              let query = supabase.from('teams').select("id, name, category").eq("club_id", profile.club_id).order("name")
+              if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
+                const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+                const teamIds = coachTeams?.map(ct => ct.team_id) || [];
+                if (teamIds.length > 0) {
+                  query = query.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
+                } else {
+                  query = query.eq('coach_id', user.id);
+                }
               }
+              const { data: eqData } = await query
+              if (eqData) setEquipos(eqData)
+            } else {
+              setEquipos([])
             }
-            const { data: eqData } = await query
-            if (eqData) setEquipos(eqData)
 
             if (profile.role === 'jugador') {
               const { data: playerRec } = await supabase
@@ -361,7 +365,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       n.href === "/dashboard/mis-equipos"
     );
     
-    const isStaff = userRole === 'admin' || userRole === 'coordinador' || userRole === 'utillero';
+    const isStaff = userRole === 'admin' || userRole === 'coordinador';
     const isPlayerOrFamily = userRole === 'jugador' || userRole === 'tutor' || userRole === 'familiar' || userRole === 'family' || userRole === 'familia';
 
     const filteredNavItems = globalNavItems.filter(n => {
@@ -375,14 +379,8 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "General / Club",
         items: [
-          ...(filteredNavItems.length > 0 ? filteredNavItems : [
-            { name: "Inicio",       href: "/dashboard",            icon: LayoutDashboard },
-            ...(!isPlayerOrFamily ? [{ name: "Directorio",   href: "/dashboard/club/miembros", icon: Users }] : []),
-          ]),
+          ...filteredNavItems,
           ...(isCoach && !hasMisEquipos ? [{ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield }] : []),
-          ...(isStaff ? [{ name: "Utillería", href: "/dashboard/utilleria", icon: Shirt }] : []),
-          { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
-          { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
           { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ],
@@ -506,7 +504,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       )}
 
       {/* ── Context Selector ──────────────────────────────── */}
-      {!collapsed && !isAdmin && (
+      {!collapsed && !isAdmin && (equipos.length > 0 || linkedPlayers.length > 0) && (
         <div className={cn("relative px-4 py-3", isAdmin ? "border-b border-slate-800" : "border-b border-gray-100")}>
           <button 
             onClick={() => setShowTeamDropdown(!showTeamDropdown)}

@@ -1,9 +1,9 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 
 export async function toggleMatchTimer(matchId: string, isRunning: boolean, elapsedSeconds: number) {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
   
   const startedAt = isRunning ? new Date().toISOString() : null;
 
@@ -24,7 +24,7 @@ export async function toggleMatchTimer(matchId: string, isRunning: boolean, elap
 }
 
 export async function addLiveEvent(matchId: string, eventData: any) {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
   
   const { data, error } = await supabase
     .from("match_events")
@@ -53,7 +53,7 @@ export async function addLiveEvent(matchId: string, eventData: any) {
 }
 
 export async function deleteLiveEvent(eventId: string, matchId: string) {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
   
   const { error } = await supabase
     .from("match_events")
@@ -101,7 +101,7 @@ async function recalculateScore(matchId: string, supabase: any) {
 }
 
 export async function updateMatchState(matchId: string, estado: string, updates: any = {}) {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
   
   const { error } = await supabase
     .from("partidos")

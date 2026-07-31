@@ -411,7 +411,7 @@ export async function getClubStaffAction(clubId: string) {
         team_coaches(teams(id, name, color))
       `)
       .eq('club_id', clubId)
-      .not('role', 'in', '("tutor","familia","family","jugador")')
+      .or('role.in.(admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado),roles.ov.{admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado}')
     
     if (error) throw error
 

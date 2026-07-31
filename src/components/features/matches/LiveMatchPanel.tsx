@@ -1,410 +1,328 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useTransition } from "react"
-import { addMatchEvent, deleteMatchEvent, AddMatchEventPayload } from "@/lib/matches-actions"
-import { MatchEvent, TipoEvento } from "@/types/matches"
-import {
-  Zap, Goal, AlertTriangle, ArrowRightLeft, X, Loader2,
-  ChevronDown, Trash2, Plus, Activity
-} from "lucide-react"
+import { useState, useEffect } from "react";
+import { Clock, MapPin, Activity } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useLiveTimer } from "@/hooks/useLiveTimer";
+import { getPublicMatchEvents } from "@/app/actions/match-actions";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ConvocadoBasic {
-  id: string
-  first_name: string
-  last_name: string
-  dorsal?: number | null
-  estado_asistencia: 'Pendiente' | 'Confirmado' | 'Ausente'
+function formatTime(totalSeconds: number) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-interface LiveMatchPanelProps {
-  partidoId: string
-  convocados: ConvocadoBasic[]
-  initialEvents: MatchEvent[]
-  teamColor: string
-}
+export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
+  const [match, setMatch] = useState<any>(initialMatch);
+  const [matchEvents, setMatchEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
-// ─── Event config ─────────────────────────────────────────────────────────────
+  const supabase = createClient();
+  const matchId = match?.id;
 
-interface EventConfig {
-  label: string
-  icon: string        // emoji for timeline
-  color: string       // Tailwind bg class
-  text: string        // Tailwind text class
-  requiresPlayer: boolean
-}
-
-const EVENT_CONFIG: Record<TipoEvento, EventConfig> = {
-  'Gol':             { label: 'Gol',            icon: '⚽', color: 'bg-emerald-500', text: 'text-emerald-700', requiresPlayer: true  },
-  'Asistencia':      { label: 'Asistencia',     icon: '🎯', color: 'bg-blue-500',    text: 'text-blue-700',    requiresPlayer: true  },
-  'Tarjeta Amarilla':{ label: 'T. Amarilla',    icon: '🟨', color: 'bg-amber-400',   text: 'text-amber-700',   requiresPlayer: true  },
-  'Tarjeta Roja':    { label: 'T. Roja',        icon: '🟥', color: 'bg-red-500',     text: 'text-red-700',     requiresPlayer: true  },
-  'Cambio Entra':    { label: 'Entra',          icon: '🔼', color: 'bg-teal-500',    text: 'text-teal-700',    requiresPlayer: true  },
-  'Cambio Sale':     { label: 'Sale',           icon: '🔽', color: 'bg-orange-400',  text: 'text-orange-700',  requiresPlayer: true  },
-  'Penalty':         { label: 'Penalty',        icon: '🎽', color: 'bg-violet-500',  text: 'text-violet-700',  requiresPlayer: false },
-  'Gol en Propia':   { label: 'Autogol',        icon: '🔴', color: 'bg-rose-600',    text: 'text-rose-700',    requiresPlayer: false },
-}
-
-const QUICK_ACTION_TYPES: TipoEvento[] = [
-  'Gol', 'Asistencia', 'Tarjeta Amarilla', 'Tarjeta Roja',
-  'Cambio Entra', 'Cambio Sale', 'Penalty', 'Gol en Propia',
-]
-
-// ─── Add Event Modal ──────────────────────────────────────────────────────────
-
-interface AddEventModalProps {
-  tipoEvento: TipoEvento
-  convocados: ConvocadoBasic[]
-  onClose: () => void
-  onSave: (payload: Omit<AddMatchEventPayload, 'partido_id'>) => void
-  isSaving: boolean
-}
-
-function AddEventModal({ tipoEvento, convocados, onClose, onSave, isSaving }: AddEventModalProps) {
-  const cfg = EVENT_CONFIG[tipoEvento]
-  const [minuto, setMinuto] = useState(45)
-  const [playerId, setPlayerId] = useState("")
-  const [notas, setNotas] = useState("")
-  const overlayRef = useRef<HTMLDivElement>(null)
-
-  // Close on Escape
+  // Sync state if initialMatch changes (user clicked another match in carousel)
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    document.addEventListener("keydown", handler)
-    return () => document.removeEventListener("keydown", handler)
-  }, [onClose])
+    setMatch(initialMatch);
+    setLoadingEvents(true);
+  }, [initialMatch]);
 
-  // Confirmed players only
-  const confirmados = convocados.filter(p => p.estado_asistencia === 'Confirmado')
+  // Fetch initial events and subscribe
+  useEffect(() => {
+    if (!matchId) return;
 
-  const canSubmit = !cfg.requiresPlayer || playerId !== ""
+    let mounted = true;
 
-  return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
-    >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className={`px-5 py-4 text-white flex items-center justify-between ${cfg.color}`}>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{cfg.icon}</span>
-            <div>
-              <p className="font-black text-base">Registrar {cfg.label}</p>
-              <p className="text-white/70 text-xs">Introduce los datos del evento</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* Minuto */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">
-              Minuto
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={0}
-                max={130}
-                value={minuto}
-                onChange={e => setMinuto(Number(e.target.value))}
-                className="flex-1 h-2 rounded-full accent-blue-600"
-              />
-              <div className="w-14 h-10 rounded-xl border-2 border-blue-200 bg-blue-50 flex items-center justify-center">
-                <span className="font-black text-blue-700 text-lg">{minuto}'</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Jugador */}
-          {cfg.requiresPlayer && (
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">
-                Jugador {confirmados.length === 0 && <span className="text-red-400">(sin confirmados)</span>}
-              </label>
-              <div className="relative">
-                <select
-                  value={playerId}
-                  onChange={e => setPlayerId(e.target.value)}
-                  className="w-full appearance-none bg-white border border-gray-200 rounded-xl pl-3 pr-8 py-2.5 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Seleccionar jugador —</option>
-                  {confirmados.map(p => (
-                    <option key={p.id} value={p.id}>
-                      #{p.dorsal ?? '?'} {p.first_name} {p.last_name}
-                    </option>
-                  ))}
-                  {convocados
-                    .filter(p => p.estado_asistencia !== 'Confirmado')
-                    .map(p => (
-                      <option key={p.id} value={p.id} className="text-gray-400">
-                        #{p.dorsal ?? '?'} {p.first_name} {p.last_name} (no confirmado)
-                      </option>
-                    ))
-                  }
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-          )}
-
-          {/* Notas */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">
-              Notas <span className="text-gray-300 normal-case">(opcional)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ej: Cabezazo en el área..."
-              value={notas}
-              onChange={e => setNotas(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => onSave({
-                tipo_evento: tipoEvento,
-                minuto,
-                player_id: playerId || null,
-                notas: notas || null,
-              })}
-              disabled={!canSubmit || isSaving}
-              className={[
-                "flex-1 py-2.5 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-all",
-                cfg.color,
-                (!canSubmit || isSaving) ? "opacity-60 cursor-not-allowed" : "hover:opacity-90",
-              ].join(" ")}
-            >
-              {isSaving
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Guardando…</>
-                : <><Plus className="w-4 h-4" /> Registrar</>
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Timeline Event Row ───────────────────────────────────────────────────────
-
-function TimelineEvent({
-  event,
-  onDelete,
-}: {
-  event: MatchEvent
-  onDelete: (id: string) => void
-}) {
-  const cfg = EVENT_CONFIG[event.tipo_evento]
-  const [isPending, startTransition] = useTransition()
-
-  const playerName = event.player
-    ? `${event.player.first_name} ${event.player.last_name}`
-    : null
-
-  return (
-    <div className="flex items-center gap-3 group py-2 px-1 rounded-xl hover:bg-gray-50 transition-colors">
-      {/* Minuto */}
-      <div className="w-10 text-right shrink-0">
-        <span className="text-[11px] font-black text-gray-400">{event.minuto}'</span>
-      </div>
-
-      {/* Dot + line */}
-      <div className="flex flex-col items-center shrink-0">
-        <div className={`w-7 h-7 rounded-full ${cfg.color} flex items-center justify-center text-sm shadow-sm`}>
-          {cfg.icon}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-900 leading-tight">
-          {cfg.label}
-          {playerName && (
-            <span className="font-medium text-gray-500 ml-1">· {playerName}</span>
-          )}
-        </p>
-        {event.notas && (
-          <p className="text-[11px] text-gray-400 truncate mt-0.5">{event.notas}</p>
-        )}
-      </div>
-
-      {/* Delete */}
-      <button
-        onClick={() => startTransition(() => onDelete(event.id))}
-        disabled={isPending}
-        className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-        title="Eliminar evento"
-      >
-        {isPending
-          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          : <Trash2 className="w-3.5 h-3.5" />
-        }
-      </button>
-    </div>
-  )
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
-
-export function LiveMatchPanel({
-  partidoId,
-  convocados,
-  initialEvents,
-  teamColor,
-}: LiveMatchPanelProps) {
-  const [events, setEvents] = useState<MatchEvent[]>(initialEvents)
-  const [modalTipo, setModalTipo] = useState<TipoEvento | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-
-  // Score counters derived from events
-  const goles = events.filter(e => e.tipo_evento === 'Gol').length
-  const tarjetasAmarillas = events.filter(e => e.tipo_evento === 'Tarjeta Amarilla').length
-  const tarjetasRojas = events.filter(e => e.tipo_evento === 'Tarjeta Roja').length
-
-  const handleSaveEvent = async (payload: Omit<AddMatchEventPayload, 'partido_id'>) => {
-    setIsSaving(true)
-    const result = await addMatchEvent({ ...payload, partido_id: partidoId })
-    setIsSaving(false)
-    if (result.success && result.id) {
-      // Optimistically add to local state
-      const p = payload.player_id
-        ? convocados.find(c => c.id === payload.player_id)
-        : null
-
-      const newEvent: MatchEvent = {
-        id: result.id,
-        partido_id: partidoId,
-        player_id: payload.player_id ?? null,
-        tipo_evento: payload.tipo_evento,
-        minuto: payload.minuto,
-        notas: payload.notas ?? null,
-        created_at: new Date().toISOString(),
-        player: p ? {
-          id: p.id,
-          first_name: p.first_name,
-          last_name: p.last_name,
-          dorsal: p.dorsal ?? undefined,
-        } : undefined,
+    async function fetchEvents() {
+      const data = await getPublicMatchEvents(matchId);
+      if (mounted && data) {
+        setMatchEvents(data);
+        setLoadingEvents(false);
       }
-      setEvents(prev => [...prev, newEvent].sort((a, b) => a.minuto - b.minuto))
-      setModalTipo(null)
     }
-  }
 
-  const handleDeleteEvent = async (eventId: string) => {
-    const result = await deleteMatchEvent(eventId, partidoId)
-    if (result.success) {
-      setEvents(prev => prev.filter(e => e.id !== eventId))
+    fetchEvents();
+
+    const channel = supabase.channel(`live-panel-${matchId}-${Math.random().toString(36).substring(7)}`);
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `partido_id=eq.${matchId}` }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          // Fetch player details if there's a player_id
+          if (payload.new.player_id) {
+            supabase.from('players').select('first_name, last_name, dorsal').eq('id', payload.new.player_id).single().then(({ data }) => {
+              setMatchEvents(prev => {
+                if (prev.some(e => e.id === payload.new.id)) return prev;
+                return [...prev, { ...payload.new, player: data }].sort((a, b) => a.minuto - b.minuto);
+              });
+            });
+          } else {
+            setMatchEvents(prev => {
+              if (prev.some(e => e.id === payload.new.id)) return prev;
+              return [...prev, payload.new].sort((a, b) => a.minuto - b.minuto);
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setMatchEvents(prev => prev.filter(e => e.id !== payload.old.id));
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidos', filter: `id=eq.${matchId}` }, (payload) => {
+        setMatch((prev: any) => ({ ...prev, ...payload.new }));
+      })
+      .subscribe();
+      
+    // Polling fallback por si los websockets fallan (especialmente para usuarios anónimos sin RLS o websockets bloqueados)
+    const intervalId = setInterval(() => {
+      fetchEvents();
+    }, 5000);
+      
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+      supabase.removeChannel(channel);
+    };
+  }, [matchId, supabase]);
+
+  // Live Timer
+  const { seconds } = useLiveTimer(matchId, match?.live_timer_elapsed_seconds || 0, match?.live_timer_started_at || null);
+
+  const isLocal = true; // Match Coach View: Always show the club on the left
+  const teamName = match?.equipo?.name || "Sporting Saladar";
+  const rivalName = match?.rival_nombre || "Rival por definir";
+  
+  const localName = isLocal ? teamName : rivalName;
+  const awayName = isLocal ? rivalName : teamName;
+  
+  const matchDate = match?.fecha_hora ? new Date(match.fecha_hora) : new Date();
+
+  // Goals calculations
+  const localGoalsList = matchEvents.filter(e => {
+    if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta') return isLocal ? !e.player_id : e.player_id;
+    return false;
+  });
+  
+  const awayGoalsList = matchEvents.filter(e => {
+    if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta') return !isLocal ? !e.player_id : e.player_id;
+    return false;
+  });
+
+  const localGoals = match?.resultado_propio ?? localGoalsList.length;
+  const awayGoals = match?.resultado_rival ?? awayGoalsList.length;
+
+  const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta').sort((a, b) => a.minuto - b.minuto);
+  let runningLocal = 0;
+  let runningAway = 0;
+  const goalTimeline = allGoals.map((goal) => {
+    let isHomeGoal = false;
+    if (goal.tipo_evento === 'Gol') {
+      isHomeGoal = isLocal ? !!goal.player_id : !goal.player_id;
+    } else {
+      isHomeGoal = isLocal ? !goal.player_id : !!goal.player_id;
     }
-  }
+    
+    if (isHomeGoal) runningLocal++;
+    else runningAway++;
+    return {
+      ...goal,
+      isHomeGoal,
+      score: `${runningLocal} - ${runningAway}`
+    };
+  });
 
-  const sortedEvents = [...events].sort((a, b) => a.minuto - b.minuto)
+  // Split Timeline Data
+  const descansoIndex = matchEvents.findIndex(e => e.tipo_evento === 'Descanso');
+  const firstHalfEvents = descansoIndex !== -1 ? matchEvents.slice(0, descansoIndex + 1) : matchEvents;
+  const secondHalfEvents = descansoIndex !== -1 ? matchEvents.slice(descansoIndex + 1) : [];
+
+  const renderEventRow = (event: any) => {
+    let icon = "⏱️";
+    let bgColor = "bg-slate-50";
+    let textColor = "text-slate-800";
+    
+    if (event.tipo_evento === 'Gol') { icon = "⚽"; bgColor = "bg-emerald-50"; textColor = "text-emerald-700"; }
+    else if (event.tipo_evento === 'Gol en propia puerta') { icon = "🤦‍♂️"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
+    else if (event.tipo_evento === 'Tarjeta Amarilla') { icon = "🟨"; bgColor = "bg-amber-50"; textColor = "text-amber-700"; }
+    else if (event.tipo_evento === 'Tarjeta Roja') { icon = "🟥"; bgColor = "bg-red-50"; textColor = "text-red-700"; }
+    else if (event.tipo_evento === 'Cambio') { icon = "🔄"; bgColor = "bg-blue-50"; textColor = "text-blue-700"; }
+    else if (event.tipo_evento === 'Lesión') { icon = "🚑"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
+    else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = "📌"; bgColor = "bg-slate-100/50"; textColor = "text-slate-500"; }
+
+    return (
+      <div key={event.id} className={`flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 ${bgColor} transition-all`}>
+        <div className="w-10 h-10 shrink-0 bg-white rounded-lg border border-slate-200 flex flex-col items-center justify-center shadow-sm">
+          <span className="text-[11px] font-black text-slate-800 leading-none">{event.minuto}'</span>
+        </div>
+        
+        <div className="flex-1 flex items-center gap-3">
+          <div className="text-lg">{icon}</div>
+          <div>
+            <p className={`text-xs font-bold ${textColor}`}>{event.tipo_evento}</p>
+            {event.player ? (
+              <p className="text-[10px] font-semibold text-slate-600">
+                {event.player.first_name} {event.player.last_name}
+              </p>
+            ) : (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') ? null : (
+              <p className="text-[10px] font-semibold text-slate-500">Rival / Staff</p>
+            )}
+            {event.notas && (
+              <p className="text-[9px] text-slate-500 mt-0.5 italic">{event.notas}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-5">
-
-      {/* ── Live score banner ───────────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-4 flex items-center justify-between text-white shadow-md"
-        style={{ background: `linear-gradient(135deg, ${teamColor}cc, ${teamColor})` }}
-      >
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 animate-pulse" />
-          <span className="text-sm font-bold">En Directo</span>
-        </div>
-        <div className="flex items-center gap-5 text-sm font-bold">
-          <span>⚽ {goles} gol{goles !== 1 ? 'es' : ''}</span>
-          <span>🟨 {tarjetasAmarillas}</span>
-          <span>🟥 {tarjetasRojas}</span>
-        </div>
-      </div>
-
-      {/* ── Quick action buttons ─────────────────────────────────────── */}
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-          Acciones rápidas
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {QUICK_ACTION_TYPES.map((tipo) => {
-            const cfg = EVENT_CONFIG[tipo]
-            return (
-              <button
-                key={tipo}
-                onClick={() => setModalTipo(tipo)}
-                className={[
-                  "flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 border-transparent",
-                  "transition-all hover:scale-105 hover:border-current hover:shadow-md active:scale-95",
-                  "bg-gray-50",
-                  cfg.text,
-                ].join(" ")}
-              >
-                <span className="text-2xl">{cfg.icon}</span>
-                <span className="text-[11px] font-bold">{cfg.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* ── Timeline ─────────────────────────────────────────────────── */}
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-1">
-          Línea temporal · {events.length} evento{events.length !== 1 ? 's' : ''}
-        </p>
-
-        {sortedEvents.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-10 text-center text-gray-400">
-            <Zap className="w-8 h-8 opacity-30" />
-            <p className="text-sm font-medium">Sin eventos todavía</p>
-            <p className="text-xs">Usa los botones de arriba para registrar goles, tarjetas y cambios</p>
+    <div className="w-full bg-slate-50/50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-in fade-in zoom-in-95 duration-300">
+      {/* ─── SCOREBOARD ─── */}
+      <div className="bg-white">
+        {/* Header */}
+        <div className="bg-indigo-600 text-white px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 text-xs font-bold tracking-wide">
+          <span className="uppercase">{match.competicion_nombre || 'Liga'}</span>
+          <div className="flex items-center gap-4 opacity-90 text-[11px]">
+            <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {match?.lugar || 'Por definir'}</span>
           </div>
-        ) : (
-          <div className="relative">
-            {/* Vertical line */}
-            <div className="absolute left-[54px] top-0 bottom-0 w-px bg-gray-100" />
-            <div className="space-y-0">
-              {sortedEvents.map(event => (
-                <TimelineEvent
-                  key={event.id}
-                  event={event}
-                  onDelete={handleDeleteEvent}
-                />
+        </div>
+
+        {/* Body */}
+        <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          {/* Local */}
+          <div className="flex flex-col md:flex-row items-center gap-4 flex-1 text-center md:text-left">
+            <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
+              🛡️
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-950 leading-tight">{localName}</h2>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">Local</span>
+            </div>
+          </div>
+
+          {/* Score & Timer */}
+          <div className="flex items-center gap-5 shrink-0">
+            <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
+              {localGoals}
+            </span>
+            
+            <div className="flex flex-col items-center justify-center px-4">
+              {(() => {
+                const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
+                const isDescanso = match?.first_half_duration_seconds !== null &&
+                                   match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
+                                   !match?.live_timer_started_at;
+                
+                if (isFinalizado || isDescanso) {
+                  return (
+                    <div className="flex flex-col items-center">
+                      <span className={`text-[14px] font-black tracking-[0.2em] uppercase px-4 py-2 rounded-xl border-2 ${isFinalizado ? 'text-slate-800 bg-slate-100 border-slate-200' : 'text-amber-800 bg-amber-100 border-amber-200'}`}>
+                        {isFinalizado ? 'Finalizado' : 'Descanso'}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">
+                      Tiempo de Juego
+                    </span>
+                    <div className={`text-2xl font-black tabular-nums tracking-tight px-4 py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-2 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                      {match?.live_timer_started_at && (
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                      )}
+                      {formatTime(seconds)}
+                    </div>
+                    <span className={`text-[10px] font-bold mt-2 uppercase tracking-widest px-2 py-0.5 rounded ${(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
+                      {(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'En Curso' : (match?.estado || 'Programado')}
+                    </span>
+                  </>
+                );
+              })()}
+            </div>
+
+            <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
+              {awayGoals}
+            </span>
+          </div>
+
+          {/* Away */}
+          <div className="flex flex-col md:flex-row-reverse items-center gap-4 flex-1 text-center md:text-right">
+            <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
+              🏆
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-950 leading-tight">{awayName}</h2>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">Visitante</span>
+            </div>
+          </div>
+        </div>
+
+        {/* GOALS TIMELINE */}
+        {goalTimeline.length > 0 && (
+          <div className="bg-slate-50 border-t border-slate-200 p-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {goalTimeline.map((goal, idx) => (
+                <div key={goal.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm text-xs">
+                  <span className="font-black text-slate-900">{goal.minuto}'</span>
+                  <span className="text-slate-300">|</span>
+                  <span className={goal.isHomeGoal ? "font-bold text-blue-700" : "font-bold text-slate-600"}>
+                    {goal.score}
+                  </span>
+                  {goal.tipo_evento === 'Gol en propia puerta' && <span className="text-[9px] text-rose-500 font-bold uppercase ml-1">(PP)</span>}
+                  {goal.player && <span className="text-[10px] text-slate-500 ml-1 truncate max-w-[80px]">{goal.player.last_name}</span>}
+                </div>
               ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Modal ────────────────────────────────────────────────────── */}
-      {modalTipo && (
-        <AddEventModal
-          tipoEvento={modalTipo}
-          convocados={convocados}
-          onClose={() => setModalTipo(null)}
-          onSave={handleSaveEvent}
-          isSaving={isSaving}
-        />
-      )}
+      {/* ─── EVENTS TIMELINE ─── */}
+      <div className="p-6 lg:p-8 bg-slate-50">
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-slate-400" />
+          Cronología del Encuentro
+        </h3>
+        
+        {loadingEvents ? (
+          <div className="flex justify-center p-8">
+            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : matchEvents.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+            <Clock className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium text-sm">El partido no tiene eventos registrados aún.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* 1st Half */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Primera Parte</h4>
+              </div>
+              {firstHalfEvents.length > 0 ? (
+                firstHalfEvents.map(renderEventRow)
+              ) : (
+                <p className="text-xs text-slate-400 italic bg-white p-4 rounded-xl border border-slate-100 text-center">No hay eventos</p>
+              )}
+            </div>
+            
+            {/* 2nd Half */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Segunda Parte</h4>
+              </div>
+              {secondHalfEvents.length > 0 ? (
+                secondHalfEvents.map(renderEventRow)
+              ) : (
+                <p className="text-xs text-slate-400 italic bg-white p-4 rounded-xl border border-slate-100 text-center">No hay eventos</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }

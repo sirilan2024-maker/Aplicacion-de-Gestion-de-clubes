@@ -14,7 +14,7 @@ interface NavItem {
   sort_order: number
 }
 
-const ROLES = ['admin', 'coordinador', 'entrenador', 'jugador', 'tutor', 'utillero', 'directivo', 'secretario', 'tesorero', 'delegado']
+const ROLES = ['admin', 'coordinador', 'entrenador', 'jugador', 'tutor', 'utillero', 'directivo', 'secretario', 'tesorero', 'delegado', 'socio']
 
 export default function ConfigRolesPage() {
   const [navItems, setNavItems] = useState<NavItem[]>([])
@@ -115,8 +115,8 @@ export default function ConfigRolesPage() {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      {/* Desktop Table View */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-xs">
@@ -162,6 +162,39 @@ export default function ConfigRolesPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {loading ? (
+          <div className="flex justify-center p-12">
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          </div>
+        ) : (
+          ROLES.map(role => (
+            <details key={`${role}-mobile`} className="bg-white border border-gray-200 rounded-xl group overflow-hidden shadow-sm">
+              <summary className="px-4 py-4 font-bold text-gray-900 capitalize flex justify-between items-center cursor-pointer list-none bg-gray-50/50 hover:bg-gray-100 transition-colors">
+                <span>{role}</span>
+                <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="p-4 border-t border-gray-100 space-y-3 bg-white">
+                {navItems.map(item => (
+                  <label key={`${item.id}-${role}-mobile`} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
+                    <div className="flex flex-col pr-4">
+                      <span className="font-semibold text-gray-900 text-sm">{item.label}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={rolePermissions[role]?.includes(item.id) || false}
+                      onChange={() => handleToggle(role, item.id)}
+                      className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                    />
+                  </label>
+                ))}
+              </div>
+            </details>
+          ))
+        )}
       </div>
     </div>
   )

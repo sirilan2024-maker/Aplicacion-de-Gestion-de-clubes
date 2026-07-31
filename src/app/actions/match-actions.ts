@@ -440,3 +440,36 @@ export async function updatePlayerCardsInMatch(matchId: string, playerId: string
   console.log(`[updatePlayerCardsInMatch] Done.`);
   return { success: true };
 }
+
+export async function getPublicMatchEvents(matchId: string) {
+  const supabase = await createAdminClient()
+  const { data, error } = await supabase
+    .from('match_events')
+    .select(`
+      *,
+      player:players(first_name, last_name, dorsal)
+    `)
+    .eq('partido_id', matchId)
+    .order('minuto', { ascending: true })
+
+  if (error) {
+    console.error("Error fetching match events:", error)
+    return []
+  }
+  return data || []
+}
+
+export async function getPublicMatches() {
+  const supabase = await createAdminClient()
+  const { data, error } = await supabase
+    .from('partidos')
+    .select('id, estado, resultado_propio, resultado_rival, live_timer_started_at, live_timer_elapsed_seconds')
+    .eq('estado', 'Programado')
+    .or('live_timer_started_at.not.is.null,live_timer_elapsed_seconds.gt.0');
+    
+  if (error) {
+    console.error("Error fetching public matches:", error);
+    return [];
+  }
+  return data || [];
+}

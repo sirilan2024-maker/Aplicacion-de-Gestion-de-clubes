@@ -70,7 +70,10 @@ export function ForumTab({ matchId }: ForumTabProps) {
         (payload) => {
           const newComment = payload.new as Comment;
           if (newComment && newComment.match_id === matchId) {
-            setMessages((prev) => [...prev, newComment]);
+            setMessages((prev) => {
+              if (prev.some((c) => c.id === newComment.id)) return prev;
+              return [...prev, newComment];
+            });
           }
         }
       )

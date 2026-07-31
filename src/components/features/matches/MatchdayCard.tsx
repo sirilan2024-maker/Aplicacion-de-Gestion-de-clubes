@@ -6,16 +6,17 @@ import { Shield, Clock, MapPin, User, Activity, CheckCircle } from "lucide-react
 
 interface MatchdayCardProps {
   match: any;
+  onClick?: (matchId: string) => void;
 }
 
-export function MatchdayCard({ match }: MatchdayCardProps) {
+export function MatchdayCard({ match, onClick }: MatchdayCardProps) {
   const supabase = createClient()
   const [events, setEvents] = useState<any[]>([])
   const [showModal, setShowModal] = useState(false)
   const [elapsedString, setElapsedString] = useState("00:00")
 
-  const isLive = match.estado === 'En Curso'
   const isFinished = match.estado === 'Finalizado'
+  const isLive = !isFinished && (match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
   const isLocal = !match.lugar?.toLowerCase().includes('fuera') && !match.lugar?.toLowerCase().includes('visitante')
 
   // Cronómetro en vivo
@@ -51,12 +52,23 @@ export function MatchdayCard({ match }: MatchdayCardProps) {
         .limit(20)
       if (data) setEvents(data)
     }
+    
+    // Carga inicial
     loadEvents()
+
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    // Si está en directo, configuramos un polling de seguridad por si falla el Realtime
+    if (isLive) {
+      intervalId = setInterval(() => {
+        loadEvents();
+      }, 5000);
+    }
 
     if (!isLive) return
 
     const channel = supabase
-      .channel(`matchday-events-${match.id}`)
+      .channel(`matchday-events-${match.id}-${Math.random().toString(36).substring(7)}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'match_events',
         filter: `partido_id=eq.${match.id}`
@@ -68,11 +80,17 @@ export function MatchdayCard({ match }: MatchdayCardProps) {
             .eq('id', payload.new.player_id).single()
           player = p
         }
-        setEvents(prev => [{ ...payload.new, player }, ...prev])
+        setEvents(prev => {
+          if (prev.some(e => e.id === payload.new.id)) return prev;
+          return [{ ...payload.new, player }, ...prev];
+        })
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { 
+      supabase.removeChannel(channel)
+      if (intervalId) clearInterval(intervalId);
+    }
   }, [match.id, isLive, isFinished, supabase])
 
   const getEventIcon = (tipo: string) => {
@@ -87,8 +105,22 @@ export function MatchdayCard({ match }: MatchdayCardProps) {
     }
   }
 
-  const ourScore = isLocal ? (match.resultado_propio ?? 0) : (match.resultado_rival ?? 0)
-  const theirScore = isLocal ? (match.resultado_rival ?? 0) : (match.resultado_propio ?? 0)
+  // Calculate live scores from events
+  const liveLocalGoals = events.filter(e => {
+    if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta') return isLocal ? !e.player_id : e.player_id;
+    return false;
+  }).length;
+  
+  const liveAwayGoals = events.filter(e => {
+    if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta') return !isLocal ? !e.player_id : e.player_id;
+    return false;
+  }).length;
+
+  const ourScore = isLive ? liveLocalGoals : (isLocal ? (match.resultado_propio ?? liveLocalGoals) : (match.resultado_rival ?? liveAwayGoals))
+  const theirScore = isLive ? liveAwayGoals : (isLocal ? (match.resultado_rival ?? liveAwayGoals) : (match.resultado_propio ?? liveLocalGoals))
+  
   const ourName = match.equipo?.name || 'Sporting Saladar'
   const theirName = match.rival_nombre || 'Rival'
 
@@ -97,7 +129,9 @@ export function MatchdayCard({ match }: MatchdayCardProps) {
 
   return (
     <>
-      <div className={`rounded-2xl overflow-hidden border transition-all hover:shadow-lg ${
+      <div 
+        onClick={() => onClick ? onClick(match.id) : setShowModal(true)}
+        className={`rounded-2xl overflow-hidden border transition-all hover:shadow-lg ${onClick ? 'cursor-pointer hover:border-blue-300' : 'cursor-pointer'} ${
         isLive
           ? 'bg-gradient-to-br from-slate-900 to-slate-800 border-red-500/30 shadow-lg shadow-red-500/10'
           : isFinished

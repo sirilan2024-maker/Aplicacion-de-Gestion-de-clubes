@@ -83,7 +83,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
   // Realtime subscription for events and timer
   useEffect(() => {
-    const channel = supabase.channel(`match-${matchId}-live`);
+    const channel = supabase.channel(`match-${matchId}-live-${Math.random().toString(36).substring(7)}`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `partido_id=eq.${matchId}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
@@ -185,7 +185,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
   const handleStartSecondHalf = async () => {
     const targetSeconds = halfLengthMinutes * 60;
     await updateMatchState(matchId, "Programado");
-    setPartidoEstado("En Curso");
+    setPartidoEstado("Programado");
     start(targetSeconds);
     toast.success("Segunda parte iniciada");
   };
@@ -319,16 +319,26 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
               <span>Fin de Partido</span>
             </button>
             <button
-              onClick={() => {
-                if (partidoEstado === "Finalizado") {
-                  toast.error("El partido ha finalizado. El cronómetro no puede reanudarse.");
-                  return;
+              onClick={async () => {
+                try {
+                  if (partidoEstado === "Finalizado") {
+                    toast.error("El partido ha finalizado. El cronómetro no puede reanudarse.");
+                    return;
+                  }
+                  if (isDescansoActive) {
+                    toast.error("Estás en el descanso. Usa el botón 'Iniciar 2ª Parte' para reanudar el partido.");
+                    return;
+                  }
+                  
+                  if (!running) {
+                    start();
+                  } else {
+                    pause();
+                  }
+                } catch (e: any) {
+                  console.error("Crash on play button:", e);
+                  toast.error("Crash: " + e.message);
                 }
-                if (isDescansoActive) {
-                  toast.error("Estás en el descanso. Usa el botón 'Iniciar 2ª Parte' para reanudar el partido.");
-                  return;
-                }
-                running ? pause() : start();
               }}
               className={`flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors ml-2 ${isDescuento ? 'bg-red-800 hover:bg-red-700' : 'bg-blue-800 hover:bg-blue-700'}`}
             >

@@ -27,17 +27,23 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   // Real-time subscriptions
   useEffect(() => {
     if (!matchId) return;
-    const channel = supabase.channel(`family-match-${matchId}-live`);
+    const channel = supabase.channel(`family-match-${matchId}-live-${Math.random().toString(36).substring(7)}`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `partido_id=eq.${matchId}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
           // Fetch player details if there's a player_id
           if (payload.new.player_id) {
             supabase.from('players').select('first_name, last_name, dorsal').eq('id', payload.new.player_id).single().then(({ data }) => {
-              setMatchEvents(prev => [...prev, { ...payload.new, player: data }].sort((a, b) => a.minuto - b.minuto));
+              setMatchEvents(prev => {
+                if (prev.some(e => e.id === payload.new.id)) return prev;
+                return [...prev, { ...payload.new, player: data }].sort((a, b) => a.minuto - b.minuto);
+              });
             });
           } else {
-            setMatchEvents(prev => [...prev, payload.new].sort((a, b) => a.minuto - b.minuto));
+            setMatchEvents(prev => {
+              if (prev.some(e => e.id === payload.new.id)) return prev;
+              return [...prev, payload.new].sort((a, b) => a.minuto - b.minuto);
+            });
           }
         } else if (payload.eventType === 'DELETE') {
           setMatchEvents(prev => prev.filter(e => e.id !== payload.old.id));
@@ -156,7 +162,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
         {/* Back Link */}
         <div className="flex items-center justify-between mb-4">
           <Link
-            href={`/dashboard/family/e/${playerId}/partidos`}
+            href={playerId ? `/dashboard/family/e/${playerId}/partidos` : `/dashboard/matches`}
             className="inline-flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 uppercase tracking-wider transition-colors"
           >
             <ChevronLeft className="w-4 h-4 mr-1 stroke-[2.5]" />

@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
+export const dynamic = 'force-dynamic';
 
 export default async function PartidosPage() {
   const supabase = await createClient()
@@ -9,7 +10,7 @@ export default async function PartidosPage() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) return null
 
-  const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', userData.user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('club_id, role').eq('id', userData.user.id).single()
   const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
 
   let matchesQuery = supabase
@@ -59,6 +60,11 @@ export default async function PartidosPage() {
     .from("convocatorias")
     .select("*")
 
+  const role = (profile?.role || '').toLowerCase().trim();
+  const isReadOnly = role === 'socio' || role === 'utillero' || role === 'directivo' || role === 'secretario' || role === 'tesorero' || role === 'jugador' || role === 'tutor' || role === 'familia' || role === 'family' || role === 'delegado';
+
+  console.log("DASHBOARD/MATCHES DEBUG -> user_id:", userData.user.id, "profile.role:", profile?.role, "isReadOnly:", isReadOnly);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -68,6 +74,7 @@ export default async function PartidosPage() {
             teams={teams || []}
             players={players || []}
             convocatorias={convocatorias || []}
+            isReadOnly={isReadOnly}
           />
         </Suspense>
       </div>

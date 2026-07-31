@@ -382,13 +382,18 @@ export default function StaffProfilePage() {
                   <div className="space-y-5">
                     <div>
                       <label className="block text-sm font-medium text-blue-900 mb-2">Roles Asignados</label>
-                      <div className="grid grid-cols-2 gap-2 p-3 bg-white rounded-lg border border-blue-200">
+                      <div className="flex flex-wrap gap-3 p-3 bg-white rounded-lg border border-blue-200">
                         {[
                           { val: 'admin', label: 'Admin' },
                           { val: 'coordinador', label: 'Coordinador' },
                           { val: 'entrenador', label: 'Entrenador' },
                           { val: 'jugador', label: 'Jugador' },
-                          { val: 'tutor', label: 'Padre/Madre/Tutor' }
+                          { val: 'tutor', label: 'Padre/Madre/Tutor' },
+                          { val: 'utillero', label: 'Utillero' },
+                          { val: 'directivo', label: 'Directivo' },
+                          { val: 'secretario', label: 'Secretario' },
+                          { val: 'tesorero', label: 'Tesorero' },
+                          { val: 'delegado', label: 'Delegado' }
                         ].map(r => {
                           const checked = assignedRoles.includes(r.val);
                           return (
@@ -433,7 +438,16 @@ export default function StaffProfilePage() {
                         >
                           {assignedRoles.map(r => (
                             <option key={r} value={r}>
-                              {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r}
+                              {r === 'admin' ? 'Admin' : 
+                               r === 'coordinador' ? 'Coordinador' :
+                               r === 'coach' || r === 'entrenador' ? 'Entrenador' : 
+                               r === 'jugador' ? 'Jugador' : 
+                               r === 'tutor' ? 'Padre/Madre/Tutor' : 
+                               r === 'utillero' ? 'Utillero' :
+                               r === 'directivo' ? 'Directivo' :
+                               r === 'secretario' ? 'Secretario' :
+                               r === 'tesorero' ? 'Tesorero' :
+                               r === 'delegado' ? 'Delegado' : r}
                             </option>
                           ))}
                         </select>

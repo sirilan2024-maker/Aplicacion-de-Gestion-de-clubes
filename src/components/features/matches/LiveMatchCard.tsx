@@ -56,7 +56,7 @@ export function LiveMatchCard({ match }: LiveMatchCardProps) {
     loadEvents()
 
     const channel = supabase
-      .channel(`public:match_events:${match.id}`)
+      .channel(`public:match_events:${match.id}-${Math.random().toString(36).substring(7)}`)
       .on(
         'postgres_changes',
         {

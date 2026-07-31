@@ -740,7 +740,12 @@ export default function PlayerProfilePage() {
             </div>
 
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Información de Contacto</h3>
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 cursor-pointer list-none flex items-center justify-between hover:text-blue-600 transition-colors">
+                  Información de Contacto
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="mt-4">
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono</label>
@@ -816,16 +821,22 @@ export default function PlayerProfilePage() {
                   </div>
                 )}
               </div>
+                </div>
+              </details>
             </div>
 
             {/* Historial de equipos movido a vista admin */}
 
             {/* ── FASE 5: Bloque Datos Médicos (resumen) ── */}
             <div className="md:col-span-2 border-t pt-8 mt-4">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                <HeartPulse size={18} className="text-red-500" />
-                Datos Médicos
-              </h3>
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <HeartPulse size={18} className="text-red-500" />
+                    Datos Médicos
+                  </div>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {[
                   { label: 'SIP / Tarjeta Sanitaria', value: (player as any).sip },
@@ -843,14 +854,19 @@ export default function PlayerProfilePage() {
                   </div>
                 ))}
               </div>
+              </details>
             </div>
 
             {/* ── FASE 5: Bloque Consentimientos y Legal ── */}
             <div className="md:col-span-2 border-t pt-8 mt-4">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                <CheckCircle size={18} className="text-emerald-500" />
-                Consentimientos y Legal (RGPD)
-              </h3>
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={18} className="text-emerald-500" />
+                    Consentimientos y Legal (RGPD)
+                  </div>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
                   { label: 'Política de Privacidad (RGPD)', field: 'consent_rgpd_at' },
@@ -886,16 +902,20 @@ export default function PlayerProfilePage() {
                   </div>
                 )}
               </div>
+              </details>
             </div>
 
             {/* ── FASE 5: Bloque de Facturación ── */}
+            {!(player as any).is_senior && (
             <div className="md:col-span-2 border-t pt-8 mt-4">
-              {!(player as any).is_senior && (
-              <>
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
-                <FileText size={18} className="text-blue-500" />
-                Facturación y Pago
-              </h3>
+              <details className="group">
+                <summary className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <FileText size={18} className="text-blue-500" />
+                    Facturación y Pago
+                  </div>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Método de Pago</span>
@@ -927,8 +947,6 @@ export default function PlayerProfilePage() {
               <div className="mt-6">
                 <Subscriptions playerId={playerId} />
               </div>
-              </>
-            )}
 
               {/* Documentos Subidos */}
               {playerDocs.length > 0 && (
@@ -945,7 +963,9 @@ export default function PlayerProfilePage() {
                   </div>
                 </div>
               )}
+              </details>
             </div>
+            )}
           </div>
         )}
 

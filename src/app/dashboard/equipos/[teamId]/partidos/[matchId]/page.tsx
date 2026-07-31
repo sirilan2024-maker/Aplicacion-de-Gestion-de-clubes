@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { PremiumMatchManager } from "@/components/features/matches/premium-match-manager"
+import { FamilyMatchView } from "@/components/features/matches/family-match-view"
+export const dynamic = 'force-dynamic';
 
 export default async function MatchPage({ params }: { params: Promise<{ teamId: string, matchId: string }> }) {
   const { teamId, matchId } = await params
@@ -66,15 +68,38 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .in("equipo_id", globalTeamIds)
     .order("fecha_hora", { ascending: true })
 
+  const { data: userData } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData?.user?.id).single()
+  const role = (profile?.role || '').toLowerCase().trim();
+  const isReadOnly = role === 'socio' || role === 'utillero' || role === 'directivo' || role === 'secretario' || role === 'tesorero' || role === 'jugador' || role === 'tutor' || role === 'familia' || role === 'family' || role === 'delegado';
+
+  if (isReadOnly) {
+    return (
+      <div className="w-full flex">
+        <FamilyMatchView
+          match={matchData}
+          playerId={""}
+          matchEvents={eventsData || []}
+          convocatorias={convocatoriasData || []}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full flex">
-      <PremiumMatchManager
+    <div className="w-full flex flex-col">
+      <div className="bg-red-600 text-white p-4 font-bold text-center w-full">
+        DEBUG: Tu rol en base de datos es "{role}"
+      </div>
+      <div className="w-full flex">
+        <PremiumMatchManager
         match={matchData as any}
         players={playersData || []}
         convocatorias={convocatoriasData || []}
         matchEvents={eventsData || []}
         allMatches={allMatchesData || []}
       />
+      </div>
     </div>
   )
 }

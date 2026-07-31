@@ -354,7 +354,7 @@ export async function switchActiveRoleAction(selectedRole: string) {
     return { success: false, error: error.message }
   }
 
-  revalidatePath("/dashboard")
+  // revalidatePath("/dashboard") // Removed to prevent hook mismatch race condition since client does a full window.location.href redirect
   return { success: true }
 }
 

@@ -289,35 +289,51 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
         {!isFamilyView && (
           <div className="flex items-center gap-2">
-            {isDescansoActive ? (
+            {partidoEstado === "Finalizado" ? (
               <button
-                onClick={() => {
-                  if (partidoEstado === "Finalizado") {
-                    toast.error("El partido ya ha finalizado.");
-                    return;
-                  }
-                  if (!window.confirm("¿Seguro que deseas iniciar la 2ª Parte?")) return;
-                  handleStartSecondHalf();
+                onClick={async () => {
+                  if (!window.confirm("¿Seguro que deseas REABRIR el partido? El cronómetro quedará pausado donde se quedó.")) return;
+                  await updateMatchState(matchId, "Programado", { second_half_duration_seconds: null });
+                  setPartidoEstado("Programado");
+                  toast.success("Partido reabierto");
                 }}
-                className="flex items-center gap-1 rounded-lg bg-emerald-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-emerald-600 transition-colors"
+                className="flex items-center gap-1 rounded-lg bg-yellow-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-yellow-600 transition-colors"
               >
-                <span>Iniciar 2ª Parte</span>
+                <span>Reabrir Partido</span>
               </button>
             ) : (
-              <button
-                onClick={() => handlePhaseChange("Descanso")}
-                className="flex items-center gap-1 rounded-lg bg-orange-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-orange-600 transition-colors"
-              >
-                <span>Descanso</span>
-              </button>
+              <>
+                {isDescansoActive ? (
+                  <button
+                    onClick={() => {
+                      if (partidoEstado === "Finalizado") {
+                        toast.error("El partido ya ha finalizado.");
+                        return;
+                      }
+                      if (!window.confirm("¿Seguro que deseas iniciar la 2ª Parte?")) return;
+                      handleStartSecondHalf();
+                    }}
+                    className="flex items-center gap-1 rounded-lg bg-emerald-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-emerald-600 transition-colors"
+                  >
+                    <span>Iniciar 2ª Parte</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handlePhaseChange("Descanso")}
+                    className="flex items-center gap-1 rounded-lg bg-orange-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-orange-600 transition-colors"
+                  >
+                    <span>Descanso</span>
+                  </button>
+                )}
+                
+                <button
+                  onClick={() => handlePhaseChange("Fin de Partido")}
+                  className="flex items-center gap-1 rounded-lg bg-red-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-red-600 transition-colors"
+                >
+                  <span>Fin de Partido</span>
+                </button>
+              </>
             )}
-            
-            <button
-              onClick={() => handlePhaseChange("Fin de Partido")}
-              className="flex items-center gap-1 rounded-lg bg-red-600/80 px-2.5 py-1.5 text-xs font-bold hover:bg-red-600 transition-colors"
-            >
-              <span>Fin de Partido</span>
-            </button>
             <button
               onClick={async () => {
                 try {

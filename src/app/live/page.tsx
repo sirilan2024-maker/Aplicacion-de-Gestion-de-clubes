@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { MatchdayView } from "@/components/features/matches/MatchdayView"
 import Image from "next/image"
 
+import { getLiveAd } from "@/app/actions/ad-actions"
+
 export const revalidate = 0 // Opt out of caching for live route
 
 export default async function PublicLivePage() {
@@ -10,7 +12,7 @@ export default async function PublicLivePage() {
   // Fetch teams
   const { data: teamsData } = await supabase
     .from('teams')
-    .select('id, name, logo_url')
+    .select('id, name, logo_url, category')
 
   // Fetch all matches (we let MatchdayView filter the +/- 72h window)
   const { data: matchesData } = await supabase
@@ -22,6 +24,8 @@ export default async function PublicLivePage() {
     ...match,
     equipo: teamsData?.find(t => t.id === match.equipo_id)
   })) || []
+  
+  const liveAd = await getLiveAd();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -52,6 +56,7 @@ export default async function PublicLivePage() {
         <MatchdayView 
           initialMatches={matchesWithTeams} 
           teams={teamsData || []} 
+          ad={liveAd}
         />
       </main>
       

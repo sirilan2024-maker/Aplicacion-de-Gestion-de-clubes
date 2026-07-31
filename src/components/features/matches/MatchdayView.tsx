@@ -7,12 +7,15 @@ import { LiveMatchPanel } from "./LiveMatchPanel"
 import { getPublicMatches } from "@/app/actions/match-actions"
 import { CalendarDays, X } from "lucide-react"
 
+import { ChevronLeft, ChevronRight } from "lucide-react"
+
 interface MatchdayViewProps {
   initialMatches: any[];
   teams: any[];
+  ad?: any;
 }
 
-export function MatchdayView({ initialMatches, teams }: MatchdayViewProps) {
+export function MatchdayView({ initialMatches, teams, ad }: MatchdayViewProps) {
   const supabase = createClient()
   const [matches, setMatches] = useState<any[]>(initialMatches)
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)
@@ -119,106 +122,135 @@ export function MatchdayView({ initialMatches, teams }: MatchdayViewProps) {
     )
   }
 
-  // Separate live, upcoming and finished for visual grouping
+  // Separate live
   const live = jornada.filter(m => m.estado !== 'Finalizado' && (m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0))
-  const upcoming = jornada.filter(m => m.estado === 'Programado')
-  const finished = jornada.filter(m => m.estado === 'Finalizado')
-  
   const selectedMatch = selectedLiveMatchId ? live.find(m => m.id === selectedLiveMatchId) : null;
 
+  // Group by date
+  const groupedByDate: Record<string, any[]> = {};
+  jornada.forEach(m => {
+    const dateStr = new Date(m.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
+    if (!groupedByDate[dateStr]) groupedByDate[dateStr] = [];
+    groupedByDate[dateStr].push(m);
+  });
+
   return (
-    <div className="space-y-8 animate-in fade-in">
+    <div className="animate-in fade-in">
+      {/* Selector Cabecera Jornada */}
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
+        <button className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="px-6 py-2 rounded-full border border-slate-200 font-semibold text-slate-800 text-sm shadow-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2">
+          Partidos fin de semana
+        </div>
+        <button className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
       {/* EN DIRECTO */}
-      {live.length > 0 && (
-        <section>
+      {selectedMatch && (
+        <section className="mb-8 bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden p-4">
           <div className="flex items-center gap-2 mb-4">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
             </span>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-red-600">En Directo</h2>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-red-600">Minuto a Minuto</h2>
           </div>
-          
-          {selectedMatch ? (
-            <div className="space-y-4">
-              {/* Carrusel de mini-marcadores para cambiar de partido */}
-              <div className="flex overflow-x-auto pb-4 gap-3 snap-x">
-                {live.map(match => {
-                  const isSelected = match.id === selectedLiveMatchId;
-                  const ourScore = match.resultado_propio ?? 0;
-                  const theirScore = match.resultado_rival ?? 0;
-                  return (
-                    <div 
-                      key={match.id}
-                      onClick={() => setSelectedLiveMatchId(match.id)}
-                      className={`shrink-0 snap-start px-4 py-2 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${isSelected ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-slate-200 bg-white hover:border-red-300'}`}
-                    >
-                      <div className="flex flex-col text-xs font-bold w-16 truncate">
-                        <span className="truncate">{match.equipo?.name?.split(' ')[1] || 'SPO'}</span>
-                        <span className="truncate text-slate-500 font-medium">{match.rival_nombre?.split(' ')[0] || 'RIV'}</span>
-                      </div>
-                      <div className="flex flex-col text-sm font-black text-slate-800 text-center bg-slate-100 rounded px-2">
-                        <span>{ourScore}</span>
-                        <span>{theirScore}</span>
-                      </div>
+          <div className="flex flex-col lg:flex-row gap-5">
+            <div className="flex lg:flex-col gap-2 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-48 hide-scrollbar">
+              {live.map(match => {
+                const isSelected = match.id === selectedLiveMatchId;
+                const ourScore = match.resultado_propio ?? 0;
+                const theirScore = match.resultado_rival ?? 0;
+                return (
+                  <div 
+                    key={match.id}
+                    onClick={() => setSelectedLiveMatchId(match.id)}
+                    className={`shrink-0 snap-start px-4 py-2 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${isSelected ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-slate-200 bg-white hover:border-red-300'}`}
+                  >
+                    <div className="flex flex-col text-xs font-bold w-16 truncate">
+                      <span className="truncate">{match.equipo?.category || 'SPO'}</span>
+                      <span className="truncate text-slate-500 font-medium">{match.rival_nombre?.split(' ')[0] || 'RIV'}</span>
                     </div>
-                  )
-                })}
-                <button 
-                  onClick={() => setSelectedLiveMatchId(null)}
-                  className="shrink-0 px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 flex items-center justify-center cursor-pointer transition-all"
-                  title="Cerrar vista detallada"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              {/* Panel principal del partido seleccionado */}
-              <div className="w-full">
-                <LiveMatchPanel match={selectedMatch} />
-              </div>
+                    <div className="flex flex-col text-sm font-black text-slate-800 text-center bg-slate-100 rounded px-2">
+                      <span>{ourScore}</span>
+                      <span>{theirScore}</span>
+                    </div>
+                  </div>
+                )
+              })}
+              <button 
+                onClick={() => setSelectedLiveMatchId(null)}
+                className="shrink-0 px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 flex items-center justify-center cursor-pointer transition-all"
+                title="Cerrar vista detallada"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {live.map(match => (
-                <MatchdayCard key={match.id} match={match} onClick={(id) => setSelectedLiveMatchId(id)} />
-              ))}
+            <div className="w-full">
+              <LiveMatchPanel match={selectedMatch} />
             </div>
-          )}
-        </section>
-      )}
-
-      {/* PRÓXIMOS */}
-      {upcoming.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-blue-600">
-              {live.length > 0 ? 'Próximos' : 'Partidos de la Jornada'}
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {upcoming.map(match => (
-              <MatchdayCard key={match.id} match={match} />
-            ))}
           </div>
         </section>
       )}
 
-      {/* FINALIZADOS */}
-      {finished.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-3 w-3 rounded-full bg-slate-400"></div>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Finalizados</h2>
+      {/* Partidos por día */}
+      <div className="space-y-12">
+        {Object.entries(groupedByDate).map(([date, dayMatches]) => (
+          <div key={date}>
+            {/* Header del día */}
+            <div className="flex items-end justify-between border-b border-slate-300 pb-2 mb-4 relative">
+              <h2 className="text-sm font-black text-slate-800 tracking-wide">{date}</h2>
+              {ad && ad.isActive && (
+                <div className="absolute right-0 -bottom-2 md:bottom-0 bg-white pl-4 flex items-center gap-2">
+                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold hidden md:inline">Gestionado por</span>
+                  {ad.url ? (
+                    <a href={ad.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                      {ad.imageUrl ? (
+                        <img src={ad.imageUrl} alt={ad.text} className="h-6 object-contain" />
+                      ) : (
+                        <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">{ad.text}</span>
+                      )}
+                    </a>
+                  ) : (
+                    <span className="shrink-0">
+                      {ad.imageUrl ? (
+                        <img src={ad.imageUrl} alt={ad.text} className="h-6 object-contain" />
+                      ) : (
+                        <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">{ad.text}</span>
+                      )}
+                    </span>
+                  )}
+                  <span className="text-[8px] text-slate-300 font-bold ml-1 hidden md:inline">AD</span>
+                </div>
+              )}
+            </div>
+
+            {/* Grid de Partidos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
+              {dayMatches.map(match => {
+                const isLiveNow = match.estado !== 'Finalizado' && (match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
+                return (
+                  <MatchdayCard 
+                    key={match.id} 
+                    match={match} 
+                    onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
+                  />
+                );
+              })}
+            </div>
+            
+            {ad && ad.isActive && (
+              <div className="mt-2 text-right">
+                <p className="text-[8px] text-slate-400">+18. Juega de forma responsable.</p>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {finished.map(match => (
-              <MatchdayCard key={match.id} match={match} />
-            ))}
-          </div>
-        </section>
-      )}
+        ))}
+      </div>
     </div>
   )
 }

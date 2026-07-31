@@ -124,8 +124,14 @@ export function MatchdayCard({ match, onClick }: MatchdayCardProps) {
   const ourName = match.equipo?.name || 'Sporting Saladar'
   const theirName = match.rival_nombre || 'Rival'
 
-  const matchTime = new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-  const matchDate = new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const matchTime = isMounted ? new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '--:--'
+  const matchDate = isMounted ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) : '...'
 
   return (
     <>

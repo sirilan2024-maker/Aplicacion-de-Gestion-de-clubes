@@ -19,6 +19,11 @@ export function MatchdayView({ initialMatches, teams, ad }: MatchdayViewProps) {
   const supabase = createClient()
   const [matches, setMatches] = useState<any[]>(initialMatches)
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Compute the ±72h window matches + highlighted matches
   const jornada = React.useMemo(() => {
@@ -128,11 +133,15 @@ export function MatchdayView({ initialMatches, teams, ad }: MatchdayViewProps) {
 
   // Group by date
   const groupedByDate: Record<string, any[]> = {};
-  jornada.forEach(m => {
-    const dateStr = new Date(m.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
-    if (!groupedByDate[dateStr]) groupedByDate[dateStr] = [];
-    groupedByDate[dateStr].push(m);
-  });
+  if (isMounted) {
+    jornada.forEach(m => {
+      const dateStr = new Date(m.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
+      if (!groupedByDate[dateStr]) groupedByDate[dateStr] = [];
+      groupedByDate[dateStr].push(m);
+    });
+  }
+
+  if (!isMounted) return <div className="animate-in fade-in py-20 text-center text-slate-400">Cargando partidos...</div>;
 
   return (
     <div className="animate-in fade-in">

@@ -88,9 +88,6 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
 
   return (
     <div className="w-full flex flex-col">
-      <div className="bg-red-600 text-white p-4 font-bold text-center w-full">
-        DEBUG: Tu rol en base de datos es "{role}"
-      </div>
       <div className="w-full flex">
         <PremiumMatchManager
         match={matchData as any}

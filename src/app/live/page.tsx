@@ -9,21 +9,19 @@ export const revalidate = 0 // Opt out of caching for live route
 export default async function PublicLivePage() {
   const supabase = await createAdminClient()
   
-  // Fetch teams
+  // Fetch teams for realtime lookups
   const { data: teamsData } = await supabase
     .from('teams')
     .select('id, name, logo_url, category')
-
-  // Fetch all matches (we let MatchdayView filter the +/- 72h window)
   const { data: matchesData } = await supabase
     .from('partidos')
-    .select('*')
+    .select(`
+      *,
+      equipo:teams (id, name, category, logo_url)
+    `)
     .order('fecha_hora', { ascending: true })
 
-  const matchesWithTeams = matchesData?.map(match => ({
-    ...match,
-    equipo: teamsData?.find(t => t.id === match.equipo_id)
-  })) || []
+  const matchesWithTeams = matchesData || []
   const liveAds = await getLiveAds();
 
   // Fetch club logo (ensure we get one with a logo)

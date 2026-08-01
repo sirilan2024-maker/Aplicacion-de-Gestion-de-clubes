@@ -26,8 +26,8 @@ export default async function PublicLivePage() {
   })) || []
   const liveAds = await getLiveAds();
 
-  // Fetch club logo
-  const { data: clubData } = await supabase.from('clubs').select('logo_url').limit(1).single()
+  // Fetch club logo (ensure we get one with a logo)
+  const { data: clubData } = await supabase.from('clubs').select('logo_url').not('logo_url', 'is', null).limit(1).single()
 
   // Check if current user is admin to show inline ad manager
   const userSupabase = await createClient()

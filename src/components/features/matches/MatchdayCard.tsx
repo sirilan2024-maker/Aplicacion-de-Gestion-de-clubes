@@ -167,16 +167,16 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           <div className="flex flex-col items-center justify-center w-1/3 shrink-0">
             {isLive || isFinished ? (
               <div className="flex items-center justify-center gap-3">
-                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-red-600' : 'text-slate-900'}`}>
+                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : 'text-red-600'}`}>
                   {isLocal ? liveLocalGoals : liveAwayGoals}
                 </span>
                 <span className="text-xl md:text-2xl font-black text-slate-300">-</span>
-                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-red-600' : 'text-slate-900'}`}>
+                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : 'text-red-600'}`}>
                   {isLocal ? liveAwayGoals : liveLocalGoals}
                 </span>
               </div>
             ) : (
-              <div className="text-3xl md:text-4xl font-black tracking-tighter text-slate-900 tabular-nums">
+              <div className="text-3xl md:text-4xl font-black tracking-tighter text-black tabular-nums">
                 {matchTime}
               </div>
             )}

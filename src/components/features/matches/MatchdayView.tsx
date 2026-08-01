@@ -209,51 +209,74 @@ export function MatchdayView({ initialMatches, teams, ad, isAdmin }: MatchdayVie
 
       {/* Partidos por día */}
       <div className="space-y-8 mb-12">
-        {Object.keys(groupedByDate).map((date, dateIdx) => {
-          const dayMatches = groupedByDate[date];
-          return (
-            <div key={date}>
-              {/* Header del día */}
-              <div className="flex items-end justify-between border-b border-slate-300 pb-2 mb-0 relative">
-                <h2 className="text-sm font-black text-slate-800 tracking-wide">{date}</h2>
-              </div>
+        {(() => {
+          let globalMatchCount = 0;
+          return Object.keys(groupedByDate).map((date, dateIdx) => {
+            const dayMatches = groupedByDate[date];
+            return (
+              <div key={date}>
+                {/* Header del día */}
+                <div className="flex items-end justify-between border-b border-slate-300 pb-2 mb-0 relative">
+                  <h2 className="text-sm font-black text-slate-800 tracking-wide">{date}</h2>
+                </div>
 
-              {/* Lista de Partidos (1 columna) */}
-              <div className="flex flex-col">
-                {dayMatches.map((match, idx) => {
-                  const isLiveNow = match.estado !== 'Finalizado' && (match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
-                  const showAdAfterThis = ad && ad.isActive && dateIdx === 0 && idx === 0;
+                {/* Lista de Partidos (1 columna) */}
+                <div className="flex flex-col">
+                  {dayMatches.map((match, idx) => {
+                    const isLiveNow = match.estado !== 'Finalizado' && (match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
+                    
+                    const slotAd = (ads && ads.length > 0) ? ads[globalMatchCount % ads.length] : null;
+                    globalMatchCount++;
 
-                  return (
-                    <div key={match.id}>
-                      <MatchdayCard 
-                        match={match} 
-                        onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
-                      />
-                      
-                      {/* Banner de Publicidad intercalado */}
-                      {showAdAfterThis && (
-                        <div className="w-full border-b border-slate-200 bg-white hover:bg-slate-50 transition-colors group relative">
-                          <a href={ad.url || '#'} target="_blank" rel="noopener noreferrer" className="block w-full flex items-center justify-center p-4 h-24 md:h-32 relative">
-                            <span className="absolute top-2 right-2 text-[8px] uppercase font-bold text-slate-300 tracking-widest z-10 group-hover:text-slate-400">Publicidad</span>
-                            {ad.imageUrl ? (
-                              <img src={ad.imageUrl} alt={ad.text} className="w-full h-full object-contain" />
-                            ) : (
-                              <span className="text-xl font-black text-slate-300 tracking-widest uppercase">{ad.text}</span>
-                            )}
-                            {ad.text.toLowerCase().includes('bet') && (
-                              <span className="absolute bottom-2 right-2 text-[8px] text-slate-400">+18. Juega con responsabilidad.</span>
-                            )}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    return (
+                      <div key={match.id}>
+                        <MatchdayCard 
+                          match={match} 
+                          onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
+                        />
+                        
+                        {/* Banner de Publicidad intercalado */}
+                        {slotAd && slotAd.isActive && (
+                          <div className="w-full border-b border-slate-200 bg-slate-50 hover:bg-white transition-colors group relative overflow-hidden">
+                            <a href={slotAd.url || '#'} target="_blank" rel="noopener noreferrer" className={`block w-full flex flex-col items-center justify-center relative ${slotAd.textLayout === 'below' ? '' : 'h-32 md:h-40'}`}>
+                              <span className="absolute top-2 right-2 text-[8px] uppercase font-bold text-slate-300 tracking-widest z-10 group-hover:text-slate-400">Publicidad</span>
+                              
+                              <div className={`w-full flex items-center justify-center relative ${slotAd.textLayout === 'below' ? 'h-32 md:h-40 p-4' : 'h-full p-4'}`}>
+                                {slotAd.imageUrl ? (
+                                  <img src={slotAd.imageUrl} alt={slotAd.text} className="w-full h-full object-contain z-0" />
+                                ) : (
+                                  <span className="text-xl font-black text-slate-300 tracking-widest uppercase">{slotAd.text}</span>
+                                )}
+                                
+                                {slotAd.textLayout !== 'below' && (slotAd.text || slotAd.description) && (
+                                  <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end z-0">
+                                    {slotAd.text && <span className="text-white font-bold text-sm md:text-base drop-shadow-md">{slotAd.text}</span>}
+                                    {slotAd.description && <span className="text-white/90 text-xs md:text-sm drop-shadow-md mt-1">{slotAd.description}</span>}
+                                  </div>
+                                )}
+                              </div>
+
+                              {slotAd.textLayout === 'below' && (slotAd.text || slotAd.description) && (
+                                <div className="w-full bg-white p-4 border-t border-slate-100 flex flex-col justify-center text-center">
+                                  {slotAd.text && <span className="text-slate-900 font-bold text-sm md:text-base">{slotAd.text}</span>}
+                                  {slotAd.description && <span className="text-slate-500 text-xs md:text-sm mt-1">{slotAd.description}</span>}
+                                </div>
+                              )}
+
+                              {slotAd.text.toLowerCase().includes('bet') && (
+                                <span className="absolute top-2 left-2 text-[8px] text-slate-400 bg-white/80 px-1 rounded z-10">+18. Juega con responsabilidad.</span>
+                              )}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          });
+        })()}
       </div>
 
       {isAdmin && (
@@ -272,7 +295,7 @@ export function MatchdayView({ initialMatches, teams, ad, isAdmin }: MatchdayVie
           </div>
           
           {showAdManager && (
-            <LiveAdManager initialAd={ad} />
+            <LiveAdManager initialAds={ads || []} />
           )}
         </div>
       )}

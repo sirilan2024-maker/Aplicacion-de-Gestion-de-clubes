@@ -2,7 +2,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server"
 import { MatchdayView } from "@/components/features/matches/MatchdayView"
 import Image from "next/image"
 
-import { getLiveAd } from "@/app/actions/ad-actions"
+import { getLiveAds } from "@/app/actions/ad-actions"
 
 export const revalidate = 0 // Opt out of caching for live route
 
@@ -24,7 +24,7 @@ export default async function PublicLivePage() {
     ...match,
     equipo: teamsData?.find(t => t.id === match.equipo_id)
   })) || []
-  const liveAd = await getLiveAd();
+  const liveAds = await getLiveAds();
 
   // Check if current user is admin to show inline ad manager
   const userSupabase = await createClient()
@@ -64,7 +64,7 @@ export default async function PublicLivePage() {
         <MatchdayView 
           initialMatches={matchesWithTeams} 
           teams={teamsData || []} 
-          ad={liveAd}
+          ads={liveAds}
           isAdmin={isAdmin}
         />
       </main>

@@ -208,58 +208,52 @@ export function MatchdayView({ initialMatches, teams, ad, isAdmin }: MatchdayVie
       )}
 
       {/* Partidos por día */}
-      <div className="space-y-12 mb-12">
-        {Object.entries(groupedByDate).map(([date, dayMatches]) => (
-          <div key={date}>
-            {/* Header del día */}
-            <div className="flex items-end justify-between border-b border-slate-300 pb-2 mb-4 relative">
-              <h2 className="text-sm font-black text-slate-800 tracking-wide">{date}</h2>
-              {ad && ad.isActive && (
-                <div className="absolute right-0 -bottom-2 md:bottom-0 bg-white pl-4 flex items-center gap-2">
-                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold hidden md:inline">Gestionado por</span>
-                  {ad.url ? (
-                    <a href={ad.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                      {ad.imageUrl ? (
-                        <img src={ad.imageUrl} alt={ad.text} className="h-6 object-contain" />
-                      ) : (
-                        <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">{ad.text}</span>
-                      )}
-                    </a>
-                  ) : (
-                    <span className="shrink-0">
-                      {ad.imageUrl ? (
-                        <img src={ad.imageUrl} alt={ad.text} className="h-6 object-contain" />
-                      ) : (
-                        <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">{ad.text}</span>
-                      )}
-                    </span>
-                  )}
-                  <span className="text-[8px] text-slate-300 font-bold ml-1 hidden md:inline">AD</span>
-                </div>
-              )}
-            </div>
-
-            {/* Grid de Partidos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0">
-              {dayMatches.map(match => {
-                const isLiveNow = match.estado !== 'Finalizado' && (match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
-                return (
-                  <MatchdayCard 
-                    key={match.id} 
-                    match={match} 
-                    onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
-                  />
-                );
-              })}
-            </div>
-            
-            {ad && ad.isActive && (
-              <div className="mt-2 text-right">
-                <p className="text-[8px] text-slate-400">+18. Juega de forma responsable.</p>
+      <div className="space-y-8 mb-12">
+        {Object.keys(groupedByDate).map((date, dateIdx) => {
+          const dayMatches = groupedByDate[date];
+          return (
+            <div key={date}>
+              {/* Header del día */}
+              <div className="flex items-end justify-between border-b border-slate-300 pb-2 mb-0 relative">
+                <h2 className="text-sm font-black text-slate-800 tracking-wide">{date}</h2>
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Lista de Partidos (1 columna) */}
+              <div className="flex flex-col">
+                {dayMatches.map((match, idx) => {
+                  const isLiveNow = match.estado !== 'Finalizado' && (match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
+                  const showAdAfterThis = ad && ad.isActive && dateIdx === 0 && idx === 0;
+
+                  return (
+                    <div key={match.id}>
+                      <MatchdayCard 
+                        match={match} 
+                        onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
+                      />
+                      
+                      {/* Banner de Publicidad intercalado */}
+                      {showAdAfterThis && (
+                        <div className="w-full border-b border-slate-200 bg-white hover:bg-slate-50 transition-colors group relative">
+                          <a href={ad.url || '#'} target="_blank" rel="noopener noreferrer" className="block w-full flex items-center justify-center p-4 h-24 md:h-32 relative">
+                            <span className="absolute top-2 right-2 text-[8px] uppercase font-bold text-slate-300 tracking-widest z-10 group-hover:text-slate-400">Publicidad</span>
+                            {ad.imageUrl ? (
+                              <img src={ad.imageUrl} alt={ad.text} className="w-full h-full object-contain" />
+                            ) : (
+                              <span className="text-xl font-black text-slate-300 tracking-widest uppercase">{ad.text}</span>
+                            )}
+                            {ad.text.toLowerCase().includes('bet') && (
+                              <span className="absolute bottom-2 right-2 text-[8px] text-slate-400">+18. Juega con responsabilidad.</span>
+                            )}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {isAdmin && (

@@ -8,8 +8,8 @@ const supabase = createClient(
 )
 
 async function test() {
-  const { data, error } = await supabase.from('clubs').select('*')
-  console.log('Clubs data:', data, 'error:', error)
+  const { data, error } = await supabase.from('teams').select('id, name')
+  console.log('All Teams data:', data, 'error:', error)
 }
 
 test()

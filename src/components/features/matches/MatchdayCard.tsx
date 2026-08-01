@@ -122,7 +122,7 @@ export function MatchdayCard({ match, onClick }: MatchdayCardProps) {
   const theirScore = isLive ? liveAwayGoals : (isLocal ? (match.resultado_rival ?? liveAwayGoals) : (match.resultado_propio ?? liveLocalGoals))
   
   const ourName = match.equipo?.name || 'Sporting Saladar'
-  const ourCleanName = match.equipo?.category || ourName.replace(/Sporting Saladar\s*/i, '').trim() || 'Sporting Saladar';
+  const ourCleanName = ourName.replace(/Sporting Saladar\s*/i, '').trim() || 'Sporting Saladar';
   const theirName = match.rival_nombre || 'Rival'
 
   const [isMounted, setIsMounted] = useState(false)

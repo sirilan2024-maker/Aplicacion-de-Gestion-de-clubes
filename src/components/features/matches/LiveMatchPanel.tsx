@@ -201,9 +201,17 @@ export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
 
           {/* Score & Timer */}
           <div className="flex items-center gap-5 shrink-0">
-            <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
-              {localGoals}
-            </span>
+            {(() => {
+              const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
+              const isLive = !isFinalizado && (match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
+              const scoreColor = isLive ? 'text-green-600' : isFinalizado ? 'text-red-600' : 'text-black';
+              
+              return (
+                <span className={`text-5xl font-extrabold ${scoreColor} tabular-nums leading-none`}>
+                  {localGoals}
+                </span>
+              );
+            })()}
             
             <div className="flex flex-col items-center justify-center px-4">
               {(() => {
@@ -240,9 +248,17 @@ export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
               })()}
             </div>
 
-            <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
-              {awayGoals}
-            </span>
+            {(() => {
+              const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
+              const isLive = !isFinalizado && (match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
+              const scoreColor = isLive ? 'text-green-600' : isFinalizado ? 'text-red-600' : 'text-black';
+              
+              return (
+                <span className={`text-5xl font-extrabold ${scoreColor} tabular-nums leading-none`}>
+                  {awayGoals}
+                </span>
+              );
+            })()}
           </div>
 
           {/* Away */}

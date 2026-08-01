@@ -72,7 +72,7 @@ export async function updateLiveAd(formData: FormData) {
   const jsonStr = JSON.stringify(ad);
   const jsonFile = new File([jsonStr], 'live-ad.json', { type: 'application/json' })
   
-  const { error } = await supabase.storage
+  const { error } = await adminClient.storage
     .from('avatars')
     .upload('live-ad.json', jsonFile, { upsert: true, contentType: 'application/json' })
 

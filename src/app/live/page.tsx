@@ -12,12 +12,13 @@ export default async function PublicLivePage() {
   // Fetch teams for realtime lookups
   const { data: teamsData } = await supabase
     .from('teams')
-    .select('id, name, logo_url, category')
+    .select('id, name, category')
+    
   const { data: matchesData } = await supabase
     .from('partidos')
     .select(`
       *,
-      equipo:teams (id, name, category, logo_url)
+      equipo:teams (id, name, category)
     `)
     .order('fecha_hora', { ascending: true })
 

@@ -184,7 +184,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                   <button
                     key={match.id}
                     onClick={() => setSelectedLiveMatchId(match.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 max-w-full ${isSelected ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 ${isSelected ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
                     {isPlaying ? (
                       <span className="relative flex h-2 w-2 shrink-0">
@@ -195,7 +195,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                       <span className={`h-2 w-2 rounded-full shrink-0 ${isSelected ? 'bg-white/50' : 'bg-slate-300'}`} title="Pausado / Descanso"></span>
                     )}
                     <span className="shrink-0">{cleanName} vs</span>
-                    <span className="truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[250px]">{rivalName}</span>
+                    <span>{rivalName}</span>
                   </button>
                 )
               })}

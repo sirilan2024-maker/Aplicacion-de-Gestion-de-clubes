@@ -176,14 +176,15 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
               {live.length > 1 && live.map(match => {
                 const teamName = match.equipo?.name || 'SPO';
                 const cleanName = teamName.replace(/Sporting Saladar\s*/i, '').trim() || teamName;
-                const rivalName = match.rival_nombre?.split(' ')[0] || 'RIV';
+                const rivalName = match.rival_nombre || 'Rival';
                 return (
                   <button
                     key={match.id}
                     onClick={() => setSelectedLiveMatchId(match.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${match.id === selectedLiveMatchId ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 max-w-full ${match.id === selectedLiveMatchId ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
-                    {cleanName} vs {rivalName}
+                    <span className="shrink-0">{cleanName} vs</span>
+                    <span className="truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[250px]">{rivalName}</span>
                   </button>
                 )
               })}

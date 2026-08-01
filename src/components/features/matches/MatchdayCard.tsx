@@ -202,8 +202,8 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           {/* Away Team */}
           <div className="flex flex-col items-center flex-1 w-1/3">
             <div className="w-12 h-12 md:w-14 md:h-14 mb-2 flex items-center justify-center">
-              {!isLocal && match.equipo?.logo_url ? (
-                <img src={match.equipo.logo_url} alt="Visitante" className="max-w-full max-h-full object-contain" />
+              {!isLocal && clubLogoUrl ? (
+                <img src={clubLogoUrl} alt="Visitante" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
               ) : (
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-100 rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-200">
                   {!isLocal ? '🛡️' : '🏆'}

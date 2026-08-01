@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { updateLiveAd, LiveAd } from "@/app/actions/ad-actions"
-import { CheckCircle, Loader2, Save } from "lucide-react"
+import { CheckCircle, Loader2, Save, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export function LiveAdManager({ initialAd }: { initialAd: LiveAd | null }) {
@@ -17,15 +17,50 @@ export function LiveAdManager({ initialAd }: { initialAd: LiveAd | null }) {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(ad.imageUrl || null)
   
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("La imagen no puede superar los 2MB.");
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError("El archivo debe ser una imagen válida.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setLogoPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async () => {
     setLoading(true)
     setError(null)
     setSuccess(false)
     
     try {
-      const result = await updateLiveAd(ad)
-      if (result.success) {
+      const formData = new FormData()
+      formData.append('text', ad.text)
+      formData.append('url', ad.url)
+      formData.append('isActive', ad.isActive.toString())
+      if (ad.imageUrl) formData.append('imageUrl', ad.imageUrl)
+
+      const file = fileInputRef.current?.files?.[0];
+      if (file) {
+        formData.append('logo', file);
+      }
+
+      const result = await updateLiveAd(formData)
+      if (result.success && result.ad) {
+        setAd(result.ad)
         setSuccess(true)
         router.refresh()
         setTimeout(() => setSuccess(false), 3000)
@@ -65,36 +100,57 @@ export function LiveAdManager({ initialAd }: { initialAd: LiveAd | null }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Texto Alternativo / Nombre</label>
+          <div className="space-y-4 md:col-span-2 flex flex-col sm:flex-row items-center gap-6">
+            {/* Upload Area */}
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-32 h-20 shrink-0 rounded-xl border-2 border-dashed border-indigo-200 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition-all bg-slate-50 shadow-inner"
+            >
+              {logoPreview ? (
+                <>
+                  <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Upload size={20} className="text-white" />
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center text-indigo-400 group-hover:text-indigo-600">
+                  <Upload size={20} className="mb-1" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide">Subir Imagen</span>
+                </div>
+              )}
+            </div>
             <input 
-              type="text"
-              value={ad.text}
-              onChange={e => setAd({...ad, text: e.target.value})}
-              placeholder="Ej: Patrocinador Local"
-              className="w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              disabled={loading}
             />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Enlace (URL)</label>
-            <input 
-              type="url"
-              value={ad.url}
-              onChange={e => setAd({...ad, url: e.target.value})}
-              placeholder="https://..."
-              className="w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium text-slate-700">URL de la Imagen (Logo)</label>
-            <input 
-              type="url"
-              value={ad.imageUrl}
-              onChange={e => setAd({...ad, imageUrl: e.target.value})}
-              placeholder="https://.../logo.png"
-              className="w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-slate-500">Deja esto en blanco si prefieres mostrar solo el texto.</p>
+            
+            <div className="flex-1 space-y-4 w-full">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Texto Alternativo / Nombre</label>
+                <input 
+                  type="text"
+                  value={ad.text}
+                  onChange={e => setAd({...ad, text: e.target.value})}
+                  placeholder="Ej: Patrocinador Local"
+                  className="w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Enlace (URL al hacer clic)</label>
+                <input 
+                  type="url"
+                  value={ad.url}
+                  onChange={e => setAd({...ad, url: e.target.value})}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -127,16 +183,16 @@ export function LiveAdManager({ initialAd }: { initialAd: LiveAd | null }) {
             {ad.isActive ? (
               ad.url ? (
                 <a href={ad.url} target="_blank" rel="noopener noreferrer" className="shrink-0 pointer-events-none">
-                  {ad.imageUrl ? (
-                    <img src={ad.imageUrl} alt={ad.text} className="h-6 object-contain" />
+                  {logoPreview ? (
+                    <img src={logoPreview} alt={ad.text} className="h-6 object-contain" />
                   ) : (
                     <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">{ad.text}</span>
                   )}
                 </a>
               ) : (
                 <span className="shrink-0">
-                  {ad.imageUrl ? (
-                    <img src={ad.imageUrl} alt={ad.text} className="h-6 object-contain" />
+                  {logoPreview ? (
+                    <img src={logoPreview} alt={ad.text} className="h-6 object-contain" />
                   ) : (
                     <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">{ad.text}</span>
                   )}

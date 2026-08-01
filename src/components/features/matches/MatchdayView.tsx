@@ -118,22 +118,44 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
             const cleanName = teamName.replace(/Sporting Saladar\s*/i, '').trim() || teamName;
             let message = '';
             let icon = '⏱️';
+            const evt = newEvent.tipo_evento;
             
-            if (newEvent.tipo_evento === 'Gol' || newEvent.tipo_evento === 'Gol en propia puerta') {
+            if (evt === 'Gol' || evt === 'Gol en propia puerta') {
               message = `¡GOL! ${cleanName} vs ${match.rival_nombre}`;
               icon = '⚽';
-            } else if (newEvent.tipo_evento === 'Tarjeta Amarilla') {
+            } else if (evt === 'Tarjeta Amarilla') {
               message = `Tarjeta amarilla en ${cleanName} vs ${match.rival_nombre}`;
               icon = '🟨';
-            } else if (newEvent.tipo_evento === 'Tarjeta Roja') {
+            } else if (evt === 'Tarjeta Roja') {
               message = `Tarjeta roja en ${cleanName} vs ${match.rival_nombre}`;
               icon = '🟥';
-            } else if (newEvent.tipo_evento === 'Descanso') {
+            } else if (evt === 'Descanso') {
               message = `Descanso: ${cleanName} vs ${match.rival_nombre}`;
               icon = '⏸️';
-            } else if (newEvent.tipo_evento === 'Fin del Partido') {
+            } else if (evt === 'Fin del Partido') {
               message = `Final: ${cleanName} vs ${match.rival_nombre}`;
               icon = '🏁';
+            } else if (evt === 'Cambio') {
+              message = `Cambio en ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🔄';
+            } else if (evt === 'Lesión') {
+              message = `Lesión en ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🚑';
+            } else if (evt === 'Penalti') {
+              message = `¡Penalti! ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🎯';
+            } else if (evt === 'Ocasión Peligrosa') {
+              message = `¡Ocasión peligrosa! ${cleanName} vs ${match.rival_nombre}`;
+              icon = '⚠️';
+            } else if (evt === 'Palo / Larguero' || evt === 'Palo' || evt === 'Larguero') {
+              message = `¡Al palo! ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🥅';
+            } else if (evt === 'Parada') {
+              message = `¡Parada! ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🧤';
+            } else {
+              message = `${evt}: ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🔔';
             }
 
             if (message) {

@@ -11,11 +11,11 @@ import { LiveAdManager } from "@/components/features/admin/LiveAdManager"
 interface MatchdayViewProps {
   initialMatches: any[];
   teams: any[];
-  ad?: any;
+  ads?: any[];
   isAdmin?: boolean;
 }
 
-export function MatchdayView({ initialMatches, teams, ad, isAdmin }: MatchdayViewProps) {
+export function MatchdayView({ initialMatches, teams, ads, isAdmin }: MatchdayViewProps) {
   const supabase = createClient()
   const [matches, setMatches] = useState<any[]>(initialMatches)
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)

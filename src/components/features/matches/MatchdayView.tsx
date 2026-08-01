@@ -13,9 +13,10 @@ interface MatchdayViewProps {
   teams: any[];
   ads?: any[];
   isAdmin?: boolean;
+  clubLogoUrl?: string | null;
 }
 
-export function MatchdayView({ initialMatches, teams, ads, isAdmin }: MatchdayViewProps) {
+export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl }: MatchdayViewProps) {
   const supabase = createClient()
   const [matches, setMatches] = useState<any[]>(initialMatches)
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)
@@ -228,6 +229,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin }: MatchdayVi
                         <MatchdayCard 
                           match={match} 
                           onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
+                          clubLogoUrl={clubLogoUrl}
                         />
                         
                         {/* Banner de Publicidad intercalado */}

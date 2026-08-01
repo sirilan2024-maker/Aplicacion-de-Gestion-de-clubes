@@ -84,6 +84,7 @@ export default async function PublicLivePage() {
           teams={teamsData || []} 
           ads={liveAds}
           isAdmin={isAdmin}
+          clubLogoUrl={clubData?.logo_url}
         />
       </main>
       

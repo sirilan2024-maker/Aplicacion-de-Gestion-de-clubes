@@ -26,6 +26,9 @@ export default async function PublicLivePage() {
   })) || []
   const liveAds = await getLiveAds();
 
+  // Fetch club logo
+  const { data: clubData } = await supabase.from('clubs').select('logo_url').limit(1).single()
+
   // Check if current user is admin to show inline ad manager
   const userSupabase = await createClient()
   const { data: authData } = await userSupabase.auth.getUser()
@@ -38,23 +41,39 @@ export default async function PublicLivePage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Public Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
-              <span className="text-white font-black text-xl">S</span>
-            </div>
-            <div>
-              <h1 className="font-black text-slate-900 leading-tight">Sporting Saladar</h1>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">En Directo</p>
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm relative overflow-hidden">
+        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-20"></div>
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative">
+          
+          {/* Centered Logo & Name */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="flex items-center gap-2 md:gap-4 pointer-events-auto">
+              <span className="font-black text-slate-900 text-sm sm:text-lg md:text-xl tracking-wider md:tracking-widest">SPORTING</span>
+              
+              <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center relative z-10 shrink-0">
+                {clubData?.logo_url ? (
+                  <img src={clubData.logo_url} alt="Escudo" className="w-full h-full object-contain drop-shadow-sm" />
+                ) : (
+                  <div className="w-full h-full bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
+                    <span className="text-white font-black text-lg md:text-xl">S</span>
+                  </div>
+                )}
+              </div>
+              
+              <span className="font-black text-slate-900 text-sm sm:text-lg md:text-xl tracking-wider md:tracking-widest">SALADAR</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex-1">
+            <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest relative z-10 hidden md:block">Resultados en Directo</p>
+          </div>
+
+          <div className="flex items-center gap-2 relative z-10 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
             </span>
-            <span className="text-xs font-bold text-red-600 uppercase tracking-wider hidden sm:inline-block">LIVE</span>
+            <span className="text-[10px] md:text-xs font-bold text-red-600 uppercase tracking-wider hidden sm:inline-block">LIVE</span>
           </div>
         </div>
       </header>

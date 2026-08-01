@@ -41,21 +41,21 @@ export default async function PublicLivePage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Public Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm relative overflow-hidden">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm relative">
         <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-20"></div>
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative">
+        <div className="max-w-5xl mx-auto px-4 h-20 md:h-24 flex items-center justify-between relative">
           
           {/* Centered Logo & Name */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="flex items-center gap-2 md:gap-4 pointer-events-auto">
               <span className="font-black text-slate-900 text-sm sm:text-lg md:text-xl tracking-wider md:tracking-widest">SPORTING</span>
               
-              <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center relative z-10 shrink-0">
+              <div className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center relative z-20 shrink-0">
                 {clubData?.logo_url ? (
-                  <img src={clubData.logo_url} alt="Escudo" className="w-full h-full object-contain drop-shadow-sm" />
+                  <img src={clubData.logo_url} alt="Escudo" className="w-full h-full object-contain drop-shadow-md scale-110" />
                 ) : (
                   <div className="w-full h-full bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
-                    <span className="text-white font-black text-lg md:text-xl">S</span>
+                    <span className="text-white font-black text-2xl md:text-3xl">S</span>
                   </div>
                 )}
               </div>

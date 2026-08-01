@@ -177,12 +177,23 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                 const teamName = match.equipo?.name || 'SPO';
                 const cleanName = teamName.replace(/Sporting Saladar\s*/i, '').trim() || teamName;
                 const rivalName = match.rival_nombre || 'Rival';
+                const isPlaying = match.live_timer_started_at !== null;
+                const isSelected = match.id === selectedLiveMatchId;
+                
                 return (
                   <button
                     key={match.id}
                     onClick={() => setSelectedLiveMatchId(match.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 max-w-full ${match.id === selectedLiveMatchId ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 max-w-full ${isSelected ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
+                    {isPlaying ? (
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSelected ? 'bg-white' : 'bg-red-400'}`}></span>
+                        <span className={`relative inline-flex rounded-full h-2 w-2 ${isSelected ? 'bg-white' : 'bg-red-500'}`}></span>
+                      </span>
+                    ) : (
+                      <span className={`h-2 w-2 rounded-full shrink-0 ${isSelected ? 'bg-white/50' : 'bg-slate-300'}`} title="Pausado / Descanso"></span>
+                    )}
                     <span className="shrink-0">{cleanName} vs</span>
                     <span className="truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[250px]">{rivalName}</span>
                   </button>

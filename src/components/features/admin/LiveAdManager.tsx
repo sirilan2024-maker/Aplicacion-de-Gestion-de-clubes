@@ -3,8 +3,10 @@
 import { useState } from "react"
 import { updateLiveAd, LiveAd } from "@/app/actions/ad-actions"
 import { CheckCircle, Loader2, Save } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export function LiveAdManager({ initialAd }: { initialAd: LiveAd | null }) {
+  const router = useRouter()
   const [ad, setAd] = useState<LiveAd>(initialAd || {
     text: "bet365",
     url: "https://www.bet365.es",
@@ -25,6 +27,7 @@ export function LiveAdManager({ initialAd }: { initialAd: LiveAd | null }) {
       const result = await updateLiveAd(ad)
       if (result.success) {
         setSuccess(true)
+        router.refresh()
         setTimeout(() => setSuccess(false), 3000)
       } else {
         setError(result.error || "Error al guardar la publicidad")

@@ -5,21 +5,22 @@ import { createClient } from "@/lib/supabase/client"
 import { MatchdayCard } from "./MatchdayCard"
 import { LiveMatchPanel } from "./LiveMatchPanel"
 import { getPublicMatches } from "@/app/actions/match-actions"
-import { CalendarDays, X } from "lucide-react"
-
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarDays, X, ChevronLeft, ChevronRight, Settings } from "lucide-react"
+import { LiveAdManager } from "@/components/features/admin/LiveAdManager"
 
 interface MatchdayViewProps {
   initialMatches: any[];
   teams: any[];
   ad?: any;
+  isAdmin?: boolean;
 }
 
-export function MatchdayView({ initialMatches, teams, ad }: MatchdayViewProps) {
+export function MatchdayView({ initialMatches, teams, ad, isAdmin }: MatchdayViewProps) {
   const supabase = createClient()
   const [matches, setMatches] = useState<any[]>(initialMatches)
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
+  const [showAdManager, setShowAdManager] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -207,7 +208,7 @@ export function MatchdayView({ initialMatches, teams, ad }: MatchdayViewProps) {
       )}
 
       {/* Partidos por día */}
-      <div className="space-y-12">
+      <div className="space-y-12 mb-12">
         {Object.entries(groupedByDate).map(([date, dayMatches]) => (
           <div key={date}>
             {/* Header del día */}
@@ -260,6 +261,27 @@ export function MatchdayView({ initialMatches, teams, ad }: MatchdayViewProps) {
           </div>
         ))}
       </div>
+
+      {isAdmin && (
+        <div className="mt-12 border-t-2 border-dashed border-indigo-200 pt-8 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-black text-indigo-900 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-indigo-500" />
+              Gestión de Publicidad (Solo Admins)
+            </h3>
+            <button 
+              onClick={() => setShowAdManager(!showAdManager)}
+              className="text-sm font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-colors"
+            >
+              {showAdManager ? 'Ocultar Panel' : 'Editar Publicidad'}
+            </button>
+          </div>
+          
+          {showAdManager && (
+            <LiveAdManager initialAd={ad} />
+          )}
+        </div>
+      )}
     </div>
   )
 }

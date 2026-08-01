@@ -122,6 +122,7 @@ export function MatchdayCard({ match, onClick }: MatchdayCardProps) {
   const theirScore = isLive ? liveAwayGoals : (isLocal ? (match.resultado_rival ?? liveAwayGoals) : (match.resultado_propio ?? liveLocalGoals))
   
   const ourName = match.equipo?.name || 'Sporting Saladar'
+  const ourCleanName = match.equipo?.category || ourName.replace(/Sporting Saladar\s*/i, '').trim() || 'Sporting Saladar';
   const theirName = match.rival_nombre || 'Rival'
 
   const [isMounted, setIsMounted] = useState(false)
@@ -157,7 +158,7 @@ export function MatchdayCard({ match, onClick }: MatchdayCardProps) {
               )}
             </div>
             <span className="text-[13px] md:text-sm font-bold text-slate-900 text-center leading-tight">
-              {isLocal ? (match.equipo?.category || ourName) : theirName}
+              {isLocal ? ourCleanName : theirName}
             </span>
           </div>
 
@@ -209,7 +210,7 @@ export function MatchdayCard({ match, onClick }: MatchdayCardProps) {
               )}
             </div>
             <span className="text-[13px] md:text-sm font-bold text-slate-900 text-center leading-tight">
-              {!isLocal ? (match.equipo?.category || ourName) : theirName}
+              {!isLocal ? ourCleanName : theirName}
             </span>
           </div>
           

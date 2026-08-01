@@ -261,7 +261,6 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Disciplina", href: getHref("Disciplina", "/dashboard/matches?view=disciplina"), icon: AlertTriangle },
           { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
           { name: "Utillería", href: "/dashboard/utilleria", icon: Shirt },
-          { name: "Publicidad Directo", href: "/dashboard/club/publicidad", icon: Globe },
         ]
       },
 

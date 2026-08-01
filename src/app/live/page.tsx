@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server"
+import { createAdminClient, createClient } from "@/lib/supabase/server"
 import { MatchdayView } from "@/components/features/matches/MatchdayView"
 import Image from "next/image"
 
@@ -24,8 +24,16 @@ export default async function PublicLivePage() {
     ...match,
     equipo: teamsData?.find(t => t.id === match.equipo_id)
   })) || []
-  
   const liveAd = await getLiveAd();
+
+  // Check if current user is admin to show inline ad manager
+  const userSupabase = await createClient()
+  const { data: authData } = await userSupabase.auth.getUser()
+  let isAdmin = false
+  if (authData?.user) {
+    const { data: profile } = await userSupabase.from("profiles").select("role").eq("id", authData.user.id).single()
+    isAdmin = profile?.role === 'admin'
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -57,6 +65,7 @@ export default async function PublicLivePage() {
           initialMatches={matchesWithTeams} 
           teams={teamsData || []} 
           ad={liveAd}
+          isAdmin={isAdmin}
         />
       </main>
       

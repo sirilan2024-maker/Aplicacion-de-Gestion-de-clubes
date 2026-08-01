@@ -7,6 +7,7 @@ import { LiveMatchPanel } from "./LiveMatchPanel"
 import { getPublicMatches } from "@/app/actions/match-actions"
 import { CalendarDays, X, ChevronLeft, ChevronRight, Settings } from "lucide-react"
 import { LiveAdManager } from "@/components/features/admin/LiveAdManager"
+import toast from "react-hot-toast"
 
 interface MatchdayViewProps {
   initialMatches: any[];
@@ -19,6 +20,12 @@ interface MatchdayViewProps {
 export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl }: MatchdayViewProps) {
   const supabase = createClient()
   const [matches, setMatches] = useState<any[]>(initialMatches)
+  const matchesRef = React.useRef(matches)
+  
+  useEffect(() => {
+    matchesRef.current = matches
+  }, [matches])
+
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const [showAdManager, setShowAdManager] = useState(false)
@@ -96,6 +103,54 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
               return [...prev, { ...updated, equipo }]
             }
           })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'match_events' },
+        (payload) => {
+          const newEvent = payload.new as any;
+          if (!newEvent || !newEvent.partido_id) return;
+          
+          const match = matchesRef.current.find(m => m.id === newEvent.partido_id);
+          if (match) {
+            const teamName = match.equipo?.name || 'Local';
+            const cleanName = teamName.replace(/Sporting Saladar\s*/i, '').trim() || teamName;
+            let message = '';
+            let icon = '⏱️';
+            
+            if (newEvent.tipo_evento === 'Gol' || newEvent.tipo_evento === 'Gol en propia puerta') {
+              message = `¡GOL! ${cleanName} vs ${match.rival_nombre}`;
+              icon = '⚽';
+            } else if (newEvent.tipo_evento === 'Tarjeta Amarilla') {
+              message = `Tarjeta amarilla en ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🟨';
+            } else if (newEvent.tipo_evento === 'Tarjeta Roja') {
+              message = `Tarjeta roja en ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🟥';
+            } else if (newEvent.tipo_evento === 'Descanso') {
+              message = `Descanso: ${cleanName} vs ${match.rival_nombre}`;
+              icon = '⏸️';
+            } else if (newEvent.tipo_evento === 'Fin del Partido') {
+              message = `Final: ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🏁';
+            }
+
+            if (message) {
+              toast(message, {
+                icon,
+                position: 'top-center',
+                duration: 5000,
+                style: {
+                  borderRadius: '10px',
+                  background: '#1e293b',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'
+                }
+              });
+            }
+          }
         }
       )
       .subscribe()

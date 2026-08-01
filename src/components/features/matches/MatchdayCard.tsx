@@ -185,7 +185,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
               {isLive ? (
                 <div className="flex items-center gap-1.5 bg-red-100 px-2 py-0.5 rounded text-[10px] font-bold text-red-700 uppercase tracking-wider animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                  {elapsedString}
+                  EN JUEGO • {elapsedString}
                 </div>
               ) : isFinished ? (
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">

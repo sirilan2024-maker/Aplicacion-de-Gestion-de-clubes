@@ -79,11 +79,20 @@ export async function getChannelsAction(clubId: string) {
     let allowedChannels = allChannels || []
 
     if (role === 'family' || role === 'familia' || role === 'tutor' || role === 'jugador') {
-      const { data: players } = await supabase.from('players').select('team_id').eq('tutor_id', user.id)
-      const familyTeamIds = new Set(players?.map(p => p.team_id) || [])
-      
-      // also include if they are a player themselves
-      const { data: myPlayer } = await supabase.from('players').select('team_id').eq('user_id', user.id)
+      const familyTeamIds = new Set<string>()
+
+      // 1. Check legacy players.tutor_id
+      const { data: directPlayers } = await supabase.from('players').select('team_id').eq('tutor_id', user.id)
+      directPlayers?.forEach(p => p.team_id && familyTeamIds.add(p.team_id))
+
+      // 2. Check player_tutors relation (new system)
+      const { data: linkedPlayers } = await supabase.from('player_tutors').select('players(team_id)').eq('tutor_id', user.id)
+      linkedPlayers?.forEach((lp: any) => {
+        if (lp.players?.team_id) familyTeamIds.add(lp.players.team_id)
+      })
+
+      // 3. also include if they are a player themselves
+      const { data: myPlayer } = await supabase.from('players').select('team_id').eq('user_auth_id', user.id)
       myPlayer?.forEach(p => p.team_id && familyTeamIds.add(p.team_id))
 
       allowedChannels = allowedChannels.filter(c => c.type === 'global' || (c.team_id && familyTeamIds.has(c.team_id)))

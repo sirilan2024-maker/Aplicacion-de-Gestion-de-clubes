@@ -224,9 +224,9 @@ export default function TemporadasPage() {
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 text-sm text-gray-600">
                     <Clock size={14} className="text-gray-400" />
-                    <span>Inicio: {new Date(season.start_date).toLocaleDateString()}</span>
+                    <span>Inicio: {new Date(season.start_date).toLocaleDateString('es-ES')}</span>
                     <ArrowRight size={14} className="text-gray-400 mx-1" />
-                    <span>Fin: {new Date(season.end_date).toLocaleDateString()}</span>
+                    <span>Fin: {new Date(season.end_date).toLocaleDateString('es-ES')}</span>
                   </div>
                 </div>
               </div>

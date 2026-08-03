@@ -108,7 +108,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'match_events' },
-        (payload) => {
+        async (payload) => {
           const newEvent = payload.new as any;
           if (!newEvent || !newEvent.partido_id) return;
           
@@ -116,18 +116,33 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
           if (match) {
             const teamName = match.equipo?.name || 'Local';
             const cleanName = teamName.replace(/Sporting Saladar\s*/i, '').trim() || teamName;
+            
+            let playerName = '';
+            if (newEvent.player_id) {
+              const { data: player } = await supabase.from('players').select('first_name, last_name, nickname').eq('id', newEvent.player_id).single();
+              if (player) {
+                playerName = player.nickname || player.first_name || '';
+              }
+            }
+
+            const isSportingAction = !!newEvent.player_id;
+            const actionSuffix = isSportingAction ? (playerName ? `de ${playerName} (${cleanName})` : `de ${cleanName}`) : `del Rival`;
+
             let message = '';
             let icon = '⏱️';
             const evt = newEvent.tipo_evento;
             
-            if (evt === 'Gol' || evt === 'Gol en propia puerta') {
-              message = `¡GOL! ${cleanName} vs ${match.rival_nombre}`;
+            if (evt === 'Gol') {
+              message = `¡GOL ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
               icon = '⚽';
+            } else if (evt === 'Gol en propia puerta' || evt === 'Gol en Propia') {
+              message = `¡Gol en propia ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
+              icon = '🤦‍♂️';
             } else if (evt === 'Tarjeta Amarilla') {
-              message = `Tarjeta amarilla en ${cleanName} vs ${match.rival_nombre}`;
+              message = `Tarjeta amarilla ${actionSuffix} en ${cleanName} vs ${match.rival_nombre}`;
               icon = '🟨';
             } else if (evt === 'Tarjeta Roja') {
-              message = `Tarjeta roja en ${cleanName} vs ${match.rival_nombre}`;
+              message = `Tarjeta roja ${actionSuffix} en ${cleanName} vs ${match.rival_nombre}`;
               icon = '🟥';
             } else if (evt === 'Descanso') {
               message = `Descanso: ${cleanName} vs ${match.rival_nombre}`;
@@ -135,26 +150,30 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
             } else if (evt === 'Fin del Partido') {
               message = `Final: ${cleanName} vs ${match.rival_nombre}`;
               icon = '🏁';
-            } else if (evt === 'Cambio') {
-              message = `Cambio en ${cleanName} vs ${match.rival_nombre}`;
+            } else if (evt === 'Cambio' || evt === 'Cambio Entra' || evt === 'Cambio Sale') {
+              message = `Cambio ${actionSuffix} en ${cleanName} vs ${match.rival_nombre}`;
               icon = '🔄';
             } else if (evt === 'Lesión') {
-              message = `Lesión en ${cleanName} vs ${match.rival_nombre}`;
+              message = `Lesión ${actionSuffix} en ${cleanName} vs ${match.rival_nombre}`;
               icon = '🚑';
-            } else if (evt === 'Penalti') {
-              message = `¡Penalti! ${cleanName} vs ${match.rival_nombre}`;
+            } else if (evt === 'Penalti' || evt === 'Penalty') {
+              if (isSportingAction) {
+                message = `¡Penalti en contra de ${cleanName}! Falta ${actionSuffix}`;
+              } else {
+                message = `¡Penalti a favor de ${cleanName}! Falta ${actionSuffix}`;
+              }
               icon = '🎯';
             } else if (evt === 'Ocasión Peligrosa') {
-              message = `¡Ocasión peligrosa! ${cleanName} vs ${match.rival_nombre}`;
+              message = `¡Ocasión peligrosa ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
               icon = '⚠️';
-            } else if (evt === 'Palo / Larguero' || evt === 'Palo' || evt === 'Larguero') {
-              message = `¡Al palo! ${cleanName} vs ${match.rival_nombre}`;
+            } else if (evt === 'Palo / Larguero' || evt === 'Palo' || evt === 'Larguero' || evt === 'Tiro al larguero' || evt === 'Tiro al palo') {
+              message = `¡Tiro al palo ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
               icon = '🥅';
             } else if (evt === 'Parada') {
-              message = `¡Parada! ${cleanName} vs ${match.rival_nombre}`;
+              message = `¡Parada ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
               icon = '🧤';
             } else {
-              message = `${evt}: ${cleanName} vs ${match.rival_nombre}`;
+              message = `${evt} ${actionSuffix}: ${cleanName} vs ${match.rival_nombre}`;
               icon = '🔔';
             }
 
@@ -230,7 +249,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="px-6 py-2 rounded-full border border-slate-200 font-semibold text-slate-800 text-sm shadow-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2">
-          Partidos fin de semana
+          Partidos de la jornada
         </div>
         <button className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50">
           <ChevronRight className="w-5 h-5" />
@@ -287,7 +306,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
           </div>
           
           <div className="w-full">
-            <LiveMatchPanel match={selectedMatch} />
+            <LiveMatchPanel match={selectedMatch} clubLogoUrl={clubLogoUrl} />
           </div>
         </section>
       )}

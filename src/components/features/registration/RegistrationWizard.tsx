@@ -55,6 +55,7 @@ export function RegistrationWizard({
       sizeSudadera: "",
       sizeCamisetaPaseo: "",
       sizePantalonPaseo: "",
+      sizeMedias: "",
       isSeniorTeam: isSeniorTeam,
       isSeniorSelection: isSeniorTeam ? "senior" : "minor",
       ...initialData,
@@ -86,7 +87,7 @@ export function RegistrationWizard({
     } else if (currentStep === 3) {
       fieldsToValidate = ['paymentMethod'];
     } else if (currentStep === 4) {
-      fieldsToValidate = ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo'];
+      fieldsToValidate = ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo', 'sizeMedias'];
     }
     
     const isStepValid = await trigger(fieldsToValidate);
@@ -175,7 +176,7 @@ export function RegistrationWizard({
       1: ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode', 'tutor1Name', 'tutor1LastName', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation', 'isSeniorSelection'],
       2: ['docsUploaded', 'escolarizacion'],
       3: isSeniorTeam ? [] : ['paymentMethod', 'paymentPlan', 'wasInClub', 'paidReservation'],
-      4: ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo'],
+      4: ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo', 'sizeMedias'],
       5: !isAdult ? ['consentRgpd', 'consentTutela', 'consentMedical', 'password', 'confirmPassword'] : ['consentRgpd', 'consentMedical', 'password', 'confirmPassword']
     };
 

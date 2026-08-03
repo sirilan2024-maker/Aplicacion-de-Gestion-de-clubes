@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, FolderOpen, Users, Filter, X } from "lucide-react";
+import { Search, FolderOpen, Users, Filter, X, Archive, Download, Loader2, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
+import toast from "react-hot-toast";
 
 interface PlayerBrief {
   id: string;
@@ -26,6 +27,10 @@ export default function DocumentManagementPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerBrief | null>(null);
 
+  // Mass download state
+  const [massDownloadTeam, setMassDownloadTeam] = useState<string>("all");
+  const [massDownloading, setMassDownloading] = useState(false);
+
   useEffect(() => {
     fetchPlayersAndTeams();
   }, []);
@@ -33,7 +38,6 @@ export default function DocumentManagementPage() {
   const fetchPlayersAndTeams = async () => {
     const supabase = createClient();
     try {
-      // Obtener jugadores con su equipo asociado
       const { data, error } = await supabase
         .from('players')
         .select(`
@@ -49,20 +53,18 @@ export default function DocumentManagementPage() {
       if (error) throw error;
       
       const parsedPlayers = (data || []).map(p => {
-        // En supabase si es 1 a 1 teams puede ser objeto, si es 1 a N es array
         const teamObj = Array.isArray(p.teams) ? p.teams[0] : p.teams;
         return {
           ...p,
           category: p.status === 'pending_revision' ? 'Inscripción Pdte' : 'Jugador Oficial',
-          team_name: teamObj?.name || 'Sin equipo',
-          team_id: teamObj?.id || 'none'
+          team_name: (teamObj as any)?.name || 'Sin equipo',
+          team_id: (teamObj as any)?.id || 'none'
         };
       });
 
       setPlayers(parsedPlayers);
 
-      // Extraer equipos únicos para el filtro
-      const uniqueTeams = new Map();
+      const uniqueTeams = new Map<string, string>();
       parsedPlayers.forEach(p => {
         if (p.team_id !== 'none' && p.team_name) {
           uniqueTeams.set(p.team_id, p.team_name);
@@ -83,8 +85,50 @@ export default function DocumentManagementPage() {
     return matchesSearch && matchesTeam;
   });
 
+  /** Trigger mass ZIP download via the API route */
+  const handleMassDownload = async () => {
+    setMassDownloading(true);
+    const scope = massDownloadTeam === "all" ? "todo el club" : teams.find(t => t.id === massDownloadTeam)?.name || "equipo";
+    const toastId = toast.loading(`Generando ZIP de ${scope}... Esto puede tardar unos segundos.`);
+
+    try {
+      const url = massDownloadTeam === "all"
+        ? "/api/admin/export-documents"
+        : `/api/admin/export-documents?team_id=${massDownloadTeam}`;
+
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Error ${res.status}`);
+      }
+
+      // Trigger browser download from the blob response
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("content-disposition") || "";
+      const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      const fileName = fileNameMatch?.[1] || `Expedientes_${scope}.zip`;
+
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+
+      toast.success(`✅ Descarga completada: ${fileName}`, { id: toastId, duration: 5000 });
+    } catch (err: any) {
+      toast.error(`Error al generar el ZIP: ${err.message}`, { id: toastId });
+    } finally {
+      setMassDownloading(false);
+    }
+  };
+
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
+    <div className="w-full max-w-7xl mx-auto p-4 space-y-5 animate-in fade-in slide-in-from-bottom-4">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -95,9 +139,76 @@ export default function DocumentManagementPage() {
         </div>
       </div>
 
+      {/* ====== MASS DOWNLOAD PANEL ====== */}
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 shadow-lg border border-slate-700">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-500/20 rounded-xl border border-blue-400/30">
+              <Archive className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-base">Exportación Masiva de Expedientes</h2>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Descarga todos los documentos de un equipo o del club entero en un único archivo ZIP
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            {/* Team selector for mass download */}
+            <div className="relative flex items-center">
+              <Building2 className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={massDownloadTeam}
+                onChange={e => setMassDownloadTeam(e.target.value)}
+                disabled={massDownloading}
+                className="pl-9 pr-4 py-2.5 bg-slate-700 border border-slate-600 text-white text-sm rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 min-w-[200px]"
+              >
+                <option value="all">🏟️ Todo el club</option>
+                {teams.map(t => (
+                  <option key={t.id} value={t.id}>⚽ {t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={handleMassDownload}
+              disabled={massDownloading || loading}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {massDownloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generando ZIP...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Descargar ZIP
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Info pills */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600/50">
+            📁 Estructura: Equipo / Jugador / Archivo
+          </span>
+          <span className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600/50">
+            🔒 Acceso seguro con Service Role
+          </span>
+          <span className="text-xs bg-amber-600/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30">
+            ⏳ Puede tardar 30-60 s si hay muchos archivos
+          </span>
+        </div>
+      </div>
+
+      {/* Main two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lado Izquierdo: Lista de Jugadores */}
-        <Card className="lg:col-span-1 shadow-sm border border-gray-200 h-[calc(100vh-240px)] lg:h-[calc(100vh-180px)] flex flex-col overflow-hidden">
+        {/* Left: Player list */}
+        <Card className="lg:col-span-1 shadow-sm border border-gray-200 h-[calc(100vh-380px)] lg:h-[calc(100vh-300px)] flex flex-col overflow-hidden">
           <div className="p-4 border-b bg-gray-50 space-y-3 shrink-0">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -122,6 +233,7 @@ export default function DocumentManagementPage() {
                 ))}
               </select>
             </div>
+            <p className="text-xs text-gray-400 text-right">{filteredPlayers.length} jugadores</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? (
@@ -158,9 +270,9 @@ export default function DocumentManagementPage() {
           </div>
         </Card>
 
-        {/* Lado Derecho: Visor del Expediente (Modal en móvil, Columna en Desktop) */}
+        {/* Right: Document viewer */}
         <div className={`
-          lg:col-span-2 lg:h-[calc(100vh-180px)] lg:block lg:static lg:bg-transparent lg:z-auto lg:p-0
+          lg:col-span-2 lg:h-[calc(100vh-300px)] lg:block lg:static lg:bg-transparent lg:z-auto lg:p-0
           ${selectedPlayer ? 'fixed inset-0 z-[100] bg-slate-900/60 p-4 flex flex-col items-center justify-center animate-in fade-in duration-200' : 'hidden'}
         `}>
           {selectedPlayer ? (
@@ -186,7 +298,7 @@ export default function DocumentManagementPage() {
               <FolderOpen className="w-16 h-16 mb-4 text-gray-300" />
               <p className="text-lg font-medium text-gray-600">Ningún expediente seleccionado</p>
               <p className="text-sm text-center max-w-sm mt-2">
-                Selecciona un jugador del listado de la izquierda para explorar y descargar masivamente toda su documentación legal y certificados.
+                Selecciona un jugador del listado de la izquierda para explorar y descargar su documentación.
               </p>
             </Card>
           )}

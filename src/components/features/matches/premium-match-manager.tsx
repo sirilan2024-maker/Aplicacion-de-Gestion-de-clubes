@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { ChevronLeft, Users, Calendar, MapPin, ClipboardList, CheckSquare, MessageSquare, Award } from "lucide-react"
 
 // Import custom sub-components
@@ -23,7 +24,9 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
 }) {
   const matchId = match.id;
   const teamId = match.equipo_id;
-  const [activeTab, setActiveTab] = useState<TabType>("resumen");
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("tab") as TabType) || "resumen";
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
   // Filtrar entrenadores y delegados
   const activePlayers = players.filter(p => {
@@ -110,7 +113,9 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
 
           {/* TAB: POST-PARTIDO */}
           {activeTab === "post-partido" && (
-            <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={convocatorias} />
+            <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm font-medium">Cargando informe...</div>}>
+              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={convocatorias} />
+            </Suspense>
           )}
 
           {/* TAB: FORO */}

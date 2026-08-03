@@ -84,7 +84,7 @@ export function LiveMatchCard({ match }: LiveMatchCardProps) {
     }
   }, [match.id, supabase])
 
-  const isLocal = !match.lugar?.toLowerCase().includes('fuera') && !match.lugar?.toLowerCase().includes('visitante');
+  const isLocal = !/\b(fuera|visitante)\b/i.test(match.lugar || '');
 
   const getEventIcon = (tipo: string) => {
     switch(tipo) {

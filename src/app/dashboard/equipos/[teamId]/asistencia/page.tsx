@@ -144,10 +144,47 @@ export default function AsistenciaEquipoPage() {
         .from('team_events')
         .select('*')
         .eq('id', queryEventId)
-        .single();
+        .maybeSingle();
       
       if (evError) throw evError;
-      setEventDetails(ev);
+      
+      let finalEvent = ev;
+
+      // Si no encontramos un evento en team_events, puede que sea un Partido.
+      // Creamos un evento "sombra" en team_events para poder usar la misma tabla de attendance.
+      if (!finalEvent) {
+        const { data: pEv } = await supabase.from('partidos').select('*').eq('id', queryEventId).maybeSingle();
+        if (pEv) {
+           const { data: newEv, error: insertError } = await supabase
+             .from('team_events')
+             .insert({
+                id: pEv.id,
+                team_id: pEv.equipo_id,
+                event_type: 'Partido',
+                title: `Jornada vs ${pEv.rival_nombre || 'Rival'}`,
+                date: pEv.fecha_hora ? pEv.fecha_hora.split('T')[0] : new Date().toISOString().split('T')[0],
+                start_time: pEv.fecha_hora ? pEv.fecha_hora.split('T')[1].substring(0, 5) : '00:00'
+             })
+             .select()
+             .single();
+             
+           if (newEv) {
+             finalEvent = newEv;
+           } else if (insertError) {
+             // If we failed to insert, maybe it was just inserted by another concurrent request, try fetching again
+             const { data: retryEv } = await supabase.from('team_events').select('*').eq('id', queryEventId).maybeSingle();
+             if (retryEv) finalEvent = retryEv;
+           }
+        }
+      }
+
+      if (!finalEvent) {
+        toast.error("El evento no se encuentra.");
+        setLoadingEvent(false);
+        return;
+      }
+      
+      setEventDetails(finalEvent);
 
       // 2. Fetch existing attendance records
       const { data: atts, error: attError } = await supabase
@@ -450,7 +487,7 @@ export default function AsistenciaEquipoPage() {
                         {ev.title}
                       </div>
                       <div className="text-[10px] text-gray-400 font-medium mt-1">
-                        {ev.date.substring(5,10)}
+                        {new Date(ev.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
                       </div>
                     </th>
                   ))}
@@ -590,7 +627,7 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
                   <div className={`w-2 h-2 rounded-full mt-1.5 sm:mt-0 shrink-0 ${isExcused ? 'bg-amber-500' : 'bg-red-500'}`}></div>
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 text-sm truncate">{ev.title}</div>
-                    <div className="text-xs text-slate-500 truncate">{new Date(ev.date).toLocaleDateString()} • {ev.event_type}</div>
+                    <div className="text-xs text-slate-500 truncate">{new Date(ev.date).toLocaleDateString('es-ES')} • {ev.event_type}</div>
                   </div>
                 </div>
                 <div className={`self-start sm:self-auto px-3 py-1 rounded-full text-[10px] md:text-xs font-bold shrink-0 ${isExcused ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>

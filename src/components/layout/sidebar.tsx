@@ -317,7 +317,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
             href: (userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') ? `/dashboard/mis-equipos` : `/dashboard`, 
             icon: LayoutDashboard 
           },
-          { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
+          { name: "En directo", href: "/live", icon: Trophy },
           { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]
@@ -348,7 +348,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "TEAMS CLUB",
         items: [
-          { name: "En directo", href: "/dashboard/global-club", icon: Trophy },
+          { name: "En directo", href: "/live", icon: Trophy },
           { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]

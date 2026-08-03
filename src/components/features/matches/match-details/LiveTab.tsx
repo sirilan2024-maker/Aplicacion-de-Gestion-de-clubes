@@ -183,6 +183,10 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
   };
 
   const handleStartSecondHalf = async () => {
+    if (convocatorias.length === 0) {
+      toast.error("Guarda la convocatoria y alineación primero para poder iniciar el partido.");
+      return;
+    }
     const targetSeconds = halfLengthMinutes * 60;
     await updateMatchState(matchId, "Programado");
     setPartidoEstado("Programado");
@@ -257,7 +261,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
   return (
     <div className="max-w-5xl mx-auto pb-10">
       {/* ---------- Cronómetro Superior ---------- */}
-      <div className={`sticky top-0 z-10 flex items-center justify-between px-4 py-2 rounded-b-xl shadow-sm ${partidoEstado === "Finalizado" ? 'bg-slate-800' : (isDescuento ? 'bg-red-900' : 'bg-blue-900')} text-slate-100 transition-colors duration-500`}>
+      <div className={`sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-b-xl shadow-sm ${partidoEstado === "Finalizado" ? 'bg-slate-800' : (isDescuento ? 'bg-red-900' : 'bg-blue-900')} text-slate-100 transition-colors duration-500`}>
         <div className="flex items-center gap-3">
           <Clock className={`w-5 h-5 ${partidoEstado === "Finalizado" ? 'text-slate-400' : (isDescuento ? 'text-red-300' : 'text-blue-300')}`} />
           <div className="text-2xl font-black font-mono tracking-wider tabular-nums">
@@ -288,7 +292,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
         </div>
 
         {!isFamilyView && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {partidoEstado === "Finalizado" ? (
               <button
                 onClick={async () => {
@@ -347,6 +351,10 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                   }
                   
                   if (!running) {
+                    if (convocatorias.length === 0) {
+                      toast.error("Guarda la convocatoria y alineación primero para poder iniciar el partido.");
+                      return;
+                    }
                     start();
                   } else {
                     pause();
@@ -392,17 +400,18 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
               </h3>
 
               {/* Botones principales */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 {([
                   { tipo: "Gol", icon: "⚽", label: "Gol", color: "hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 text-emerald-600 border-slate-200" },
                   { tipo: "Tarjeta Amarilla", icon: "🟨", label: "Amarilla", color: "hover:bg-amber-50 hover:text-amber-700 hover:border-amber-400 text-amber-500 border-slate-200" },
+                  { tipo: "Tarjeta Roja", icon: "🟥", label: "Roja", color: "hover:bg-red-50 hover:text-red-700 hover:border-red-400 text-red-500 border-slate-200" },
                   { tipo: "Cambio", icon: "🔄", label: "Cambio", color: "hover:bg-blue-50 hover:text-blue-700 hover:border-blue-400 text-blue-600 border-slate-200" }
                 ] as const).map(action => (
                   <button
                     key={action.tipo}
                     onClick={() => { setActiveForm(action.tipo as any); setMinuto(Math.floor(seconds / 60)); }}
                     className={[
-                      "flex flex-col items-center justify-center p-4 border border-dashed rounded-xl bg-slate-50/50 shadow-sm",
+                      "flex flex-col items-center justify-center p-3 border border-dashed rounded-xl bg-slate-50/50 shadow-sm",
                       "transition-all duration-200 hover:scale-105 active:scale-95",
                       action.color
                     ].join(" ")}
@@ -414,13 +423,17 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
               </div>
 
               {/* Botones adicionales */}
-              <div className="grid grid-cols-5 gap-2 mt-4">
+              <div className="grid grid-cols-4 gap-2 mt-4">
                 {([
-                  { tipo: "Tiro al larguero", icon: <Target className="w-5 h-5" />, label: "Larguero", color: "bg-orange-100 text-orange-700 hover:bg-orange-200" },
-                  { tipo: "Tiro al palo", icon: <Target className="w-5 h-5" />, label: "Palo", color: "bg-orange-100 text-orange-700 hover:bg-orange-200" },
-                  { tipo: "Penalti", icon: <AlertTriangle className="w-5 h-5" />, label: "Penalti", color: "bg-purple-100 text-purple-700 hover:bg-purple-200" },
-                  { tipo: "Lesión", icon: <Bandage className="w-5 h-5" />, label: "Lesión", color: "bg-red-100 text-red-700 hover:bg-red-200" },
-                  { tipo: "Gol en propia puerta", icon: <X className="w-5 h-5" />, label: "Autogol", color: "bg-gray-800 text-gray-100 hover:bg-gray-700" }
+                  { tipo: "Ocasión Peligrosa", icon: "⚠️", label: "Ocasión", color: "bg-amber-100 text-amber-700 hover:bg-amber-200" },
+                  { tipo: "Parada", icon: "🧤", label: "Parada", color: "bg-sky-100 text-sky-700 hover:bg-sky-200" },
+                  { tipo: "Tiro al larguero", icon: "🥅", label: "Larguero", color: "bg-orange-100 text-orange-700 hover:bg-orange-200" },
+                  { tipo: "Tiro al palo", icon: "🥅", label: "Palo", color: "bg-orange-100 text-orange-700 hover:bg-orange-200" },
+                  { tipo: "Penalti", icon: "🎯", label: "Penalti", color: "bg-purple-100 text-purple-700 hover:bg-purple-200" },
+                  { tipo: "Lesión", icon: "🚑", label: "Lesión", color: "bg-red-100 text-red-700 hover:bg-red-200" },
+                  { tipo: "Falta", icon: "🛑", label: "Falta", color: "bg-stone-100 text-stone-700 hover:bg-stone-200" },
+                  { tipo: "Fuera de juego", icon: "🚩", label: "F. Juego", color: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200" },
+                  { tipo: "Gol en propia puerta", icon: "🤦‍♂️", label: "Autogol", color: "bg-rose-100 text-rose-700 hover:bg-rose-200" }
                 ] as const).map(action => (
                   <button
                     key={action.tipo}
@@ -431,10 +444,33 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                       action.color
                     ].join(" ")}
                   >
-                    {action.icon}
-                    <span className="text-[8px] font-black uppercase tracking-wider mt-0.5">{action.label}</span>
+                    <span className="text-xl">{action.icon}</span>
+                    <span className="text-[8px] font-black uppercase tracking-wider mt-1">{action.label}</span>
                   </button>
                 ))}
+              </div>
+              
+              {/* Reset Match Button */}
+              <div className="pt-4 mt-2 border-t border-slate-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("¿Estás 100% seguro de que deseas REINICIAR el partido? Se borrarán todos los eventos, goles y el cronómetro volverá a 0.")) {
+                      try {
+                        const { resetMatchAction } = await import('@/app/actions/live-match-actions');
+                        await resetMatchAction(matchId);
+                        toast.success("Partido reiniciado por completo.");
+                        window.location.reload();
+                      } catch (err: any) {
+                        toast.error("Error al reiniciar: " + err.message);
+                      }
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  Reiniciar Partido
+                </button>
               </div>
             </div>
 

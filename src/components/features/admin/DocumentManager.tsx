@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Download, FileText, Loader2, AlertCircle, Image as ImageIcon,
-  CheckCircle2, XCircle, Clock, Eye, RefreshCw, Shield, ShieldCheck, ShieldX
+  CheckCircle2, XCircle, Clock, Eye, RefreshCw, Shield, ShieldCheck, ShieldX,
+  PackageOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,8 @@ import {
   updateDocumentStatusAction
 } from "@/app/actions/secretaria-actions";
 import toast from "react-hot-toast";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 interface DocumentManagerProps {
   playerId: string;
@@ -79,18 +82,46 @@ function StatusBadge({ status }: { status: DocStatus }) {
   );
 }
 
+/** Helper: download a single signed URL and trigger browser save */
+async function downloadSingleFile(signedUrl: string, fileName: string) {
+  const res = await fetch(signedUrl);
+  if (!res.ok) throw new Error("No se pudo descargar el archivo");
+  const blob = await res.blob();
+  saveAs(blob, fileName);
+}
+
+/** Helper: infer extension from url or mime */
+function getExtension(url: string, mimeType?: string): string {
+  const mimeMap: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf",
+    "image/tiff": ".tiff",
+  };
+  if (mimeType && mimeMap[mimeType]) return mimeMap[mimeType];
+  const parts = url.split(".");
+  const ext = parts[parts.length - 1].split("?")[0];
+  return ext && ext.length <= 5 ? `.${ext}` : "";
+}
+
 function DocumentCard({
   doc,
+  playerName,
   onStatusChange,
 }: {
   doc: PlayerDocument;
+  playerName: string;
   onStatusChange: (id: string, status: DocStatus, reason?: string) => Promise<void>;
 }) {
   const [updating, setUpdating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState<string>(doc.rejection_reason || "");
 
   const isImage = doc.document_type.startsWith("foto_");
+  const docLabel = DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
 
   const handleValidate = async () => {
     setUpdating(true);
@@ -110,6 +141,25 @@ function DocumentCard({
     setShowRejectInput(false);
   };
 
+  const handleDownloadSingle = async () => {
+    if (!doc.signedUrl) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(doc.signedUrl);
+      if (!res.ok) throw new Error("Error al descargar");
+      const mime = res.headers.get("content-type") || "";
+      const ext = getExtension(doc.file_url || "", mime);
+      const fileName = `${playerName} - ${docLabel}${ext}`;
+      const blob = await res.blob();
+      saveAs(blob, fileName);
+      toast.success("Archivo descargado correctamente");
+    } catch {
+      toast.error("No se pudo descargar el archivo");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className={`border rounded-xl overflow-hidden shadow-sm transition-all ${
       doc.status === "validado" ? "border-emerald-200 bg-emerald-50/30" :
@@ -124,7 +174,7 @@ function DocumentCard({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">
-              {DOC_TYPE_LABELS[doc.document_type] || doc.document_type}
+              {docLabel}
             </p>
             <p className="text-xs text-gray-400">{new Date(doc.created_at).toLocaleDateString('es-ES')}</p>
           </div>
@@ -140,7 +190,7 @@ function DocumentCard({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={doc.signedUrl}
-                alt={DOC_TYPE_LABELS[doc.document_type]}
+                alt={docLabel}
                 className="object-contain w-full h-full"
               />
             </div>
@@ -152,28 +202,52 @@ function DocumentCard({
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-blue-600 font-medium hover:underline"
               >
-                <Download className="w-4 h-4" />
-                Descargar / Ver documento
+                <Eye className="w-4 h-4" />
+                Ver documento
               </a>
             </div>
           )}
 
-          {/* Botón de abrir en nueva pestaña para imágenes */}
+          {/* Botones de abrir y descargar para imágenes */}
           {isImage && (
-            <a
-              href={doc.signedUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute top-2 right-2 bg-white/90 text-gray-700 px-2 py-1 rounded-md text-xs font-semibold shadow hover:bg-white flex items-center gap-1 transition-colors"
-            >
-              <Eye className="w-3 h-3" />
-              Ampliar
-            </a>
+            <div className="absolute top-2 right-2 flex gap-1.5">
+              <a
+                href={doc.signedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white/90 text-gray-700 px-2 py-1 rounded-md text-xs font-semibold shadow hover:bg-white flex items-center gap-1 transition-colors"
+              >
+                <Eye className="w-3 h-3" />
+                Ampliar
+              </a>
+              <button
+                onClick={handleDownloadSingle}
+                disabled={downloading}
+                className="bg-blue-600/90 text-white px-2 py-1 rounded-md text-xs font-semibold shadow hover:bg-blue-700 flex items-center gap-1 transition-colors disabled:opacity-60"
+              >
+                {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                {downloading ? "..." : "Descargar"}
+              </button>
+            </div>
           )}
         </div>
       ) : (
         <div className="p-4 flex items-center justify-center text-gray-400 text-sm italic bg-gray-50">
           URL expirada — recarga para generar un nuevo enlace seguro
+        </div>
+      )}
+
+      {/* Download button for non-images */}
+      {!isImage && doc.signedUrl && (
+        <div className="px-3 pb-2 flex justify-end">
+          <button
+            onClick={handleDownloadSingle}
+            disabled={downloading}
+            className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-60"
+          >
+            {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+            {downloading ? "Descargando..." : "Descargar archivo"}
+          </button>
         </div>
       )}
 
@@ -265,6 +339,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
   const [sipNumber, setSipNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingAll, setDownloadingAll] = useState(false);
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -297,7 +372,6 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
     const res = await updateDocumentStatusAction(docId, status, reason);
     if (res.success) {
       toast.success(`Documento marcado como "${STATUS_CONFIG[status].label}"`);
-      // Actualizar el estado localmente sin recargar
       setDocuments((prev) =>
         prev.map((d) =>
           d.id === docId
@@ -307,6 +381,62 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
       );
     } else {
       toast.error(`Error al actualizar: ${res.error}`);
+    }
+  };
+
+  /** Download ALL documents for this player as a ZIP */
+  const handleDownloadAll = async () => {
+    const docsWithUrl = documents.filter(d => d.signedUrl);
+    if (docsWithUrl.length === 0) {
+      toast.error("No hay documentos disponibles para descargar");
+      return;
+    }
+
+    setDownloadingAll(true);
+    const toastId = toast.loading(`Preparando expediente de ${playerName}...`);
+
+    try {
+      const zip = new JSZip();
+      const playerFolder = zip.folder(playerName) as JSZip;
+
+      const usedNames: Record<string, number> = {};
+
+      for (const doc of docsWithUrl) {
+        try {
+          const res = await fetch(doc.signedUrl!);
+          if (!res.ok) continue;
+          const mime = res.headers.get("content-type") || "";
+          const ext = getExtension(doc.file_url || "", mime);
+          const label = DOC_TYPE_LABELS[doc.document_type] || doc.document_type;
+          let fileName = `${label}${ext}`;
+
+          // Avoid duplicate filenames in the same folder
+          if (usedNames[fileName] !== undefined) {
+            usedNames[fileName]++;
+            fileName = `${label}_${usedNames[fileName]}${ext}`;
+          } else {
+            usedNames[fileName] = 0;
+          }
+
+          const buf = await res.arrayBuffer();
+          playerFolder.file(fileName, buf);
+        } catch {
+          // Skip files that fail – don't break the whole ZIP
+        }
+      }
+
+      const blob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 },
+      });
+
+      saveAs(blob, `Expediente_${playerName}.zip`);
+      toast.success(`Expediente de ${playerName} descargado (${docsWithUrl.length} archivos)`, { id: toastId });
+    } catch (e: any) {
+      toast.error("Error al generar el ZIP: " + e.message, { id: toastId });
+    } finally {
+      setDownloadingAll(false);
     }
   };
 
@@ -339,6 +469,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
   const validatedCount = documents.filter((d) => d.status === "validado").length;
   const pendingCount = documents.filter((d) => d.status === "pendiente" || d.status === "recibido").length;
   const rejectedCount = documents.filter((d) => d.status === "rechazado").length;
+  const availableForDownload = documents.filter(d => d.signedUrl).length;
 
   return (
     <div className="space-y-6">
@@ -353,7 +484,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
             Expediente de <strong>{playerName}</strong> · {documents.length} documentos
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex gap-2 text-xs font-medium">
             <span className="flex items-center gap-1 text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full border border-emerald-200">
               <CheckCircle2 className="w-3 h-3" /> {validatedCount} validados
@@ -367,6 +498,24 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
               </span>
             )}
           </div>
+
+          {/* DOWNLOAD ALL BUTTON */}
+          {availableForDownload > 0 && (
+            <button
+              onClick={handleDownloadAll}
+              disabled={downloadingAll}
+              title={`Descargar todos los documentos de ${playerName} como ZIP`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {downloadingAll ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <PackageOpen className="w-3.5 h-3.5" />
+              )}
+              {downloadingAll ? "Generando ZIP..." : `Descargar todo (${availableForDownload})`}
+            </button>
+          )}
+
           <button
             onClick={fetchDocuments}
             title="Recargar (las URLs expiran en 15 min)"
@@ -379,19 +528,35 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
 
       {/* DNI del Tutor (viene de families.tutor_1_dni_url) */}
       {tutorDniUrl && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between gap-4">
+          <h4 className="text-sm font-bold text-blue-900 flex items-center gap-2">
             <Shield className="w-4 h-4" /> DNI / NIE del Tutor
           </h4>
-          <a
-            href={tutorDniUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-blue-700 font-semibold hover:underline"
-          >
-            <Eye className="w-4 h-4" />
-            Ver DNI del Tutor (enlace seguro, 15 min)
-          </a>
+          <div className="flex gap-2">
+            <a
+              href={tutorDniUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-blue-700 font-semibold hover:underline"
+            >
+              <Eye className="w-4 h-4" />
+              Ver
+            </a>
+            <button
+              onClick={async () => {
+                try {
+                  await downloadSingleFile(tutorDniUrl, `${playerName} - DNI Tutor`);
+                  toast.success("DNI del tutor descargado");
+                } catch {
+                  toast.error("Error al descargar el DNI");
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs bg-blue-700 text-white px-2.5 py-1 rounded-lg font-semibold hover:bg-blue-800 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Descargar
+            </button>
+          </div>
         </div>
       )}
 
@@ -417,6 +582,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
             <DocumentCard
               key={doc.id}
               doc={doc}
+              playerName={playerName}
               onStatusChange={handleStatusChange}
             />
           ))}

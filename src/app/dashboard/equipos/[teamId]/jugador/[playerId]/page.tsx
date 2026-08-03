@@ -701,7 +701,7 @@ export default function GlobalPlayerProfilePage() {
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Fecha Nacimiento</label>
                   {isEditing ? (
                     <input type="date" value={editData.birth_date || ''} onChange={e => setEditData({...editData, birth_date: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
-                  ) : <div className="text-gray-900 font-medium">{player.birth_date ? new Date(player.birth_date).toLocaleDateString() : '-'}</div>}
+                  ) : <div className="text-gray-900 font-medium">{player.birth_date ? new Date(player.birth_date).toLocaleDateString('es-ES') : '-'}</div>}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Año de llegada</label>
@@ -1154,7 +1154,7 @@ export default function GlobalPlayerProfilePage() {
                     <tbody className="divide-y divide-gray-100">
                       {measurementsHistory.map((m, idx) => (
                         <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-gray-900">{new Date(m.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 font-medium text-gray-900">{new Date(m.date).toLocaleDateString('es-ES')}</td>
                           <td className="px-4 py-3 text-center text-gray-700">{m.weight ? `${m.weight} kg` : '-'}</td>
                           <td className="px-4 py-3 text-center text-gray-700">{m.height ? `${m.height} m` : '-'}</td>
                           <td className="px-4 py-3 text-center font-bold text-blue-700">{m.bmi ? m.bmi : '-'}</td>
@@ -1268,7 +1268,7 @@ export default function GlobalPlayerProfilePage() {
                         <tbody className="divide-y divide-slate-100">
                           {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map(t => (
                             <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-6 py-4 font-medium text-slate-900">{new Date(t.date).toLocaleDateString()}</td>
+                              <td className="px-6 py-4 font-medium text-slate-900">{new Date(t.date).toLocaleDateString('es-ES')}</td>
                               <td className="px-6 py-4">{t.title}</td>
                               <td className="px-6 py-4 text-center">
                                 {t.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Presente</span> : 
@@ -1290,7 +1290,7 @@ export default function GlobalPlayerProfilePage() {
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <div className="font-bold text-slate-900">{t.title}</div>
-                              <div className="text-xs text-slate-500">{new Date(t.date).toLocaleDateString()}</div>
+                              <div className="text-xs text-slate-500">{new Date(t.date).toLocaleDateString('es-ES')}</div>
                             </div>
                             <div>
                               {t.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Presente</span> : 
@@ -1396,7 +1396,7 @@ export default function GlobalPlayerProfilePage() {
                             <tbody className="divide-y divide-slate-100">
                               {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map(m => (
                                 <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-6 py-4 font-medium text-slate-900">{new Date(m.date).toLocaleDateString()}</td>
+                                  <td className="px-6 py-4 font-medium text-slate-900">{new Date(m.date).toLocaleDateString('es-ES')}</td>
                                   <td className="px-6 py-4">{m.title}</td>
                                   <td className="px-6 py-4 text-center">
                                     {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Asiste</span> : 
@@ -1424,7 +1424,7 @@ export default function GlobalPlayerProfilePage() {
                               <div className="flex justify-between items-start mb-2">
                                 <div>
                                   <div className="font-bold text-slate-900">{m.title}</div>
-                                  <div className="text-xs text-slate-500">{new Date(m.date).toLocaleDateString()}</div>
+                                  <div className="text-xs text-slate-500">{new Date(m.date).toLocaleDateString('es-ES')}</div>
                                 </div>
                                 <div>
                                   {m.attendance === 'Presente' ? <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Asiste</span> : 
@@ -1581,7 +1581,7 @@ export default function GlobalPlayerProfilePage() {
                             </div>
                             <div>
                               <div className="font-bold text-slate-900">{ev.title}</div>
-                              <div className="text-xs font-medium text-slate-500">{new Date(ev.date).toLocaleDateString()} {ev.start_time ? `a las ${ev.start_time.substring(0,5)}` : ''}</div>
+                              <div className="text-xs font-medium text-slate-500">{new Date(ev.date).toLocaleDateString('es-ES')} {ev.start_time ? `a las ${ev.start_time.substring(0,5)}` : ''}</div>
                             </div>
                           </li>
                         ))}
@@ -1606,7 +1606,7 @@ export default function GlobalPlayerProfilePage() {
                               <div className="w-2 h-8 bg-gray-200 rounded-full"></div>
                               <div>
                                 <div className="font-bold text-slate-800 text-sm">{ev.title}</div>
-                                <div className="text-xs text-slate-500">{new Date(ev.date).toLocaleDateString()}</div>
+                                <div className="text-xs text-slate-500">{new Date(ev.date).toLocaleDateString('es-ES')}</div>
                               </div>
                             </div>
                             <div>

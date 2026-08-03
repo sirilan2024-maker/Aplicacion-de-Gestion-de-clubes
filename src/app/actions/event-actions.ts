@@ -30,7 +30,8 @@ export async function createTeamEventAction(teamId: string, eventData: any, clie
   const { data, error } = await adminClient.from('team_events').insert({
     ...eventData,
     team_id: teamId,
-    season_id: finalSeasonId
+    season_id: finalSeasonId,
+    rsvp_reminder_time: eventData.rsvp_reminder_time || null
   }).select().single();
 
   if (error) throw new Error(error.message);
@@ -41,7 +42,10 @@ export async function createTeamEventAction(teamId: string, eventData: any, clie
 export async function updateTeamEventAction(eventId: string, teamId: string, eventData: any) {
   const adminClient = await createAdminClient();
   // Omitting strict season_id check for updates for brevity, assuming if it exists they can edit it if they are on the page (UI protection handles this).
-  const { error } = await adminClient.from('team_events').update(eventData).eq('id', eventId);
+  const { error } = await adminClient.from('team_events').update({
+    ...eventData,
+    rsvp_reminder_time: eventData.rsvp_reminder_time !== undefined ? eventData.rsvp_reminder_time : undefined
+  }).eq('id', eventId);
   if (error) throw new Error(error.message);
   revalidatePath(`/dashboard/equipos/${teamId}/calendario`);
   return true;

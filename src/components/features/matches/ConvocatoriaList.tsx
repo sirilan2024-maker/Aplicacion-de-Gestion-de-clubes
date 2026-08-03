@@ -24,7 +24,7 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
     const conv = convocatorias.find(c => c.player_id === p.id);
     let status: AttendanceStatus = null;
     if (conv) {
-      if (conv.status === 'convocado') status = 'Convocado';
+      if (conv.status === 'convocado' || conv.status === 'titular' || conv.status === 'suplente') status = 'Convocado';
       else if (conv.status === 'no_convocado') status = 'No convocado';
       else if (conv.status === 'duda') status = 'Duda';
       else if (conv.status === 'lesionado') status = 'Lesión';
@@ -61,8 +61,15 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
     
     startTransition(async () => {
       const updates = playerList.map(p => {
-        let dbStatus: "convocado" | "lesionado" | "duda" | "no_convocado" | null = null;
-        if (p.status === 'Convocado') dbStatus = 'convocado';
+        let dbStatus: "convocado" | "lesionado" | "duda" | "no_convocado" | "titular" | "suplente" | null = null;
+        if (p.status === 'Convocado') {
+          const originalConv = convocatorias?.find(c => c.player_id === p.id);
+          if (originalConv && (originalConv.status === 'titular' || originalConv.status === 'suplente')) {
+            dbStatus = originalConv.status;
+          } else {
+            dbStatus = 'convocado';
+          }
+        }
         else if (p.status === 'No convocado') dbStatus = 'no_convocado';
         else if (p.status === 'Duda') dbStatus = 'duda';
         else if (p.status === 'Lesión') dbStatus = 'lesionado';

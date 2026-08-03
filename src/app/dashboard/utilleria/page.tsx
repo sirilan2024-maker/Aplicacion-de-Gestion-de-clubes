@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Loader2, Search, Shirt, CheckSquare, BarChart3, AlertCircle, ShoppingBag, ClipboardList, X } from "lucide-react"
 import toast from "react-hot-toast"
 import { createClient } from "@/lib/supabase/client"
-import { getApparelDashboardDataAction, getApparelSummaryReportAction, toggleApparelDeliveryAction, updatePlayerApparelSizesAction } from "@/app/actions/apparel-actions"
+import { getApparelDashboardDataAction, getApparelSummaryReportAction, toggleApparelDeliveryAction, updatePlayerApparelSizesAction, updateApparelStockAction } from "@/app/actions/apparel-actions"
 
 const CLOTHING_SIZES = [
   'Talla 116',
@@ -45,6 +45,36 @@ const APPAREL_ITEMS = [
   { key: 'Mochila', label: '🎒 Mochila' }
 ]
 
+const APPAREL_ITEMS_REPORT = [
+  { key: 'Camiseta de Juego', label: '👕 Cam. Juego' },
+  { key: 'Pantalón de Juego', label: '🩳 Pan. Juego' },
+  { key: 'Medias', label: '🧦 Medias' },
+  { key: 'Chándal Oficial', label: '🧥 Chándal' },
+  { key: 'Camiseta de Entrenamiento (Total 1/2 + 2/2)', label: '👕 TOTAL Cam. Entr.' },
+  { key: 'Camiseta de Entrenamiento (1/2)', label: '👕 Cam. Entr. (1/2)' },
+  { key: 'Camiseta de Entrenamiento (2/2)', label: '👕 Cam. Entr. (2/2)' },
+  { key: 'Pantalón de Entrenamiento (Total 1/2 + 2/2)', label: '🩳 TOTAL Pant. Entr.' },
+  { key: 'Pantalón de Entrenamiento (1/2)', label: '🩳 Pant. Entr. (1/2)' },
+  { key: 'Pantalón de Entrenamiento (2/2)', label: '🩳 Pant. Entr. (2/2)' },
+  { key: 'Sudadera', label: '🧥 Sudadera' },
+  { key: 'Camiseta de paseo', label: '👕 Cam. Paseo' },
+  { key: 'Pantalón de paseo', label: '🩳 Pan. Paseo' },
+  { key: 'Mochila', label: '🎒 Mochila' }
+]
+
+const APPAREL_ITEMS_EXCEL = [
+  { key: 'Camiseta de Juego', label: 'Camiseta de Juego' },
+  { key: 'Pantalón de Juego', label: 'Pantalón de Juego' },
+  { key: 'Medias', label: 'Medias' },
+  { key: 'Chándal Oficial', label: 'Chándal Oficial' },
+  { key: 'Camiseta de Entrenamiento (Total 1/2 + 2/2)', label: 'Camiseta de Entrenamiento (Suma 1/2 + 2/2)' },
+  { key: 'Pantalón de Entrenamiento (Total 1/2 + 2/2)', label: 'Pantalón de Entrenamiento (Suma 1/2 + 2/2)' },
+  { key: 'Sudadera', label: 'Sudadera' },
+  { key: 'Camiseta de paseo', label: 'Camiseta de paseo' },
+  { key: 'Pantalón de paseo', label: 'Pantalón de paseo' },
+  { key: 'Mochila', label: 'Mochila' }
+]
+
 export default function UtilleriaDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [togglingMap, setTogglingMap] = useState<{ [key: string]: boolean }>({})
@@ -56,7 +86,9 @@ export default function UtilleriaDashboardPage() {
   const [search, setSearch] = useState("")
   const [selectedTeam, setSelectedTeam] = useState("")
   const [deliveryFilter, setDeliveryFilter] = useState("")
+  const [reportFilter, setReportFilter] = useState<'all' | 'to_order' | 'in_stock'>('all')
   const [activeTab, setActiveTab] = useState<'deliveries' | 'report'>('deliveries')
+  const [showTrainingBreakdown, setShowTrainingBreakdown] = useState(false)
 
   // Clickable Summary Modal State
   const [summaryModal, setSummaryModal] = useState<'total' | 'delivered' | 'pending' | null>(null)
@@ -86,7 +118,27 @@ export default function UtilleriaDashboardPage() {
     // 2. Load consolidated report
     const reportRes = await getApparelSummaryReportAction(selectedTeam || undefined)
     if (reportRes.success && reportRes.data) {
-      setReport(reportRes.data)
+      const r = reportRes.data;
+      
+      const consolidate = (item1: string, item2: string, virtualItem: string) => {
+        r[virtualItem] = {};
+        const allSizes = new Set([...Object.keys(r[item1] || {}), ...Object.keys(r[item2] || {})]);
+        allSizes.forEach(size => {
+          const s1 = r[item1]?.[size] || { totalNeeded: 0, delivered: 0, pending: 0, initialStock: 0 };
+          const s2 = r[item2]?.[size] || { totalNeeded: 0, delivered: 0, pending: 0, initialStock: 0 };
+          r[virtualItem][size] = {
+            totalNeeded: s1.totalNeeded + s2.totalNeeded,
+            delivered: s1.delivered + s2.delivered,
+            pending: s1.pending + s2.pending,
+            initialStock: s1.initialStock
+          };
+        });
+      };
+
+      consolidate('Camiseta de Entrenamiento (1/2)', 'Camiseta de Entrenamiento (2/2)', 'Camiseta de Entrenamiento (Total 1/2 + 2/2)');
+      consolidate('Pantalón de Entrenamiento (1/2)', 'Pantalón de Entrenamiento (2/2)', 'Pantalón de Entrenamiento (Total 1/2 + 2/2)');
+
+      setReport(r)
     } else {
       toast.error('Error al cargar informe: ' + reportRes.error)
     }
@@ -107,72 +159,82 @@ export default function UtilleriaDashboardPage() {
       setPlayers(prev => prev.map(p => {
         if (p.id === playerId) {
           const updatedApparel = { ...p.apparel }
-          updatedApparel[itemName] = { 
-            ...updatedApparel[itemName], 
-            delivered: nextState,
-            delivered_at: nextState ? new Date().toISOString() : null
+          if (!updatedApparel[itemName]) {
+            updatedApparel[itemName] = { size: '', delivered: nextState }
+          } else {
+            updatedApparel[itemName].delivered = nextState
           }
           return { ...p, apparel: updatedApparel }
         }
         return p
       }))
-
-      // Reload report in background
-      const reportRes = await getApparelSummaryReportAction(selectedTeam || undefined)
-      if (reportRes.success && reportRes.data) {
-        setReport(reportRes.data)
-      }
     } else {
-      toast.error(res.error || 'Error al cambiar estado de entrega')
+      toast.error('Error al actualizar: ' + res.error)
     }
-    
     setTogglingMap(prev => ({ ...prev, [toggleKey]: false }))
   }
 
-  const handleSizeChange = async (playerId: string, itemName: string, newSize: string) => {
-    const res = await updatePlayerApparelSizesAction(playerId, { [itemName]: newSize })
-    if (res.success) {
-      toast.success('Talla actualizada correctamente')
-      
-      // Update local state immediately
-      setPlayers(prev => prev.map(p => {
-        if (p.id === playerId) {
-          const updatedApparel = { ...p.apparel }
-          updatedApparel[itemName] = {
-            ...updatedApparel[itemName],
-            size: newSize
-          }
-          return { ...p, apparel: updatedApparel }
+  const handleSizeChange = async (playerId: string, itemName: string, size: string) => {
+    // Update locally instantly for responsiveness
+    setPlayers(prev => prev.map(p => {
+      if (p.id === playerId) {
+        const updatedApparel = { ...p.apparel }
+        if (!updatedApparel[itemName]) {
+          updatedApparel[itemName] = { size, delivered: false }
+        } else {
+          updatedApparel[itemName].size = size
         }
-        return p
-      }))
-
-      // Reload report in background
-      const reportRes = await getApparelSummaryReportAction(selectedTeam || undefined)
-      if (reportRes.success && reportRes.data) {
-        setReport(reportRes.data)
+        return { ...p, apparel: updatedApparel }
       }
+      return p
+    }))
+    
+    const res = await updatePlayerApparelSizesAction(playerId, { [itemName]: size })
+    if (res.success) {
+      toast.success('Talla actualizada')
     } else {
       toast.error('Error al actualizar talla: ' + res.error)
+      loadData() // Revert local state on error
     }
   }
 
-  const handleDorsalInputChange = (playerId: string, value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, '')
+  const handleDorsalInputChange = (playerId: string, val: string) => {
     setPlayers(prev => prev.map(p => {
       if (p.id === playerId) {
-        return { ...p, dorsal: cleaned }
+        return { ...p, dorsal: val }
       }
       return p
     }))
   }
 
-  const handleDorsalBlur = async (playerId: string, nextDorsal: string) => {
-    const res = await updatePlayerApparelSizesAction(playerId, {}, nextDorsal)
+  const handleDorsalBlur = async (playerId: string, val: string) => {
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+    const res = await updatePlayerDorsalAction(playerId, val);
     if (res.success) {
-      toast.success('Número de dorsal actualizado')
+      toast.success('Dorsal actualizado');
     } else {
-      toast.error('Error al actualizar dorsal: ' + res.error)
+      toast.error('Error al actualizar dorsal: ' + res.error);
+      loadData();
+    }
+  }
+
+  const handleStockChange = async (itemName: string, size: string, newStock: number) => {
+    setReport((prev: any) => ({
+      ...prev,
+      [itemName]: {
+        ...prev[itemName],
+        [size]: {
+          ...prev[itemName][size],
+          initialStock: newStock
+        }
+      }
+    }));
+    
+    const res = await updateApparelStockAction(itemName, size, newStock);
+    if (!res.success) {
+      toast.error('Error al actualizar stock: ' + res.error);
+      loadData(); // revert
     }
   }
 
@@ -181,7 +243,7 @@ export default function UtilleriaDashboardPage() {
     
     if (activeTab === 'deliveries') {
       // 1. Headers
-      const headers = ["Nombre", "Apellidos", "Equipo", "Categoría", "Dorsal", ...APPAREL_ITEMS.map(i => i.label.split(' ').slice(1).join(' ') || i.key)];
+      const headers = ["Nombre", "Apellidos", "Equipo", "Categoría", "Dorsal", ...APPAREL_ITEMS.map(i => i.key)];
       csvContent += headers.join(";") + "\n";
       
       // 2. Rows
@@ -245,18 +307,21 @@ export default function UtilleriaDashboardPage() {
       
     } else {
       // 1. Headers
-      const headers = ["Prenda", "Talla", "Entregados", "Pedir (Pendiente)", "Total Solicitado"];
+      const headers = ["Prenda", "Talla", "Entregados", "Stock Club", "A Pedir", "Total Solicitado"];
       csvContent += headers.join(";") + "\n";
       
       // 2. Rows
-      APPAREL_ITEMS.forEach(item => {
+      APPAREL_ITEMS_EXCEL.forEach(item => {
         const sizesReport = report[item.key] || {};
         Object.entries(sizesReport).forEach(([size, stats]: any) => {
+          const stock = stats.initialStock || 0;
+          const toOrder = Math.max(0, stats.totalNeeded - stock);
           const row = [
-            item.key,
+            item.label, // Usar label para que se vea bien en excel la nota
             size,
             stats.delivered,
-            stats.pending,
+            stock,
+            toOrder,
             stats.totalNeeded
           ];
           csvContent += row.join(";") + "\n";
@@ -284,11 +349,11 @@ export default function UtilleriaDashboardPage() {
     csvContent += headers.join(";") + "\n";
     
     // 2. Rows
-    APPAREL_ITEMS.forEach(item => {
+    APPAREL_ITEMS_EXCEL.forEach(item => {
       const breakdown = getModalBreakdown(item.key, type);
       breakdown.forEach(b => {
         const row = [
-          item.key,
+          item.label, // Usar el label detallado
           b.size,
           b.count
         ];
@@ -448,16 +513,18 @@ export default function UtilleriaDashboardPage() {
 
       {/* FILTROS GLOBAL (Estáticos en PC) */}
       <div className="lg:flex-none bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-1.5 rounded-lg w-full sm:max-w-xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-          <Search size={16} className="text-slate-400 shrink-0" />
-          <input
-            type="text"
-            placeholder="Buscar jugador..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-transparent border-none outline-none text-xs w-full placeholder-slate-400 text-slate-700 font-semibold"
-          />
-        </div>
+        {activeTab === 'deliveries' && (
+          <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-1.5 rounded-lg w-full sm:max-w-xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Buscar jugador..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs w-full placeholder-slate-400 text-slate-700 font-semibold"
+            />
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
           <select
@@ -471,25 +538,37 @@ export default function UtilleriaDashboardPage() {
             ))}
           </select>
 
-          <select
-            value={deliveryFilter}
-            onChange={(e) => setDeliveryFilter(e.target.value)}
-            className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
-          >
-            <option value="">Estado entrega: Todos</option>
-            <option value="all_delivered">📦 Con todo entregado</option>
-            <option value="pending_any">⚠️ Con alguna prenda pendiente</option>
-            <option value="missing_all_sizes">❌ Sin tallas registradas</option>
-            <option disabled>─────────────────────────</option>
-            {APPAREL_ITEMS.map(item => {
-              const cleanLabel = item.label.split(' ').slice(1).join(' ') || item.key;
-              return (
-                <option key={item.key} value={`missing_${item.key}`}>
-                  ❌ Falta: {cleanLabel}
-                </option>
-              )
-            })}
-          </select>
+          {activeTab === 'deliveries' ? (
+            <select
+              value={deliveryFilter}
+              onChange={(e) => setDeliveryFilter(e.target.value)}
+              className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
+            >
+              <option value="">Estado entrega: Todos</option>
+              <option value="all_delivered">📦 Con todo entregado</option>
+              <option value="pending_any">⚠️ Con alguna prenda pendiente</option>
+              <option value="missing_all_sizes">❌ Sin tallas registradas</option>
+              <option disabled>─────────────────────────</option>
+              {APPAREL_ITEMS.map(item => {
+                const cleanLabel = item.label.split(' ').slice(1).join(' ') || item.key;
+                return (
+                  <option key={item.key} value={`missing_${item.key}`}>
+                    ❌ Falta: {cleanLabel}
+                  </option>
+                )
+              })}
+            </select>
+          ) : (
+            <select
+              value={reportFilter}
+              onChange={(e) => setReportFilter(e.target.value as any)}
+              className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
+            >
+              <option value="all">Filtro: Todas las tallas</option>
+              <option value="to_order">🔴 Solo "A Pedir"</option>
+              <option value="in_stock">🟢 Solo "En Stock"</option>
+            </select>
+          )}
 
           <button
             onClick={exportToExcel}
@@ -588,17 +667,16 @@ export default function UtilleriaDashboardPage() {
                               >
                                 <div className="flex items-center justify-center gap-1 min-w-[95px] mx-auto">
                                   {/* SELECT DE TALLAS */}
-                                  {['Medias', 'Mochila'].includes(item.key) ? (
-                                    <select
-                                      disabled
-                                      className={`px-1 py-0.5 text-[10px] font-black rounded-lg border w-16 text-center shadow-sm bg-white ${
+                                  {item.key === 'Mochila' ? (
+                                    <div
+                                      className={`px-1 py-1 text-[10px] font-black rounded-lg border w-16 text-center shadow-sm ${
                                         isDelivered 
-                                          ? 'border-emerald-300 text-emerald-800' 
-                                          : 'border-slate-200 text-slate-400'
+                                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
+                                          : 'bg-slate-50 border-slate-200 text-slate-500'
                                       }`}
                                     >
-                                      <option value="">-</option>
-                                    </select>
+                                      Única
+                                    </div>
                                   ) : (
                                     <select
                                       value={info.size || ''}
@@ -612,17 +690,17 @@ export default function UtilleriaDashboardPage() {
                                       }`}
                                     >
                                       <option value="">-</option>
-                                      {CLOTHING_SIZES.map(sz => (
-                                        <option key={sz} value={sz}>{sz}</option>
+                                      {(item.key === 'Medias' ? SOCKS_SIZES : CLOTHING_SIZES).map(sz => (
+                                        <option key={sz} value={sz}>{sz.replace('Talla ', '')}</option>
                                       ))}
                                     </select>
                                   )}
 
                                   {/* CHECKBOX DE ENTREGA */}
-                                  {(info.size || ['Medias', 'Mochila'].includes(item.key)) && (
+                                  {(info.size || item.key === 'Mochila') && (
                                     <button
                                       onClick={() => handleToggleDelivery(p.id, item.key, isDelivered)}
-                                      disabled={isToggling}
+                                      disabled={(!info.size && item.key !== 'Mochila') || isToggling}
                                       className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
                                         isDelivered 
                                           ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-500/20' 
@@ -768,48 +846,101 @@ export default function UtilleriaDashboardPage() {
           </>
         ) : (
           /* SECCIÓN DE INFORME DE PEDIDOS */
-          <div className="lg:flex-1 lg:overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-            {APPAREL_ITEMS.map(item => {
+          <div className="lg:flex-1 lg:overflow-y-auto min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12 items-start p-1">
+            {APPAREL_ITEMS_REPORT.map(item => {
+              // Hide 1/2 and 2/2 if showTrainingBreakdown is false
+              if (!showTrainingBreakdown && item.key.includes('(1/2)')) return null;
+              if (!showTrainingBreakdown && item.key.includes('(2/2)')) return null;
+
               const sizesReport = report[item.key] || {}
-              const sizesList = Object.entries(sizesReport)
+              
+              const sizesList = Object.entries(sizesReport).filter(([_, stats]: any) => {
+                const stock = stats.initialStock || 0;
+                const toOrder = Math.max(0, (stats.totalNeeded || 0) - stock);
+                
+                if (reportFilter === 'to_order') return toOrder > 0;
+                if (reportFilter === 'in_stock') return stock > 0;
+                return true;
+              })
 
               return (
-                <div key={item.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-fit">
-                  <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-base">
-                      {item.label}
-                    </h3>
-                    <span className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-lg">
-                      {sizesList.reduce((acc, [_, stats]: any) => acc + stats.totalNeeded, 0)} Solicitados
-                    </span>
+                <div key={item.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-fit">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-base">
+                        {item.label}
+                      </h3>
+                      <span className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-lg">
+                        {Object.values(sizesReport).reduce((acc: any, stats: any) => acc + (stats.totalNeeded || 0), 0)} Solicitados
+                      </span>
+                    </div>
+                    {item.key.includes('Total') && (
+                      <button
+                        onClick={() => setShowTrainingBreakdown(!showTrainingBreakdown)}
+                        className={`self-start px-3 py-1.5 text-[10px] font-extrabold rounded-lg border transition-colors shadow-sm ${
+                          showTrainingBreakdown 
+                            ? 'bg-indigo-100 border-indigo-200 text-indigo-700' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {showTrainingBreakdown ? 'Ocultar desglose (1/2 y 2/2)' : 'Mostrar desglose (1/2 y 2/2)'}
+                      </button>
+                    )}
                   </div>
 
-                  <div className="p-4 flex-1 space-y-2">
+                  <div className="p-4 space-y-2">
                     {sizesList.length === 0 ? (
-                      <div className="h-full flex items-center justify-center py-6 text-slate-400 text-xs font-semibold">
-                        Ningún jugador ha registrado su talla para este artículo.
+                      <div className="h-full flex items-center justify-center py-6 text-slate-400 text-xs font-semibold text-center">
+                        {reportFilter === 'all' 
+                          ? 'Ningún jugador ha registrado su talla para este artículo.'
+                          : 'No hay tallas que coincidan con el filtro.'}
                       </div>
                     ) : (
                       <div className="divide-y divide-slate-100">
-                        {sizesList.map(([size, stats]: any) => (
+                        {sizesList.map(([size, stats]: any) => {
+                          const stock = stats.initialStock || 0;
+                          const toOrder = Math.max(0, (stats.totalNeeded || 0) - stock);
+                          
+                          return (
                           <div key={size} className="py-2.5 flex items-center justify-between text-sm">
-                            <span className="font-bold text-slate-800">Talla: {size}</span>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-slate-500 font-medium">
-                                Entregados: <strong className="text-slate-800 font-bold">{stats.delivered}</strong>
+                            <span className="font-bold text-slate-800 w-16">Talla: {size}</span>
+                            <div className="flex items-center justify-end gap-3 flex-1">
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                Entregados: <strong className="text-slate-800">{stats.delivered}</strong>
                               </span>
-                              <span className="px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-700 font-extrabold text-xs rounded-lg flex items-center gap-1">
-                                Pedir: {stats.pending}
-                              </span>
+                              <div className="flex flex-col items-center">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Solicitado</span>
+                                <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-xs rounded-lg flex items-center justify-center min-w-[40px]">
+                                  {stats.totalNeeded || 0}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-center ml-2 border-l border-slate-100 pl-2">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Stock Club</span>
+                                <input 
+                                  type="number" 
+                                  min="0" 
+                                  value={stock}
+                                  onChange={(e) => handleStockChange(item.key, size, parseInt(e.target.value) || 0)}
+                                  className="w-12 h-6 text-center text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">A Pedir</span>
+                                <span className="px-2.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-700 font-extrabold text-xs rounded-lg flex items-center justify-center min-w-[40px]">
+                                  {toOrder}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
                     )}
                   </div>
                 </div>
               )
             })}
+            </div>
           </div>
         )}
       </div>
@@ -839,7 +970,7 @@ export default function UtilleriaDashboardPage() {
             {/* Contenido Modal */}
             <div className="p-5 overflow-y-auto space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {APPAREL_ITEMS.map(item => {
+                {APPAREL_ITEMS_REPORT.map(item => {
                   const breakdown = getModalBreakdown(item.key, summaryModal)
                   
                   return (

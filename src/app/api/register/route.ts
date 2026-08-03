@@ -374,6 +374,7 @@ export async function POST(request: Request) {
         { item: 'Sudadera', size: formData.sizeSudadera },
         { item: 'Camiseta de paseo', size: formData.sizeCamisetaPaseo },
         { item: 'Pantalón de paseo', size: formData.sizePantalonPaseo },
+        { item: 'Medias', size: formData.sizeMedias },
       ];
 
       for (const { item, size } of apparelItems) {

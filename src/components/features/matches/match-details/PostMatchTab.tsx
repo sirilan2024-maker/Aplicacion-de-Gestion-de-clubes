@@ -6,10 +6,13 @@ import { saveMatchReport } from "@/app/actions/match-actions"
 import { Button } from "@/components/ui/button"
 import { MatchFullReportModal } from "./MatchFullReportModal"
 
+import { useSearchParams } from "next/navigation"
+
 export function PostMatchTab({ matchId, initialData, players = [], convocatorias = [] }: { matchId: string, initialData?: any, players?: any[], convocatorias?: any[] }) {
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
-  const [showFullReportModal, setShowFullReportModal] = useState(false)
+  const [showFullReportModal, setShowFullReportModal] = useState(() => searchParams.get("action") === "pasar-lista");
 
   const [rating, setRating] = useState<string>(initialData?.coach_rating?.toString() || "7")
   const [summary, setSummary] = useState(initialData?.coach_summary || "")

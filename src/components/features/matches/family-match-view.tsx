@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, Clock, MapPin, Activity, CheckCircle2, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
@@ -18,6 +19,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   matchEvents: any[]; 
   convocatorias: any[] 
 }) {
+  const router = useRouter();
   const [match, setMatch] = useState<any>(initialMatch);
   const [matchEvents, setMatchEvents] = useState<any[]>(initialMatchEvents);
 
@@ -174,6 +176,59 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
             EN DIRECTO
           </div>
         </div>
+
+        {/* ─── ASISTENCIA CONVOCATORIA ─── */}
+        {playerConv && playerConv.status === 'convocado' && playerConv.asistencia_confirmada_familia === null && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-blue-900 font-bold text-lg">Has sido convocado</h3>
+              <p className="text-blue-700 text-sm mt-1">
+                El entrenador ha convocado al jugador para este partido. Por favor, confirma si podrá asistir.
+              </p>
+            </div>
+            
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
+                <button 
+                  onClick={async () => {
+                    if (playerConv.asistencia_confirmada_familia === true) return;
+                    const res = await fetch(`/api/matches/${matchId}/attendance`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ playerId, status: true })
+                    });
+                    if (res.ok) router.refresh();
+                  }}
+                  className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                    ${playerConv.asistencia_confirmada_familia === true 
+                      ? 'bg-emerald-600 text-white cursor-default' 
+                      : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                >
+                  {playerConv.asistencia_confirmada_familia === true && <CheckCircle2 className="w-5 h-5" />}
+                  Sí, asistiré
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (playerConv.asistencia_confirmada_familia === false) return;
+                    const res = await fetch(`/api/matches/${matchId}/attendance`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ playerId, status: false })
+                    });
+                    if (res.ok) router.refresh();
+                  }}
+                  className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                    ${playerConv.asistencia_confirmada_familia === false
+                      ? 'bg-rose-600 text-white cursor-default'
+                      : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+                    }`}
+                >
+                  {playerConv.asistencia_confirmada_familia === false && <span className="text-lg leading-none">❌</span>}
+                  No podré
+                </button>
+              </div>
+          </div>
+        )}
 
         {/* ─── SCOREBOARD (Like PremiumMatchManager) ─── */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-150 overflow-hidden">

@@ -12,13 +12,13 @@ interface MatchdayCardProps {
 
 export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps) {
   const supabase = createClient()
-  const [events, setEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>(match.match_events || [])
   const [showModal, setShowModal] = useState(false)
   const [elapsedString, setElapsedString] = useState("00:00")
 
   const isFinished = match.estado === 'Finalizado'
   const isLive = !isFinished && (match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
-  const isLocal = !match.lugar?.toLowerCase().includes('fuera') && !match.lugar?.toLowerCase().includes('visitante')
+  const isLocal = !/\b(fuera|visitante)\b/i.test(match.lugar || '');
 
   // Cronómetro en vivo
   useEffect(() => {
@@ -45,6 +45,9 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     if (!isLive && !isFinished) return
 
     const loadEvents = async () => {
+      // If we already have events from SSR and we are just finished, skip fetching again
+      if (isFinished && match.match_events && match.match_events.length > 0 && events.length > 0) return;
+      
       const { data } = await supabase
         .from('match_events')
         .select('*, player:players(first_name, last_name)')
@@ -107,17 +110,20 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   }
 
   // Calculate live scores from events
-  const liveLocalGoals = events.filter(e => {
+  const liveLocalGoalsComputed = events.filter(e => {
     if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta') return isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : e.player_id;
     return false;
   }).length;
   
-  const liveAwayGoals = events.filter(e => {
+  const liveAwayGoalsComputed = events.filter(e => {
     if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta') return !isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return !isLocal ? !e.player_id : e.player_id;
     return false;
   }).length;
+
+  const liveLocalGoals = match.resultado_propio ?? liveLocalGoalsComputed;
+  const liveAwayGoals = match.resultado_rival ?? liveAwayGoalsComputed;
 
   const ourScore = isLive ? liveLocalGoals : (isLocal ? (match.resultado_propio ?? liveLocalGoals) : (match.resultado_rival ?? liveAwayGoals))
   const theirScore = isLive ? liveAwayGoals : (isLocal ? (match.resultado_rival ?? liveAwayGoals) : (match.resultado_propio ?? liveLocalGoals))
@@ -125,6 +131,40 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   const ourName = match.equipo?.name || 'Sporting Saladar'
   const ourCleanName = ourName.replace(/Sporting Saladar\s*/i, '').trim() || 'Sporting Saladar';
   const theirName = match.rival_nombre || 'Rival'
+
+  const getGoalsForTeam = (isHomeTeam: boolean) => {
+    const isSporting = isHomeTeam === isLocal;
+    const goals = events.filter(e => {
+      if (e.tipo_evento !== 'Gol' && e.tipo_evento !== 'Gol en propia puerta' && e.tipo_evento !== 'Gol en Propia') return false;
+
+      const isSportingPoint = (e.tipo_evento === 'Gol' && e.player_id) || 
+                              ((e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') && !e.player_id);
+                              
+      return isSporting ? isSportingPoint : !isSportingPoint;
+    }).sort((a, b) => a.minuto - b.minuto);
+
+    if (goals.length === 0) return null;
+
+    return (
+      <div className="flex flex-col text-[11px] md:text-xs text-slate-500 mt-2 text-center w-full px-1 space-y-0.5 leading-tight opacity-90">
+        {goals.map((g, i) => {
+          let name = '';
+          const isOwnGoal = g.tipo_evento === 'Gol en propia puerta' || g.tipo_evento === 'Gol en Propia';
+          
+          if (isSporting) {
+            if (isOwnGoal) name = 'Rival (PP)';
+            else name = g.player ? g.player.first_name : 'Jugador';
+          } else {
+            if (isOwnGoal) name = g.player ? `${g.player.first_name} (PP)` : 'Sporting (PP)';
+            else name = 'Rival';
+          }
+          
+          const icon = (g.tipo_evento === 'Penalty' || g.tipo_evento === 'Penalti') ? '🎯' : '⚽';
+          return <span key={i} className="flex items-center justify-center gap-1"><span className="text-slate-400 text-[10px]">{icon}</span> {name} {g.minuto}'</span>
+        })}
+      </div>
+    )
+  }
 
   const [isMounted, setIsMounted] = useState(false)
 
@@ -216,6 +256,15 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           </div>
           
         </div>
+
+        {/* Goals List Row */}
+        {(getGoalsForTeam(true) || getGoalsForTeam(false)) && (
+          <div className="px-4 pb-4 flex justify-between items-start gap-4">
+            <div className="flex-1 w-1/3 flex flex-col items-center">{getGoalsForTeam(true)}</div>
+            <div className="w-1/3 shrink-0"></div>
+            <div className="flex-1 w-1/3 flex flex-col items-center">{getGoalsForTeam(false)}</div>
+          </div>
+        )}
       </div>
 
       {/* Modal Minuto a Minuto */}

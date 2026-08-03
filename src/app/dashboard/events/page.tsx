@@ -20,6 +20,9 @@ import { CalendarGridView } from "@/components/features/events/CalendarGridView"
 import { CalendarListView } from "@/components/features/events/CalendarListView"
 import { createClient } from "@/lib/supabase/client"
 import toast, { Toaster } from "react-hot-toast"
+import { useRouter } from "next/navigation"
+import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
+import { format, parseISO, addDays, getDay } from "date-fns"
 
 type ViewMode = "month" | "list"
 
@@ -49,6 +52,8 @@ export default function EventsPage() {
 
   // Modal states
   const [showModal, setShowModal] = useState(false)
+  const [showMatchModal, setShowMatchModal] = useState(false)
+  const [editingMatch, setEditingMatch] = useState<any>(null)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [modalTitle, setModalTitle] = useState("")
   const [modalDate, setModalDate] = useState(() => {
@@ -57,9 +62,14 @@ export default function EventsPage() {
   })
   const [modalStartTime, setModalStartTime] = useState("18:00")
   const [modalEndTime, setModalEndTime] = useState("19:30")
-  const [modalType, setModalType] = useState<'Entrenamiento' | 'Partido' | 'Reunión' | 'Otro'>('Entrenamiento')
+  const [modalType, setModalType] = useState<"Entrenamiento" | "Partido" | "Reunión" | "Otro">("Entrenamiento")
   const [modalLocation, setModalLocation] = useState("")
   const [modalSelectedTeams, setModalSelectedTeams] = useState<string[]>([])
+  
+  // Recurring state
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurringDays, setRecurringDays] = useState<number[]>([])
+  const [recurringEndDate, setRecurringEndDate] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
   const supabase = createClient()
@@ -128,16 +138,29 @@ export default function EventsPage() {
         .select("*")
         .in("team_id", teamIds)
 
+      let partidosQuery = supabase
+        .from("partidos")
+        .select("*")
+        .in("equipo_id", teamIds)
+        .order("fecha_hora", { ascending: true })
+
       if (activeSeason?.id) {
         eventsQuery = eventsQuery.eq('season_id', activeSeason.id)
+        // Partidos no tiene season_id directo en este momento, o si lo tiene habría que agregarlo.
+        // Asumo que si no lo tiene, devolvemos los recientes o los vinculamos al equipo.
       }
 
-      const { data: eventsData } = await eventsQuery
+      const [eventsRes, partidosRes] = await Promise.all([
+        eventsQuery,
+        partidosQuery
+      ])
 
-      if (eventsData) {
-        const mappedEvents: CalendarEvent[] = eventsData.map(ev => {
+      const mappedEvents: CalendarEvent[] = []
+
+      if (eventsRes.data) {
+        eventsRes.data.forEach((ev: any) => {
           const teamInfo = mappedTeams.find(t => t.id === ev.team_id)
-          return {
+          mappedEvents.push({
             id: ev.id,
             title: ev.title,
             date: ev.date, // "YYYY-MM-DD" expected
@@ -147,11 +170,44 @@ export default function EventsPage() {
             teamName: teamInfo?.name || "Equipo",
             teamColor: "", 
             teamHex: teamInfo?.hex || "#10b981",
-            location: ev.location || ""
-          }
+            location: ev.location || "",
+            isOfficialMatch: false
+          })
         })
-        setDbEvents(mappedEvents)
       }
+
+      if (partidosRes.data) {
+        partidosRes.data.forEach((p: any) => {
+          if (!p.fecha_hora) return;
+          const dt = new Date(p.fecha_hora)
+          const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+          const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
+          const teamInfo = mappedTeams.find(t => t.id === p.equipo_id)
+          
+          let title = `Jornada (vs ${p.rival_nombre || 'Rival'})`
+          if (p.lugar === 'Local') {
+            title = `${teamInfo?.name || 'Local'} vs ${p.rival_nombre || 'Visitante'}`
+          } else {
+            title = `${p.rival_nombre || 'Local'} vs ${teamInfo?.name || 'Visitante'}`
+          }
+
+          mappedEvents.push({
+            id: p.id,
+            title: title,
+            date: dateStr,
+            time: timeStr,
+            type: "Partido",
+            teamId: p.equipo_id,
+            teamName: teamInfo?.name || "Equipo",
+            teamColor: "", 
+            teamHex: teamInfo?.hex || "#10b981",
+            location: p.lugar || "",
+            isOfficialMatch: true // flag to distinguish real match vs just an event named Partido
+          })
+        })
+      }
+      
+      setDbEvents(mappedEvents)
     }
     setLoading(false)
   }
@@ -171,6 +227,8 @@ export default function EventsPage() {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1))
   }
 
+  const router = useRouter()
+
   // --- Modal Handlers ---
   const handleOpenCreateModal = () => {
     setEditingEventId(null)
@@ -180,10 +238,18 @@ export default function EventsPage() {
     setModalType("Entrenamiento")
     setModalLocation("")
     setModalSelectedTeams([])
+    setIsRecurring(false)
+    setRecurringDays([])
+    setRecurringEndDate("")
     setShowModal(true)
   }
 
   const handleOpenEditModal = (ev: CalendarEvent) => {
+    if (ev.isOfficialMatch) {
+      router.push(`/dashboard/matches/${ev.id}`)
+      return
+    }
+
     setEditingEventId(ev.id)
     setModalTitle(ev.title)
     setModalDate(ev.date)
@@ -239,21 +305,64 @@ export default function EventsPage() {
       }
     } else {
       // Create new event(s) for all selected teams
-      const eventsToInsert = modalSelectedTeams.map(tid => ({
-        team_id: tid,
-        season_id: activeSeasonId,
-        title: modalTitle,
-        event_type: modalType,
-        date: modalDate,
-        start_time: modalStartTime,
-        end_time: modalEndTime,
-        location: modalLocation
-      }))
+      if (isRecurring && (!recurringEndDate || recurringDays.length === 0)) {
+        toast.error("Selecciona días y fecha fin para la recurrencia.")
+        setSubmitting(false)
+        return
+      }
+
+      const eventsToInsert: any[] = []
+      
+      if (!isRecurring) {
+        modalSelectedTeams.forEach(tid => {
+          eventsToInsert.push({
+            team_id: tid,
+            season_id: activeSeasonId,
+            title: modalTitle,
+            event_type: modalType,
+            date: modalDate,
+            start_time: modalStartTime,
+            end_time: modalEndTime,
+            location: modalLocation
+          })
+        })
+      } else {
+        let currentDate = parseISO(modalDate)
+        const end = parseISO(recurringEndDate)
+        
+        let iterations = 0
+        while (currentDate <= end && iterations < 730) {
+          if (recurringDays.includes(getDay(currentDate))) {
+            const dateStr = format(currentDate, 'yyyy-MM-dd')
+            modalSelectedTeams.forEach(tid => {
+              eventsToInsert.push({
+                team_id: tid,
+                season_id: activeSeasonId,
+                title: modalTitle,
+                event_type: modalType,
+                date: dateStr,
+                start_time: modalStartTime,
+                end_time: modalEndTime,
+                location: modalLocation
+              })
+            })
+          }
+          currentDate = addDays(currentDate, 1)
+          iterations++
+        }
+        
+        if (eventsToInsert.length === 0) {
+          toast.error("No hay fechas válidas en el rango seleccionado.")
+          setSubmitting(false)
+          return
+        }
+      }
+
       const { error } = await supabase.from("team_events").insert(eventsToInsert)
       if (error) {
         toast.error("Error al crear: " + error.message)
       } else {
-        toast.success("Eventos creados")
+        toast.success(eventsToInsert.length > 1 ? `${eventsToInsert.length} eventos creados` : "Evento creado")
         setShowModal(false)
         fetchData()
       }
@@ -311,13 +420,30 @@ export default function EventsPage() {
               {eventCountThisMonth} eventos en {MONTH_NAMES[month]}
             </p>
           </div>
-          <button 
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm shadow-blue-200 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Evento
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                const res = await fetch('/api/events/send-reminders', { method: 'POST' });
+                if (res.ok) {
+                  const data = await res.json();
+                  toast.success(`Recordatorios enviados: ${data.message || 'OK'}`);
+                } else {
+                  toast.error("Error al enviar recordatorios");
+                }
+              }}
+              className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-xl border border-slate-300 transition-all"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Enviar Recordatorios
+            </button>
+            <button 
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm shadow-blue-200 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo Evento
+            </button>
+          </div>
         </div>
 
         {/* ─── Two-column Layout ────────────────────────────────────────── */}
@@ -560,7 +686,17 @@ export default function EventsPage() {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
                   <select 
                     value={modalType} 
-                    onChange={e => setModalType(e.target.value as any)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'Partido') {
+                        setShowModal(false);
+                        setEditingMatch({ id: 'new', fecha_hora: new Date().toISOString() });
+                        setShowMatchModal(true);
+                        setModalType('Entrenamiento');
+                      } else {
+                        setModalType(val as any);
+                      }
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="Entrenamiento">Entrenamiento</option>
@@ -640,7 +776,58 @@ export default function EventsPage() {
                 )}
               </div>
               
-              <div className="pt-4 flex items-center justify-between border-t border-gray-100">
+              {/* RECURRENCIA */}
+              {!editingEventId && (
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isRecurring}
+                      onChange={e => setIsRecurring(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span className="font-bold text-blue-900">Evento Recurrente</span>
+                  </label>
+                  
+                  {isRecurring && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
+                            <button
+                              type="button"
+                              key={day.id}
+                              onClick={() => {
+                                if (recurringDays.includes(day.id)) {
+                                  setRecurringDays(recurringDays.filter(d => d !== day.id));
+                                } else {
+                                  setRecurringDays([...recurringDays, day.id]);
+                                }
+                              }}
+                              className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
+                        <input 
+                          type="date" 
+                          value={recurringEndDate}
+                          onChange={(e) => setRecurringEndDate(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          required={isRecurring}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-4 flex items-center justify-between border-t border-gray-100 mt-4">
                 {editingEventId ? (
                   <button 
                     type="button"
@@ -670,6 +857,22 @@ export default function EventsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showMatchModal && editingMatch && (
+        <ManageMatchModal
+          match={editingMatch}
+          teams={dbTeams}
+          onClose={() => {
+            setShowMatchModal(false)
+            setEditingMatch(null)
+          }}
+          onSave={() => {
+            setShowMatchModal(false)
+            setEditingMatch(null)
+            fetchEvents() // refresh events list
+          }}
+        />
       )}
     </div>
   )

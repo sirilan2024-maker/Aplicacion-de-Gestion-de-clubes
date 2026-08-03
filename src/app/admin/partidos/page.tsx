@@ -90,7 +90,7 @@ export default function AdminPartidosPage() {
             <div className="flex items-center gap-3">
               <div className="text-sm font-medium text-gray-500 flex items-center">
                 <Calendar className="w-4 h-4 mr-1.5" />
-                {new Date(match.fecha_hora).toLocaleDateString()} {new Date(match.fecha_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                {new Date(match.fecha_hora).toLocaleDateString('es-ES')} {new Date(match.fecha_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </div>
               <button 
                 onClick={(e) => { e.preventDefault(); setEditingMatch(match); }}

@@ -78,7 +78,7 @@ export default function TrainingPage() {
             <div className="p-6 space-y-4">
               <div className="flex items-center text-sm text-gray-600">
                 <Calendar className="mr-3 h-5 w-5 text-amber-500" />
-                {new Date(session.date).toLocaleDateString()} a las {new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(session.date).toLocaleDateString('es-ES')} a las {new Date(session.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
               <div className="flex items-center text-sm text-gray-600">
                 <Clock className="mr-3 h-5 w-5 text-amber-500" />

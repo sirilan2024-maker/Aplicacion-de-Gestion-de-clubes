@@ -37,7 +37,7 @@ export async function updateConvocatoria(matchId: string, playerId: string, stat
   return { success: true }
 }
 
-export async function updateConvocatoriaBatch(matchId: string, updates: { playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | null }[]) {
+export async function updateConvocatoriaBatch(matchId: string, updates: { playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | "titular" | "suplente" | null }[]) {
   const supabase = await createAdminClient()
 
   let hasError = false;
@@ -83,17 +83,54 @@ export async function updateConvocatoriaBatch(matchId: string, updates: { player
 }
 
 export async function sendConvocatoriaAlerts(matchId: string, teamId: string, playerIds: string[]) {
-  // Simularemos el envío de la notificación a los perfiles vinculados a los players
-  // En una versión real, cruzaríamos playerIds con profiles para insertar en public.notifications
   const supabase = await createClient()
 
-  console.log(`[ALERTA ENVIADA] Partido ${matchId}: Se ha notificado a ${playerIds.length} jugadores para confirmar asistencia.`)
+  // 1. Get tutor_ids for the players
+  const { data: players } = await supabase
+    .from('players')
+    .select('id, first_name, last_name, tutor_id')
+    .in('id', playerIds)
+    .not('tutor_id', 'is', null)
+
+  if (!players || players.length === 0) {
+    return { success: true, message: 'No se encontraron tutores para enviar alertas.' }
+  }
+
+  // 2. Get match details
+  const { data: match } = await supabase
+    .from('partidos')
+    .select('rival_nombre, fecha_hora')
+    .eq('id', matchId)
+    .single()
+
+  const matchTitle = match ? `Partido vs ${match.rival_nombre}` : 'Nuevo Partido'
+
+  // 3. Create notifications for each tutor
+  const notificationsToInsert = players.map(p => ({
+    profile_id: p.tutor_id,
+    title: `Convocatoria: ${matchTitle}`,
+    content: `${p.first_name} ha sido convocado para el próximo partido. Por favor, confirma su asistencia.`,
+    read: false,
+    match_id: matchId,
+    // Add player_id if needed in the notification payload for the frontend to know who it is for
+    // payload: { player_id: p.id } -> Assuming schema allows JSON payloads, otherwise we just use match_id
+  }))
+
+  const { error } = await supabase
+    .from('notifications')
+    .insert(notificationsToInsert)
+
+  if (error) {
+    console.error('[sendConvocatoriaAlerts] Error inserting notifications:', error)
+    return { success: false, message: 'Error enviando alertas.' }
+  }
+
+  console.log(`[ALERTA ENVIADA] Partido ${matchId}: Se ha notificado a ${playerIds.length} jugadores.`)
   
-  // Guardamos un pequeño registro en supabase o simulamos éxito
-  return { success: true, message: `Alertas push enviadas a ${playerIds.length} jugadores.` }
+  return { success: true, message: `Alertas enviadas a ${notificationsToInsert.length} familias.` }
 }
 
-export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string }) {
+export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null }) {
   const supabase = await createClient()
   await supabase.from('partidos').update(updates).eq('id', matchId)
   revalidatePath(`/dashboard/e/${teamId}/partidos`, 'page')
@@ -168,7 +205,8 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
       lugar: data.lugar,
       rival_nombre: data.rival_nombre,
       estado: 'Programado',
-      season_id: finalSeasonId
+      season_id: finalSeasonId,
+      rsvp_reminder_time: (data as any).rsvp_reminder_time || null
     })
     .select()
     .single()

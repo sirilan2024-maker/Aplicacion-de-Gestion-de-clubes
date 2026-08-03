@@ -34,7 +34,9 @@ export default function CrearVariosEquiposPage() {
   };
 
   const addRow = () => {
-    setRows((prev) => [...prev, { id: Date.now(), name: "", category: "", sport: "", gender: "", ageGroup: "", format: "", color: "#1E40AF" }]);
+    const paletteSize = Math.max(1, COLORS.length - 2);
+    const randomColor = COLORS[Math.floor(Math.random() * paletteSize)].value;
+    setRows((prev) => [...prev, { id: Date.now(), name: "", category: "", sport: "", gender: "", ageGroup: "", format: "", color: randomColor }]);
   };
 
   const validateRows = (): string | null => {
@@ -60,7 +62,11 @@ export default function CrearVariosEquiposPage() {
       toast.error('Introduce un número válido de equipos');
       return;
     }
-    const initialRows = Array.from({ length: count }, (_, i) => ({ id: i, name: "", category: "", sport: "", gender: "", ageGroup: "", format: "", color: "#1E40AF" }));
+    const paletteSize = Math.max(1, COLORS.length - 2);
+    const initialRows = Array.from({ length: count }, (_, i) => {
+      const randomColor = COLORS[Math.floor(Math.random() * paletteSize)].value;
+      return { id: i, name: "", category: "", sport: "", gender: "", ageGroup: "", format: "", color: randomColor };
+    });
     setRows(initialRows);
     setShowModal(false);
   };

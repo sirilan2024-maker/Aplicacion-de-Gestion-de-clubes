@@ -36,15 +36,18 @@ export default function EntrenamientoDetailPage() {
   const [playerMetrics, setPlayerMetrics] = useState<Record<string, Record<string, string | number>>>({});
   
   // Selection States
-  const [activeModule, setActiveModule] = useState<'asistencia' | 'formativo' | 'rapida'>('rapida');
+  const [activeModule, setActiveModule] = useState<'asistencia' | 'formativo' | 'rapida'>('asistencia');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [savingPlayer, setSavingPlayer] = useState<string | null>(null);
 
-  // Asistencia States
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
+  const [showFormativo, setShowFormativo] = useState(false);
+  const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
 
   useEffect(() => {
+    const stored = localStorage.getItem('showFormativo');
+    if (stored) setShowFormativo(stored === 'true');
     fetchData();
   }, [teamId, eventId]);
 
@@ -61,6 +64,10 @@ export default function EntrenamientoDetailPage() {
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = user ? await supabase.from('profiles').select('club_id').eq('id', user.id).single() : { data: null };
     const { data: activeSeason } = profile?.club_id ? await supabase.from('seasons').select('id').eq('club_id', profile.club_id).eq('is_active', true).single() : { data: null };
+    
+    if (activeSeason?.id) {
+      setActiveSeasonId(activeSeason.id);
+    }
     
     let plData: any[] = [];
     if (activeSeason?.id) {
@@ -238,38 +245,32 @@ export default function EntrenamientoDetailPage() {
     setSavingPlayer('asistencia');
     const supabase = createClient();
     
-    let hasError = false;
-    for (const player of allPlayers) {
-      const status = attendance[player.id];
-      const payload = {
-        event_id: eventId,
-        team_id: teamId,
-        player_id: player.id,
-        date: eventDetails?.date,
-        status: status
-      };
+    const payloads = allPlayers.map(player => ({
+      session_id: eventId,
+      event_id: eventId,
+      player_id: player.id,
+      date: eventDetails?.date,
+      status: attendance[player.id],
+      season_id: activeSeasonId
+    }));
 
-      const { data: existing } = await supabase.from('attendance').select('id').eq('event_id', eventId).eq('player_id', player.id).maybeSingle();
-      if (existing) {
-        const { error } = await supabase.from('attendance').update({ status }).eq('id', existing.id);
-        if (error) hasError = true;
-      } else {
-        const { error } = await supabase.from('attendance').insert(payload);
-        if (error) hasError = true;
-      }
+    const { error } = await supabase.from('attendance').upsert(payloads, { onConflict: 'session_id,player_id' });
+    
+    if (error) {
+      console.error(error);
+      toast.error("Error al guardar: " + error.message);
+      setSavingPlayer(null);
+      return;
     }
 
     setSavingPlayer(null);
-    if (hasError) {
-      toast.error("Hubo un error al guardar la asistencia.");
-    } else {
-      toast.success("Asistencia guardada correctamente");
-      // Update players list based on new attendance
-      const presentIds = Object.keys(attendance).filter(id => attendance[id] === 'Presente');
-      const presentPlayers = allPlayers.filter(p => presentIds.includes(p.id));
-      setPlayers(presentPlayers);
-      if (presentPlayers.length > 0) setSelectedPlayerId(presentPlayers[0].id);
-    }
+    toast.success("Asistencia guardada correctamente");
+    
+    // Update players list based on new attendance
+    const presentIds = Object.keys(attendance).filter(id => attendance[id] === 'Presente');
+    const presentPlayers = allPlayers.filter(p => presentIds.includes(p.id));
+    setPlayers(presentPlayers);
+    if (presentPlayers.length > 0) setSelectedPlayerId(presentPlayers[0].id);
   };
 
   if (loading) {
@@ -314,14 +315,14 @@ export default function EntrenamientoDetailPage() {
             </button>
           </div>
           <p className="text-gray-500 mt-1">
-            {eventDetails?.date} • Selecciona un módulo y un jugador para registrar sus datos.
+            {eventDetails?.date ? new Date(eventDetails.date).toLocaleDateString('es-ES') : ''} • Selecciona un módulo y un jugador para registrar sus datos.
           </p>
         </div>
 
         {/* MODULE SELECTOR */}
-        <div className="w-full md:w-auto">
+        <div className="w-full md:w-auto flex flex-col md:flex-row items-start md:items-center gap-4">
         {/* TABS (Desktop) */}
-        <div className="hidden sm:flex gap-2 pb-2 border-b border-gray-100">
+        <div className="hidden sm:flex gap-2 pb-2 md:pb-0 border-b md:border-b-0 border-gray-100">
           <button 
             onClick={() => setActiveModule('asistencia')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
@@ -332,15 +333,6 @@ export default function EntrenamientoDetailPage() {
             Asistencia
           </button>
           <button 
-            onClick={() => setActiveModule('formativo')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-              activeModule === 'formativo' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <BrainCircuit size={18} />
-            Formativo
-          </button>
-          <button 
             onClick={() => setActiveModule('rapida')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
               activeModule === 'rapida' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
@@ -349,20 +341,56 @@ export default function EntrenamientoDetailPage() {
             <Zap size={18} />
             Carga Rápida (RPE)
           </button>
+          {showFormativo && (
+            <button 
+              onClick={() => setActiveModule('formativo')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
+                activeModule === 'formativo' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <BrainCircuit size={18} />
+              Formativo
+            </button>
+          )}
         </div>
 
+        {/* Formativo Toggle */}
+        <label className="hidden sm:flex items-center cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm text-xs font-bold text-gray-600">
+          <div className="relative">
+            <input type="checkbox" className="sr-only" checked={showFormativo} onChange={(e) => {
+              setShowFormativo(e.target.checked);
+              localStorage.setItem('showFormativo', e.target.checked.toString());
+              if (!e.target.checked && activeModule === 'formativo') setActiveModule('asistencia');
+            }} />
+            <div className={`block w-8 h-5 rounded-full transition-colors ${showFormativo ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
+            <div className={`absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform ${showFormativo ? 'transform translate-x-3' : ''}`}></div>
+          </div>
+          <span className="ml-2">Módulo Formativo</span>
+        </label>
+
         {/* TABS (Mobile Dropdown) */}
-        <div className="sm:hidden mb-2">
+        <div className="sm:hidden mb-2 flex gap-2 w-full">
           <select
              value={activeModule}
              onChange={(e) => setActiveModule(e.target.value as any)}
-             className="w-full bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
+             className="flex-1 bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25rem' }}
           >
              <option value="asistencia">✅ Asistencia</option>
-             <option value="formativo">🧠 Formativo</option>
              <option value="rapida">⚡ Carga Rápida (RPE)</option>
+             {showFormativo && <option value="formativo">🧠 Formativo</option>}
           </select>
+          <button
+            onClick={() => {
+              const newVal = !showFormativo;
+              setShowFormativo(newVal);
+              localStorage.setItem('showFormativo', newVal.toString());
+              if (!newVal && activeModule === 'formativo') setActiveModule('asistencia');
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${showFormativo ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-500'}`}
+          >
+            {showFormativo ? 'Ocultar Formativo' : '+ Formativo'}
+          </button>
         </div>   </div>
       </div>
 
@@ -424,66 +452,71 @@ export default function EntrenamientoDetailPage() {
                   Guardar Asistencia
                 </button>
               </div>
-              <div className="p-0 overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
-                      <th className="p-4 font-bold">Jugador</th>
-                      <th className="p-4 font-bold w-64 text-center">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {allPlayers.map(player => {
-                      const currentStatus = attendance[player.id];
-                      return (
-                        <tr key={player.id} className="hover:bg-gray-50/50">
-                          <td className="p-4 font-semibold text-gray-900 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
-                              {player.dorsal || '-'}
-                            </div>
-                            {player.first_name} {player.last_name}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex bg-gray-100 rounded-lg p-1 w-full max-w-md mx-auto shadow-inner">
-                              <button
-                                onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Presente' }))}
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                  currentStatus === 'Presente' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                              >
-                                Presente
-                              </button>
-                              <button
-                                onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Retraso' }))}
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                  currentStatus === 'Retraso' ? 'bg-white text-orange-500 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                              >
-                                Retraso
-                              </button>
-                              <button
-                                onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Ausente' }))}
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                  currentStatus === 'Ausente' ? 'bg-white text-red-600 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                              >
-                                Ausente
-                              </button>
-                              <button
-                                onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Lesionado' }))}
-                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                  currentStatus === 'Lesionado' ? 'bg-white text-amber-600 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                              >
-                                Permiso/Lesión
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="p-0 overflow-x-auto divide-y divide-gray-100">
+                {allPlayers.map(player => {
+                  const currentStatus = attendance[player.id];
+                  
+                  return (
+                    <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-sm border border-gray-200 shrink-0">
+                          {player.dorsal || '-'}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">{player.first_name} {player.last_name}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Status selectors */}
+                      <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-auto relative border border-gray-200/50 shadow-inner">
+                          <button
+                            onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Presente' }))}
+                            className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                              currentStatus === 'Presente' || currentStatus === 'present'
+                                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
+                                : 'text-gray-600 hover:bg-gray-200/60'
+                            }`}
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Presente</span>
+                          </button>
+                          <button
+                            onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Retraso' }))}
+                            className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                              currentStatus === 'Retraso' || currentStatus === 'late'
+                                ? 'bg-orange-500 text-white shadow-sm shadow-orange-100'
+                                : 'text-gray-600 hover:bg-gray-200/60'
+                            }`}
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Retraso</span>
+                          </button>
+                        <button
+                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Ausente' }))}
+                          className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                            currentStatus === 'Ausente' || currentStatus === 'absent'
+                              ? 'bg-red-500 text-white shadow-sm shadow-red-100'
+                              : 'text-gray-600 hover:bg-gray-200/60'
+                          }`}
+                        >
+                          <span className="text-sm leading-none">❌</span>
+                          <span className="hidden sm:inline">Ausente</span>
+                        </button>
+                        <button
+                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Lesionado' }))}
+                          className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                            currentStatus === 'Lesionado' || currentStatus === 'excused'
+                              ? 'bg-amber-500 text-white shadow-sm shadow-amber-100'
+                              : 'text-gray-600 hover:bg-gray-200/60'
+                          }`}
+                        >
+                          <span className="text-sm leading-none">⚕️</span>
+                          <span className="hidden sm:inline">Justificado</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : activeModule === 'rapida' ? (

@@ -57,8 +57,10 @@ export function NotificationBell() {
     setNotifications(prev => prev.filter(n => n.id !== notification.id))
     setIsOpen(false)
     
-    // Navigate based on type
-    if (notification.type === 'disciplina') {
+    // Navigate based on type or link
+    if (notification.link) {
+      router.push(notification.link)
+    } else if (notification.type === 'disciplina') {
       router.push('/dashboard/mensajes') // Go to chat to see the alert
     }
   }
@@ -118,7 +120,7 @@ export function NotificationBell() {
                         <p className="text-xs font-bold text-slate-900 mb-0.5">{notif.title}</p>
                         <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{notif.content}</p>
                         <p className="text-[10px] text-slate-400 mt-1">
-                          {new Date(notif.created_at).toLocaleDateString()}
+                          {new Date(notif.created_at).toLocaleDateString('es-ES')}
                         </p>
                       </div>
                       <button 

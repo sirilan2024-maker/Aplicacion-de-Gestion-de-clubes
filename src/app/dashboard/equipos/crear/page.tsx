@@ -1,7 +1,7 @@
 // src/app/dashboard/equipos/crear/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import { Info } from "lucide-react";
@@ -21,6 +21,14 @@ export default function CrearEquipoPage() {
   const [ageGroup, setAgeGroup] = useState(AGE_GROUPS[0]);
   const [format, setFormat] = useState(FORMATS[0]);
   const [color, setColor] = useState(COLORS[0].value);
+
+  // Auto-assign a random color on mount to ensure distinct colors for new teams
+  useEffect(() => {
+    // Avoid the last two colors (typically Black and White) for team primary colors if possible
+    const paletteSize = Math.max(1, COLORS.length - 2);
+    const randomIndex = Math.floor(Math.random() * paletteSize);
+    setColor(COLORS[randomIndex].value);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

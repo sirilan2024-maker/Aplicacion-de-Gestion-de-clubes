@@ -327,7 +327,7 @@ export default function Payments() {
                       )}
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap text-sm"><EstadoBadge estado={fee.estado} /></td>
-                    <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString() : "–"}</td>
+                    <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}</td>
                     <td className="px-2 py-3 whitespace-nowrap text-sm flex gap-1">
                       <button onClick={() => initiateStatusChange(fee.id, fee.estado)}
                         className={`flex items-center justify-center w-8 h-8 rounded ${fee.estado === "pendiente" ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"}`}

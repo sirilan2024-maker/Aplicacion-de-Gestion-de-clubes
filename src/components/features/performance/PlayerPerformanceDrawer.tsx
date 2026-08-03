@@ -96,7 +96,7 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
                       return (
                         <div key={ev.id} className="p-3 border border-slate-100 rounded-xl bg-white shadow-sm flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-bold text-slate-700">{new Date(ev.date).toLocaleDateString()}</div>
+                            <div className="text-sm font-bold text-slate-700">{new Date(ev.date).toLocaleDateString('es-ES')}</div>
                             <div className="text-xs text-slate-400">{ev.title}</div>
                           </div>
                           <div className="flex gap-4 text-center">
@@ -167,7 +167,7 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
                       return (
                         <div key={ev.id} className="p-3 border border-slate-100 rounded-xl bg-white shadow-sm flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-bold text-slate-700">{new Date(ev.date).toLocaleDateString()}</div>
+                            <div className="text-sm font-bold text-slate-700">{new Date(ev.date).toLocaleDateString('es-ES')}</div>
                             <div className="text-xs text-slate-400">{ev.title}</div>
                           </div>
                           <div className="flex gap-3 text-center">

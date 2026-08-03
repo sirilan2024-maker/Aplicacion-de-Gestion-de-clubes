@@ -144,7 +144,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   {cardEvents.map((ev: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                        {new Date(ev.match.fecha_hora).toLocaleDateString()}
+                        {new Date(ev.match.fecha_hora).toLocaleDateString('es-ES')}
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-900">{ev.match.rival_nombre}</div>
@@ -190,7 +190,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   return (
                     <tr key={m.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
-                        {new Date(m.fecha_hora).toLocaleDateString()}
+                        {new Date(m.fecha_hora).toLocaleDateString('es-ES')}
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-900 truncate max-w-[150px] sm:max-w-xs">{m.rival_nombre}</div>

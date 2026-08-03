@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays, addDays, getDay } from "date-fns";
 import { es } from "date-fns/locale";
 
 interface TrainingSession {
@@ -37,6 +37,12 @@ export default function EntrenamientosListPage() {
   const [newTitle, setNewTitle] = useState("Entrenamiento");
   const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newTime, setNewTime] = useState("18:00");
+  const [newEndTime, setNewEndTime] = useState("");
+  const [newLocation, setNewLocation] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
+  const [recurringEndDate, setRecurringEndDate] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -141,28 +147,68 @@ export default function EntrenamientosListPage() {
     setCreating(true);
     const supabase = createClient();
     
-    const newSession = {
+    if (isRecurring && (!recurringEndDate || recurringDays.length === 0)) {
+      toast.error("Selecciona días y fecha fin para la recurrencia.");
+      setCreating(false);
+      return;
+    }
+
+    const baseEvent = {
       team_id: teamId,
       title: newTitle || "Entrenamiento",
       event_type: "Entrenamiento",
-      date: newDate,
-      start_time: newTime
+      start_time: newTime,
+      end_time: newEndTime || null,
+      lugar: newLocation || null,
+      description: newDescription || null,
     };
+
+    const eventsToInsert = [];
+
+    if (!isRecurring) {
+      eventsToInsert.push({ ...baseEvent, date: newDate });
+    } else {
+      let currentDate = parseISO(newDate);
+      const end = parseISO(recurringEndDate);
+      
+      // Limitar a máximo 2 años por seguridad (730 iteraciones)
+      let iterations = 0;
+      while (currentDate <= end && iterations < 730) {
+        // getDay: 0=Dom, 1=Lun, 2=Mar, 3=Mie, 4=Jue, 5=Vie, 6=Sab
+        if (recurringDays.includes(getDay(currentDate))) {
+          eventsToInsert.push({ ...baseEvent, date: format(currentDate, 'yyyy-MM-dd') });
+        }
+        currentDate = addDays(currentDate, 1);
+        iterations++;
+      }
+      
+      if (eventsToInsert.length === 0) {
+        toast.error("No hay fechas válidas en el rango seleccionado.");
+        setCreating(false);
+        return;
+      }
+    }
 
     const { data, error } = await supabase
       .from('team_events')
-      .insert(newSession)
-      .select()
-      .single();
+      .insert(eventsToInsert)
+      .select();
 
     if (error) {
-      toast.error("Error al crear la sesión");
+      toast.error("Error al crear la sesión: " + error.message);
       setCreating(false);
     } else if (data) {
-      toast.success("Sesión creada");
+      toast.success(eventsToInsert.length > 1 ? `${eventsToInsert.length} sesiones creadas` : "Sesión creada");
       setCreating(false);
       setShowModal(false);
-      fetchData(); // Refresh list instead of redirecting
+      // Reset form
+      setIsRecurring(false);
+      setRecurringDays([]);
+      setRecurringEndDate("");
+      setNewEndTime("");
+      setNewLocation("");
+      setNewDescription("");
+      fetchData();
     }
   };
 
@@ -338,7 +384,7 @@ export default function EntrenamientosListPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Fecha</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Fecha Inicial</label>
                   <input 
                     type="date" 
                     value={newDate}
@@ -347,16 +393,86 @@ export default function EntrenamientosListPage() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora</label>
-                  <input 
-                    type="time" 
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora Inicio</label>
+                    <input 
+                      type="time" 
+                      value={newTime}
+                      onChange={(e) => setNewTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora Fin</label>
+                    <input 
+                      type="time" 
+                      value={newEndTime}
+                      onChange={(e) => setNewEndTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+                    />
+                  </div>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">Ubicación</label>
+                <input 
+                  type="text" 
+                  value={newLocation}
+                  onChange={(e) => setNewLocation(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  placeholder="Ej: Campo Norte"
+                />
+              </div>
+
+              {/* RECURRENCIA */}
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={isRecurring}
+                    onChange={e => setIsRecurring(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                  />
+                  <span className="font-bold text-blue-900">Entrenamiento Recurrente</span>
+                </label>
+                
+                {isRecurring && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
+                      <div className="flex flex-wrap gap-2">
+                        {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
+                          <button
+                            type="button"
+                            key={day.id}
+                            onClick={() => {
+                              if (recurringDays.includes(day.id)) {
+                                setRecurringDays(recurringDays.filter(d => d !== day.id));
+                              } else {
+                                setRecurringDays([...recurringDays, day.id]);
+                              }
+                            }}
+                            className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                          >
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
+                      <input 
+                        type="date" 
+                        value={recurringEndDate}
+                        onChange={(e) => setRecurringEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                        required={isRecurring}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="pt-4 flex gap-3">
                 <button 

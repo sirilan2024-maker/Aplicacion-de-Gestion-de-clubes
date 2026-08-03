@@ -80,7 +80,7 @@ export function TeamMatchesView({
     const formattedMatches = data.matches
       .filter(m => m.equipo_id === teamId)
       .map(m => ({
-        Fecha: new Date(m.fecha_hora).toLocaleDateString(),
+        Fecha: new Date(m.fecha_hora).toLocaleDateString('es-ES'),
         Hora: new Date(m.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         Jornada: m.jornada || '-',
         Rival: m.rival_nombre || m.rival || 'Por definir',

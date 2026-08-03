@@ -12,7 +12,7 @@ function formatTime(totalSeconds: number) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
+export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: any, clubLogoUrl?: string }) {
   const [match, setMatch] = useState<any>(initialMatch);
   const [matchEvents, setMatchEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -84,7 +84,7 @@ export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
   // Live Timer
   const { seconds } = useLiveTimer(matchId, match?.live_timer_elapsed_seconds || 0, match?.live_timer_started_at || null);
 
-  const isLocal = true; // Match Coach View: Always show the club on the left
+  const isLocal = !/\b(fuera|visitante)\b/i.test(match?.lugar || ''); // Consider local unless explicitly marked as fuera/visitante
   const teamName = match?.equipo?.name || "Sporting Saladar";
   const rivalName = match?.rival_nombre || "Rival por definir";
   
@@ -96,13 +96,13 @@ export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
   // Goals calculations
   const localGoalsList = matchEvents.filter(e => {
     if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta') return isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : e.player_id;
     return false;
   });
   
   const awayGoalsList = matchEvents.filter(e => {
     if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta') return !isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return !isLocal ? !e.player_id : e.player_id;
     return false;
   });
 
@@ -191,7 +191,11 @@ export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
           {/* Local */}
           <div className="flex flex-col md:flex-row items-center gap-4 flex-1 text-center md:text-left">
             <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
-              🛡️
+              {isLocal && clubLogoUrl ? (
+                <img src={clubLogoUrl} alt="Local" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
+              ) : (
+                '🛡️'
+              )}
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-950 leading-tight">{localName}</h2>
@@ -264,7 +268,11 @@ export function LiveMatchPanel({ match: initialMatch }: { match: any }) {
           {/* Away */}
           <div className="flex flex-col md:flex-row-reverse items-center gap-4 flex-1 text-center md:text-right">
             <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
-              🏆
+              {!isLocal && clubLogoUrl ? (
+                <img src={clubLogoUrl} alt="Visitante" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
+              ) : (
+                '🏆'
+              )}
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-950 leading-tight">{awayName}</h2>

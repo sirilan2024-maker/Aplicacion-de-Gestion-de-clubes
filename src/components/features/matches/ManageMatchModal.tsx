@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { X, Save } from "lucide-react"
@@ -14,6 +15,8 @@ interface ManageMatchModalProps {
 }
 
 export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: ManageMatchModalProps) {
+  const [autoRsvp, setAutoRsvp] = useState(false);
+  
   if (!match) return null;
 
   const defaultTeamId = match.equipo_id || teamId;
@@ -36,9 +39,17 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           const golesRivalStr = formData.get("resultado_rival") as string;
           const notasStr = formData.get("notas") as string;
           const highlightJornada = formData.get("highlight_jornada") === 'on';
+          // autoRsvp state handles the toggle
+          const rsvpDateStr = formData.get("rsvp_date") as string;
+          const rsvpTimeStr = formData.get("rsvp_time") as string;
 
           const golesPropios = golesPropiosStr !== "" ? parseInt(golesPropiosStr) : null;
           const golesRival = golesRivalStr !== "" ? parseInt(golesRivalStr) : null;
+          
+          let rsvpReminderTime = null;
+          if (autoRsvp && rsvpDateStr && rsvpTimeStr) {
+            rsvpReminderTime = new Date(`${rsvpDateStr}T${rsvpTimeStr}:00`).toISOString();
+          }
           
           // Determine status based on scores
           const estado = (golesPropios !== null && golesRival !== null) ? 'Finalizado' : 'Programado';
@@ -55,7 +66,8 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               resultado_rival: golesRival,
               estado: estado,
               coach_summary: notasStr,
-              highlight_jornada: highlightJornada
+              highlight_jornada: highlightJornada,
+              rsvp_reminder_time: rsvpReminderTime
             };
 
             if (match.id === 'new') {
@@ -187,6 +199,54 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               <p className="text-sm font-bold text-slate-800">Mostrar en Jornada</p>
               <p className="text-xs text-slate-500 mt-0.5">Fija este partido en la pestaña Jornada aunque esté fuera de la ventana de 72h automática.</p>
             </div>
+          </div>
+
+          {/* Programar petición de asistencia */}
+          <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="relative mt-0.5">
+                <input
+                  type="checkbox"
+                  id="auto_rsvp"
+                  name="auto_rsvp"
+                  checked={autoRsvp}
+                  onChange={(e) => setAutoRsvp(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <label
+                  htmlFor="auto_rsvp"
+                  className="block w-10 h-5 bg-slate-200 rounded-full cursor-pointer peer-checked:bg-blue-500 transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:shadow after:transition-transform peer-checked:after:translate-x-5"
+                />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-blue-900">Programar petición de asistencia</p>
+                <p className="text-xs text-blue-700/80 mt-0.5">Enviar una notificación interactiva automáticamente a los tutores.</p>
+              </div>
+            </div>
+            
+            {autoRsvp && (
+              <div className="grid grid-cols-2 gap-4 mt-4 animate-in fade-in slide-in-from-top-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Día de envío</label>
+                  <input 
+                    type="date" 
+                    name="rsvp_date"
+                    required={autoRsvp}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
+                  <input 
+                    type="time" 
+                    name="rsvp_time"
+                    required={autoRsvp}
+                    defaultValue="19:00"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white" 
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

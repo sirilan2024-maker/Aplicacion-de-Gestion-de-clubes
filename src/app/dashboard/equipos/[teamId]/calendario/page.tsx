@@ -9,11 +9,12 @@ import {
 } from "lucide-react";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
-  eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO 
+  eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO, getDay, addDays
 } from "date-fns";
 import { es } from "date-fns/locale";
 import toast, { Toaster } from "react-hot-toast";
 import { createTeamEventAction, updateTeamEventAction } from "@/app/actions/event-actions";
+import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal";
 
 interface TeamEvent {
   id: string;
@@ -24,6 +25,7 @@ interface TeamEvent {
   end_time?: string;
   location?: string;
   notes?: string;
+  isOfficialMatch?: boolean;
 }
 
 export default function CalendarioEquipoPage() {
@@ -35,8 +37,10 @@ export default function CalendarioEquipoPage() {
   const [events, setEvents] = useState<TeamEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showMatchModal, setShowMatchModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingMatch, setEditingMatch] = useState<any>(null);
 
   // Form states
   const [title, setTitle] = useState("");
@@ -46,6 +50,14 @@ export default function CalendarioEquipoPage() {
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [autoRsvp, setAutoRsvp] = useState(false);
+  const [rsvpDate, setRsvpDate] = useState("");
+  const [rsvpTime, setRsvpTime] = useState("19:00");
+
+  // Recurring state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
+  const [recurringEndDate, setRecurringEndDate] = useState("");
 
   useEffect(() => {
     fetchEvents();
@@ -59,18 +71,54 @@ export default function CalendarioEquipoPage() {
     const start = format(startOfMonth(currentMonth), "yyyy-MM-dd");
     const end = format(endOfMonth(currentMonth), "yyyy-MM-dd");
 
-    const { data, error } = await supabase
+    const { data: teamEvents, error: eventsError } = await supabase
       .from('team_events')
       .select('*')
       .eq('team_id', teamId)
       .gte('date', start)
-      .lte('date', end)
-      .order('date', { ascending: true })
-      .order('start_time', { ascending: true });
+      .lte('date', end);
 
-    if (!error && data) {
-      setEvents(data);
+    const { data: partidos, error: partidosError } = await supabase
+      .from('partidos')
+      .select('*')
+      .eq('equipo_id', teamId);
+
+    const mergedEvents: TeamEvent[] = [];
+
+    if (!eventsError && teamEvents) {
+      teamEvents.forEach(ev => mergedEvents.push(ev));
     }
+
+    if (!partidosError && partidos) {
+      partidos.forEach(p => {
+        if (!p.fecha_hora) return;
+        const dt = new Date(p.fecha_hora);
+        const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        
+        // Filter out matches that don't fall in the current month bounds (optional but good practice)
+        if (dateStr >= start && dateStr <= end) {
+          mergedEvents.push({
+            id: p.id,
+            title: `Jornada vs ${p.rival_nombre || 'Rival'}`,
+            event_type: 'Partido',
+            date: dateStr,
+            start_time: timeStr,
+            location: p.lugar || "",
+            notes: "Partido oficial",
+            isOfficialMatch: true
+          });
+        }
+      });
+    }
+
+    mergedEvents.sort((a, b) => {
+      const timeA = new Date(`${a.date}T${a.start_time}:00`).getTime();
+      const timeB = new Date(`${b.date}T${b.start_time}:00`).getTime();
+      return timeA - timeB;
+    });
+
+    setEvents(mergedEvents);
     setLoading(false);
   };
 
@@ -120,9 +168,19 @@ export default function CalendarioEquipoPage() {
     setEndTime("19:30");
     setLocation("Campo Principal");
     setNotes("");
+    setAutoRsvp(false);
+    setRsvpDate("");
+    setRsvpTime("19:00");
+    setIsRecurring(false);
+    setRecurringDays([]);
+    setRecurringEndDate("");
   };
 
   const handleOpenEditModal = (event: TeamEvent) => {
+    if (event.isOfficialMatch) {
+      router.push(`/dashboard/matches/${event.id}`);
+      return;
+    }
     setSelectedDate(parseISO(event.date));
     setEditingEventId(event.id);
     setTitle(event.title);
@@ -131,6 +189,11 @@ export default function CalendarioEquipoPage() {
     setEndTime(event.end_time ? event.end_time.substring(0, 5) : "19:30");
     setLocation(event.location || "");
     setNotes(event.notes || "");
+    
+    // For now we don't fetch rsvp_reminder_time from the API in this view, 
+    // but if we did, we would parse it here. We'll leave it as off for edits by default unless we add it to the fetch.
+    setAutoRsvp(false);
+    
     setShowModal(true);
   };
 
@@ -149,7 +212,8 @@ export default function CalendarioEquipoPage() {
       start_time: startTime,
       end_time: endTime || null,
       location: location || null,
-      notes: notes || null
+      notes: notes || null,
+      rsvp_reminder_time: autoRsvp && rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null
     };
 
     let errorMsg = null;
@@ -157,7 +221,34 @@ export default function CalendarioEquipoPage() {
       if (editingEventId) {
         await updateTeamEventAction(editingEventId, teamId, eventData);
       } else {
-        await createTeamEventAction(teamId, eventData);
+        if (!isRecurring) {
+          await createTeamEventAction(teamId, eventData);
+        } else {
+          if (!recurringEndDate || recurringDays.length === 0) {
+            toast.error("Selecciona días y fecha fin para la recurrencia.");
+            setSubmitting(false);
+            return;
+          }
+          let currentDate = parseISO(format(selectedDate, 'yyyy-MM-dd'));
+          const end = parseISO(recurringEndDate);
+          let iterations = 0;
+          let created = 0;
+          
+          while(currentDate <= end && iterations < 730) {
+            if (recurringDays.includes(getDay(currentDate))) {
+              await createTeamEventAction(teamId, { ...eventData, date: format(currentDate, 'yyyy-MM-dd') });
+              created++;
+            }
+            currentDate = addDays(currentDate, 1);
+            iterations++;
+          }
+          
+          if (created === 0) {
+            toast.error("No hay fechas válidas en el rango seleccionado.");
+            setSubmitting(false);
+            return;
+          }
+        }
       }
     } catch(e: any) {
       errorMsg = e.message;
@@ -324,26 +415,46 @@ export default function CalendarioEquipoPage() {
                 
                 {/* ACTION BUTTONS */}
                 <div className="w-full sm:w-auto pt-4 sm:pt-0 border-t sm:border-0 border-gray-100 flex gap-2">
-                  <button 
-                    onClick={() => handleOpenEditModal(event)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    onClick={() => router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${event.id}&date=${event.date}`)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
-                  >
-                    <ClipboardCheck size={16} />
-                    Pasar Lista
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteEvent(event.id)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-bold shadow-sm border border-red-100 transition-colors"
-                    title="Eliminar evento"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {event.isOfficialMatch ? (
+                    <>
+                      <button 
+                        onClick={() => router.push(`/dashboard/matches/${event.id}`)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                      >
+                        Ver Partido
+                      </button>
+                      <button 
+                        onClick={() => router.push(`/dashboard/equipos/${teamId}/partidos/${event.id}?tab=post-partido&action=pasar-lista`)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                      >
+                        <ClipboardCheck size={16} />
+                        Pasar Lista
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => handleOpenEditModal(event)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${event.id}&date=${event.date}`)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                      >
+                        <ClipboardCheck size={16} />
+                        Pasar Lista
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteEvent(event.id)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-bold shadow-sm border border-red-100 transition-colors"
+                        title="Eliminar evento"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -382,7 +493,17 @@ export default function CalendarioEquipoPage() {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
                   <select 
                     value={eventType} 
-                    onChange={(e) => setEventType(e.target.value as any)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'Partido') {
+                        setShowModal(false);
+                        setEditingMatch({ id: 'new', fecha_hora: new Date(selectedDate || new Date()).toISOString() });
+                        setShowMatchModal(true);
+                        setEventType('Entrenamiento');
+                      } else {
+                        setEventType(val as any);
+                      }
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="Entrenamiento">Entrenamiento</option>
@@ -433,6 +554,94 @@ export default function CalendarioEquipoPage() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none resize-none" 
                 />
               </div>
+
+              {/* RECURRENCIA */}
+              {!editingEventId && (
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isRecurring}
+                      onChange={e => setIsRecurring(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span className="font-bold text-blue-900">Evento Recurrente</span>
+                  </label>
+                  
+                  {isRecurring && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
+                            <button
+                              type="button"
+                              key={day.id}
+                              onClick={() => {
+                                if (recurringDays.includes(day.id)) {
+                                  setRecurringDays(recurringDays.filter(d => d !== day.id));
+                                } else {
+                                  setRecurringDays([...recurringDays, day.id]);
+                                }
+                              }}
+                              className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
+                        <input 
+                          type="date" 
+                          value={recurringEndDate}
+                          onChange={(e) => setRecurringEndDate(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          required={isRecurring}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <input 
+                    type="checkbox" 
+                    checked={autoRsvp}
+                    onChange={(e) => setAutoRsvp(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="font-bold text-blue-900 text-sm">Programar petición de asistencia automática</span>
+                </label>
+                
+                {autoRsvp && (
+                  <div className="grid grid-cols-2 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Día de envío</label>
+                      <input 
+                        type="date" 
+                        required={autoRsvp}
+                        value={rsvpDate}
+                        onChange={e => setRsvpDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
+                      <input 
+                        type="time" 
+                        required={autoRsvp}
+                        value={rsvpTime}
+                        onChange={e => setRsvpTime(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
               
               <div className="pt-4 flex gap-3">
                 <button 
@@ -453,6 +662,23 @@ export default function CalendarioEquipoPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showMatchModal && editingMatch && (
+        <ManageMatchModal
+          match={editingMatch}
+          teamId={teamId}
+          teams={[{ id: teamId, name: "Equipo actual", hex: "#000000" }]}
+          onClose={() => {
+            setShowMatchModal(false)
+            setEditingMatch(null)
+          }}
+          onSave={() => {
+            setShowMatchModal(false)
+            setEditingMatch(null)
+            fetchEvents()
+          }}
+        />
       )}
     </div>
   );

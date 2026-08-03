@@ -90,7 +90,7 @@ export default function ExpensesList({ refreshBalances }: { refreshBalances: () 
       `"${expense.concept}"`, 
       expense.status, 
       (expense.amount_cents / 100).toFixed(2), 
-      new Date(expense.created_at).toLocaleDateString()
+      new Date(expense.created_at).toLocaleDateString('es-ES')
     ]);
     const csvContent = "data:text/csv;charset=utf-8," 
       + header.join(",") + "\n" 
@@ -150,7 +150,7 @@ export default function ExpensesList({ refreshBalances }: { refreshBalances: () 
                 <tr><td colSpan={5} className="p-6 text-center text-gray-500">No hay gastos registrados</td></tr>
               ) : expenses.map(exp => (
                 <tr key={exp.id} className="hover:bg-gray-50">
-                  <td className="p-4 text-gray-600">{new Date(exp.date).toLocaleDateString()}</td>
+                  <td className="p-4 text-gray-600">{new Date(exp.date).toLocaleDateString('es-ES')}</td>
                   <td className="p-4 font-medium text-gray-800 truncate max-w-[150px]">{exp.concept}</td>
                   <td className="p-4">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

@@ -10,9 +10,14 @@ const CLOTHING_SIZES = [
   "XS", "S", "M", "L", "XL", "2XL", "3XL"
 ];
 
+const SOCKS_SIZES = [
+  "28-32", "33-35", "36-38", "39-42", "43-46"
+];
+
 const APPAREL_FIELDS = [
   { name: "sizeCamisetaJuego", label: "Camiseta Juego/Entrenamiento" },
   { name: "sizePantalonJuego", label: "Pantalón Juego/Entrenamiento" },
+  { name: "sizeMedias", label: "Medias" },
   { name: "sizeChandal", label: "Chándal Oficial" },
   { name: "sizeSudadera", label: "Sudadera" },
   { name: "sizeCamisetaPaseo", label: "Camiseta de Paseo" },
@@ -72,7 +77,7 @@ export function Step4Apparel() {
                 className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 shadow-sm transition-colors border-gray-300 hover:border-blue-400`}
               >
                 <option value="">Seleccionar Talla...</option>
-                {CLOTHING_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
+                {(item.name === 'sizeMedias' ? SOCKS_SIZES : CLOTHING_SIZES).map(size => <option key={size} value={size}>{size}</option>)}
               </select>
             </div>
           );

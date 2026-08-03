@@ -81,8 +81,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
       
     // Filter Location
     let matchesLocation = true;
-    const lugarText = (m.lugar || 'visitante').toLowerCase();
-    const isLocal = lugarText.includes('local') || lugarText.includes('casa');
+    const isLocal = !/\b(fuera|visitante)\b/i.test(m.lugar || '');
     if (filterLocation === 'local') matchesLocation = isLocal;
     else if (filterLocation === 'visitante') matchesLocation = !isLocal;
 
@@ -158,7 +157,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
           </h1>
           <p className="text-slate-500 mt-1">Aqui tienes toda la informacion de calendarios, partidos y clasificaciones de los equipos tu club.</p>
         </div>
-        {!fixedTeamId && !isReadOnly && (
+        {!isReadOnly && (
           <button
             onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors self-start sm:self-auto shadow-sm"
@@ -275,7 +274,7 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
             >
               <CalendarCheck size={15} />
               Jornada
-              {hasLiveMatches && viewMode !== 'en-directo' && (
+              {hasLiveMatches && (
                 <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
@@ -337,9 +336,36 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
         </div>
       )}
 
-      {/* Vistas */}
       {viewMode === 'en-directo' ? (
-        <MatchdayView initialMatches={matches} teams={teams} />
+        (() => {
+          const selectedTeamName = teams.find(t => t.id === selectedTeamId)?.name || '';
+          const equipoCoach = teams.find(e => e.name?.toLowerCase() === selectedTeamName.toLowerCase());
+          const actualEquipoId = selectedTeamId === 'all' ? 'all' : (equipoCoach ? equipoCoach.id : selectedTeamId);
+          
+          return (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-6 relative">
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => router.push('/live')}
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 shadow-sm transition-all"
+                >
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                  </span>
+                  Ver LIVE Público
+                </button>
+              </div>
+              <MatchdayView 
+                initialMatches={filteredMatches} 
+                teams={teams}
+                players={players}
+                convocatorias={convocatorias}
+                teamId={actualEquipoId}
+              />
+            </div>
+          );
+        })()
       ) : viewMode === 'clasificacion' ? (
         selectedTeamId === 'all' ? (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -532,7 +558,12 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); setDeletingMatch(match) }}
+                          onClick={(e) => { 
+                            const teamName = match.equipo?.name || teams.find(t => t.id === match.equipo_id)?.name;
+                            const coachEquipo = teams.find(e => e.name?.toLowerCase() === teamName?.toLowerCase());
+                            const targetTeamId = coachEquipo ? coachEquipo.id : match.equipo_id;
+                            handleDelete(e, match.id, targetTeamId);
+                          }}
                           className="p-1.5 bg-white hover:bg-rose-50 text-rose-600 rounded-lg transition-colors border border-slate-200 shadow-sm"
                           title="Eliminar partido"
                         >

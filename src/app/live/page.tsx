@@ -4,6 +4,8 @@ import Image from "next/image"
 
 import { getLiveAds } from "@/app/actions/ad-actions"
 
+import { LiveBackButton } from "@/components/features/matches/LiveBackButton"
+
 export const revalidate = 0 // Opt out of caching for live route
 
 export default async function PublicLivePage() {
@@ -18,7 +20,13 @@ export default async function PublicLivePage() {
     .from('partidos')
     .select(`
       *,
-      equipo:teams (id, name, category)
+      equipo:teams (id, name, category),
+      match_events (
+        tipo_evento,
+        minuto,
+        player_id,
+        player:players (first_name, last_name, nickname)
+      )
     `)
     .order('fecha_hora', { ascending: true })
 
@@ -31,8 +39,9 @@ export default async function PublicLivePage() {
   // Check if current user is admin to show inline ad manager
   const userSupabase = await createClient()
   const { data: authData } = await userSupabase.auth.getUser()
+  const isLoggedIn = !!authData?.user
   let isAdmin = false
-  if (authData?.user) {
+  if (isLoggedIn) {
     const { data: profile } = await userSupabase.from("profiles").select("role").eq("id", authData.user.id).single()
     isAdmin = profile?.role === 'admin'
   }
@@ -63,8 +72,12 @@ export default async function PublicLivePage() {
             </div>
           </div>
 
-          <div className="flex-1">
-            <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest relative z-10 hidden md:block">Resultados en Directo</p>
+          <div className="flex-1 flex items-center gap-2">
+            {isLoggedIn ? (
+              <LiveBackButton />
+            ) : (
+              <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest relative z-10 hidden md:block">Resultados en Directo</p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 relative z-10 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full">

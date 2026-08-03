@@ -178,3 +178,23 @@ async function syncMatchEventsToConvocatorias(matchId: string, supabase: any) {
     }
   }
 }
+
+export async function resetMatchAction(matchId: string) {
+  const supabase = await createAdminClient();
+  
+  // Borramos todos los eventos de este partido
+  await supabase.from("match_events").delete().eq("partido_id", matchId);
+  
+  // Reseteamos el estado y cronómetro del partido
+  await supabase.from("partidos").update({
+    estado: 'Programado',
+    resultado_propio: null,
+    resultado_rival: null,
+    live_timer_started_at: null,
+    live_timer_elapsed_seconds: 0,
+    first_half_duration_seconds: null,
+    second_half_duration_seconds: null
+  }).eq("id", matchId);
+
+  return { success: true };
+}

@@ -147,7 +147,7 @@ export default function TreasuryDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 min-h-[600px]">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         {activeTab === "ingresos" ? (
           <Payments key={`payments-${refreshTrigger}`} />
         ) : (

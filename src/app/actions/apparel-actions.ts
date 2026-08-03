@@ -132,6 +132,8 @@ export async function updatePlayerApparelSizesAction(playerId: string, sizes: { 
         .from('player_apparel')
         .upsert(upserts, { onConflict: 'player_id,item_name' })
       if (error) throw error
+    } else if (Object.keys(sizes).length > 0) {
+      return { success: false, error: `Las prendas seleccionadas no coinciden con la lista oficial del servidor: ${Object.keys(sizes).join(', ')}` }
     }
 
     revalidatePath(`/dashboard/family/e/${playerId}/ropa`)
@@ -178,7 +180,7 @@ export async function toggleApparelDeliveryAction(playerId: string, itemName: st
           .insert({
             player_id: playerId,
             item_name: itemName,
-            size: '',
+            size: 'Única',
             delivered: delivered,
             delivered_at: delivered ? new Date().toISOString() : null
           })
@@ -273,8 +275,14 @@ export async function getApparelDashboardDataAction(teamId?: string) {
       // Cargar datos
       p.player_apparel?.forEach((row: any) => {
         if (DEFAULT_ITEMS.includes(row.item_name)) {
+          let rowSize = row.size;
+          // Fix for legacy sizes that lack the "Talla " prefix
+          if (/^(116|128|140|152|164|176)$/.test(rowSize)) {
+            rowSize = `Talla ${rowSize}`;
+          }
+          
           apparelMap[row.item_name] = {
-            size: row.size,
+            size: rowSize,
             delivered: row.delivered,
             delivered_at: row.delivered_at
           }
@@ -308,50 +316,110 @@ export async function getApparelSummaryReportAction(teamId?: string) {
     if (!user) return { success: false, error: 'No autenticado' }
 
     // Consultar todos los registros de ropa de jugadores activos
-    let query = supabase
-      .from('player_apparel')
-      .select(`
-        item_name,
-        size,
-        delivered,
-        players!inner (
-          status,
-          team_id
-        )
-      `)
-      .neq('players.status', 'inactive')
+    let allApparelRows: any[] = []
+    let hasMore = true
+    let page = 0
+    const pageSize = 1000
 
-    if (teamId) {
-      query = query.eq('players.team_id', teamId)
+    while (hasMore) {
+      let query = supabase
+        .from('player_apparel')
+        .select(`
+          item_name,
+          size,
+          delivered,
+          players!inner (
+            status,
+            team_id
+          )
+        `)
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+
+      if (teamId) {
+        query = query.eq('players.team_id', teamId)
+      }
+
+      const { data: apparelRows, error } = await query
+      if (error) throw error
+
+      if (apparelRows && apparelRows.length > 0) {
+        allApparelRows = [...allApparelRows, ...apparelRows]
+        if (apparelRows.length < pageSize) {
+          hasMore = false
+        } else {
+          page++
+        }
+      } else {
+        hasMore = false
+      }
     }
 
-    const { data: apparelRows, error } = await query
-    if (error) throw error
+    const activeRows = allApparelRows.filter((row: any) => row.players?.status !== 'inactive')
 
     // Consolidar contadores en JS
     // Estructura: { [itemName]: { [size]: { totalNeeded: number, delivered: number, pending: number } } }
     const report: { 
       [itemName: string]: { 
-        [size: string]: { totalNeeded: number, delivered: number, pending: number } 
+        [size: string]: { totalNeeded: number, delivered: number, pending: number, initialStock?: number } 
       } 
     } = {}
 
-    // Inicializar prendas oficiales
+    const CLOTHING_SIZES = ['Talla 116', 'Talla 128', 'Talla 140', 'Talla 152', 'Talla 164', 'Talla 176', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+    const SOCKS_SIZES = ['28-32', '33-35', '36-38', '39-42', '43-46'];
+
+    // Obtener cantidad de jugadores activos para prendas de talla única (Medias, Mochila)
+    let playersCountQuery = supabase.from('players').select('id', { count: 'exact', head: true }).neq('status', 'inactive')
+    if (teamId) {
+      playersCountQuery = playersCountQuery.eq('team_id', teamId)
+    }
+    const { count: totalActivePlayers } = await playersCountQuery
+    const totalPlayers = totalActivePlayers || 0;
+
+    // Inicializar prendas oficiales con TODAS sus tallas
     DEFAULT_ITEMS.forEach(item => {
       report[item] = {}
+      
+      let sizesToUse = CLOTHING_SIZES;
+      if (item === 'Medias') sizesToUse = SOCKS_SIZES;
+      else if (item === 'Mochila') sizesToUse = ['Única'];
+
+      sizesToUse.forEach(size => {
+        const isUnica = sizesToUse.length === 1 && size === 'Única';
+        report[item][size] = { 
+          totalNeeded: isUnica ? totalPlayers : 0, 
+          delivered: 0, 
+          pending: 0, 
+          initialStock: 0 
+        }
+      })
     })
 
-    apparelRows?.forEach(row => {
+    activeRows?.forEach((row: any) => {
       const item = row.item_name
-      const size = row.size
+      let size = row.size || 'Única'
+      
+      // Fix for legacy sizes that lack the "Talla " prefix
+      if (/^(116|128|140|152|164|176)$/.test(size)) {
+        size = `Talla ${size}`;
+      }
+
+      // Asegurarnos de que Mochila cae en Única si venía con otra cosa por error histórico
+      if (item === 'Mochila') {
+        size = 'Única'
+      }
+
       const isDelivered = row.delivered
 
       if (!report[item]) report[item] = {}
       if (!report[item][size]) {
-        report[item][size] = { totalNeeded: 0, delivered: 0, pending: 0 }
+        report[item][size] = { totalNeeded: 0, delivered: 0, pending: 0, initialStock: 0 }
       }
 
-      report[item][size].totalNeeded += 1
+      // Solo incrementamos totalNeeded si NO es una prenda de talla única (ya lo sumamos arriba por cantidad de jugadores)
+      if (item !== 'Mochila') {
+        report[item][size].totalNeeded += 1
+      }
+      
       if (isDelivered) {
         report[item][size].delivered += 1
       } else {
@@ -359,9 +427,47 @@ export async function getApparelSummaryReportAction(teamId?: string) {
       }
     })
 
+    // Fetch initial stock
+    const { data: stockData } = await supabase.from('apparel_stock').select('*')
+    stockData?.forEach(row => {
+      const item = row.item_name
+      let size = row.size || 'Única'
+      
+      // Fix for legacy sizes that lack the "Talla " prefix
+      if (/^(116|128|140|152|164|176)$/.test(size)) {
+        size = `Talla ${size}`;
+      }
+
+      if (item === 'Mochila') {
+        size = 'Única'
+      }
+
+      if (!report[item]) report[item] = {}
+      if (!report[item][size]) {
+        report[item][size] = { totalNeeded: 0, delivered: 0, pending: 0, initialStock: 0 }
+      }
+      // Sumar al stock inicial por si hubiera registros legacy duplicados (ej: 116 y Talla 116)
+      report[item][size].initialStock = (report[item][size].initialStock || 0) + (row.stock || 0)
+    })
+
     return { success: true, data: report }
   } catch (error: any) {
     console.error('Error in getApparelSummaryReportAction:', error.message)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateApparelStockAction(itemName: string, size: string, stock: number) {
+  const supabase = await createClient()
+  try {
+    const { error } = await supabase
+      .from('apparel_stock')
+      .upsert({ item_name: itemName, size: size, stock: stock, updated_at: new Date().toISOString() }, { onConflict: 'item_name,size' })
+    if (error) throw error
+    revalidatePath('/dashboard/utilleria')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error in updateApparelStockAction:', error.message)
     return { success: false, error: error.message }
   }
 }

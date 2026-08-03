@@ -485,21 +485,49 @@ export default function PlayerDashboardPage() {
                 </>
               )}
             </div>
-            {nextMatchCallup && !nextMatchCallup.asistencia_confirmada_familia && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  alert("Asistencia confirmada");
-                }}
-                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-sm transition-colors"
-              >
-                Confirmar Asistencia
-              </button>
-            )}
-            {nextMatchCallup && nextMatchCallup.asistencia_confirmada_familia && (
-              <span className="px-4 py-2 bg-green-50 text-green-700 font-bold rounded-lg border border-green-200">
-                ✅ Asistencia Confirmada
-              </span>
+            {nextMatchCallup && (
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full mt-4">
+                <button 
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (nextMatchCallup.asistencia_confirmada_familia === true) return;
+                    const res = await fetch(`/api/matches/${nextMatch.id}/attendance`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ playerId, status: true })
+                    });
+                    if (res.ok) window.location.reload();
+                  }}
+                  className={`flex-1 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                    ${nextMatchCallup.asistencia_confirmada_familia === true 
+                      ? 'bg-emerald-600 text-white cursor-default' 
+                      : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                >
+                  {nextMatchCallup.asistencia_confirmada_familia === true && <CheckCircle2 className="w-4 h-4" />}
+                  Sí, asistiré
+                </button>
+                <button 
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (nextMatchCallup.asistencia_confirmada_familia === false) return;
+                    const res = await fetch(`/api/matches/${nextMatch.id}/attendance`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ playerId, status: false })
+                    });
+                    if (res.ok) window.location.reload();
+                  }}
+                  className={`flex-1 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                    ${nextMatchCallup.asistencia_confirmada_familia === false
+                      ? 'bg-rose-600 text-white cursor-default'
+                      : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+                    }`}
+                >
+                  {nextMatchCallup.asistencia_confirmada_familia === false && <span className="text-sm leading-none">❌</span>}
+                  No podré
+                </button>
+              </div>
             )}
           </div>
         </div>

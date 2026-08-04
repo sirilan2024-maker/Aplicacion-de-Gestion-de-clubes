@@ -1372,32 +1372,95 @@ export async function getOfficialReceiptsAction() {
   if (!user) throw new Error("No autenticado");
 
   const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  if (!profile?.club_id) throw new Error("Club no encontrado");
+  const clubId = profile?.club_id;
+  if (!clubId) throw new Error("Club no encontrado");
 
+  // 1. Intentar sincronizar recibos de todas las cuotas pagadas o con entregas a cuenta
+  try {
+    const { data: paidFees } = await adminSupabase
+      .from("fees")
+      .select("id, amount_cents, amount_paid_cents, concept, payment_method, creado_en, player_id, club_id, estado, players(first_name, last_name, club_id)")
+      .or("estado.eq.pagado,amount_paid_cents.gt.0");
+
+    if (paidFees && paidFees.length > 0) {
+      const clubFees = paidFees.filter(f => f.club_id === clubId || f.players?.club_id === clubId);
+
+      for (const fee of clubFees) {
+        const { data: existing } = await adminSupabase
+          .from("official_receipts")
+          .select("id")
+          .eq("fee_id", fee.id)
+          .single();
+
+        if (!existing) {
+          try {
+            await generateAndUploadReceiptAction(fee.id);
+          } catch (e) {
+            console.error("Auto-sincronizando recibo error:", e);
+          }
+        }
+      }
+    }
+  } catch (syncErr) {
+    console.error("Error sincronizando cuotas pagadas a official_receipts:", syncErr);
+  }
+
+  // 2. Consultar la tabla official_receipts
   const { data: receipts, error } = await adminSupabase
     .from("official_receipts")
     .select("id, receipt_number, sequence_number, amount_cents, concept, payment_method, status, pdf_path, created_at, fee_id, player_id, players(first_name, last_name)")
-    .eq("club_id", profile.club_id)
+    .eq("club_id", clubId)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("Error fetching official receipts:", error);
-    return [];
+  if (!error && receipts && receipts.length > 0) {
+    return receipts.map((r: any) => ({
+      id: r.id,
+      receipt_number: r.receipt_number,
+      sequence_number: r.sequence_number,
+      created_at: r.created_at,
+      player_name: r.players ? `${r.players.first_name} ${r.players.last_name}` : "General",
+      concept: r.concept,
+      amount_cents: r.amount_cents,
+      payment_method: r.payment_method || "Contado",
+      status: r.status || "emitido",
+      pdf_path: r.pdf_path,
+      fee_id: r.fee_id,
+    }));
   }
 
-  return (receipts || []).map((r: any) => ({
-    id: r.id,
-    receipt_number: r.receipt_number,
-    sequence_number: r.sequence_number,
-    created_at: r.created_at,
-    player_name: r.players ? `${r.players.first_name} ${r.players.last_name}` : "General",
-    concept: r.concept,
-    amount_cents: r.amount_cents,
-    payment_method: r.payment_method || "Contado",
-    status: r.status || "emitido",
-    pdf_path: r.pdf_path,
-    fee_id: r.fee_id,
-  }));
+  // Fallback de respaldo: Si la tabla no devuelve filas, construir la lista directamente desde cuotas pagadas
+  const { data: fallbackFees } = await adminSupabase
+    .from("fees")
+    .select("id, amount_cents, amount_paid_cents, concept, payment_method, creado_en, estado, player_id, club_id, players(first_name, last_name, club_id)")
+    .or("estado.eq.pagado,amount_paid_cents.gt.0")
+    .order("creado_en", { ascending: false });
+
+  const clubFallbackFees = (fallbackFees || []).filter(f => f.club_id === clubId || f.players?.club_id === clubId);
+
+  return clubFallbackFees.map((f: any, idx: number) => {
+    const d = new Date(f.creado_en || Date.now());
+    const dayStr = String(d.getDate()).padStart(2, "0");
+    const monthStr = String(d.getMonth() + 1).padStart(2, "0");
+    const yearStr = String(d.getFullYear());
+    const datePrefix = `${dayStr}${monthStr}${yearStr}`;
+    const seqStr = String(clubFallbackFees.length - idx).padStart(4, "0");
+    const receiptNumber = `${datePrefix}-${seqStr}`;
+
+    const paidCents = f.estado === "pagado" ? f.amount_cents : (f.amount_paid_cents || 0);
+
+    return {
+      id: f.id,
+      receipt_number: receiptNumber,
+      sequence_number: clubFallbackFees.length - idx,
+      created_at: f.creado_en || new Date().toISOString(),
+      player_name: f.players ? `${f.players.first_name} ${f.players.last_name}` : "General",
+      concept: f.concept || "Cuota Oficial",
+      amount_cents: paidCents,
+      payment_method: f.payment_method || "Contado",
+      status: "emitido",
+      fee_id: f.id,
+    };
+  });
 }
 
 export async function exportOfficialReceiptsCsvAction() {

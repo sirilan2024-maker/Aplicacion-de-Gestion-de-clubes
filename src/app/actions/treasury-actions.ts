@@ -1508,4 +1508,143 @@ export async function downloadOfficialReceiptPdfAction(receiptId: string) {
   throw new Error("No se pudo obtener el PDF del recibo");
 }
 
+export async function updateFeeAmountAction(feeId: string, newAmountCents: number, reason?: string) {
+  const adminSupabase = await createAdminClient();
+
+  if (newAmountCents < 0) {
+    throw new Error("El importe de la cuota no puede ser negativo.");
+  }
+
+  const { data: fee, error: feeErr } = await adminSupabase
+    .from("fees")
+    .select("amount_paid_cents, concept")
+    .eq("id", feeId)
+    .single();
+
+  if (feeErr || !fee) throw new Error("Cuota no encontrada");
+
+  const paidCents = fee.amount_paid_cents || 0;
+  const newStatus = paidCents >= newAmountCents ? "pagado" : "pendiente";
+  const updatedConcept = reason ? `${fee.concept || 'Cuota'} (Ajuste: ${reason})` : fee.concept;
+
+  const { error: updateErr } = await adminSupabase
+    .from("fees")
+    .update({
+      amount_cents: newAmountCents,
+      estado: newStatus,
+      concept: updatedConcept,
+    })
+    .eq("id", feeId);
+
+  if (updateErr) throw new Error("Error al actualizar importe de cuota: " + updateErr.message);
+
+  return { success: true };
+}
+
+export async function createManualReceiptAction(params: {
+  payerName: string;
+  payerDni?: string;
+  concept: string;
+  amountCents: number;
+  paymentMethod: string;
+  phone?: string;
+}) {
+  const supabase = await createClient();
+  const adminSupabase = await createAdminClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
+  const clubId = profile?.club_id;
+  if (!clubId) throw new Error("Club no encontrado");
+
+  if (!params.payerName || !params.concept || params.amountCents <= 0) {
+    throw new Error("Por favor completa los campos obligatorios: Nombre, Concepto e Importe.");
+  }
+
+  // 1. Generate receipt number DDMMAAAA-XXXX
+  const now = new Date();
+  const dayStr = String(now.getDate()).padStart(2, "0");
+  const monthStr = String(now.getMonth() + 1).padStart(2, "0");
+  const yearStr = String(now.getFullYear());
+  const datePrefix = `${dayStr}${monthStr}${yearStr}`;
+  const currentYear = now.getFullYear();
+
+  const { data: lastReceipt } = await adminSupabase
+    .from("official_receipts")
+    .select("sequence_number")
+    .eq("club_id", clubId)
+    .eq("year", currentYear)
+    .order("sequence_number", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextSeq = (lastReceipt?.sequence_number || 0) + 1;
+  const seqStr = String(nextSeq).padStart(4, "0");
+  const receiptNumber = `${datePrefix}-${seqStr}`;
+
+  // 2. Generate PDF
+  let clubLogoUrl = null;
+  const { data: club } = await adminSupabase.from("clubs").select("logo_url").eq("id", clubId).single();
+  if (club) clubLogoUrl = club.logo_url;
+
+  const recibiDe = params.payerDni ? `${params.payerName} (DNI: ${params.payerDni})` : params.payerName;
+
+  const pdfBytes = await generateOfficialReceiptPdfBuffer({
+    title: "RECIBO DE PAGO",
+    dateStr: now.toLocaleDateString("es-ES"),
+    receiptNo: receiptNumber,
+    recibiDe: recibiDe,
+    amountFormatted: `${(params.amountCents / 100).toFixed(2)} €`,
+    concept: params.concept,
+    paymentMethod: params.paymentMethod || "Contado",
+    clubLogoUrl: clubLogoUrl,
+  });
+
+  const sanitizedName = params.payerName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const fileName = `Recibo_${receiptNumber}_${sanitizedName}.pdf`;
+  const storagePath = `manual_receipts/${receiptNumber}_${sanitizedName}.pdf`;
+
+  await adminSupabase.storage
+    .from("recibos_pagos")
+    .upload(storagePath, Buffer.from(pdfBytes), { contentType: "application/pdf", upsert: true });
+
+  // 3. Record in official_receipts table
+  await adminSupabase.from("official_receipts").insert({
+    club_id: clubId,
+    receipt_number: receiptNumber,
+    sequence_number: nextSeq,
+    series_prefix: datePrefix,
+    year: currentYear,
+    amount_cents: params.amountCents,
+    concept: `${params.concept} - Pagador: ${params.payerName}`,
+    payment_method: params.paymentMethod || "Contado",
+    status: "emitido",
+    pdf_path: storagePath,
+  });
+
+  // Get Signed URL
+  const { data: signedData } = await adminSupabase.storage
+    .from("recibos_pagos")
+    .createSignedUrl(storagePath, 60 * 60, { download: fileName });
+
+  // Optional WhatsApp URL if phone is provided
+  let whatsappUrl = null;
+  if (params.phone) {
+    const cleanPhone = params.phone.replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.length === 9 ? `34${cleanPhone}` : cleanPhone;
+    const msg = encodeURIComponent(`Hola ${params.payerName}, adjuntamos tu recibo de pago N.º ${receiptNumber} por concepto de "${params.concept}" por importe de ${(params.amountCents / 100).toFixed(2)} €.\nDescarga tu recibo PDF aquí: ${signedData?.signedUrl || ''}`);
+    whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${msg}`;
+  }
+
+  return {
+    success: true,
+    receiptNumber,
+    url: signedData?.signedUrl,
+    whatsappUrl,
+    fileName,
+  };
+}
+
 

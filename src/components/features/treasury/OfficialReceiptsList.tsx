@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import {
   getOfficialReceiptsAction,
   exportOfficialReceiptsCsvAction,
-  downloadOfficialReceiptPdfAction
+  downloadOfficialReceiptPdfAction,
+  createManualReceiptAction
 } from "@/app/actions/treasury-actions";
 import {
   FileCheck2, Search, Filter, Download, FileSpreadsheet, Loader2,
-  CheckCircle2, XCircle, Calendar, Hash, CreditCard
+  CheckCircle2, XCircle, Calendar, Hash, CreditCard, PlusCircle, MessageSquare, X
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -32,6 +33,24 @@ export default function OfficialReceiptsList() {
   const [exporting, setExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "emitido" | "anulado">("todos");
+
+  // Modal Recibo Manual / Eventual State
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [payerName, setPayerName] = useState("");
+  const [payerDni, setPayerDni] = useState("");
+  const [concept, setConcept] = useState("");
+  const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Contado");
+  const [phone, setPhone] = useState("");
+  const [submittingManual, setSubmittingManual] = useState(false);
+
+  // Success modal result
+  const [manualResult, setManualResult] = useState<{
+    receiptNumber: string;
+    url?: string;
+    whatsappUrl?: string;
+    fileName?: string;
+  } | null>(null);
 
   const fetchReceipts = useCallback(async () => {
     setLoading(true);
@@ -71,15 +90,58 @@ export default function OfficialReceiptsList() {
   };
 
   const handleDownloadPdf = async (receiptId: string) => {
+    const toastId = toast.loading("Obteniendo recibo oficial PDF...");
     try {
-      const toastId = toast.loading("Obteniendo recibo oficial PDF...");
       const res = await downloadOfficialReceiptPdfAction(receiptId);
       toast.dismiss(toastId);
       if (res?.url) {
         window.open(res.url, "_blank");
       }
     } catch (err: any) {
-      toast.error(err.message || "Error al abrir el PDF");
+      toast.error(err.message || "Error al abrir el PDF", { id: toastId });
+    }
+  };
+
+  const handleCreateManualReceipt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAmount = parseFloat(amount.replace(",", "."));
+    if (!payerName.trim() || !concept.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Por favor completa el Nombre, Concepto e Importe válido");
+      return;
+    }
+
+    setSubmittingManual(true);
+    try {
+      const res = await createManualReceiptAction({
+        payerName: payerName.trim(),
+        payerDni: payerDni.trim() || undefined,
+        concept: concept.trim(),
+        amountCents: Math.round(parsedAmount * 100),
+        paymentMethod,
+        phone: phone.trim() || undefined,
+      });
+
+      if (res.success) {
+        toast.success(`Recibo N.º ${res.receiptNumber} generado exitosamente`);
+        setManualResult({
+          receiptNumber: res.receiptNumber,
+          url: res.url,
+          whatsappUrl: res.whatsappUrl,
+          fileName: res.fileName,
+        });
+        setShowManualModal(false);
+        // Reset form
+        setPayerName("");
+        setPayerDni("");
+        setConcept("");
+        setAmount("");
+        setPhone("");
+        fetchReceipts();
+      }
+    } catch (err: any) {
+      toast.error("Error al crear recibo manual: " + err.message);
+    } finally {
+      setSubmittingManual(false);
     }
   };
 
@@ -110,22 +172,25 @@ export default function OfficialReceiptsList() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white p-4 md:p-5 rounded-2xl shadow-md border border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900 text-white p-4 md:p-5 rounded-2xl shadow-md border border-slate-800">
         <div>
           <div className="flex items-center gap-2">
             <FileCheck2 className="w-6 h-6 text-emerald-400" />
             <h2 className="text-lg font-bold">Registro de Recibos Emitidos</h2>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Auditoría contable y control numerado de recibos oficiales del club
+            Auditoría contable, serie numerada consecutiva y recibos manuales para no registrados
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-[10px] text-slate-400 uppercase font-bold">Total Recaudado</p>
-            <p className="text-lg font-black text-emerald-400">{totalAmount.toFixed(2)} €</p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowManualModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Emitir Recibo Eventual
+          </button>
 
           <button
             onClick={handleExportCsv}
@@ -144,7 +209,7 @@ export default function OfficialReceiptsList() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por Nº recibo (ej. SALADAR-2026-0001), socio o concepto..."
+            placeholder="Buscar por Nº recibo (ej. 04082026-0001), socio o concepto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-slate-50 md:bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
@@ -246,9 +311,9 @@ export default function OfficialReceiptsList() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">N.º Recibo Oficial</th>
+                <th className="py-3 px-4">N.º Recibo</th>
                 <th className="py-3 px-4">Fecha</th>
-                <th className="py-3 px-4">Socio / Jugador</th>
+                <th className="py-3 px-4">Pagador / Socio</th>
                 <th className="py-3 px-4">Concepto</th>
                 <th className="py-3 px-4">Método</th>
                 <th className="py-3 px-4 text-right">Importe</th>
@@ -309,6 +374,172 @@ export default function OfficialReceiptsList() {
           </table>
         </div>
       </div>
+
+      {/* ====== MODAL EMITIR RECIBO MANUAL / EVENTUAL ====== */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-slate-900 text-base">Emitir Recibo Eventual / Manual</h3>
+              </div>
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualReceipt} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nombre del Pagador / Socio Eventual *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. María López / Juan Gómez"
+                  value={payerName}
+                  onChange={(e) => setPayerName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">DNI / NIE (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="12345678Z"
+                    value={payerDni}
+                    onChange={(e) => setPayerDni(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Teléfono (para WhatsApp)</label>
+                  <input
+                    type="text"
+                    placeholder="612345678"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Concepto *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. Material deportivo, Ropa entrenamiento, Torneo Verano..."
+                  value={concept}
+                  onChange={(e) => setConcept(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Importe (€) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej. 45.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Método de Pago</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white font-medium"
+                  >
+                    <option value="Contado">Contado / Efectivo</option>
+                    <option value="Bizum">Bizum</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta / TPV</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(false)}
+                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingManual}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {submittingManual ? <Loader2 className="w-4 h-4 animate-spin" /> : "Generar Recibo Oficial"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ====== MODAL RESULTADO DE RECIBO MANUAL ====== */}
+      {manualResult && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center space-y-4 animate-in zoom-in-95">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-900 text-lg">¡Recibo Generado!</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Recibo N.º <strong className="font-mono text-indigo-700">{manualResult.receiptNumber}</strong> emitido correctamente.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {manualResult.url && (
+                <a
+                  href={manualResult.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar Recibo PDF
+                </a>
+              )}
+
+              {manualResult.whatsappUrl && (
+                <a
+                  href={manualResult.whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Enviar por WhatsApp
+                </a>
+              )}
+
+              <button
+                onClick={() => setManualResult(null)}
+                className="w-full py-2 text-slate-500 font-bold text-xs hover:bg-slate-100 rounded-xl"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

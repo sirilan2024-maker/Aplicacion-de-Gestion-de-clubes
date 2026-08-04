@@ -8,12 +8,13 @@ import {
   addPartialPaymentAction,
   sendPaymentNotificationAction,
   sendMemberBalanceNotificationAction,
-  downloadFeeReceiptAction
+  downloadFeeReceiptAction,
+  updateFeeAmountAction
 } from "@/app/actions/treasury-actions";
 import {
   Users, Search, Filter, TrendingUp, TrendingDown, Scale, CheckCircle2,
   AlertTriangle, Coins, FileText, ChevronRight, X, Plus, Download, Bell,
-  Calendar, CreditCard, ShieldCheck, Loader2, MessageSquare, ExternalLink
+  Calendar, CreditCard, ShieldCheck, Loader2, MessageSquare, ExternalLink, Pencil
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -77,6 +78,35 @@ export default function MemberBalances() {
 
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("Contado");
+
+  // Edit fee state
+  const [editingFee, setEditingFee] = useState<{ id: string; concept: string; amount: string; reason: string } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleSaveFeeEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFee) return;
+    const parsed = parseFloat(editingFee.amount.replace(",", "."));
+    if (isNaN(parsed) || parsed < 0) {
+      toast.error("Por favor introduce un importe válido.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      await updateFeeAmountAction(editingFee.id, Math.round(parsed * 100), editingFee.reason.trim() || undefined);
+      toast.success("Cuota y saldo actualizados correctamente");
+      setEditingFee(null);
+      if (selectedPlayerId) {
+        fetchStatement(selectedPlayerId);
+      }
+      fetchBalances();
+    } catch (err: any) {
+      toast.error("Error al modificar cuota: " + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const fetchBalances = useCallback(async () => {
     setLoading(true);
@@ -651,9 +681,25 @@ export default function MemberBalances() {
                           </div>
 
                           <div className="text-right">
-                            <p className="font-black text-slate-900 text-base">
-                              {(fee.amount_cents / 100).toFixed(2)} €
-                            </p>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <p className="font-black text-slate-900 text-base">
+                                {(fee.amount_cents / 100).toFixed(2)} €
+                              </p>
+                              <button
+                                onClick={() =>
+                                  setEditingFee({
+                                    id: fee.id,
+                                    concept: fee.concept,
+                                    amount: (fee.amount_cents / 100).toString(),
+                                    reason: "",
+                                  })
+                                }
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                                title="Modificar importe de cuota (Ajuste / Error inscripción)"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                             {fee.estado === "pagado" ? (
                               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
                                 ✅ Pagado
@@ -855,6 +901,72 @@ export default function MemberBalances() {
                   className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700"
                 >
                   Registrar Cobro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ====== MODAL MODIFICAR IMPORTE DE CUOTA ====== */}
+      {editingFee && (
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-slate-900 text-base">Modificar Cargo de Cuota</h3>
+              </div>
+              <button
+                onClick={() => setEditingFee(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFeeEdit} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Concepto</label>
+                <p className="p-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium">{editingFee.concept}</p>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nuevo Importe Cargado (€) *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingFee.amount}
+                  onChange={(e) => setEditingFee({ ...editingFee, amount: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Motivo del Ajuste (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="ej. Error en inscripción, Beca 20%, Descuento hermano..."
+                  value={editingFee.reason}
+                  onChange={(e) => setEditingFee({ ...editingFee, reason: e.target.value })}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div className="pt-3 flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingFee(null)}
+                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : "Guardar Cambios"}
                 </button>
               </div>
             </form>

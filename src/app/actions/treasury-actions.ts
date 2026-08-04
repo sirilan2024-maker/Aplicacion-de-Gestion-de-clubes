@@ -404,8 +404,14 @@ export async function generateAndUploadReceiptAction(feeId: string) {
     }
   }
 
-  // Generar o consultar número correlativo de recibo oficial
-  const currentYear = new Date().getFullYear();
+  // Generar o consultar número correlativo de recibo oficial (formato DDMMAAAA-0001)
+  const now = new Date(fee.creado_en || Date.now());
+  const dayStr = String(now.getDate()).padStart(2, "0");
+  const monthStr = String(now.getMonth() + 1).padStart(2, "0");
+  const yearStr = String(now.getFullYear());
+  const datePrefix = `${dayStr}${monthStr}${yearStr}`; // ej. 04082026
+  const currentYear = now.getFullYear();
+
   let receiptNumber = "";
 
   // Check if official receipt record exists
@@ -430,7 +436,7 @@ export async function generateAndUploadReceiptAction(feeId: string) {
 
     const nextSeq = (lastReceipt?.sequence_number || 0) + 1;
     const seqStr = String(nextSeq).padStart(4, "0");
-    receiptNumber = `${clubName}-${currentYear}-${seqStr}`;
+    receiptNumber = `${datePrefix}-${seqStr}`;
 
     // Record in official_receipts table
     await adminSupabase.from("official_receipts").insert({
@@ -439,7 +445,7 @@ export async function generateAndUploadReceiptAction(feeId: string) {
       player_id: fee.player_id,
       receipt_number: receiptNumber,
       sequence_number: nextSeq,
-      series_prefix: clubName,
+      series_prefix: datePrefix,
       year: currentYear,
       amount_cents: fee.estado === "pagado" ? fee.amount_cents : paidCents,
       concept: fee.concept || "Cuota Oficial",
@@ -449,7 +455,7 @@ export async function generateAndUploadReceiptAction(feeId: string) {
   }
 
   const pdfBytes = await generateOfficialReceiptPdfBuffer({
-    title: "RECIBO OFICIAL DE PAGO",
+    title: "RECIBO DE PAGO",
     dateStr: new Date(fee.creado_en || Date.now()).toLocaleDateString("es-ES"),
     receiptNo: receiptNumber,
     recibiDe: recibiDe,
@@ -1161,15 +1167,25 @@ export async function downloadFeeReceiptAction(feeId: string) {
   const adminSupabase = await createAdminClient();
   const res = await generateAndUploadReceiptAction(feeId);
 
+  const { data: fee } = await adminSupabase
+    .from("fees")
+    .select("players(first_name, last_name)")
+    .eq("id", feeId)
+    .single();
+
+  const playerName = fee?.players ? `${fee.players.first_name}_${fee.players.last_name}` : "Socio";
+  const sanitizedName = playerName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const fileName = `Recibo_${res.receiptNumber}_${sanitizedName}.pdf`;
+
   const { data, error } = await adminSupabase.storage
     .from("recibos_pagos")
-    .createSignedUrl(res.path, 60 * 15, { download: true });
+    .createSignedUrl(res.path, 60 * 15, { download: fileName });
 
   if (error || !data?.signedUrl) {
     throw new Error(`No se pudo obtener la URL de descarga del recibo de cuota. Detalles: ${error?.message || "URL no generada"}`);
   }
 
-  return { success: true, url: data.signedUrl };
+  return { success: true, url: data.signedUrl, fileName };
 }
 
 export async function getMemberBalancesAction() {
@@ -1404,7 +1420,7 @@ export async function downloadOfficialReceiptPdfAction(receiptId: string) {
 
   const { data: receipt, error } = await adminSupabase
     .from("official_receipts")
-    .select("*, fees(*)")
+    .select("*, players(first_name, last_name)")
     .eq("id", receiptId)
     .single();
 
@@ -1413,12 +1429,16 @@ export async function downloadOfficialReceiptPdfAction(receiptId: string) {
   // If receipt has a fee_id, generate/get PDF URL
   if (receipt.fee_id) {
     const res = await generateAndUploadReceiptAction(receipt.fee_id);
+    const playerName = receipt.players ? `${receipt.players.first_name}_${receipt.players.last_name}` : "Socio";
+    const sanitizedName = playerName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = `Recibo_${receipt.receipt_number}_${sanitizedName}.pdf`;
+
     const { data: signedData } = await adminSupabase.storage
       .from("recibos_pagos")
-      .createSignedUrl(res.path, 900, { download: `${receipt.receipt_number}.pdf` });
+      .createSignedUrl(res.path, 900, { download: fileName });
 
     if (signedData?.signedUrl) {
-      return { success: true, url: signedData.signedUrl };
+      return { success: true, url: signedData.signedUrl, fileName };
     }
   }
 

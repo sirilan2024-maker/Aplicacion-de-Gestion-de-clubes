@@ -340,7 +340,20 @@ export default function Payments() {
                           <Coins className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={() => viewReceipt(fee.id)} className="flex items-center justify-center w-8 h-8 bg-blue-50 text-blue-700 rounded hover:bg-blue-100" title="Descargar / Ver Recibo en PDF">
+                      <button
+                        onClick={() => viewReceipt(fee.id)}
+                        disabled={fee.estado === "pendiente" && (fee.amount_paid_cents || 0) === 0}
+                        className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
+                          fee.estado === "pendiente" && (fee.amount_paid_cents || 0) === 0
+                            ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                            : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        }`}
+                        title={
+                          fee.estado === "pendiente" && (fee.amount_paid_cents || 0) === 0
+                            ? "El recibo oficial solo está disponible tras registrar un cobro (total o parcial)"
+                            : "Descargar Recibo Oficial PDF"
+                        }
+                      >
                         <Download className="w-4 h-4" />
                       </button>
                       <button onClick={() => setNotifModalFeeId(fee.id)} className="flex items-center justify-center w-8 h-8 bg-gray-50 text-gray-700 rounded hover:bg-gray-200" title="Notificar">

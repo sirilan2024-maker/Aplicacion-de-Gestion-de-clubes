@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import Payments from "@/components/features/treasury/Payments";
 import ExpensesList from "@/components/features/treasury/ExpensesList";
 import MemberBalances from "@/components/features/treasury/MemberBalances";
-import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, TrendingDown, Scale, FileDown, Users } from "lucide-react";
+import OfficialReceiptsList from "@/components/features/treasury/OfficialReceiptsList";
+import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, TrendingDown, Scale, FileDown, Users, FileCheck2 } from "lucide-react";
 import { getTreasuryBalanceAction, exportAccountingCsvAction } from "@/app/actions/treasury-actions";
 import toast from "react-hot-toast";
 
 export default function TreasuryDashboard() {
-  const [activeTab, setActiveTab] = useState<"saldos" | "ingresos" | "gastos">("saldos");
+  const [activeTab, setActiveTab] = useState<"saldos" | "ingresos" | "gastos" | "recibos">("saldos");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [balances, setBalances] = useState({ ingresos: 0, gastos: 0 });
   const [exporting, setExporting] = useState(false);
@@ -157,6 +158,17 @@ export default function TreasuryDashboard() {
             <ArrowUpRight className="w-4 h-4" />
             Gastos Operativos
           </button>
+          <button
+            onClick={() => setActiveTab("recibos")}
+            className={`px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === "recibos"
+                ? "bg-white text-emerald-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <FileCheck2 className="w-4 h-4" />
+            Recibos Emitidos
+          </button>
         </div>
       </div>
 
@@ -166,8 +178,10 @@ export default function TreasuryDashboard() {
           <MemberBalances key={`balances-${refreshTrigger}`} />
         ) : activeTab === "ingresos" ? (
           <Payments key={`payments-${refreshTrigger}`} />
-        ) : (
+        ) : activeTab === "gastos" ? (
           <ExpensesList refreshBalances={() => setRefreshTrigger(prev => prev + 1)} />
+        ) : (
+          <OfficialReceiptsList key={`receipts-${refreshTrigger}`} />
         )}
       </div>
 

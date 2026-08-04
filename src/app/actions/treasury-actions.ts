@@ -380,31 +380,87 @@ export async function generateAndUploadReceiptAction(feeId: string) {
     .eq("id", feeId)
     .single();
 
-  if (feeError || !fee) throw new Error("Fee no encontrada");
+  if (feeError || !fee) throw new Error("Cuota no encontrada");
+
+  // RESTRICCIÓN DE SEGURIDAD CONTABLE: Solo se emite recibo si está pagada o tiene abonos
+  const paidCents = fee.amount_paid_cents || 0;
+  if (fee.estado !== "pagado" && paidCents === 0) {
+    throw new Error("No se puede generar un recibo oficial para una cuota pendiente de pago.");
+  }
 
   const tutorName = fee.players?.parent1_name;
   const playerName = fee.players ? `${fee.players.first_name} ${fee.players.last_name}` : "Desconocido";
   const recibiDe = tutorName ? `${tutorName} (Tutor de ${playerName})` : playerName;
 
   let clubLogoUrl = null;
+  let clubName = "REC";
   if (fee.players?.club_id) {
-    const { data: club } = await adminSupabase.from('clubs').select('logo_url').eq('id', fee.players.club_id).single();
-    if (club) clubLogoUrl = club.logo_url;
+    const { data: club } = await adminSupabase.from('clubs').select('name, logo_url').eq('id', fee.players.club_id).single();
+    if (club) {
+      clubLogoUrl = club.logo_url;
+      if (club.name) {
+        clubName = club.name.replace(/[^a border-zA-Z]/g, '').slice(0, 7).toUpperCase() || "REC";
+      }
+    }
+  }
+
+  // Generar o consultar número correlativo de recibo oficial
+  const currentYear = new Date().getFullYear();
+  let receiptNumber = "";
+
+  // Check if official receipt record exists
+  const { data: existingReceipt } = await adminSupabase
+    .from("official_receipts")
+    .select("receipt_number")
+    .eq("fee_id", feeId)
+    .single();
+
+  if (existingReceipt?.receipt_number) {
+    receiptNumber = existingReceipt.receipt_number;
+  } else {
+    // Calculate next sequence number for this club & year
+    const { data: lastReceipt } = await adminSupabase
+      .from("official_receipts")
+      .select("sequence_number")
+      .eq("club_id", fee.club_id || fee.players?.club_id)
+      .eq("year", currentYear)
+      .order("sequence_number", { ascending: false })
+      .limit(1)
+      .single();
+
+    const nextSeq = (lastReceipt?.sequence_number || 0) + 1;
+    const seqStr = String(nextSeq).padStart(4, "0");
+    receiptNumber = `${clubName}-${currentYear}-${seqStr}`;
+
+    // Record in official_receipts table
+    await adminSupabase.from("official_receipts").insert({
+      club_id: fee.club_id || fee.players?.club_id,
+      fee_id: feeId,
+      player_id: fee.player_id,
+      receipt_number: receiptNumber,
+      sequence_number: nextSeq,
+      series_prefix: clubName,
+      year: currentYear,
+      amount_cents: fee.estado === "pagado" ? fee.amount_cents : paidCents,
+      concept: fee.concept || "Cuota Oficial",
+      payment_method: fee.payment_method || "Contado",
+      status: "emitido",
+    });
   }
 
   const pdfBytes = await generateOfficialReceiptPdfBuffer({
-    title: "RECIBO DE PAGO",
-    dateStr: new Date(fee.created_at || Date.now()).toLocaleDateString("es-ES"),
-    receiptNo: fee.id.split("-")[0].toUpperCase(),
+    title: "RECIBO OFICIAL DE PAGO",
+    dateStr: new Date(fee.creado_en || Date.now()).toLocaleDateString("es-ES"),
+    receiptNo: receiptNumber,
     recibiDe: recibiDe,
-    amountFormatted: `${(fee.amount_cents / 100).toFixed(2)} €`,
+    amountFormatted: `${((fee.estado === "pagado" ? fee.amount_cents : paidCents) / 100).toFixed(2)} €`,
     concept: fee.concept || "Cuota Oficial",
-    paymentMethod: fee.payment_method || "",
+    paymentMethod: fee.payment_method || "Contado",
     clubLogoUrl: clubLogoUrl,
   });
 
   const folder = fee.profile_id || 'general';
-  const path = `${folder}/fee_${feeId}.pdf`;
+  const path = `${folder}/receipt_${receiptNumber.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
   
   const { error: uploadError } = await adminSupabase.storage
     .from('recibos_pagos')
@@ -412,14 +468,17 @@ export async function generateAndUploadReceiptAction(feeId: string) {
 
   if (uploadError) throw new Error("Error subiendo PDF: " + uploadError.message);
 
-  const { error: updateError } = await adminSupabase
+  await adminSupabase
     .from("fees")
     .update({ receipt_path: path })
     .eq("id", feeId);
 
-  if (updateError) throw new Error("Error actualizando fee con receipt_path");
+  await adminSupabase
+    .from("official_receipts")
+    .update({ pdf_path: path })
+    .eq("receipt_number", receiptNumber);
 
-  return { success: true, path };
+  return { success: true, path, receiptNumber };
 }
 
 export async function getReceiptSignedUrlAction(feeId: string) {
@@ -1288,4 +1347,82 @@ export async function getMemberStatementAction(playerId: string) {
     fees: formattedFees,
   };
 }
+
+export async function getOfficialReceiptsAction() {
+  const supabase = await createClient();
+  const adminSupabase = await createAdminClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
+  if (!profile?.club_id) throw new Error("Club no encontrado");
+
+  const { data: receipts, error } = await adminSupabase
+    .from("official_receipts")
+    .select("id, receipt_number, sequence_number, amount_cents, concept, payment_method, status, pdf_path, created_at, fee_id, player_id, players(first_name, last_name)")
+    .eq("club_id", profile.club_id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching official receipts:", error);
+    return [];
+  }
+
+  return (receipts || []).map((r: any) => ({
+    id: r.id,
+    receipt_number: r.receipt_number,
+    sequence_number: r.sequence_number,
+    created_at: r.created_at,
+    player_name: r.players ? `${r.players.first_name} ${r.players.last_name}` : "General",
+    concept: r.concept,
+    amount_cents: r.amount_cents,
+    payment_method: r.payment_method || "Contado",
+    status: r.status || "emitido",
+    pdf_path: r.pdf_path,
+    fee_id: r.fee_id,
+  }));
+}
+
+export async function exportOfficialReceiptsCsvAction() {
+  const receipts = await getOfficialReceiptsAction();
+  let csv = "Numero Recibo;Fecha;Socio/Jugador;Concepto;Importe (EUR);Metodo;Estado\n";
+
+  receipts.forEach((r: any) => {
+    const fecha = new Date(r.created_at).toLocaleDateString("es-ES");
+    const importe = (r.amount_cents / 100).toFixed(2);
+    csv += `"${r.receipt_number}";"${fecha}";"${r.player_name}";"${r.concept}";"${importe}";"${r.payment_method}";"${r.status}"\n`;
+  });
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return { csv, filename: `Registro_Recibos_Emitidos_${dateStr}.csv` };
+}
+
+export async function downloadOfficialReceiptPdfAction(receiptId: string) {
+  const adminSupabase = await createAdminClient();
+
+  const { data: receipt, error } = await adminSupabase
+    .from("official_receipts")
+    .select("*, fees(*)")
+    .eq("id", receiptId)
+    .single();
+
+  if (error || !receipt) throw new Error("Recibo no encontrado");
+
+  // If receipt has a fee_id, generate/get PDF URL
+  if (receipt.fee_id) {
+    const res = await generateAndUploadReceiptAction(receipt.fee_id);
+    const { data: signedData } = await adminSupabase.storage
+      .from("recibos_pagos")
+      .createSignedUrl(res.path, 900, { download: `${receipt.receipt_number}.pdf` });
+
+    if (signedData?.signedUrl) {
+      return { success: true, url: signedData.signedUrl };
+    }
+  }
+
+  throw new Error("No se pudo obtener el PDF del recibo");
+}
+
 

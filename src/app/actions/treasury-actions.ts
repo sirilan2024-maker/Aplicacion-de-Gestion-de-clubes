@@ -1047,3 +1047,180 @@ export async function downloadFeeReceiptAction(feeId: string) {
 
   return { success: true, url: data.signedUrl };
 }
+
+export async function getMemberBalancesAction() {
+  const supabase = await createClient();
+  const adminSupabase = await createAdminClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
+  if (!profile?.club_id) throw new Error("Club no encontrado");
+
+  // 1. Fetch players with teams
+  const { data: players, error: playersError } = await adminSupabase
+    .from("players")
+    .select("id, first_name, last_name, team_id, teams(id, name)")
+    .eq("club_id", profile.club_id)
+    .neq("status", "inactive")
+    .order("first_name", { ascending: true });
+
+  if (playersError) throw new Error(playersError.message);
+
+  // 2. Fetch fees with payments for the club
+  const { data: fees, error: feesError } = await adminSupabase
+    .from("fees")
+    .select("id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en, fee_payments(id, amount_cents, payment_method, created_at)")
+    .eq("club_id", profile.club_id);
+
+  if (feesError) throw new Error(feesError.message);
+
+  // Map fees by player
+  const feesByPlayer: Record<string, any[]> = {};
+  (fees || []).forEach((f: any) => {
+    if (f.player_id) {
+      if (!feesByPlayer[f.player_id]) feesByPlayer[f.player_id] = [];
+      feesByPlayer[f.player_id].push(f);
+    }
+  });
+
+  const memberBalances = (players || []).map((p: any) => {
+    const playerFees = feesByPlayer[p.id] || [];
+    
+    let totalChargedCents = 0;
+    let totalPaidCents = 0;
+    let pendingFeesCount = 0;
+
+    playerFees.forEach((f: any) => {
+      totalChargedCents += f.amount_cents || 0;
+      
+      let paid = f.amount_paid_cents || 0;
+      if (f.estado === "pagado" && paid === 0) {
+        paid = f.amount_cents || 0;
+      }
+      totalPaidCents += paid;
+
+      if (f.estado === "pendiente") {
+        pendingFeesCount++;
+      }
+    });
+
+    const balanceCents = totalChargedCents - totalPaidCents;
+    let status: "al_dia" | "con_deuda" | "saldo_favor" = "al_dia";
+    if (balanceCents > 0) status = "con_deuda";
+    else if (balanceCents < 0) status = "saldo_favor";
+
+    const teamObj = Array.isArray(p.teams) ? p.teams[0] : p.teams;
+
+    return {
+      player_id: p.id,
+      player_name: `${p.first_name} ${p.last_name}`,
+      team_id: (teamObj as any)?.id || "none",
+      team_name: (teamObj as any)?.name || "Sin equipo",
+      total_charged_cents: totalChargedCents,
+      total_paid_cents: totalPaidCents,
+      balance_cents: balanceCents,
+      status,
+      fees_count: playerFees.length,
+      pending_fees_count: pendingFeesCount,
+    };
+  });
+
+  // Global KPIs
+  const totalCharged = memberBalances.reduce((acc, m) => acc + m.total_charged_cents, 0) / 100;
+  const totalPaid = memberBalances.reduce((acc, m) => acc + m.total_paid_cents, 0) / 100;
+  const totalPending = memberBalances.reduce((acc, m) => acc + Math.max(0, m.balance_cents), 0) / 100;
+  const membersAlDia = memberBalances.filter(m => m.status === "al_dia" || m.status === "saldo_favor").length;
+  const membersConDeuda = memberBalances.filter(m => m.status === "con_deuda").length;
+
+  return {
+    success: true,
+    members: memberBalances,
+    summary: {
+      totalCharged,
+      totalPaid,
+      totalPending,
+      membersAlDia,
+      membersConDeuda,
+      totalMembers: memberBalances.length,
+    },
+  };
+}
+
+export async function getMemberStatementAction(playerId: string) {
+  const supabase = await createClient();
+  const adminSupabase = await createAdminClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Fetch player info
+  const { data: player, error: pErr } = await adminSupabase
+    .from("players")
+    .select("id, first_name, last_name, team_id, teams(name)")
+    .eq("id", playerId)
+    .single();
+
+  if (pErr || !player) throw new Error("Jugador no encontrado");
+
+  // Fetch all fees and payments for this player
+  const { data: fees, error: fErr } = await adminSupabase
+    .from("fees")
+    .select("id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, receipt_path, fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
+    .eq("player_id", playerId)
+    .order("creado_en", { ascending: false });
+
+  if (fErr) throw new Error(fErr.message);
+
+  let totalChargedCents = 0;
+  let totalPaidCents = 0;
+
+  const formattedFees = (fees || []).map((f: any) => {
+    totalChargedCents += f.amount_cents || 0;
+
+    let paidCents = f.amount_paid_cents || 0;
+    if (f.estado === "pagado" && paidCents === 0) {
+      paidCents = f.amount_cents || 0;
+    }
+    totalPaidCents += paidCents;
+
+    return {
+      id: f.id,
+      concept: f.concept,
+      amount_cents: f.amount_cents,
+      amount_paid_cents: paidCents,
+      pending_cents: Math.max(0, f.amount_cents - paidCents),
+      estado: f.estado || "pendiente",
+      creado_en: f.creado_en,
+      payment_method: f.payment_method,
+      receipt_path: f.receipt_path,
+      payments: (f.fee_payments || []).map((p: any) => ({
+        id: p.id,
+        amount_cents: p.amount_cents,
+        payment_method: p.payment_method || "Contado",
+        created_at: p.created_at,
+        receipt_path: p.receipt_path,
+      })),
+    };
+  });
+
+  const teamObj = Array.isArray(player.teams) ? player.teams[0] : player.teams;
+
+  return {
+    success: true,
+    player: {
+      id: player.id,
+      name: `${player.first_name} ${player.last_name}`,
+      team_name: (teamObj as any)?.name || "Sin equipo",
+    },
+    summary: {
+      total_charged: totalChargedCents / 100,
+      total_paid: totalPaidCents / 100,
+      balance: (totalChargedCents - totalPaidCents) / 100,
+      status: (totalChargedCents - totalPaidCents) > 0 ? "con_deuda" : "al_dia",
+    },
+    fees: formattedFees,
+  };
+}
+

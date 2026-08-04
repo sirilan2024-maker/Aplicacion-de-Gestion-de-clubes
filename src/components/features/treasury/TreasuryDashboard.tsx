@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import Payments from "@/components/features/treasury/Payments";
 import ExpensesList from "@/components/features/treasury/ExpensesList";
-import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, TrendingDown, Scale, FileDown } from "lucide-react";
+import MemberBalances from "@/components/features/treasury/MemberBalances";
+import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, TrendingDown, Scale, FileDown, Users } from "lucide-react";
 import { getTreasuryBalanceAction, exportAccountingCsvAction } from "@/app/actions/treasury-actions";
 import toast from "react-hot-toast";
 
 export default function TreasuryDashboard() {
-  const [activeTab, setActiveTab] = useState<"ingresos" | "gastos">("ingresos");
+  const [activeTab, setActiveTab] = useState<"saldos" | "ingresos" | "gastos">("saldos");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [balances, setBalances] = useState({ ingresos: 0, gastos: 0 });
   const [exporting, setExporting] = useState(false);
@@ -121,7 +122,18 @@ export default function TreasuryDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap gap-1">
+        <button
+          onClick={() => setActiveTab("saldos")}
+          className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
+            activeTab === "saldos"
+              ? "bg-white text-indigo-700 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Saldos de Socios (Cuenta Corriente)
+        </button>
         <button
           onClick={() => setActiveTab("ingresos")}
           className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
@@ -131,7 +143,7 @@ export default function TreasuryDashboard() {
           }`}
         >
           <ArrowDownRight className="w-4 h-4" />
-          Ingresos y Cuotas
+          Cuotas e Ingresos
         </button>
         <button
           onClick={() => setActiveTab("gastos")}
@@ -148,7 +160,9 @@ export default function TreasuryDashboard() {
 
       {/* Main Content */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        {activeTab === "ingresos" ? (
+        {activeTab === "saldos" ? (
+          <MemberBalances key={`balances-${refreshTrigger}`} />
+        ) : activeTab === "ingresos" ? (
           <Payments key={`payments-${refreshTrigger}`} />
         ) : (
           <ExpensesList refreshBalances={() => setRefreshTrigger(prev => prev + 1)} />
@@ -158,3 +172,4 @@ export default function TreasuryDashboard() {
     </div>
   );
 }
+

@@ -12,7 +12,7 @@ export async function getUnreadNotificationsAction() {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
       .eq('is_read', false)
       .order('created_at', { ascending: false })
 

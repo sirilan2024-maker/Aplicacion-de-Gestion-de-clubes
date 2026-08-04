@@ -509,7 +509,7 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
   const adminSupabase = await createAdminClient();
   const { data: fee } = await adminSupabase
     .from("fees")
-    .select("*, players(first_name, last_name, tutor_id)")
+    .select("*, players(first_name, last_name, tutor_id, player_tutors(tutor_id), parent1_email, parent2_email, email)")
     .eq("id", feeId)
     .single();
 
@@ -527,15 +527,34 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
     title = "Pago Confirmado";
   }
 
-  let targetUserId = fee.profile_id;
-  if (!targetUserId && fee.players?.tutor_id) {
-    targetUserId = fee.players.tutor_id;
-    // Fix the fee record while we are at it
-    await adminSupabase.from("fees").update({ profile_id: targetUserId }).eq("id", feeId);
+  // Find all target user IDs linked to player/tutor
+  const targetUserIds = new Set<string>();
+  if (fee.profile_id) targetUserIds.add(fee.profile_id);
+  if (fee.players?.tutor_id) targetUserIds.add(fee.players.tutor_id);
+  if (Array.isArray(fee.players?.player_tutors)) {
+    fee.players.player_tutors.forEach((pt: any) => {
+      if (pt?.tutor_id) targetUserIds.add(pt.tutor_id);
+    });
+  }
+
+  // Check matching parent emails in profiles
+  const emails = [fee.players?.parent1_email, fee.players?.parent2_email, fee.players?.email].filter(Boolean);
+  if (emails.length > 0) {
+    const { data: matchingProfiles } = await adminSupabase
+      .from("profiles")
+      .select("id")
+      .in("email", emails);
+    (matchingProfiles || []).forEach((p: any) => {
+      if (p.id) targetUserIds.add(p.id);
+    });
   }
 
   if (method === 'internal') {
-    if (targetUserId) {
+    if (targetUserIds.size === 0) {
+      throw new Error("Este jugador no tiene una cuenta de familiar vinculada para recibir notificaciones.");
+    }
+
+    for (const targetUserId of targetUserIds) {
       await adminSupabase.from("notifications").insert({
         user_id: targetUserId,
         profile_id: targetUserId,
@@ -546,10 +565,9 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
         is_read: false,
         link: fee.player_id ? `/dashboard/family/e/${fee.player_id}/perfil` : '/dashboard/treasury',
       });
-      return { success: true };
-    } else {
-      throw new Error("Este jugador no tiene una cuenta de familiar vinculada para recibir notificaciones.");
     }
+
+    return { success: true };
   } else if (method === 'whatsapp') {
     return { success: true, url: `https://wa.me/?text=${encodeURIComponent(msg)}` };
   }
@@ -566,7 +584,7 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
   // Get player, tutor & fees
   const { data: player } = await adminSupabase
     .from("players")
-    .select("id, first_name, last_name, club_id, tutor_id, player_tutors(tutor_id)")
+    .select("id, first_name, last_name, club_id, tutor_id, player_tutors(tutor_id), parent1_email, parent2_email, email")
     .eq("id", playerId)
     .single();
 
@@ -589,27 +607,53 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
   const title = "Aviso de Saldo Pendiente de Pago";
   const content = `Hola, te recordamos que tienes un saldo pendiente de ${amountEur}€ en concepto de cuotas del club para ${player.first_name} ${player.last_name}. Por favor, revisa tu saldo en la aplicación.`;
 
-  // Find target tutor ID
-  let targetUserId = player.tutor_id;
-  if (!targetUserId && Array.isArray(player.player_tutors) && player.player_tutors[0]?.tutor_id) {
-    targetUserId = player.player_tutors[0].tutor_id;
+  // Find all target tutor/family user IDs
+  const targetUserIds = new Set<string>();
+  if (player.tutor_id) targetUserIds.add(player.tutor_id);
+  if (Array.isArray(player.player_tutors)) {
+    player.player_tutors.forEach((pt: any) => {
+      if (pt?.tutor_id) targetUserIds.add(pt.tutor_id);
+    });
+  }
+
+  // Also query player_tutors table directly
+  const { data: ptRows } = await adminSupabase
+    .from("player_tutors")
+    .select("tutor_id")
+    .eq("player_id", playerId);
+  (ptRows || []).forEach((pt: any) => {
+    if (pt.tutor_id) targetUserIds.add(pt.tutor_id);
+  });
+
+  // Also match emails in profiles table
+  const emails = [player.parent1_email, player.parent2_email, player.email].filter(Boolean);
+  if (emails.length > 0) {
+    const { data: matchingProfiles } = await adminSupabase
+      .from("profiles")
+      .select("id")
+      .in("email", emails);
+    (matchingProfiles || []).forEach((p: any) => {
+      if (p.id) targetUserIds.add(p.id);
+    });
   }
 
   if (method === 'internal') {
-    if (!targetUserId) {
+    if (targetUserIds.size === 0) {
       throw new Error("Este jugador no tiene una cuenta de familiar vinculada para recibir notificaciones en la campanita.");
     }
 
-    await adminSupabase.from("notifications").insert({
-      user_id: targetUserId,
-      profile_id: targetUserId,
-      club_id: player.club_id,
-      type: 'tesoreria',
-      title,
-      content,
-      is_read: false,
-      link: `/dashboard/family/e/${playerId}/perfil`,
-    });
+    for (const targetUserId of targetUserIds) {
+      await adminSupabase.from("notifications").insert({
+        user_id: targetUserId,
+        profile_id: targetUserId,
+        club_id: player.club_id,
+        type: 'tesoreria',
+        title,
+        content,
+        is_read: false,
+        link: `/dashboard/family/e/${playerId}/perfil`,
+      });
+    }
 
     return { success: true, message: "Notificación enviada a la campanita de la familia." };
   } else {

@@ -16,7 +16,8 @@ export function NotificationBell() {
   useEffect(() => {
     setMounted(true)
     fetchNotifications()
-    // Optional: Set up real-time subscription here later if needed
+    const interval = setInterval(fetchNotifications, 15000)
+    return () => clearInterval(interval)
   }, [])
 
   const fetchNotifications = async () => {

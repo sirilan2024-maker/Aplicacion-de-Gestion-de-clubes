@@ -7,12 +7,13 @@ import {
   createFeeAction,
   addPartialPaymentAction,
   sendPaymentNotificationAction,
+  sendMemberBalanceNotificationAction,
   downloadFeeReceiptAction
 } from "@/app/actions/treasury-actions";
 import {
   Users, Search, Filter, TrendingUp, TrendingDown, Scale, CheckCircle2,
   AlertTriangle, Coins, FileText, ChevronRight, X, Plus, Download, Bell,
-  Calendar, CreditCard, ShieldCheck, Loader2
+  Calendar, CreditCard, ShieldCheck, Loader2, MessageSquare, ExternalLink
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -61,6 +62,10 @@ export default function MemberBalances() {
   const [statementData, setStatementData] = useState<any | null>(null);
   const [loadingStatement, setLoadingStatement] = useState(false);
 
+  // Notification Modal (Campanita vs WhatsApp)
+  const [notifPlayer, setNotifPlayer] = useState<{ id: string; name: string } | null>(null);
+  const [sendingNotif, setSendingNotif] = useState(false);
+
   // Actions inside drawer
   const [showAddChargeModal, setShowAddChargeModal] = useState(false);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
@@ -81,7 +86,6 @@ export default function MemberBalances() {
         setMembers(res.members);
         setSummary(res.summary);
 
-        // Extract unique teams
         const teamMap = new Map<string, string>();
         res.members.forEach((m) => {
           if (m.team_id !== "none" && m.team_name) {
@@ -163,10 +167,25 @@ export default function MemberBalances() {
     }
   };
 
-  const handleSendWhatsApp = (memberName: string, balance: number, pendingCount: number) => {
-    const text = `Hola ${memberName}, desde la tesorería del club te recordamos que tienes un saldo pendiente de ${balance.toFixed(2)} € (${pendingCount} cuotas). Por favor, ponte en contacto con nosotros para regularizarlo. ¡Gracias!`;
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
+  const handleSendNotification = async (method: "internal" | "whatsapp") => {
+    if (!notifPlayer) return;
+    setSendingNotif(true);
+
+    try {
+      const res = await sendMemberBalanceNotificationAction(notifPlayer.id, method);
+      if (res.success) {
+        if (method === "whatsapp" && res.url) {
+          window.open(res.url, "_blank");
+        } else {
+          toast.success(res.message || "Notificación enviada a la campanita de la familia");
+        }
+      }
+      setNotifPlayer(null);
+    } catch (err: any) {
+      toast.error("Error al notificar: " + err.message);
+    } finally {
+      setSendingNotif(false);
+    }
   };
 
   const handleDownloadReceipt = async (feeId: string) => {
@@ -203,74 +222,74 @@ export default function MemberBalances() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* KPIs Summary Header */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      {/* KPIs Summary Header (Responsive Grid) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {/* Total Cargado */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Cargado</p>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <FileText className="w-5 h-5" />
+            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Total Cargado</p>
+            <div className="p-1.5 md:p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <FileText className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <p className="text-2xl font-black text-slate-900 mt-2">{summary.totalCharged.toFixed(2)} €</p>
-          <p className="text-xs text-slate-400 mt-1">Suma global de cargos emitidos</p>
+          <p className="text-xl md:text-2xl font-black text-slate-900 mt-2">{summary.totalCharged.toFixed(2)} €</p>
+          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5">Suma global de cargos</p>
         </div>
 
         {/* Total Cobrado */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Total Cobrado</p>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-              <TrendingUp className="w-5 h-5" />
+            <p className="text-[10px] md:text-xs font-bold text-emerald-600 uppercase tracking-wider">Total Cobrado</p>
+            <div className="p-1.5 md:p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <TrendingUp className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <p className="text-2xl font-black text-emerald-600 mt-2">{summary.totalPaid.toFixed(2)} €</p>
-          <p className="text-xs text-emerald-600/70 mt-1">Abonos recibidos en caja/banco</p>
+          <p className="text-xl md:text-2xl font-black text-emerald-600 mt-2">{summary.totalPaid.toFixed(2)} €</p>
+          <p className="text-[10px] md:text-xs text-emerald-600/70 mt-0.5">Abonos recibidos</p>
         </div>
 
         {/* Deuda Pendiente */}
-        <div className="bg-white rounded-2xl p-5 border border-amber-200 bg-gradient-to-br from-white to-amber-50/40 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-200 bg-gradient-to-br from-white to-amber-50/40 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Deuda Pendiente</p>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
-              <AlertTriangle className="w-5 h-5" />
+            <p className="text-[10px] md:text-xs font-bold text-amber-700 uppercase tracking-wider">Deuda Pendiente</p>
+            <div className="p-1.5 md:p-2 bg-amber-100 text-amber-700 rounded-xl">
+              <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <p className="text-2xl font-black text-amber-700 mt-2">{summary.totalPending.toFixed(2)} €</p>
-          <p className="text-xs text-amber-600 mt-1">Pendiente de cobro en el club</p>
+          <p className="text-xl md:text-2xl font-black text-amber-700 mt-2">{summary.totalPending.toFixed(2)} €</p>
+          <p className="text-[10px] md:text-xs text-amber-600 mt-0.5">Pendiente de cobro</p>
         </div>
 
         {/* Estado de Socios */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado de Socios</p>
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Users className="w-5 h-5" />
+            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Socios</p>
+            <div className="p-1.5 md:p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <Users className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-2xl font-black text-red-600">{summary.membersConDeuda}</span>
-            <span className="text-xs font-medium text-slate-500">con deuda /</span>
-            <span className="text-2xl font-black text-emerald-600">{summary.membersAlDia}</span>
-            <span className="text-xs font-medium text-slate-500">al día</span>
+          <div className="flex items-baseline gap-1.5 mt-2">
+            <span className="text-xl md:text-2xl font-black text-red-600">{summary.membersConDeuda}</span>
+            <span className="text-[10px] md:text-xs text-slate-500">deuda /</span>
+            <span className="text-xl md:text-2xl font-black text-emerald-600">{summary.membersAlDia}</span>
+            <span className="text-[10px] md:text-xs text-slate-500">al día</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Total: {summary.totalMembers} socios activos</p>
+          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5">Total: {summary.totalMembers} socios</p>
         </div>
       </div>
 
-      {/* Main Table Card */}
+      {/* Main Table & Controls Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Controls Header */}
-        <div className="p-4 bg-slate-50/60 border-b border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
+        <div className="p-3 md:p-4 bg-slate-50/60 border-b border-slate-200 flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
             {/* Search */}
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Buscar socio por nombre..."
+                placeholder="Buscar socio..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
@@ -290,45 +309,148 @@ export default function MemberBalances() {
                 </option>
               ))}
             </select>
+          </div>
 
-            {/* Status Filter buttons */}
-            <div className="flex bg-slate-200/80 p-1 rounded-xl gap-1">
-              <button
-                onClick={() => setStatusFilter("todos")}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                  statusFilter === "todos"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Todos ({members.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter("con_deuda")}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                  statusFilter === "con_deuda"
-                    ? "bg-red-600 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Con Deuda ({summary.membersConDeuda})
-              </button>
-              <button
-                onClick={() => setStatusFilter("al_dia")}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                  statusFilter === "al_dia"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Al Día ({summary.membersAlDia})
-              </button>
-            </div>
+          {/* Status Filter buttons (Horizontal Scrollable on Mobile) */}
+          <div className="flex overflow-x-auto pb-1 md:pb-0 scrollbar-none gap-1 bg-slate-200/70 p-1 rounded-xl">
+            <button
+              onClick={() => setStatusFilter("todos")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                statusFilter === "todos"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Todos ({members.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter("con_deuda")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                statusFilter === "con_deuda"
+                  ? "bg-red-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Con Deuda ({summary.membersConDeuda})
+            </button>
+            <button
+              onClick={() => setStatusFilter("al_dia")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                statusFilter === "al_dia"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Al Día ({summary.membersAlDia})
+            </button>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* ===== MOBILE CARDS VIEW (block md:hidden) ===== */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {filteredMembers.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-sm">
+              No se encontraron socios con los filtros aplicados.
+            </div>
+          ) : (
+            filteredMembers.map((m) => {
+              const charged = (m.total_charged_cents / 100).toFixed(2);
+              const paid = (m.total_paid_cents / 100).toFixed(2);
+              const balance = (m.balance_cents / 100).toFixed(2);
+
+              return (
+                <div
+                  key={m.player_id}
+                  onClick={() => fetchStatement(m.player_id)}
+                  className="p-4 hover:bg-indigo-50/30 transition-colors active:bg-indigo-50/50 space-y-2.5 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{m.player_name}</p>
+                      <span className="inline-block mt-0.5 text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                        {m.team_name}
+                      </span>
+                    </div>
+
+                    <div>
+                      {m.status === "con_deuda" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                          <AlertTriangle className="w-3 h-3" />
+                          Deuda ({m.pending_fees_count})
+                        </span>
+                      ) : m.status === "saldo_favor" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                          Favor
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Al día
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Cargado</span>
+                      <span className="font-bold text-slate-800">{charged} €</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Pagado</span>
+                      <span className="font-bold text-emerald-600">{paid} €</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Saldo</span>
+                      <span
+                        className={`font-black ${
+                          m.balance_cents > 0
+                            ? "text-red-600"
+                            : m.balance_cents < 0
+                            ? "text-blue-600"
+                            : "text-emerald-600"
+                        }`}
+                      >
+                        {balance} €
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    {m.status === "con_deuda" ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNotifPlayer({ id: m.player_id, name: m.player_name });
+                        }}
+                        className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg active:bg-amber-100"
+                      >
+                        <Bell className="w-3.5 h-3.5" />
+                        Notificar Deuda
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fetchStatement(m.player_id);
+                      }}
+                      className="flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg active:bg-indigo-100 ml-auto"
+                    >
+                      Ver Extracto
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ===== DESKTOP TABLE VIEW (hidden md:table) ===== */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -402,9 +524,9 @@ export default function MemberBalances() {
                         <div className="flex items-center justify-end gap-1">
                           {m.status === "con_deuda" && (
                             <button
-                              onClick={() => handleSendWhatsApp(m.player_name, m.balance_cents / 100, m.pending_fees_count)}
-                              title="Enviar recordatorio por WhatsApp"
-                              className="p-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+                              onClick={() => setNotifPlayer({ id: m.player_id, name: m.player_name })}
+                              title="Enviar notificación o WhatsApp"
+                              className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-colors"
                             >
                               <Bell className="w-4 h-4" />
                             </button>
@@ -430,13 +552,13 @@ export default function MemberBalances() {
       {/* ====== DRAWER / EXTRACTO CONTABLE DEL SOCIO ====== */}
       {selectedPlayerId && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+          <div className="w-full md:max-w-2xl bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
             {/* Header Drawer */}
-            <div className="p-5 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between shrink-0">
+            <div className="p-4 md:p-5 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <Coins className="w-5 h-5 text-indigo-400" />
-                  <h2 className="text-lg font-bold">
+                  <h2 className="text-base md:text-lg font-bold">
                     {loadingStatement ? "Cargando extracto..." : statementData?.player?.name}
                   </h2>
                 </div>
@@ -457,21 +579,21 @@ export default function MemberBalances() {
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
               </div>
             ) : statementData ? (
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 bg-slate-50">
                 {/* Summary Card */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-3 gap-3 text-center">
+                <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-3 gap-2 text-center">
                   <div>
-                    <p className="text-xs text-slate-400 font-bold uppercase">Total Cargado</p>
-                    <p className="text-lg font-bold text-slate-900">{statementData.summary.total_charged.toFixed(2)} €</p>
+                    <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Total Cargado</p>
+                    <p className="text-base md:text-lg font-bold text-slate-900">{statementData.summary.total_charged.toFixed(2)} €</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400 font-bold uppercase">Total Abonado</p>
-                    <p className="text-lg font-bold text-emerald-600">{statementData.summary.total_paid.toFixed(2)} €</p>
+                    <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Total Abonado</p>
+                    <p className="text-base md:text-lg font-bold text-emerald-600">{statementData.summary.total_paid.toFixed(2)} €</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400 font-bold uppercase">Saldo Actual</p>
+                    <p className="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Saldo Actual</p>
                     <p
-                      className={`text-lg font-black ${
+                      className={`text-base md:text-lg font-black ${
                         statementData.summary.balance > 0 ? "text-red-600" : "text-emerald-600"
                       }`}
                     >
@@ -484,24 +606,18 @@ export default function MemberBalances() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => setShowAddChargeModal(true)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
                   >
                     <Plus className="w-4 h-4" />
                     Emitir Nuevo Cargo
                   </button>
                   {statementData.summary.balance > 0 && (
                     <button
-                      onClick={() =>
-                        handleSendWhatsApp(
-                          statementData.player.name,
-                          statementData.summary.balance,
-                          statementData.fees.filter((f: any) => f.estado === "pendiente").length
-                        )
-                      }
-                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                      onClick={() => setNotifPlayer({ id: statementData.player.id, name: statementData.player.name })}
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
                     >
                       <Bell className="w-4 h-4" />
-                      WhatsApp Aviso
+                      Enviar Notificación
                     </button>
                   )}
                 </div>
@@ -550,7 +666,7 @@ export default function MemberBalances() {
                           </div>
                         </div>
 
-                        {/* Partial Payments list if any */}
+                        {/* Partial Payments list */}
                         {fee.payments.length > 0 && (
                           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
                             <p className="text-[10px] font-bold text-slate-400 uppercase">Abonos parciales recibidos:</p>
@@ -594,6 +710,54 @@ export default function MemberBalances() {
                 </div>
               </div>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* ====== MODAL NOTIFICACIÓN: CAMPANITA O WHATSAPP ====== */}
+      {notifPlayer && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4 animate-in zoom-in-95">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto">
+                <Bell className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Notificar Saldo Pendiente</h3>
+              <p className="text-xs text-slate-500">
+                Selecciona cómo deseas avisar a la familia de <strong>{notifPlayer.name}</strong>:
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => handleSendNotification("internal")}
+                disabled={sendingNotif}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50"
+              >
+                {sendingNotif ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Bell className="w-4 h-4" />
+                )}
+                🔔 Notificación Interna (Campanita App)
+              </button>
+
+              <button
+                onClick={() => handleSendNotification("whatsapp")}
+                disabled={sendingNotif}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50"
+              >
+                <MessageSquare className="w-4 h-4" />
+                💬 Enviar mensaje por WhatsApp
+              </button>
+            </div>
+
+            <button
+              onClick={() => setNotifPlayer(null)}
+              className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}

@@ -473,7 +473,8 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
         type: 'tesoreria',
         title: title,
         content: msg,
-        is_read: false
+        is_read: false,
+        link: fee.player_id ? `/dashboard/family/e/${fee.player_id}/perfil` : '/dashboard/treasury',
       });
       return { success: true };
     } else {
@@ -481,6 +482,70 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
     }
   } else if (method === 'whatsapp') {
     return { success: true, url: `https://wa.me/?text=${encodeURIComponent(msg)}` };
+  }
+  return { success: false };
+}
+
+export async function sendMemberBalanceNotificationAction(playerId: string, method: 'internal' | 'whatsapp') {
+  const supabase = await createClient();
+  const adminSupabase = await createAdminClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+
+  // Get player, tutor & fees
+  const { data: player } = await adminSupabase
+    .from("players")
+    .select("id, first_name, last_name, club_id, tutor_id, player_tutors(tutor_id)")
+    .eq("id", playerId)
+    .single();
+
+  if (!player) throw new Error("Jugador no encontrado");
+
+  // Calculate pending balance
+  const { data: fees } = await adminSupabase
+    .from("fees")
+    .select("amount_cents, amount_paid_cents, estado")
+    .eq("player_id", playerId)
+    .eq("estado", "pendiente");
+
+  let pendingCents = 0;
+  (fees || []).forEach((f: any) => {
+    const paid = f.amount_paid_cents || 0;
+    pendingCents += Math.max(0, f.amount_cents - paid);
+  });
+
+  const amountEur = (pendingCents / 100).toFixed(2);
+  const title = "Aviso de Saldo Pendiente de Pago";
+  const content = `Hola, te recordamos que tienes un saldo pendiente de ${amountEur}€ en concepto de cuotas del club para ${player.first_name} ${player.last_name}. Por favor, revisa tu saldo en la aplicación.`;
+
+  // Find target tutor ID
+  let targetUserId = player.tutor_id;
+  if (!targetUserId && Array.isArray(player.player_tutors) && player.player_tutors[0]?.tutor_id) {
+    targetUserId = player.player_tutors[0].tutor_id;
+  }
+
+  if (method === 'internal') {
+    if (!targetUserId) {
+      throw new Error("Este jugador no tiene una cuenta de familiar vinculada para recibir notificaciones en la campanita.");
+    }
+
+    await adminSupabase.from("notifications").insert({
+      user_id: targetUserId,
+      profile_id: targetUserId,
+      club_id: player.club_id,
+      type: 'tesoreria',
+      title,
+      content,
+      is_read: false,
+      link: `/dashboard/family/e/${playerId}/perfil`,
+    });
+
+    return { success: true, message: "Notificación enviada a la campanita de la familia." };
+  } else {
+    const whatsappText = `Hola, desde la tesorería del club te recordamos que tienes un saldo pendiente de ${amountEur}€ en el expediente de ${player.first_name} ${player.last_name}. Por favor, ponte en contacto con nosotros para regularizarlo. ¡Gracias!`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
+    return { success: true, url: whatsappUrl };
   }
 }
 

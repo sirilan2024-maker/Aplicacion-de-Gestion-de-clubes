@@ -51,21 +51,21 @@ export default function TreasuryDashboard() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-4 md:space-y-6 animate-in fade-in duration-500">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Wallet className="w-7 h-7 text-indigo-600" />
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Wallet className="w-6 h-6 md:w-7 md:h-7 text-indigo-600" />
             Contabilidad y Tesorería
           </h1>
-          <p className="text-gray-500 mt-1">Gestión de ingresos, cuotas y gastos del club</p>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Gestión de ingresos, cuotas y gastos del club</p>
         </div>
         <button
           onClick={handleExportContabilidad}
           disabled={exporting}
-          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-colors disabled:opacity-50"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm transition-colors disabled:opacity-50 w-full sm:w-auto"
         >
           <FileDown className="w-4 h-4" />
           {exporting ? "Generando..." : "Exportar Contabilidad (CSV)"}
@@ -73,93 +73,95 @@ export default function TreasuryDashboard() {
       </div>
 
       {/* Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         {/* Ingresos */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Total Ingresos</p>
-            <div className="p-2 bg-green-50 rounded-xl text-green-600">
-              <TrendingUp className="w-5 h-5" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Ingresos</p>
+            <div className="p-1.5 md:p-2 bg-green-50 rounded-xl text-green-600">
+              <TrendingUp className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <p className="text-3xl font-black text-green-600">{balances.ingresos.toFixed(2)} €</p>
-          <p className="text-xs text-gray-400 mt-1">Cuotas cobradas (estado: pagado)</p>
+          <p className="text-2xl md:text-3xl font-black text-green-600">{balances.ingresos.toFixed(2)} €</p>
+          <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Cuotas cobradas (pagado)</p>
         </div>
 
         {/* Gastos */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Total Gastos</p>
-            <div className="p-2 bg-red-50 rounded-xl text-red-600">
-              <TrendingDown className="w-5 h-5" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Gastos</p>
+            <div className="p-1.5 md:p-2 bg-red-50 rounded-xl text-red-600">
+              <TrendingDown className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <p className="text-3xl font-black text-red-600">{balances.gastos.toFixed(2)} €</p>
-          <p className="text-xs text-gray-400 mt-1">Facturas y gastos operativos</p>
+          <p className="text-2xl md:text-3xl font-black text-red-600">{balances.gastos.toFixed(2)} €</p>
+          <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Facturas y gastos operativos</p>
         </div>
 
         {/* Balance Neto */}
-        <div className={`rounded-2xl shadow-sm border p-5 ${
+        <div className={`rounded-2xl shadow-sm border p-4 md:p-5 ${
           saldoPositivo
             ? "bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200"
             : "bg-gradient-to-br from-red-50 to-rose-100 border-red-200"
         }`}>
-          <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-semibold uppercase tracking-wider ${saldoPositivo ? "text-emerald-700" : "text-red-700"}`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className={`text-xs font-semibold uppercase tracking-wider ${saldoPositivo ? "text-emerald-700" : "text-red-700"}`}>
               Balance Neto
             </p>
-            <div className={`p-2 rounded-xl ${saldoPositivo ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"}`}>
-              <Scale className="w-5 h-5" />
+            <div className={`p-1.5 md:p-2 rounded-xl ${saldoPositivo ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"}`}>
+              <Scale className="w-4 h-4 md:w-5 md:h-5" />
             </div>
           </div>
-          <p className={`text-3xl font-black ${saldoPositivo ? "text-green-600" : "text-red-600"}`}>
+          <p className={`text-2xl md:text-3xl font-black ${saldoPositivo ? "text-green-600" : "text-red-600"}`}>
             {saldoPositivo ? "+" : ""}{saldoNeto.toFixed(2)} €
           </p>
-          <p className={`text-xs mt-1 ${saldoPositivo ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`text-[10px] md:text-xs mt-0.5 ${saldoPositivo ? "text-emerald-600" : "text-red-600"}`}>
             {saldoPositivo ? "✅ El club está en positivo" : "⚠️ El club tiene déficit"}
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap gap-1">
-        <button
-          onClick={() => setActiveTab("saldos")}
-          className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
-            activeTab === "saldos"
-              ? "bg-white text-indigo-700 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Saldos de Socios (Cuenta Corriente)
-        </button>
-        <button
-          onClick={() => setActiveTab("ingresos")}
-          className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
-            activeTab === "ingresos"
-              ? "bg-white text-indigo-700 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          <ArrowDownRight className="w-4 h-4" />
-          Cuotas e Ingresos
-        </button>
-        <button
-          onClick={() => setActiveTab("gastos")}
-          className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
-            activeTab === "gastos"
-              ? "bg-white text-red-700 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          <ArrowUpRight className="w-4 h-4" />
-          Gastos Operativos
-        </button>
+      {/* Tabs (Horizontal scroll on mobile) */}
+      <div className="w-full overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-max md:w-fit">
+          <button
+            onClick={() => setActiveTab("saldos")}
+            className={`px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === "saldos"
+                ? "bg-white text-indigo-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Saldos de Socios (Cuenta Corriente)
+          </button>
+          <button
+            onClick={() => setActiveTab("ingresos")}
+            className={`px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === "ingresos"
+                ? "bg-white text-indigo-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <ArrowDownRight className="w-4 h-4" />
+            Cuotas e Ingresos
+          </button>
+          <button
+            onClick={() => setActiveTab("gastos")}
+            className={`px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === "gastos"
+                ? "bg-white text-red-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <ArrowUpRight className="w-4 h-4" />
+            Gastos Operativos
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 md:p-6">
         {activeTab === "saldos" ? (
           <MemberBalances key={`balances-${refreshTrigger}`} />
         ) : activeTab === "ingresos" ? (

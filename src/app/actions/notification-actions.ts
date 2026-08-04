@@ -13,8 +13,8 @@ export async function getUnreadNotificationsAction() {
       .from('notifications')
       .select('*')
       .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
-      .eq('is_read', false)
       .order('created_at', { ascending: false })
+      .limit(25)
 
     if (error) throw error
 
@@ -34,7 +34,6 @@ export async function markNotificationAsReadAction(notificationId: string) {
       .from('notifications')
       .update({ is_read: true })
       .eq('id', notificationId)
-      .eq('user_id', user.id)
 
     if (error) throw error
 
@@ -53,7 +52,7 @@ export async function markAllNotificationsAsReadAction() {
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
       .eq('is_read', false)
 
     if (error) throw error

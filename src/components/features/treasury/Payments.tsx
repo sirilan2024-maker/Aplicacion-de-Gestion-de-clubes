@@ -211,15 +211,15 @@ export default function Payments() {
   };
 
   const viewReceipt = async (id: string) => {
+    const toastId = toast.loading("Generando / Obteniendo recibo...");
     try {
-      const toastId = toast.loading("Generando / Obteniendo recibo...");
       const res = await downloadFeeReceiptAction(id);
       toast.dismiss(toastId);
       if (res?.url) {
         window.open(res.url, "_blank");
       }
     } catch (error: any) {
-      toast.error("Error: " + error.message);
+      toast.error("Error: " + error.message, { id: toastId });
     }
   };
   

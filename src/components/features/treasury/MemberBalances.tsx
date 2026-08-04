@@ -189,15 +189,15 @@ export default function MemberBalances() {
   };
 
   const handleDownloadReceipt = async (feeId: string) => {
+    const toastId = toast.loading("Generando recibo PDF...");
     try {
-      const toastId = toast.loading("Generando recibo PDF...");
       const res = await downloadFeeReceiptAction(feeId);
       toast.dismiss(toastId);
       if (res?.url) {
         window.open(res.url, "_blank");
       }
     } catch (err: any) {
-      toast.error("Error al descargar recibo: " + err.message);
+      toast.error("Error al descargar recibo: " + err.message, { id: toastId });
     }
   };
 

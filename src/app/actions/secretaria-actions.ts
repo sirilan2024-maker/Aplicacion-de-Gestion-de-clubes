@@ -111,7 +111,7 @@ export async function getPlayerExpedienteAction(playerId: string) {
     // 2. Obtener el DNI del tutor desde families (vinculado por family_id en players)
     const { data: playerRow } = await supabaseAdmin
       .from('players')
-      .select('family_id, sip, families(id, tutor_1_dni_url, tutor_2_dni_url)')
+      .select('family_id, sip, dni, families(id, tutor_1_dni_url, tutor_2_dni_url)')
       .eq('id', playerId)
       .single();
 
@@ -154,6 +154,7 @@ export async function getPlayerExpedienteAction(playerId: string) {
       tutorDni2Url: tutorDni2SignedUrl,
       familyId: family?.id || null,
       sipNumber: playerRow?.sip || null,
+      playerDni: playerRow?.dni || null,
     };
   } catch (error: any) {
     console.error('[getPlayerExpedienteAction]', error);

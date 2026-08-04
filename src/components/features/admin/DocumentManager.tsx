@@ -337,6 +337,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
   const [documents, setDocuments] = useState<PlayerDocument[]>([]);
   const [tutorDniUrl, setTutorDniUrl] = useState<string | null>(null);
   const [sipNumber, setSipNumber] = useState<string | null>(null);
+  const [playerDni, setPlayerDni] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -350,6 +351,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
         setDocuments(res.documents as PlayerDocument[]);
         setTutorDniUrl(res.tutorDniUrl || null);
         setSipNumber(res.sipNumber || null);
+        setPlayerDni((res as any).playerDni || null);
       } else {
         setError(res.error || "Error al cargar documentos");
       }
@@ -560,14 +562,20 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
         </div>
       )}
 
-      {/* Número SIP */}
-      {sipNumber && (
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
-          <p className="text-sm font-semibold text-teal-900">
-            Número SIP / Tarjeta Sanitaria: <span className="font-bold">{sipNumber}</span>
-          </p>
+      {/* DNI / NIE del Jugador */}
+      {playerDni && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-indigo-600" />
+            <p className="text-sm font-bold text-indigo-900">DNI / NIE del Jugador</p>
+          </div>
+          <span className="font-mono text-base font-bold text-indigo-800 tracking-widest bg-white border border-indigo-200 px-3 py-1 rounded-lg select-all">
+            {playerDni}
+          </span>
         </div>
       )}
+
+      {/* Número SIP — oculto visualmente (solo interno) */}
 
       {/* Grid de documentos */}
       {documents.length === 0 ? (

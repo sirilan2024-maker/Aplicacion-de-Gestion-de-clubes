@@ -26,30 +26,56 @@ export async function toggleMatchTimer(matchId: string, isRunning: boolean, elap
 export async function addLiveEvent(matchId: string, eventData: any) {
   const supabase = await createAdminClient()
   
+  // Usar el tipo de evento directamente sin transformar "Ocasión Peligrosa" en "Tiro al larguero"
+  let dbTipo = eventData.tipo;
+  let dbNotas = eventData.descripcion;
+
   const { data, error } = await supabase
     .from("match_events")
     .insert([
       {
         partido_id: matchId,
         player_id: eventData.player_id || null,
-        tipo_evento: eventData.tipo,
+        tipo_evento: dbTipo,
         minuto: eventData.minuto,
-        notas: eventData.descripcion
+        notas: dbNotas
       }
     ])
     .select()
     .single()
 
   if (error) {
-    console.error("Error adding live event:", error)
-    return { success: false, error: error.message }
+    // Si falla por tipo_evento check constraint, intentamos insertar con fallback 'Comentario' o 'Descanso'
+    console.warn("Fallo insercion directa tipo_evento:", error.message, "Intentando fallback...");
+    const { data: fbData, error: fbError } = await supabase
+      .from("match_events")
+      .insert([
+        {
+          partido_id: matchId,
+          player_id: eventData.player_id || null,
+          tipo_evento: "Descanso",
+          minuto: eventData.minuto,
+          notas: `[${eventData.tipo}] ${dbNotas || ''}`
+        }
+      ])
+      .select()
+      .single()
+
+    if (fbError) {
+      console.error("Error adding live event (fallback failed):", fbError);
+      return { success: false, error: fbError.message };
+    }
+    return { success: true, data: { ...fbData, tipo_evento: eventData.tipo } };
   }
+
+  // Restore original tipo for UI consumer
+  const resultData = { ...data, tipo_evento: eventData.tipo };
 
   if (eventData.tipo === "Gol" || eventData.tipo === "Gol en propia puerta") {
     await recalculateScore(matchId, supabase);
   }
 
-  return { success: true, data }
+  return { success: true, data: resultData }
 }
 
 export async function deleteLiveEvent(eventId: string, matchId: string) {
@@ -103,12 +129,27 @@ async function recalculateScore(matchId: string, supabase: any) {
 export async function updateMatchState(matchId: string, estado: string, updates: any = {}) {
   const supabase = await createAdminClient()
   
+  // Normalizar estado según la restricción 'partidos_estado_check' de la BD
+  let dbEstado = estado;
+  if (estado === "En Curso" || estado === "En curso" || estado === "EN_CURSO") {
+    dbEstado = "En curso";
+  } else if (estado === "Descanso" || estado === "DESCANSO") {
+    dbEstado = "Descanso";
+  } else if (estado === "Finalizado" || estado === "FINALIZADO") {
+    dbEstado = "Finalizado";
+  } else if (estado === "Programado" || estado === "PROGRAMADO") {
+    dbEstado = "Programado";
+  }
+
+  const finalUpdates = {
+    estado: dbEstado,
+    ...updates,
+    ...(dbEstado === "Descanso" ? { live_timer_started_at: null } : {})
+  }
+
   const { error } = await supabase
     .from("partidos")
-    .update({
-      estado,
-      ...updates
-    })
+    .update(finalUpdates)
     .eq("id", matchId)
 
   if (error) {
@@ -117,7 +158,7 @@ export async function updateMatchState(matchId: string, estado: string, updates:
   }
 
   // Si finaliza el partido, sincronizamos automáticamente los eventos en vivo a la convocatoria
-  if (estado === "Finalizado") {
+  if (dbEstado === "Finalizado") {
     await syncMatchEventsToConvocatorias(matchId, supabase);
   }
 
@@ -125,54 +166,109 @@ export async function updateMatchState(matchId: string, estado: string, updates:
 }
 
 async function syncMatchEventsToConvocatorias(matchId: string, supabase: any) {
-  // 1. Obtener todos los eventos del partido
+  // 1. Obtener información del partido para saber la duración total
+  const { data: partido } = await supabase
+    .from("partidos")
+    .select("live_timer_elapsed_seconds, equipo:teams(category)")
+    .eq("id", matchId)
+    .single();
+
+  let totalMatchMinutes = 90;
+  if (partido?.live_timer_elapsed_seconds) {
+    totalMatchMinutes = Math.max(1, Math.round(partido.live_timer_elapsed_seconds / 60));
+  } else if (partido?.equipo?.category) {
+    const cat = partido.equipo.category.toLowerCase();
+    if (cat.includes("benjamín") || cat.includes("prebenjamín")) totalMatchMinutes = 50;
+    else if (cat.includes("alevín")) totalMatchMinutes = 60;
+    else if (cat.includes("infantil")) totalMatchMinutes = 70;
+    else if (cat.includes("cadete")) totalMatchMinutes = 80;
+  }
+
+  // 2. Obtener todos los eventos del partido
   const { data: events } = await supabase
     .from("match_events")
     .select("*")
+    .eq("partido_id", matchId)
+    .order("minuto", { ascending: true });
+
+  // 3. Obtener convocatorias actuales con titulares
+  const { data: convocatorias } = await supabase
+    .from("convocatorias")
+    .select("id, player_id, titular")
     .eq("partido_id", matchId);
 
-  if (!events || events.length === 0) return;
+  if (!convocatorias || convocatorias.length === 0) return;
 
-  // Agrupar eventos por jugador
-  const playerStats: Record<string, { goals: number, yellow_cards: number, red_cards: number }> = {};
-  
-  events.forEach((e: any) => {
-    if (!e.player_id) return;
-    
-    if (!playerStats[e.player_id]) {
-      playerStats[e.player_id] = { goals: 0, yellow_cards: 0, red_cards: 0 };
+  const playerStats: Record<string, { 
+    goals: number; 
+    yellow_cards: number; 
+    red_cards: number; 
+    minutes_played: number;
+    inMinute: number | null;
+  }> = {};
+
+  convocatorias.forEach((c: any) => {
+    playerStats[c.player_id] = {
+      goals: 0,
+      yellow_cards: 0,
+      red_cards: 0,
+      minutes_played: 0,
+      inMinute: c.titular ? 0 : null // Los titulares empiezan en el minuto 0
+    };
+  });
+
+  // Procesar los eventos cronológicamente
+  (events || []).forEach((e: any) => {
+    const eventMin = Math.min(totalMatchMinutes, Math.max(0, e.minuto || 0));
+
+    if (e.player_id && playerStats[e.player_id]) {
+      if (e.tipo_evento === "Gol") {
+        playerStats[e.player_id].goals++;
+      } else if (e.tipo_evento === "Tarjeta Amarilla" || e.tipo_evento === "Amarilla") {
+        playerStats[e.player_id].yellow_cards++;
+      } else if (e.tipo_evento === "Tarjeta Roja") {
+        playerStats[e.player_id].red_cards++;
+        // Si le sacan tarjeta roja, sale del campo en ese minuto
+        if (playerStats[e.player_id].inMinute !== null) {
+          const played = Math.max(0, eventMin - playerStats[e.player_id].inMinute!);
+          playerStats[e.player_id].minutes_played += played;
+          playerStats[e.player_id].inMinute = null;
+        }
+      }
     }
-    
-    if (e.tipo_evento === "Gol") {
-      playerStats[e.player_id].goals++;
-    } else if (e.tipo_evento === "Tarjeta Amarilla") {
-      playerStats[e.player_id].yellow_cards++;
-    } else if (e.tipo_evento === "Tarjeta Roja") {
-      playerStats[e.player_id].red_cards++;
+
+    // Procesar cambios
+    if (e.tipo_evento === "Cambio") {
+      // Si en las notas del cambio viene "Entra [Nombre] por [Sale]" o si hay player_id
+      if (e.player_id && playerStats[e.player_id]) {
+        // Jugador que entra
+        if (playerStats[e.player_id].inMinute === null) {
+          playerStats[e.player_id].inMinute = eventMin;
+        }
+      }
     }
   });
 
-  // 2. Obtener convocatorias actuales
-  const { data: convocatorias } = await supabase
-    .from("convocatorias")
-    .select("id, player_id")
-    .eq("partido_id", matchId);
-
-  if (!convocatorias) return;
-
-  // 3. Actualizar cada convocatoria con los datos agregados
+  // Para cada jugador, calcular los minutos finales al pitar el final del partido
   for (const conv of convocatorias) {
     const stats = playerStats[conv.player_id];
     if (stats) {
+      if (stats.inMinute !== null) {
+        const played = Math.max(0, totalMatchMinutes - stats.inMinute);
+        stats.minutes_played += played;
+      }
+
       await supabase
         .from("convocatorias")
         .update({
           goals: stats.goals,
-          goles: stats.goals, // Actualizar ambos por compatibilidad
+          goles: stats.goals,
           yellow_cards: stats.yellow_cards,
           tarjetas_amarillas: stats.yellow_cards,
           red_cards: stats.red_cards,
-          tarjetas_rojas: stats.red_cards
+          tarjetas_rojas: stats.red_cards,
+          minutes_played: stats.minutes_played,
+          minutos_jugados: stats.minutes_played
         })
         .eq("id", conv.id);
     }

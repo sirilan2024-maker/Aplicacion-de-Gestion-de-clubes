@@ -64,7 +64,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   // Live Timer
   const { seconds } = useLiveTimer(matchId, match?.live_timer_elapsed_seconds || 0, match?.live_timer_started_at || null);
 
-  const isLocal = true; // Match Coach View: Always show the club on the left
+  const isLocal = match?.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match?.lugar || '');
   const teamName = match?.equipo?.name || "Sporting Saladar";
   const rivalName = match?.rival_nombre || "Rival por definir";
   
@@ -90,8 +90,8 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
     return false;
   });
 
-  const localGoals = match?.resultado_propio ?? localGoalsList.length;
-  const awayGoals = match?.resultado_rival ?? awayGoalsList.length;
+  const displayLocalGoals = isLocal ? (match?.resultado_propio ?? localGoalsList.length) : (match?.resultado_rival ?? awayGoalsList.length);
+  const displayAwayGoals = isLocal ? (match?.resultado_rival ?? awayGoalsList.length) : (match?.resultado_propio ?? localGoalsList.length);
 
   const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta').sort((a, b) => a.minuto - b.minuto);
   let runningLocal = 0;
@@ -131,6 +131,9 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
     else if (event.tipo_evento === 'Lesión') { icon = "🚑"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
     else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = "📌"; bgColor = "bg-slate-100/50"; textColor = "text-slate-500"; }
 
+    const isComment = event.tipo_evento === 'Comentario del Entrenador' || event.tipo_evento === 'Comentario';
+    if (isComment) { icon = "💬"; bgColor = "bg-indigo-50/70"; textColor = "text-indigo-800"; }
+
     return (
       <div key={event.id} className={`flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 ${bgColor} transition-all`}>
         <div className="w-10 h-10 shrink-0 bg-white rounded-lg border border-slate-200 flex flex-col items-center justify-center shadow-sm">
@@ -140,15 +143,15 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
         <div className="flex-1 flex items-center gap-3">
           <div className="text-lg">{icon}</div>
           <div>
-            <p className={`text-xs font-bold ${textColor}`}>{event.tipo_evento}</p>
+            <p className={`text-xs font-bold ${textColor}`}>
+              {isComment ? (event.notas || 'Comentario') : event.tipo_evento}
+            </p>
             {event.player ? (
               <p className="text-[10px] font-semibold text-slate-600">
                 {event.player.first_name} {event.player.last_name}
               </p>
-            ) : (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') ? null : (
-              <p className="text-[10px] font-semibold text-slate-500">Rival / Staff</p>
-            )}
-            {event.notas && (
+            ) : null}
+            {event.notas && !isComment && (
               <p className="text-[9px] text-slate-500 mt-0.5 italic">{event.notas}</p>
             )}
           </div>
@@ -257,15 +260,16 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
             {/* Score & Timer */}
             <div className="flex items-center gap-5 shrink-0">
               <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
-                {localGoals}
+                {displayLocalGoals}
               </span>
               
               <div className="flex flex-col items-center justify-center px-4">
                 {(() => {
                   const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
-                  const isDescanso = match?.first_half_duration_seconds !== null &&
-                                     match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
-                                     !match?.live_timer_started_at;
+                  const isDescanso = match?.estado === 'Descanso' || 
+                                     (match?.first_half_duration_seconds !== null &&
+                                      match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
+                                      !match?.live_timer_started_at);
                   
                   if (isFinalizado || isDescanso) {
                     return (
@@ -287,8 +291,8 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
                         )}
                         {formatTime(seconds)}
                       </div>
-                      <span className={`text-[10px] font-bold mt-2 uppercase tracking-widest px-2 py-0.5 rounded ${match?.estado?.trim().toLowerCase() === 'en juego' || match?.estado?.trim().toLowerCase() === 'en curso' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
-                        {match?.estado || 'Programado'}
+                      <span className={`text-[10px] font-bold mt-2 uppercase tracking-widest px-2 py-0.5 rounded ${(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
+                        {match?.live_timer_started_at !== null ? (match?.first_half_duration_seconds ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado')}
                       </span>
                     </>
                   );
@@ -296,7 +300,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
               </div>
 
               <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
-                {awayGoals}
+                {displayAwayGoals}
               </span>
             </div>
 
@@ -316,6 +320,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
           {goalTimeline.length > 0 && (
             <div className="bg-slate-50/80 px-6 py-5 border-t border-slate-100 flex flex-col items-center gap-2.5">
               {goalTimeline.map((goal, idx) => {
+                const displayMinuto = goal.minuto > 120 ? Math.floor(goal.minuto / 60) : (goal.minuto || 0);
                 const isOwnGoal = goal.tipo_evento === 'Gol en propia puerta';
                 const nameSuffix = isOwnGoal ? ' (p.p.)' : '';
                 return (
@@ -324,8 +329,8 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
                     <div className="flex-1 text-right pr-4 text-slate-700">
                       {goal.isHomeGoal && (
                         <span>
-                          {goal.player?.first_name ? `${goal.player.first_name}${nameSuffix}` : `Local${nameSuffix}`} 
-                          <span className="text-slate-400 font-medium ml-1">({goal.minuto}')</span>
+                          {goal.player?.first_name ? `${goal.player.first_name} ${goal.player.last_name || ''}${nameSuffix}` : `Local${nameSuffix}`} 
+                          <span className="text-slate-400 font-medium ml-1">({displayMinuto}')</span>
                         </span>
                       )}
                     </div>
@@ -339,8 +344,8 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
                     <div className="flex-1 text-left pl-4 text-slate-700">
                       {!goal.isHomeGoal && (
                         <span>
-                          <span className="text-slate-400 font-medium mr-1">({goal.minuto}')</span> 
-                          {goal.player?.first_name ? `${goal.player.first_name}${nameSuffix}` : `Visitante${nameSuffix}`}
+                          <span className="text-slate-400 font-medium mr-1">({displayMinuto}')</span> 
+                          {goal.player?.first_name ? `${goal.player.first_name} ${goal.player.last_name || ''}${nameSuffix}` : `Visitante${nameSuffix}`}
                         </span>
                       )}
                     </div>

@@ -19,7 +19,7 @@ export default async function PartidosPage() {
       *,
       equipo:teams (id, name, category)
     `)
-    .order("fecha_hora", { ascending: false })
+    .order("fecha_hora", { ascending: true })
 
   let teamsQuery = supabase
     .from("teams")
@@ -60,10 +60,17 @@ export default async function PartidosPage() {
     .from("convocatorias")
     .select("*")
 
+  const { data: teamCoaches } = await supabase
+    .from("team_coaches")
+    .select("team_id")
+    .eq("profile_id", userData.user.id);
+
+  const userTeamIds = (teamCoaches || []).map((tc: any) => tc.team_id);
+
   const role = (profile?.role || '').toLowerCase().trim();
   const isReadOnly = role === 'socio' || role === 'utillero' || role === 'directivo' || role === 'secretario' || role === 'tesorero' || role === 'jugador' || role === 'tutor' || role === 'familia' || role === 'family' || role === 'delegado';
 
-  console.log("DASHBOARD/MATCHES DEBUG -> user_id:", userData.user.id, "profile.role:", profile?.role, "isReadOnly:", isReadOnly);
+  console.log("DASHBOARD/MATCHES DEBUG -> user_id:", userData.user.id, "profile.role:", profile?.role, "isReadOnly:", isReadOnly, "userTeamIds:", userTeamIds);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -75,10 +82,13 @@ export default async function PartidosPage() {
             players={players || []}
             convocatorias={convocatorias || []}
             isReadOnly={isReadOnly}
+            userRole={role}
+            userTeamIds={userTeamIds}
           />
         </Suspense>
       </div>
     </div>
   )
 }
+
 

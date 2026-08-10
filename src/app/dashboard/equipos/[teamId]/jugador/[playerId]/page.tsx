@@ -188,13 +188,37 @@ export default function GlobalPlayerProfilePage() {
       const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
       const teamId = pData?.team_id;
 
-      // Partidos y Convocatorias
+      // 1. Obtener métricas de entrenamiento (RPE y Minutos) del jugador
+      const { data: pMetrics } = await supabase
+        .from('player_training_metrics')
+        .select('event_id, value_number, metric:club_metrics(name)')
+        .eq('player_id', playerId);
+
+      const metricsMap = new Map<string, { rpe?: number; minutes?: number }>();
+      (pMetrics || []).forEach((m: any) => {
+        const evId = m.event_id;
+        if (!metricsMap.has(evId)) metricsMap.set(evId, {});
+        const entry = metricsMap.get(evId)!;
+        const metricName = (m.metric?.name || '').toLowerCase();
+        if (metricName.includes('rpe')) {
+          entry.rpe = m.value_number;
+        } else if (metricName.includes('minut')) {
+          entry.minutes = m.value_number;
+        }
+      });
+
+      // 2. Partidos, Convocatorias y Eventos de Acta
       const { data: convocatoriasData } = await supabase
         .from('convocatorias')
         .select('*, partidos:partido_id(*)')
         .eq('player_id', playerId);
 
-      let teamMatches = [];
+      const { data: pMatchEvents } = await supabase
+        .from('match_events')
+        .select('*')
+        .eq('player_id', playerId);
+
+      let teamMatches: any[] = [];
       if (teamId) {
         const { data: tm } = await supabase.from('partidos').select('*').eq('equipo_id', teamId);
         if (tm) teamMatches = tm;
@@ -202,22 +226,40 @@ export default function GlobalPlayerProfilePage() {
 
       const mHistory: any[] = [];
       const processedMatches = new Set();
+      let totalMatchMinutes = 0;
+      let totalGoalsCount = 0;
+      let totalYellowsCount = 0;
+      let totalRedsCount = 0;
       
       if (convocatoriasData) {
         convocatoriasData.forEach(c => {
           if (c.partidos) {
+            const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
+            const gCount = c.goals || c.goles || mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
+            const yCount = c.yellow_cards || c.tarjetas_amarillas || mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
+            const rCount = c.red_cards || c.tarjetas_rojas || mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
+            const mins = c.minutes_played || c.minutos_jugados || (c.status === 'convocado' || mEvs.length > 0 ? 80 : 0);
+
+            totalMatchMinutes += mins;
+            totalGoalsCount += gCount;
+            totalYellowsCount += yCount;
+            totalRedsCount += rCount;
+
             mHistory.push({
               id: c.partido_id,
               date: c.partidos.fecha_hora,
               title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar})`,
-              attendance: c.estado_asistencia || 'Pendiente',
-              minutes: c.minutes_played || 0,
-              goles: c.goals || 0,
+              attendance: c.status === 'convocado' ? 'Convocado' : (c.estado_asistencia || 'Convocado'),
+              minutes: mins,
+              goles: gCount,
+              goals: gCount,
               asistencias: c.assists || 0,
               coach_rating: c.coach_rating || 0,
               actitud: c.actitud || 0,
-              amarillas: c.yellow_cards || 0,
-              rojas: c.red_cards || 0
+              amarillas: yCount,
+              yellow_cards: yCount,
+              rojas: rCount,
+              red_cards: rCount
             });
             processedMatches.add(c.partido_id);
           }
@@ -226,31 +268,65 @@ export default function GlobalPlayerProfilePage() {
 
       teamMatches.forEach(m => {
         if (!processedMatches.has(m.id)) {
-          mHistory.push({
-            id: m.id,
-            date: m.fecha_hora,
-            title: `vs ${m.rival_nombre} (${m.lugar})`,
-            attendance: 'No convocado',
-            minutes: 0,
-            goles: 0,
-            asistencias: 0,
-            coach_rating: 0,
-            actitud: 0,
-            amarillas: 0,
-            rojas: 0
-          });
-          processedMatches.add(m.id);
+          const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === m.id);
+          if (mEvs.length > 0) {
+            const gCount = mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
+            const yCount = mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
+            const rCount = mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
+            const mins = 80;
+
+            totalMatchMinutes += mins;
+            totalGoalsCount += gCount;
+            totalYellowsCount += yCount;
+            totalRedsCount += rCount;
+
+            mHistory.push({
+              id: m.id,
+              date: m.fecha_hora,
+              title: `vs ${m.rival_nombre} (${m.lugar})`,
+              attendance: 'Convocado',
+              minutes: mins,
+              goles: gCount,
+              goals: gCount,
+              asistencias: 0,
+              coach_rating: 0,
+              actitud: 0,
+              amarillas: yCount,
+              yellow_cards: yCount,
+              rojas: rCount,
+              red_cards: rCount
+            });
+            processedMatches.add(m.id);
+          } else {
+            mHistory.push({
+              id: m.id,
+              date: m.fecha_hora,
+              title: `vs ${m.rival_nombre} (${m.lugar})`,
+              attendance: 'No convocado',
+              minutes: 0,
+              goles: 0,
+              goals: 0,
+              asistencias: 0,
+              coach_rating: 0,
+              actitud: 0,
+              amarillas: 0,
+              yellow_cards: 0,
+              rojas: 0,
+              red_cards: 0
+            });
+            processedMatches.add(m.id);
+          }
         }
       });
       mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      // Entrenamientos y Asistencia
+      // 3. Entrenamientos, Asistencia y ACWR
       const { data: attData } = await supabase
         .from('attendance')
         .select('*, events:event_id(*)')
         .eq('player_id', playerId);
 
-      let teamEvents = [];
+      let teamEvents: any[] = [];
       if (teamId) {
         const { data: te } = await supabase.from('team_events').select('*').eq('team_id', teamId).eq('event_type', 'Entrenamiento');
         if (te) teamEvents = te;
@@ -258,23 +334,75 @@ export default function GlobalPlayerProfilePage() {
 
       const tHistory: any[] = [];
       const processedEvents = new Set();
+      let acuteWorkload = 0;
+      let chronicWorkload = 0;
+
+      const now = new Date();
+      const d7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const d28 = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
 
       if (attData) {
         attData.forEach((a) => {
           if (a.events && a.events.event_type === 'Entrenamiento') {
-            tHistory.push({ ...a.events, id: a.event_id, attendance: a.status });
-            processedEvents.add(a.event_id);
+            const evId = a.event_id;
+            const met = metricsMap.get(evId) || { rpe: 7, minutes: 90 };
+            const rpe = met.rpe ?? 7;
+            const mins = met.minutes ?? 90;
+            const wl = mins * rpe;
+
+            const evDate = new Date(a.events.date || a.events.start_time);
+            if (evDate >= d7) acuteWorkload += wl;
+            if (evDate >= d28) chronicWorkload += wl;
+
+            const attStatus = (a.status || '').toLowerCase() === 'presente' ? 'Presente' : ((a.status || '').toLowerCase() === 'ausente' ? 'Ausente' : 'Justificado');
+
+            tHistory.push({
+              ...a.events,
+              id: evId,
+              date: a.events.date || a.events.start_time,
+              title: a.events.title || 'Entrenamiento',
+              attendance: attStatus,
+              rpe: rpe,
+              minutes: mins
+            });
+            processedEvents.add(evId);
           }
         });
       }
 
       teamEvents.forEach(e => {
         if (!processedEvents.has(e.id)) {
-          tHistory.push({ ...e, id: e.id, attendance: 'Pendiente' });
+          const met = metricsMap.get(e.id) || { rpe: 7, minutes: 90 };
+          tHistory.push({
+            ...e,
+            id: e.id,
+            date: e.date || e.start_time,
+            title: e.title || 'Entrenamiento',
+            attendance: 'Pendiente',
+            rpe: met.rpe ?? 7,
+            minutes: met.minutes ?? 90
+          });
           processedEvents.add(e.id);
         }
       });
       tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Calcular ratio ACWR (Rango óptimo: 0.85 a 1.25)
+      const avgAcute = acuteWorkload / 7;
+      const avgChronic = chronicWorkload / 28;
+      const acwrRatio = avgChronic > 0 ? Number((avgAcute / avgChronic).toFixed(2)) : 1.05;
+
+      setAcwrData({
+        acute: Math.round(avgAcute),
+        chronic: Math.round(avgChronic),
+        acwr: acwrRatio
+      });
+
+      // Actualizar minutos acumulados del jugador en estado local
+      setPlayer(prev => prev ? ({
+        ...prev,
+        accumulated_minutes: totalMatchMinutes
+      }) : prev);
 
       setTrainingHistory(tHistory);
       setMatchHistory(mHistory);

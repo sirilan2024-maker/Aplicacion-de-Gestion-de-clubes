@@ -21,7 +21,7 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
       .from('partidos')
       .select('*, equipo:teams(id, name, color)')
       .eq('equipo_id', teamId)
-      .order('fecha_hora', { ascending: false }),
+      .order('fecha_hora', { ascending: true }),
     supabase
       .from('teams')
       .select('*'),

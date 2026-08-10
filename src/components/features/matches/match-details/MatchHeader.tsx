@@ -1,6 +1,6 @@
 "use client"
 
-import { Award, Star, Calendar, MapPin } from "lucide-react"
+import { Award, Star, Calendar, MapPin, Clock } from "lucide-react"
 
 interface MatchHeaderProps {
   localGoals: number
@@ -11,7 +11,7 @@ interface MatchHeaderProps {
 }
 
 export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatches }: MatchHeaderProps) {
-  const isLocal = true; // Always show Sporting Saladar on the left
+  const isLocal = match?.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match?.lugar || '');
   const teamName = match?.equipo?.name || "Sporting Saladar";
   const rivalName = match?.rival_nombre || "Rival por definir";
   
@@ -24,6 +24,9 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
   const matchDate = match?.fecha_hora ? new Date(match.fecha_hora) : new Date();
   const matchLocation = match?.lugar || "Ubicación sin definir";
 
+  const displayLocalGoals = isLocal ? localGoals : awayGoals;
+  const displayAwayGoals = isLocal ? awayGoals : localGoals;
+
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -32,9 +35,10 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
         {(allMatches || []).slice(0, 5).map((m: any) => {
           const isCurrent = m.id === match?.id
           const isFinished = m.estado === 'Finalizado'
-          const localGoals = m.resultado_propio ?? '-'
-          const awayGoals = m.resultado_rival ?? '-'
-          const score = `${localGoals} - ${awayGoals}`
+          const isMatchLocal = m.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(m.lugar || '');
+          const hScore = isMatchLocal ? (m.resultado_propio ?? '-') : (m.resultado_rival ?? '-');
+          const aScore = isMatchLocal ? (m.resultado_rival ?? '-') : (m.resultado_propio ?? '-');
+          const score = `${hScore} - ${aScore}`
           
           return (
             <div 
@@ -57,7 +61,12 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
               </div>
               <div className="my-2">
                 <p className="text-xs font-bold text-slate-900 truncate">vs {m.rival_nombre}</p>
-                <p className="text-[10px] text-slate-400 font-semibold">{new Date(m.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</p>
+                <p className="text-[10px] text-slate-500 font-bold flex items-center gap-1 mt-1">
+                  <Clock className="w-3 h-3 text-blue-500 shrink-0" />
+                  <span className="capitalize">{new Date(m.fecha_hora).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span className="text-slate-300">•</span>
+                  <span>{new Date(m.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} h</span>
+                </p>
               </div>
               <div className="flex justify-between items-center mt-1">
                 <span className={[
@@ -78,7 +87,7 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
         <div className="bg-blue-600 text-white px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-3 sm:gap-2 text-xs font-bold tracking-wide">
           <span className="uppercase block w-full sm:w-auto truncate">{match?.competicion_nombre || 'Competición FFCV'}</span>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 opacity-90 text-[11px] sm:text-xs w-full sm:w-auto">
-            <span className="flex items-center gap-1.5 break-words whitespace-normal"><Calendar className="w-4 h-4 shrink-0" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+            <span className="flex items-center gap-1.5 break-words whitespace-normal"><Calendar className="w-4 h-4 shrink-0" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} • {matchDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} h</span>
             <span className="flex items-center gap-1.5 break-words whitespace-normal"><MapPin className="w-4 h-4 shrink-0" /> <span className="truncate">{matchLocation}</span></span>
           </div>
         </div>
@@ -97,20 +106,43 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
           </div>
 
           {/* Marcador Gigante */}
-          <div className="flex items-center gap-5 shrink-0 my-2 md:my-0">
-            <span className="text-5xl font-extrabold text-slate-800 tracking-tighter tabular-nums leading-none">
-              {localGoals}
-            </span>
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200/50 px-3 py-1 rounded-lg">
-                {matchDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase">{match?.estado || 'FINALIZADO'}</span>
-            </div>
-            <span className="text-5xl font-extrabold text-slate-800 tracking-tighter tabular-nums leading-none">
-              {awayGoals}
-            </span>
-          </div>
+          {(() => {
+            const isFinished = match?.estado === 'Finalizado';
+            const isDescanso = !isFinished && (match?.estado === 'Descanso' || 
+              (match?.first_half_duration_seconds !== null && 
+               match?.first_half_duration_seconds > 0 &&
+               match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds && 
+               !match?.live_timer_started_at));
+            const isLive = !isFinished && !isDescanso && (match?.estado === 'En curso' || match?.estado === 'En Curso' || match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
+            const isSecondHalf = match?.first_half_duration_seconds !== null && match?.first_half_duration_seconds > 0;
+
+            return (
+              <div className="flex items-center gap-5 shrink-0 my-2 md:my-0">
+                <span className={`text-5xl font-extrabold tracking-tighter tabular-nums leading-none ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
+                  {displayLocalGoals}
+                </span>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200/50 px-3 py-1 rounded-lg">
+                    {matchDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className={`text-[10px] font-black mt-1 uppercase px-2.5 py-0.5 rounded ${
+                    isFinished 
+                      ? 'bg-slate-100 text-slate-600 border border-slate-200' 
+                      : isDescanso 
+                      ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                      : isLive 
+                      ? 'bg-red-100 text-red-700 border border-red-200 animate-pulse' 
+                      : 'bg-slate-50 text-slate-400 border border-slate-150'
+                  }`}>
+                    {isFinished ? 'Finalizado' : isDescanso ? 'Descanso' : isLive ? (isSecondHalf ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado')}
+                  </span>
+                </div>
+                <span className={`text-5xl font-extrabold tracking-tighter tabular-nums leading-none ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
+                  {displayAwayGoals}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Visitante */}
           <div className="flex flex-col md:flex-row-reverse items-center gap-4 flex-1 text-center md:text-right">
@@ -124,21 +156,75 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
           </div>
         </div>
 
-        {/* Pie (Goleadores) */}
-        <div className="bg-slate-50/80 px-6 py-3.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-          <div className="flex items-center gap-2">
-            <span className="text-sm shrink-0">⚽</span>
-            <span>
-              <strong>{localName}:</strong> {goalsList.local || "N/A"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 sm:border-l sm:border-slate-200 sm:pl-4">
-            <span className="text-sm shrink-0">⚽</span>
-            <span>
-              <strong>{awayName}:</strong> {goalsList.away || "N/A"}
-            </span>
-          </div>
-        </div>
+        {/* Pie (Goleadores Alineados) */}
+        {(() => {
+          const matchEvents = match?.match_events || [];
+          const localGoalEvents = matchEvents.filter((e: any) => {
+            const isGol = e.tipo_evento === 'Gol' || e.tipo === 'Gol';
+            const isAutogol = e.tipo_evento === 'Gol en propia puerta' || e.tipo === 'Gol en propia puerta';
+            if (isGol) return isLocal ? e.player_id : !e.player_id;
+            if (isAutogol) return isLocal ? !e.player_id : e.player_id;
+            return false;
+          }).sort((a: any, b: any) => a.minuto - b.minuto);
+
+          const awayGoalEvents = matchEvents.filter((e: any) => {
+            const isGol = e.tipo_evento === 'Gol' || e.tipo === 'Gol';
+            const isAutogol = e.tipo_evento === 'Gol en propia puerta' || e.tipo === 'Gol en propia puerta';
+            if (isGol) return !isLocal ? e.player_id : !e.player_id;
+            if (isAutogol) return !isLocal ? !e.player_id : e.player_id;
+            return false;
+          }).sort((a: any, b: any) => a.minuto - b.minuto);
+
+          return (
+            <div className="bg-slate-50/80 px-6 py-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-xs text-slate-700">
+              {/* Columna Goles Local */}
+              <div className="flex flex-col items-start gap-1">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-0.5">
+                  <span>⚽ {localName}</span>
+                </div>
+                {localGoalEvents.length > 0 ? (
+                  localGoalEvents.map((g: any, i: number) => {
+                    const isOwnGoal = g.tipo_evento === 'Gol en propia puerta' || g.tipo === 'Gol en propia puerta';
+                    const pName = isOwnGoal ? 'Rival (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : 'Jugador');
+                    return (
+                      <div key={i} className="flex items-center gap-1.5 text-slate-700 font-medium">
+                        <span className="font-bold">{pName}</span>
+                        <span className="text-slate-400 font-semibold text-[11px]">({g.minuto}')</span>
+                      </div>
+                    );
+                  })
+                ) : goalsList?.local && goalsList.local !== "N/A" && goalsList.local !== "" ? (
+                  <span className="text-slate-600 font-medium">{goalsList.local}</span>
+                ) : (
+                  <span className="text-slate-400 italic text-[11px]">Sin goles</span>
+                )}
+              </div>
+
+              {/* Columna Goles Visitante */}
+              <div className="flex flex-col items-end gap-1 text-right border-l border-slate-200/60 pl-4">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-0.5 justify-end">
+                  <span>{awayName} ⚽</span>
+                </div>
+                {awayGoalEvents.length > 0 ? (
+                  awayGoalEvents.map((g: any, i: number) => {
+                    const isOwnGoal = g.tipo_evento === 'Gol en propia puerta' || g.tipo === 'Gol en propia puerta';
+                    const pName = isOwnGoal ? 'Sporting (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : 'Rival');
+                    return (
+                      <div key={i} className="flex items-center gap-1.5 text-slate-700 font-medium justify-end">
+                        <span className="text-slate-400 font-semibold text-[11px]">({g.minuto}')</span>
+                        <span className="font-bold">{pName}</span>
+                      </div>
+                    );
+                  })
+                ) : goalsList?.away && goalsList.away !== "N/A" && goalsList.away !== "Rival (N/A)" && goalsList.away !== "" ? (
+                  <span className="text-slate-600 font-medium">{goalsList.away}</span>
+                ) : (
+                  <span className="text-slate-400 italic text-[11px]">Sin goles</span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   )

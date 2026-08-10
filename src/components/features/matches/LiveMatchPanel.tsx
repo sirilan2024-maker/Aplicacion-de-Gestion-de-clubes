@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock, MapPin, Activity } from "lucide-react";
+import { Clock, MapPin, Activity, Calendar, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
 import { getPublicMatchEvents } from "@/app/actions/match-actions";
@@ -40,7 +40,19 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
       }
     }
 
+    async function fetchMatch() {
+      const { data } = await supabase
+        .from('partidos')
+        .select('*, equipo:teams(name, color)')
+        .eq('id', matchId)
+        .single();
+      if (mounted && data) {
+        setMatch((prev: any) => ({ ...prev, ...data }));
+      }
+    }
+
     fetchEvents();
+    fetchMatch();
 
     const channel = supabase.channel(`live-panel-${matchId}-${Math.random().toString(36).substring(7)}`);
     channel
@@ -69,17 +81,18 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
       })
       .subscribe();
       
-    // Polling fallback por si los websockets fallan (especialmente para usuarios anónimos sin RLS o websockets bloqueados)
+    // Polling fallback: refresca eventos Y datos del partido cada 4s
     const intervalId = setInterval(() => {
       fetchEvents();
-    }, 5000);
+      fetchMatch();
+    }, 4000);
       
     return () => {
       mounted = false;
       clearInterval(intervalId);
       supabase.removeChannel(channel);
     };
-  }, [matchId, supabase]);
+  }, [matchId]);
 
   // Live Timer
   const { seconds } = useLiveTimer(matchId, match?.live_timer_elapsed_seconds || 0, match?.live_timer_started_at || null);
@@ -129,26 +142,51 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
     };
   });
 
-  // Split Timeline Data
+  // Split Timeline Data (by explicit event or by half duration / 45m threshold)
   const descansoIndex = matchEvents.findIndex(e => e.tipo_evento === 'Descanso');
-  const firstHalfEvents = descansoIndex !== -1 ? matchEvents.slice(0, descansoIndex + 1) : matchEvents;
-  const secondHalfEvents = descansoIndex !== -1 ? matchEvents.slice(descansoIndex + 1) : [];
+  const firstHalfDurationMinutes = match?.first_half_duration_seconds ? Math.floor(match.first_half_duration_seconds / 60) : 45;
+  
+  let firstHalfEvents: any[] = [];
+  let secondHalfEvents: any[] = [];
 
-  const renderEventRow = (event: any) => {
+  if (descansoIndex !== -1) {
+    firstHalfEvents = matchEvents.slice(0, descansoIndex + 1);
+    secondHalfEvents = matchEvents.slice(descansoIndex + 1);
+  } else {
+    // If no explicit 'Descanso' event yet, split by timer / minute threshold if 2nd half started
+    const hasSecondHalfStarted = match?.first_half_duration_seconds && match?.live_timer_started_at;
+    if (hasSecondHalfStarted) {
+      firstHalfEvents = matchEvents.filter(e => e.minuto <= firstHalfDurationMinutes);
+      secondHalfEvents = matchEvents.filter(e => e.minuto > firstHalfDurationMinutes);
+    } else {
+      firstHalfEvents = matchEvents;
+      secondHalfEvents = [];
+    }
+  }
+
+  const renderEventRow = (event: any, idx: number) => {
     let icon = "⏱️";
     let bgColor = "bg-slate-50";
     let textColor = "text-slate-800";
-    
-    if (event.tipo_evento === 'Gol') { icon = "⚽"; bgColor = "bg-emerald-50"; textColor = "text-emerald-700"; }
+    const isComment = event.tipo_evento === 'Comentario del Entrenador' || (event.notas && (event.notas.includes('🎮') || event.notas.includes('⚡') || event.notas.includes('🛡️') || event.notas.includes('⚠️') || event.notas.includes('💬') || event.notas.includes('🔥') || event.notas.includes('⚖️')));
+
+    if (isComment) {
+      icon = "💬";
+      bgColor = "bg-indigo-50/80 border-indigo-100";
+      textColor = "text-indigo-900";
+    } else if (event.tipo_evento === 'Gol') { icon = "⚽"; bgColor = "bg-emerald-50"; textColor = "text-emerald-700"; }
     else if (event.tipo_evento === 'Gol en propia puerta') { icon = "🤦‍♂️"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
     else if (event.tipo_evento === 'Tarjeta Amarilla') { icon = "🟨"; bgColor = "bg-amber-50"; textColor = "text-amber-700"; }
     else if (event.tipo_evento === 'Tarjeta Roja') { icon = "🟥"; bgColor = "bg-red-50"; textColor = "text-red-700"; }
     else if (event.tipo_evento === 'Cambio') { icon = "🔄"; bgColor = "bg-blue-50"; textColor = "text-blue-700"; }
     else if (event.tipo_evento === 'Lesión') { icon = "🚑"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
+    else if (event.tipo_evento === 'Ocasión Peligrosa') { icon = "⚠️"; bgColor = "bg-amber-50"; textColor = "text-amber-700"; }
+    else if (event.tipo_evento === 'Penalti') { icon = "🎯"; bgColor = "bg-purple-50"; textColor = "text-purple-700"; }
+    else if (event.tipo_evento === 'Parada') { icon = "🧤"; bgColor = "bg-sky-50"; textColor = "text-sky-700"; }
     else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = "📌"; bgColor = "bg-slate-100/50"; textColor = "text-slate-500"; }
 
     return (
-      <div key={event.id} className={`flex items-center gap-3 p-2.5 rounded-xl border border-slate-100 ${bgColor} transition-all`}>
+      <div key={event.id ? `${event.id}-${idx}` : idx} className={`flex items-center gap-3 p-2.5 rounded-xl border ${bgColor} transition-all`}>
         <div className="w-10 h-10 shrink-0 bg-white rounded-lg border border-slate-200 flex flex-col items-center justify-center shadow-sm">
           <span className="text-[11px] font-black text-slate-800 leading-none">{event.minuto}'</span>
         </div>
@@ -156,16 +194,18 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
         <div className="flex-1 flex items-center gap-3">
           <div className="text-lg">{icon}</div>
           <div>
-            <p className={`text-xs font-bold ${textColor}`}>{event.tipo_evento}</p>
+            <p className={`text-xs font-bold ${textColor}`}>
+              {isComment ? (event.notas || 'En vivo') : event.tipo_evento}
+            </p>
             {event.player ? (
               <p className="text-[10px] font-semibold text-slate-600">
                 {event.player.first_name} {event.player.last_name}
               </p>
-            ) : (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') ? null : (
-              <p className="text-[10px] font-semibold text-slate-500">Rival / Staff</p>
-            )}
-            {event.notas && (
-              <p className="text-[9px] text-slate-500 mt-0.5 italic">{event.notas}</p>
+            ) : null}
+            {event.notas && !isComment && (
+              <p className="text-[10px] text-slate-500 italic mt-0.5">
+                {event.notas}
+              </p>
             )}
           </div>
         </div>
@@ -206,9 +246,14 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
           {/* Score & Timer */}
           <div className="flex items-center gap-5 shrink-0">
             {(() => {
-              const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
-              const isLive = !isFinalizado && (match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
-              const scoreColor = isLive ? 'text-green-600' : isFinalizado ? 'text-red-600' : 'text-black';
+              const isFinalizado = match?.estado === 'Finalizado';
+              const isDescanso = match?.estado === 'Descanso' ||
+                (match?.first_half_duration_seconds != null &&
+                 match?.first_half_duration_seconds > 0 &&
+                 match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
+                 !match?.live_timer_started_at);
+              const isLiveNow = !isFinalizado && !isDescanso && (match?.live_timer_started_at != null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
+              const scoreColor = isLiveNow ? 'text-green-600' : isFinalizado ? 'text-red-600' : isDescanso ? 'text-amber-600' : 'text-black';
               
               return (
                 <span className={`text-5xl font-extrabold ${scoreColor} tabular-nums leading-none`}>
@@ -219,16 +264,18 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
             
             <div className="flex flex-col items-center justify-center px-4">
               {(() => {
-                const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
-                const isDescanso = match?.first_half_duration_seconds !== null &&
-                                   match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
-                                   !match?.live_timer_started_at;
+                const isFinalizado = match?.estado === 'Finalizado';
+                const isDescanso = match?.estado === 'Descanso' ||
+                  (match?.first_half_duration_seconds != null &&
+                   match?.first_half_duration_seconds > 0 &&
+                   match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
+                   !match?.live_timer_started_at);
                 
-                if (isFinalizado || isDescanso) {
+                if (isFinalizado) {
                   return (
                     <div className="flex flex-col items-center">
-                      <span className={`text-[14px] font-black tracking-[0.2em] uppercase px-4 py-2 rounded-xl border-2 ${isFinalizado ? 'text-slate-800 bg-slate-100 border-slate-200' : 'text-amber-800 bg-amber-100 border-amber-200'}`}>
-                        {isFinalizado ? 'Finalizado' : 'Descanso'}
+                      <span className="text-[14px] font-black tracking-[0.2em] uppercase px-4 py-2 rounded-xl border-2 text-slate-800 bg-slate-100 border-slate-200">
+                        Finalizado
                       </span>
                     </div>
                   );
@@ -236,16 +283,16 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
                 return (
                   <>
                     <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">
-                      Tiempo de Juego
+                      {isDescanso ? 'Estado del Partido' : 'Tiempo de Juego'}
                     </span>
-                    <div className={`text-2xl font-black tabular-nums tracking-tight px-4 py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-2 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                    <div className={`text-2xl font-black tabular-nums tracking-tight px-4 py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-2 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : isDescanso ? 'bg-amber-100 text-amber-950 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
                       {match?.live_timer_started_at && (
                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
                       )}
                       {formatTime(seconds)}
                     </div>
-                    <span className={`text-[10px] font-bold mt-2 uppercase tracking-widest px-2 py-0.5 rounded ${(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
-                      {(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'En Curso' : (match?.estado || 'Programado')}
+                    <span className={`text-[10px] font-black mt-2 uppercase tracking-widest px-3 py-1 rounded-md border ${isDescanso ? 'bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse' : (match?.live_timer_started_at != null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'text-slate-400 border-slate-200'}`}>
+                      {isDescanso ? 'DESCANSO' : (match?.live_timer_started_at != null ? (match?.first_half_duration_seconds ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado'))}
                     </span>
                   </>
                 );
@@ -253,9 +300,14 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
             </div>
 
             {(() => {
-              const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
-              const isLive = !isFinalizado && (match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
-              const scoreColor = isLive ? 'text-green-600' : isFinalizado ? 'text-red-600' : 'text-black';
+              const isFinalizado = match?.estado === 'Finalizado';
+              const isDescanso = match?.estado === 'Descanso' ||
+                (match?.first_half_duration_seconds != null &&
+                 match?.first_half_duration_seconds > 0 &&
+                 match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
+                 !match?.live_timer_started_at);
+              const isLiveNow = !isFinalizado && !isDescanso && (match?.live_timer_started_at != null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
+              const scoreColor = isLiveNow ? 'text-green-600' : isFinalizado ? 'text-red-600' : isDescanso ? 'text-amber-600' : 'text-black';
               
               return (
                 <span className={`text-5xl font-extrabold ${scoreColor} tabular-nums leading-none`}>
@@ -283,29 +335,64 @@ export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: an
 
         {/* GOALS TIMELINE */}
         {goalTimeline.length > 0 && (
-          <div className="bg-slate-50 border-t border-slate-200 p-4">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {goalTimeline.map((goal, idx) => (
-                <div key={goal.id} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm text-xs">
-                  <span className="font-black text-slate-900">{goal.minuto}'</span>
-                  <span className="text-slate-300">|</span>
-                  <span className={goal.isHomeGoal ? "font-bold text-blue-700" : "font-bold text-slate-600"}>
-                    {goal.score}
-                  </span>
-                  {goal.tipo_evento === 'Gol en propia puerta' && <span className="text-[9px] text-rose-500 font-bold uppercase ml-1">(PP)</span>}
-                  {goal.player && <span className="text-[10px] text-slate-500 ml-1 truncate max-w-[80px]">{goal.player.last_name}</span>}
-                </div>
-              ))}
+          <div className="bg-slate-50 border-t border-slate-200 p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center mb-3">Goles del Partido</p>
+            <div className="max-w-2xl mx-auto space-y-2">
+              {goalTimeline.map((goal) => {
+                const displayMinuto = goal.minuto > 120 ? Math.floor(goal.minuto / 60) : (goal.minuto || 0);
+                const isPP = goal.tipo_evento === 'Gol en propia puerta' || goal.tipo_evento === 'Gol en Propia';
+                const pFirstName = goal.player?.first_name || '';
+                const pLastName = goal.player?.last_name || '';
+                const fullPlayerName = `${pFirstName} ${pLastName}`.trim();
+                const playerName = isPP 
+                  ? (goal.isHomeGoal ? 'Rival (p.p.)' : 'Sporting (p.p.)') 
+                  : (fullPlayerName || (goal.isHomeGoal ? 'Sporting' : 'Rival'));
+
+                return (
+                  <div key={goal.id || Math.random()} className="grid grid-cols-12 items-center gap-2 text-xs font-bold">
+                    {/* Columna Goles Local (Alineada a la Izquierda) */}
+                    <div className="col-span-5 text-right flex items-center justify-end gap-2 pr-2">
+                      {goal.isHomeGoal ? (
+                        <>
+                          <span className="text-slate-800 font-bold truncate max-w-[150px]">{playerName}</span>
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-black tabular-nums">
+                            {displayMinuto}'
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+
+                    {/* Marcador Acumulado Central */}
+                    <div className="col-span-2 text-center bg-white py-1 px-2.5 rounded-lg border border-slate-200 shadow-sm font-black text-slate-800 text-xs tracking-wider shrink-0 mx-auto">
+                      {goal.score}
+                    </div>
+
+                    {/* Columna Goles Visitante (Alineada a la Derecha) */}
+                    <div className="col-span-5 text-left flex items-center justify-start gap-2 pl-2">
+                      {!goal.isHomeGoal ? (
+                        <>
+                          <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-black tabular-nums">
+                            {displayMinuto}'
+                          </span>
+                          <span className="text-slate-800 font-bold truncate max-w-[150px]">{playerName}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
       </div>
 
       {/* ─── EVENTS TIMELINE ─── */}
-      <div className="p-6 lg:p-8 bg-slate-50">
+      <div className="p-6 lg:p-8 bg-slate-50 border-t border-slate-200">
+
+
         <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
           <Activity className="w-4 h-4 text-slate-400" />
-          Cronología del Encuentro
+          Cronología del Encuentro (Minuto a Minuto)
         </h3>
         
         {loadingEvents ? (

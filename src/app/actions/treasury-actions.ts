@@ -563,7 +563,6 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
         title: title,
         content: msg,
         is_read: false,
-        link: fee.player_id ? `/dashboard/family/e/${fee.player_id}/perfil` : '/dashboard/treasury',
       });
     }
 
@@ -651,7 +650,6 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
         title,
         content,
         is_read: false,
-        link: `/dashboard/family/e/${playerId}/perfil`,
       });
     }
 

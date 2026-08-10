@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 import { TeamDisciplineView } from "@/components/features/matches/TeamDisciplineView"
-import { AlertCircle } from "lucide-react"
+import { ActasView } from "@/components/features/matches/ActasView"
+import { AlertCircle, FileText } from "lucide-react"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
 import { useExport } from "@/components/providers/ExportContext"
 
@@ -28,7 +29,7 @@ export function TeamMatchesView({
 }: TeamMatchesViewProps) {
   const searchParams = useSearchParams()
   const initialView = (searchParams.get('view') as any) || 'partidos'
-  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina'>(initialView)
+  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'actas'>(initialView)
   const [ffcvUrl] = useState<string | null>(serverTeamData?.ffcv_url || null)
   const [teamName] = useState<string>(serverTeamData?.name || "")
   const [editingMatch, setEditingMatch] = useState<any>(null)
@@ -125,6 +126,16 @@ export function TeamMatchesView({
             Clasificación
           </button>
           <button
+            onClick={() => setViewMode('actas')}
+            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+              viewMode === 'actas'
+                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <FileText size={16} /> Actas
+          </button>
+          <button
             onClick={() => setViewMode('disciplina')}
             className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
               viewMode === 'disciplina'
@@ -165,7 +176,16 @@ export function TeamMatchesView({
         </div>
       )}
 
-      {viewMode === 'clasificacion' ? (
+      {viewMode === 'actas' ? (
+        <ActasView
+          matches={data.matches}
+          teams={data.teams}
+          players={data.players}
+          convocatorias={data.convocatorias}
+          isReadOnly={false}
+          userTeamIds={[teamId]}
+        />
+      ) : viewMode === 'clasificacion' ? (
         <FFCVStandings ffcvUrl={ffcvUrl} teamName={teamName} />
       ) : viewMode === 'disciplina' ? (
         <div className="pt-2">
@@ -201,7 +221,7 @@ export function TeamMatchesView({
               setData(prev => ({
                 ...prev,
                 matches: [fullMatch, ...prev.matches].sort(
-                  (a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()
+                  (a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
                 )
               }))
             } else {

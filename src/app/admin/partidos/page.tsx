@@ -54,7 +54,7 @@ export default function AdminPartidosPage() {
         query = query.eq('season_id', activeSeason.id)
       }
       
-      const { data, error } = await query.order("fecha_hora", { ascending: false })
+      const { data, error } = await query.order("fecha_hora", { ascending: true })
       
       if (data) setMatches(data)
       setLoading(false)
@@ -102,36 +102,62 @@ export default function AdminPartidosPage() {
             </div>
           </div>
           
-          <div className="flex justify-between items-center py-2">
-            <div className="flex flex-col items-center flex-1 text-center">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-2 shadow-sm border border-slate-200">
-                <div 
-                  className="w-4 h-4 rounded-full" 
-                  style={{ backgroundColor: match.equipo?.color || '#3b82f6' }}
-                />
-              </div>
-              <span className="font-bold text-gray-900 leading-tight">{match.equipo?.name || 'Equipo'}</span>
-            </div>
-            
-            <div className="flex flex-col items-center px-4">
-              {match.estado === 'Finalizado' ? (
-                <div className="flex items-center gap-2 text-2xl font-black text-gray-900 bg-gray-50 px-4 py-1.5 rounded-lg border border-gray-100">
-                  <span>{match.resultado_propio ?? '-'}</span>
-                  <span className="text-gray-400 font-medium">-</span>
-                  <span>{match.resultado_rival ?? '-'}</span>
-                </div>
-              ) : (
-                <div className="text-sm font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full uppercase tracking-widest border border-gray-100">VS</div>
-              )}
-            </div>
+          {(() => {
+            const isLocal = match.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match.lugar || '');
+            const homeTeamName = isLocal ? (match.equipo?.name || 'Equipo') : match.rival_nombre;
+            const awayTeamName = isLocal ? match.rival_nombre : (match.equipo?.name || 'Equipo');
+            const homeScore = isLocal ? match.resultado_propio : match.resultado_rival;
+            const awayScore = isLocal ? match.resultado_rival : match.resultado_propio;
+            const homeColor = isLocal ? (match.equipo?.color || '#3b82f6') : '#ef4444';
+            const awayColor = isLocal ? '#ef4444' : (match.equipo?.color || '#3b82f6');
 
-            <div className="flex flex-col items-center flex-1 text-center">
-              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-2 shadow-sm border border-red-100 text-red-500 font-bold text-lg">
-                {match.rival_nombre.substring(0, 1).toUpperCase()}
+            return (
+              <div className="flex justify-between items-center py-2">
+                {/* LOCAL TEAM (Columna 1) */}
+                <div className="flex flex-col items-center flex-1 text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-2 shadow-sm border border-slate-200">
+                    {isLocal ? (
+                      <div 
+                        className="w-4 h-4 rounded-full" 
+                        style={{ backgroundColor: homeColor }}
+                      />
+                    ) : (
+                      <span className="font-bold text-lg text-red-500">{homeTeamName.substring(0, 1).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <span className="font-bold text-gray-900 leading-tight">{homeTeamName}</span>
+                </div>
+                
+                {/* SCORE OR VS */}
+                <div className="flex flex-col items-center px-4">
+                  {match.estado === 'Finalizado' ? (
+                    <div className="flex items-center gap-2 text-2xl font-black text-gray-900 bg-gray-50 px-4 py-1.5 rounded-lg border border-gray-100">
+                      <span>{homeScore ?? '-'}</span>
+                      <span className="text-gray-400 font-medium">-</span>
+                      <span>{awayScore ?? '-'}</span>
+                    </div>
+                  ) : (
+                    <div className="text-sm font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full uppercase tracking-widest border border-gray-100">VS</div>
+                  )}
+                </div>
+
+                {/* VISITANTE TEAM (Columna 2) */}
+                <div className="flex flex-col items-center flex-1 text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-2 shadow-sm border border-slate-200">
+                    {!isLocal ? (
+                      <div 
+                        className="w-4 h-4 rounded-full" 
+                        style={{ backgroundColor: awayColor }}
+                      />
+                    ) : (
+                      <span className="font-bold text-lg text-red-500">{awayTeamName.substring(0, 1).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <span className="font-bold text-gray-900 leading-tight">{awayTeamName}</span>
+                </div>
               </div>
-              <span className="font-bold text-gray-900 leading-tight">{match.rival_nombre}</span>
-            </div>
-          </div>
+            );
+          })()}
 
           <div className="pt-4 border-t border-gray-50 flex justify-between items-center text-sm text-gray-500">
             <div className="flex items-center">

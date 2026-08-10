@@ -9,6 +9,7 @@ export type TabType =
   | "post-partido"
   | "foro"
   | "live"
+  | "acta"
   | "tareas";
 
 interface TabOption {
@@ -25,6 +26,7 @@ const TAB_OPTIONS: TabOption[] = [
   { id: "post-partido", label: "Post-Partido" },
   { id: "foro", label: "Foro" },
   { id: "live", label: "En Directo", hasPulse: true },
+  { id: "acta", label: "Acta Oficial" },
 ];
 
 interface MatchTabsProps {

@@ -84,9 +84,15 @@ export default function CalendarioEquipoPage() {
       .eq('equipo_id', teamId);
 
     const mergedEvents: TeamEvent[] = [];
+    const seenMatchDates = new Set<string>();
 
     if (!eventsError && teamEvents) {
-      teamEvents.forEach(ev => mergedEvents.push(ev));
+      teamEvents.forEach(ev => {
+        mergedEvents.push(ev);
+        if (ev.event_type === 'Partido') {
+          seenMatchDates.add(ev.date);
+        }
+      });
     }
 
     if (!partidosError && partidos) {
@@ -94,9 +100,10 @@ export default function CalendarioEquipoPage() {
         if (!p.fecha_hora) return;
         const dt = new Date(p.fecha_hora);
         const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        if (seenMatchDates.has(dateStr)) return;
+
         const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
         
-        // Filter out matches that don't fall in the current month bounds (optional but good practice)
         if (dateStr >= start && dateStr <= end) {
           mergedEvents.push({
             id: p.id,

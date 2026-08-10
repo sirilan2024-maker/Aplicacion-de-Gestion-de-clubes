@@ -13,7 +13,10 @@ import {
   CalendarDays,
   Loader2,
   X,
-  Trash2
+  Trash2,
+  Clock,
+  MapPin,
+  ClipboardCheck
 } from "lucide-react"
 import { CalendarEvent } from "@/components/features/events/mock-data"
 import { CalendarGridView } from "@/components/features/events/CalendarGridView"
@@ -23,6 +26,7 @@ import toast, { Toaster } from "react-hot-toast"
 import { useRouter } from "next/navigation"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
 import { format, parseISO, addDays, getDay } from "date-fns"
+import { es } from "date-fns/locale"
 
 type ViewMode = "month" | "list"
 
@@ -38,6 +42,7 @@ interface TeamData {
 }
 
 export default function EventsPage() {
+  const router = useRouter()
   const today = new Date()
   const [viewMode, setViewMode] = useState<ViewMode>("month")
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -156,10 +161,14 @@ export default function EventsPage() {
       ])
 
       const mappedEvents: CalendarEvent[] = []
+      const seenKeys = new Set<string>()
 
       if (eventsRes.data) {
         eventsRes.data.forEach((ev: any) => {
           const teamInfo = mappedTeams.find(t => t.id === ev.team_id)
+          const key = `${ev.team_id}_${ev.date}_${ev.event_type}`
+          seenKeys.add(key)
+
           mappedEvents.push({
             id: ev.id,
             title: ev.title,
@@ -171,7 +180,7 @@ export default function EventsPage() {
             teamColor: "", 
             teamHex: teamInfo?.hex || "#10b981",
             location: ev.location || "",
-            isOfficialMatch: false
+            isOfficialMatch: ev.event_type === 'Partido'
           })
         })
       }
@@ -181,6 +190,9 @@ export default function EventsPage() {
           if (!p.fecha_hora) return;
           const dt = new Date(p.fecha_hora)
           const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+          const key = `${p.equipo_id}_${dateStr}_Partido`
+          if (seenKeys.has(key)) return;
+
           const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
           const teamInfo = mappedTeams.find(t => t.id === p.equipo_id)
           
@@ -202,7 +214,7 @@ export default function EventsPage() {
             teamColor: "", 
             teamHex: teamInfo?.hex || "#10b981",
             location: p.lugar || "",
-            isOfficialMatch: true // flag to distinguish real match vs just an event named Partido
+            isOfficialMatch: true
           })
         })
       }
@@ -226,8 +238,6 @@ export default function EventsPage() {
   const handleToday = () => {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1))
   }
-
-  const router = useRouter()
 
   // --- Modal Handlers ---
   const handleOpenCreateModal = () => {
@@ -261,7 +271,11 @@ export default function EventsPage() {
     setShowModal(true)
   }
 
-  const handleDeleteEvent = async (id: string) => {
+  const handleDeleteEvent = async (id: string, isOfficialMatch?: boolean) => {
+    if (isOfficialMatch) {
+      toast.error("Para eliminar un partido oficial, hazlo desde la sección de partidos.")
+      return
+    }
     if (!confirm("¿Eliminar este evento permanentemente?")) return
     setSubmitting(true)
     const { error } = await supabase.from("team_events").delete().eq("id", id)
@@ -579,6 +593,43 @@ export default function EventsPage() {
                 </h2>
               </div>
 
+              {/* Selector rápido de meses de la temporada con badge de partidos */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar">
+                {[
+                  { label: "Ago 26", y: 2026, m: 7 },
+                  { label: "Sep 25", y: 2025, m: 8 },
+                  { label: "Oct 25", y: 2025, m: 9 },
+                  { label: "Nov 25", y: 2025, m: 10 },
+                  { label: "Dic 25", y: 2025, m: 11 },
+                  { label: "Ene 26", y: 2026, m: 0 },
+                  { label: "Feb 26", y: 2026, m: 1 },
+                  { label: "Mar 26", y: 2026, m: 2 },
+                  { label: "Abr 26", y: 2026, m: 3 },
+                  { label: "May 26", y: 2026, m: 4 },
+                ].map((item) => {
+                  const isSel = year === item.y && month === item.m;
+                  const matchCount = dbEvents.filter(e => e.date.startsWith(`${item.y}-${String(item.m+1).padStart(2,'0')}`) && e.type === "Partido").length;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => setCurrentDate(new Date(item.y, item.m, 1))}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 whitespace-nowrap shadow-sm ${
+                        isSel
+                          ? 'bg-blue-600 text-white shadow-blue-200'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      {matchCount > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSel ? 'bg-blue-800 text-white' : 'bg-blue-100 text-blue-800'}`}>
+                          ⚽ {matchCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="flex items-center gap-2 sm:ml-auto">
                 {/* Search */}
                 <div className="relative">
@@ -625,13 +676,129 @@ export default function EventsPage() {
             {/* Calendar body */}
             <div className="hidden md:block">
               {viewMode === "month" ? (
-                <CalendarGridView
-                  year={year}
-                  month={month}
-                  events={filteredEvents}
-                  today={today}
-                  onEventClick={handleOpenEditModal}
-                />
+                <>
+                  <CalendarGridView
+                    year={year}
+                    month={month}
+                    events={filteredEvents}
+                    today={today}
+                    onEventClick={handleOpenEditModal}
+                  />
+
+                  {/* Lista de eventos del mes debajo del calendario */}
+                  <div className="mt-8 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <CalendarDays className="w-5 h-5 text-blue-600" />
+                        Eventos de {MONTH_NAMES[month]} de {year} ({filteredEvents.length})
+                      </h3>
+                    </div>
+
+                    {filteredEvents.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="font-semibold text-sm">No hay eventos registrados para este mes con los filtros seleccionados.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3">
+                        {filteredEvents.map((event) => (
+                          <div 
+                            key={event.id}
+                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all bg-white gap-4"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-inner shrink-0 ${
+                                event.type === 'Entrenamiento' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                event.type === 'Partido' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                'bg-amber-50 text-amber-600 border-amber-100'
+                              }`}>
+                                {event.type === 'Partido' ? <Trophy className="w-5 h-5" /> : 
+                                 event.type === 'Entrenamiento' ? <Dumbbell className="w-5 h-5" /> : 
+                                 <CalendarDays className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-bold text-slate-900 text-base">
+                                    {event.title}
+                                  </h4>
+                                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold ${
+                                    event.type === 'Entrenamiento' ? 'bg-emerald-100 text-emerald-800' :
+                                    event.type === 'Partido' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {event.type}
+                                  </span>
+                                  {event.teamName && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: event.color || '#3b82f6' }}></span>
+                                      {event.teamName}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mt-1 font-medium">
+                                  <span className="flex items-center gap-1.5 text-slate-700">
+                                    <Clock className="w-3.5 h-3.5 text-blue-500" />
+                                    {format(parseISO(event.date), "EEEE d 'de' MMMM", { locale: es })} • {event.time}
+                                  </span>
+                                  {event.location && (
+                                    <span className="flex items-center gap-1.5">
+                                      <MapPin className="w-3.5 h-3.5 text-red-400" />
+                                      {event.location}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* ACTION BUTTONS */}
+                            <div className="w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-0 border-gray-100 flex gap-2">
+                              {event.isOfficialMatch ? (
+                                <>
+                                  <button 
+                                    onClick={() => router.push(`/dashboard/matches/${event.id}`)}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                                  >
+                                    Ver Partido
+                                  </button>
+                                  <button 
+                                    onClick={() => router.push(`/dashboard/equipos/${event.teamId}/partidos/${event.id}?tab=post-partido&action=pasar-lista`)}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                                  >
+                                    <ClipboardCheck className="w-4 h-4" />
+                                    Pasar Lista
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button 
+                                    onClick={() => handleOpenEditModal(event)}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button 
+                                    onClick={() => router.push(`/dashboard/equipos/${event.teamId}/asistencia?eventId=${event.id}&date=${event.date}`)}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                                  >
+                                    <ClipboardCheck className="w-4 h-4" />
+                                    Pasar Lista
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteEvent(event.id, event.isOfficialMatch)}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-bold shadow-sm border border-red-100 transition-colors"
+                                    title="Eliminar evento"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <CalendarListView
                   events={filteredEvents}

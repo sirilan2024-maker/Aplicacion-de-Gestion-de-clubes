@@ -3,9 +3,10 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { BarChart3, Users, Activity, TrendingUp, Goal, AlertTriangle, Clock, Ruler, Scale, Filter, History, LayoutGrid } from "lucide-react"
+import { BarChart3, Users, Activity, TrendingUp, Goal, AlertTriangle, Clock, Ruler, Scale, Filter, History, LayoutGrid, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { PlayerStatsGrid } from "@/components/features/estadisticas/PlayerStatsGrid"
+import { MatchTrendsModal } from "@/components/features/matches/match-details/MatchTrendsModal"
 
 interface RawData {
   players: any[];
@@ -23,6 +24,8 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
   const [loading, setLoading] = useState(true)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "todos")
   const [viewMode, setViewMode] = useState<'global' | 'individual'>('global')
+  const [showGlobalTrendsModal, setShowGlobalTrendsModal] = useState(false)
+  const [teamMatches, setTeamMatches] = useState<any[]>([])
   const supabase = createClient()
 
   useEffect(() => {
@@ -320,6 +323,13 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {showGlobalTrendsModal && (
+        <MatchTrendsModal
+          allMatches={teamMatches}
+          onClose={() => setShowGlobalTrendsModal(false)}
+        />
+      )}
+
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4 mb-2">
         <div className="flex items-center gap-3">
           <BarChart3 className="text-indigo-600" size={32} />
@@ -328,6 +338,22 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             <p className="text-slate-500">Panel global de dirección deportiva con todos los indicadores.</p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={async () => {
+            const { data: matches } = await supabase
+              .from('partidos')
+              .select('id, fecha_hora, rival_nombre, resultado_propio, resultado_rival, estado')
+              .order('fecha_hora', { ascending: true });
+            setTeamMatches(matches || []);
+            setShowGlobalTrendsModal(true);
+          }}
+          className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-200 transition-all flex items-center gap-2"
+        >
+          <TrendingUp className="w-4 h-4 text-indigo-200" />
+          <span>Tendencias Tácticas Multi-Partido</span>
+        </button>
       </div>
       
       {/* Tabs / Filters Section */}

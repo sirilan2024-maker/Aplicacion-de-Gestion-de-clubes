@@ -1,8 +1,8 @@
 // "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
-import { Trash2, Clock, X, Target, AlertTriangle, Bandage } from "lucide-react";
+import { Trash2, Clock, X, Target, AlertTriangle, Bandage, Plus, Edit2, Mic, MicOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toggleMatchTimer, addLiveEvent, deleteLiveEvent, updateMatchState } from "@/app/actions/live-match-actions";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -34,11 +34,12 @@ interface LiveTabProps {
   matchId: string;
   match?: any;
   players?: any[];
+  convocatorias?: any[];
   matchEvents?: any[];
   onEventChange: (localGoals: number, awayGoals: number, goalsList: { local: string; away: string }) => void;
 }
 
-export function LiveTab({ matchId, match, players = [], matchEvents = [], onEventChange }: LiveTabProps) {
+export function LiveTab({ matchId, match, players = [], convocatorias = [], matchEvents = [], onEventChange }: LiveTabProps) {
   const { rol } = useUserRole();
   const isFamilyView = rol === "familia" || rol === "jugador";
 
@@ -78,8 +79,122 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
   const [playerId, setPlayerId] = useState<string>("");
   const [playerOutId, setPlayerOutId] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [subTipoOcasion, setSubTipoOcasion] = useState<string>("Tiro al palo");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRival, setIsRival] = useState(false);
+
+  // Frases editables del entrenador (persistencia en localStorage)
+  const defaultPhrases = [
+    "{TEAM} está atacando muy bien ⚡",
+    "{TEAM} tiene el control total del juego 🎮",
+    "Gran fase defensiva de {TEAM}, muy sólidos 🛡️",
+    "El rival está apretando en estos minutos ⚠️",
+    "{TEAM} presiona arriba con mucha intensidad 🔥",
+    "Partido muy disputado en el centro del campo ⚖️"
+  ];
+  const [customPhrases, setCustomPhrases] = useState<string[]>(defaultPhrases);
+  const [isEditingPhrases, setIsEditingPhrases] = useState(false);
+  const [newPhraseInput, setNewPhraseInput] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("coach_quick_phrases");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCustomPhrases(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("Error cargando frases de localStorage:", e);
+    }
+  }, []);
+
+  const savePhrases = (newPhrases: string[]) => {
+    setCustomPhrases(newPhrases);
+    try {
+      localStorage.setItem("coach_quick_phrases", JSON.stringify(newPhrases));
+    } catch (e) {
+      console.error("Error guardando frases en localStorage:", e);
+    }
+  };
+
+  // Dictado por voz en directo
+  const [isLiveRecording, setIsLiveRecording] = useState(false);
+  const liveRecognitionRef = useRef<any>(null);
+
+  const startLiveVoiceDictation = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast.error("Tu navegador no soporta el dictado por voz.");
+      return;
+    }
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsLiveRecording(true);
+        toast.success("🎙️ Escuchando... Dicta tu comentario del partido");
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + ' ';
+          }
+        }
+        if (finalTranscript.trim()) {
+          const text = finalTranscript.trim();
+          const inputEl = document.getElementById('coach-custom-comment-input') as HTMLInputElement;
+          if (inputEl) {
+            inputEl.value = inputEl.value ? `${inputEl.value.trim()} ${text}` : text;
+          }
+        }
+      };
+
+      recognition.onerror = (err: any) => {
+        console.error("Speech recognition error:", err);
+        setIsLiveRecording(false);
+        toast.error("Error en el reconocimiento de voz");
+      };
+
+      recognition.onend = () => {
+        setIsLiveRecording(false);
+      };
+
+      liveRecognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo iniciar el dictado por voz");
+    }
+  };
+
+  const stopLiveVoiceDictation = () => {
+    if (liveRecognitionRef.current) {
+      liveRecognitionRef.current.stop();
+      setIsLiveRecording(false);
+      toast.success("Dictado finalizado");
+    }
+  };
+
+  // Ref para autoscroll
+  const formRef = useRef<HTMLDivElement | HTMLFormElement>(null);
+
+  const handleSelectAction = (tipo: string) => {
+    setActiveForm(tipo);
+    setMinuto(Math.floor(seconds / 60));
+    if (tipo === "Ocasión Peligrosa") {
+      setSubTipoOcasion("Tiro al palo");
+    }
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
 
   // Realtime subscription for events and timer
   useEffect(() => {
@@ -87,7 +202,16 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `partido_id=eq.${matchId}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setEvents(prev => [...prev, payload.new as LiveEvent].sort((a, b) => a.minuto - b.minuto));
+          setEvents(prev => {
+            if (prev.some(e => e.id === payload.new.id)) return prev;
+            const updated = [...prev, payload.new as LiveEvent];
+            return updated.sort((a, b) => {
+              if (a.minuto !== b.minuto) return a.minuto - b.minuto;
+              const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return timeA - timeB;
+            });
+          });
         } else if (payload.eventType === 'DELETE') {
           setEvents(prev => prev.filter(e => e.id !== payload.old.id));
         }
@@ -151,8 +275,8 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
     
     const secondHalfDuration = firstHalfDuration !== null ? seconds - (halfLengthMinutes * 60) : seconds;
     
-    // Guardar evento visual
-    const { success } = await addLiveEvent(matchId, {
+    // Guardar evento visual (intentamos guardarlo, pero no bloqueamos si falla)
+    await addLiveEvent(matchId, {
       player_id: null,
       tipo: phase,
       minuto: Math.floor(seconds / 60),
@@ -161,24 +285,28 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
         : `--- FINAL DEL PARTIDO (Duración 2ª Parte: ${formatTime(secondHalfDuration > 0 ? secondHalfDuration : seconds)}) ---`
     });
 
-    if (success) {
-      if (phase === "Fin de Partido") {
-        await updateMatchState(matchId, "Finalizado", { 
-          second_half_duration_seconds: secondHalfDuration > 0 ? secondHalfDuration : null 
-        });
+    // Actualizar el estado del partido sin importar si el evento se insertó o no
+    if (phase === "Fin de Partido") {
+      const res = await updateMatchState(matchId, "Finalizado", { 
+        second_half_duration_seconds: secondHalfDuration > 0 ? secondHalfDuration : null 
+      });
+      if (!res.success) {
+        toast.error(`Error finalizando el partido: ${res.error}`);
+      } else {
         setPartidoEstado("Finalizado");
         toast.success("Partido finalizado");
+      }
+    } else {
+      const res = await updateMatchState(matchId, "Descanso", { 
+        first_half_duration_seconds: seconds 
+      });
+      if (!res.success) {
+        toast.error(`Error registrando el descanso: ${res.error}`);
       } else {
-        await updateMatchState(matchId, "Programado", { 
-          first_half_duration_seconds: seconds 
-        });
-        // Do not set partidoEstado to Descanso because the DB doesn't support it.
-        // It will be inferred from firstHalfDuration automatically.
+        setPartidoEstado("Descanso");
         setFirstHalfDuration(seconds);
         toast.success("Descanso registrado");
       }
-    } else {
-      toast.error("Por favor, asegúrate de haber ejecutado el script SQL para habilitar estos eventos");
     }
   };
 
@@ -188,8 +316,12 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
       return;
     }
     const targetSeconds = halfLengthMinutes * 60;
-    await updateMatchState(matchId, "Programado");
-    setPartidoEstado("Programado");
+    const res = await updateMatchState(matchId, "En curso");
+    if (!res.success) {
+      toast.error(`Error al iniciar la segunda parte: ${res.error}`);
+      return;
+    }
+    setPartidoEstado("En curso");
     start(targetSeconds);
     toast.success("Segunda parte iniciada");
   };
@@ -202,12 +334,22 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
     let desc = "";
     
     if (isRival) {
-      desc = `${activeForm} del equipo rival ${notes ? `(${notes})` : ""}`;
+      if (activeForm === "Ocasión Peligrosa") {
+        const ocasionLabel = subTipoOcasion || "Ocasión Peligrosa";
+        desc = `Ocasión del rival: ${ocasionLabel} ${notes ? `(${notes})` : ""}`;
+      } else {
+        desc = `${activeForm} del equipo rival ${notes ? `(${notes})` : ""}`;
+      }
     } else {
       const player = players.find((p: any) => p.id === playerId);
       const playerName = player ? `${player.first_name}`.trim() : "Jugador";
 
-      if (activeForm === "Gol") {
+      if (activeForm === "Ocasión Peligrosa") {
+        const ocasionLabel = subTipoOcasion || "Ocasión Peligrosa";
+        desc = playerId 
+          ? `Ocasión: ${ocasionLabel} de ${playerName} ${notes ? `(${notes})` : ""}`
+          : `Ocasión peligrosa: ${ocasionLabel} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Gol") {
         desc = `Gol de ${playerName} ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Amarilla" || activeForm === "Tarjeta Amarilla") {
         desc = `Tarjeta Amarilla para ${playerName} ${notes ? `(${notes})` : ""}`;
@@ -225,10 +367,14 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
         desc = `Lesión de ${playerName} ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Gol en propia puerta") {
         desc = `Gol en propia puerta de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (playerId) {
+        desc = `${activeForm} de ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else {
+        desc = `${activeForm} ${notes ? `(${notes})` : ""}`;
       }
     }
 
-    const { success } = await addLiveEvent(matchId, {
+    const { success, data, error } = await addLiveEvent(matchId, {
       player_id: isRival ? null : (playerId || null),
       tipo: activeForm,
       minuto,
@@ -242,6 +388,9 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
       setPlayerOutId("");
       setNotes("");
       setIsRival(false);
+      toast.success(`${activeForm} registrado correctamente`);
+    } else {
+      toast.error(`Error al registrar ${activeForm}: ` + (error || "Error desconocido"));
     }
   };
 
@@ -269,8 +418,8 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${partidoEstado === "Finalizado" ? 'text-slate-300 bg-slate-700 border-slate-600' : (isDescuento ? 'text-red-100 bg-red-800 border-red-700' : 'text-blue-300 bg-blue-900/50 border-blue-700')}`}>
-                {partidoEstado === "Finalizado" ? "Finalizado" : (isDescansoActive ? "Descanso" : (running ? "En juego" : "Pausado"))}
+              <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${partidoEstado === "Finalizado" ? 'text-slate-300 bg-slate-700 border-slate-600' : (partidoEstado === "Descanso" || isDescansoActive ? 'text-orange-200 bg-orange-950/80 border-orange-700' : (isDescuento ? 'text-red-100 bg-red-800 border-red-700' : 'text-blue-300 bg-blue-900/50 border-blue-700'))}`}>
+                {partidoEstado === "Finalizado" ? "Finalizado" : (partidoEstado === "Descanso" || isDescansoActive ? "Descanso" : (running ? (firstHalfDuration ? "2ª Parte" : "1ª Parte") : "Pausado"))}
               </span>
               {firstHalfDuration && (
                 <span className="text-[10px] text-blue-200/80 font-medium">
@@ -307,7 +456,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
               </button>
             ) : (
               <>
-                {isDescansoActive ? (
+                {(partidoEstado === "Descanso" || isDescansoActive) ? (
                   <button
                     onClick={() => {
                       if (partidoEstado === "Finalizado") {
@@ -355,6 +504,8 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                       toast.error("Guarda la convocatoria y alineación primero para poder iniciar el partido.");
                       return;
                     }
+                    await updateMatchState(matchId, "En Curso");
+                    setPartidoEstado("En Curso");
                     start();
                   } else {
                     pause();
@@ -409,7 +560,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                 ] as const).map(action => (
                   <button
                     key={action.tipo}
-                    onClick={() => { setActiveForm(action.tipo as any); setMinuto(Math.floor(seconds / 60)); }}
+                    onClick={() => handleSelectAction(action.tipo)}
                     className={[
                       "flex flex-col items-center justify-center p-3 border border-dashed rounded-xl bg-slate-50/50 shadow-sm",
                       "transition-all duration-200 hover:scale-105 active:scale-95",
@@ -420,6 +571,195 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                     <span className="text-[10px] font-black uppercase tracking-wider">{action.label}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* Frases rápidas del Entrenador según estado de partido */}
+              <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    💬 Sensaciones / Frases Rápidas del Entrenador
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPhrases(!isEditingPhrases)}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 transition-colors"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>{isEditingPhrases ? "Listo" : "Gestionar Frases"}</span>
+                  </button>
+                </div>
+
+                {isEditingPhrases && (
+                  <div className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl space-y-2 animate-in fade-in duration-200">
+                    <p className="text-[10px] font-bold text-indigo-900">
+                      Añade o borra las frases rápidas que quieres mantener fijadas en pantalla:
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ej. El equipo necesita más intensidad en las bandas ⚡..."
+                        value={newPhraseInput}
+                        onChange={(e) => setNewPhraseInput(e.target.value)}
+                        className="flex-1 text-xs font-medium bg-white border border-indigo-200 rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-indigo-500"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (!newPhraseInput.trim()) return;
+                            savePhrases([...customPhrases, newPhraseInput.trim()]);
+                            setNewPhraseInput("");
+                            toast.success("Frase fijada guardada");
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newPhraseInput.trim()) return;
+                          savePhrases([...customPhrases, newPhraseInput.trim()]);
+                          setNewPhraseInput("");
+                          toast.success("Frase fijada guardada");
+                        }}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Fijar</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  {(() => {
+                    const rawTeamName = match?.equipo?.name || 'El equipo';
+                    return customPhrases.map((phraseTemplate, idx) => {
+                      const fullPhrase = phraseTemplate.replace(/{TEAM}/g, rawTeamName);
+                      return (
+                        <div key={idx} className="relative group">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const currentMin = Math.floor(seconds / 60);
+                              const { success, error } = await addLiveEvent(matchId, {
+                                player_id: null,
+                                tipo: "Comentario del Entrenador",
+                                minuto: currentMin,
+                                descripcion: fullPhrase
+                              });
+                              if (success) {
+                                toast.success("Comentario publicado");
+                              } else {
+                                toast.error("Error al publicar comentario: " + (error || "Error desconocido"));
+                              }
+                            }}
+                            className="w-full p-2.5 text-[11px] font-bold text-slate-700 bg-slate-100/80 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 rounded-xl text-left transition-all leading-snug flex items-center justify-between pr-7"
+                          >
+                            <span className="line-clamp-2">{fullPhrase}</span>
+                            <span className="text-xs opacity-50 shrink-0">+</span>
+                          </button>
+                          
+                          {isEditingPhrases && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const filtered = customPhrases.filter((_, i) => i !== idx);
+                                savePhrases(filtered);
+                                toast.success("Frase eliminada");
+                              }}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-red-500 hover:bg-red-100 rounded-md transition-colors"
+                              title="Eliminar frase fijada"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Entrada libre para que el entrenador ponga cualquier comentario sobre cómo va el partido */}
+                <div className="mt-3 flex gap-2">
+                  <div className="relative flex-1 flex items-center">
+                    <input
+                      type="text"
+                      id="coach-custom-comment-input"
+                      placeholder="Escribe o dicta un comentario libre..."
+                      className="w-full text-xs font-medium bg-white border border-slate-200 rounded-xl pl-3 pr-9 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (!val) return;
+                          const inputEl = e.currentTarget;
+                          const currentMin = Math.floor(seconds / 60);
+                          const { success, error } = await addLiveEvent(matchId, {
+                            player_id: null,
+                            tipo: "Comentario del Entrenador",
+                            minuto: currentMin,
+                            descripcion: `💬 ${val}`
+                          });
+                          if (success) {
+                            toast.success("Comentario publicado");
+                            inputEl.value = "";
+                          } else {
+                            toast.error("Error al publicar comentario: " + (error || "Error desconocido"));
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={isLiveRecording ? stopLiveVoiceDictation : startLiveVoiceDictation}
+                      className={`absolute right-2 p-1.5 rounded-lg transition-colors ${
+                        isLiveRecording 
+                          ? "text-red-500 bg-red-100 animate-pulse" 
+                          : "text-slate-400 hover:text-indigo-600 hover:bg-slate-100"
+                      }`}
+                      title={isLiveRecording ? "Detener dictado por voz" : "Dictar comentario por voz"}
+                    >
+                      {isLiveRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const inputEl = document.getElementById('coach-custom-comment-input') as HTMLInputElement;
+                      if (!inputEl || !inputEl.value.trim()) return;
+                      const val = inputEl.value.trim();
+                      const currentMin = Math.floor(seconds / 60);
+                      const { success, error } = await addLiveEvent(matchId, {
+                        player_id: null,
+                        tipo: "Comentario del Entrenador",
+                        minuto: currentMin,
+                        descripcion: `💬 ${val}`
+                      });
+                      if (success) {
+                        toast.success("Comentario publicado");
+                        inputEl.value = "";
+                      } else {
+                        toast.error("Error al publicar comentario: " + (error || "Error desconocido"));
+                      }
+                    }}
+                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-colors shrink-0"
+                  >
+                    Publicar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inputEl = document.getElementById('coach-custom-comment-input') as HTMLInputElement;
+                      if (!inputEl || !inputEl.value.trim()) return;
+                      const val = inputEl.value.trim();
+                      savePhrases([...customPhrases, val]);
+                      toast.success("¡Frase fijada en pantalla para siempre!");
+                    }}
+                    className="px-2.5 py-2 bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors shrink-0 flex items-center gap-1"
+                    title="Fijar este comentario para usarlo siempre"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Fijar</span>
+                  </button>
+                </div>
               </div>
 
               {/* Botones adicionales */}
@@ -437,7 +777,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                 ] as const).map(action => (
                   <button
                     key={action.tipo}
-                    onClick={() => { setActiveForm(action.tipo as any); setMinuto(Math.floor(seconds / 60)); }}
+                    onClick={() => handleSelectAction(action.tipo)}
                     className={[
                       "flex flex-col items-center justify-center p-2 border border-dashed rounded-xl bg-slate-50/50 shadow-sm",
                       "transition-all duration-200 hover:scale-105 active:scale-95",
@@ -476,7 +816,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
 
             {/* Dynamic add form */}
             {activeForm && (
-              <form onSubmit={handleAddEvent} className="bg-white border border-slate-200 rounded-xl p-5 shadow-md space-y-4 animate-in zoom-in-95 duration-200">
+              <form ref={formRef as any} onSubmit={handleAddEvent} className="bg-white border border-slate-200 rounded-xl p-5 shadow-md space-y-4 animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <span className="text-xs font-black uppercase text-slate-400 tracking-wider">
                     Añadir {activeForm}
@@ -509,6 +849,27 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                     </button>
                   </div>
 
+                  {/* Ocasión Selector (sólo para Ocasión Peligrosa) */}
+                  {activeForm === "Ocasión Peligrosa" && (
+                    <div>
+                      <label className="block text-[9px] font-bold text-amber-700 uppercase tracking-widest mb-1">
+                        Tipo de ocasión producida
+                      </label>
+                      <select
+                        value={subTipoOcasion}
+                        onChange={e => setSubTipoOcasion(e.target.value)}
+                        className="w-full text-xs font-bold text-amber-900 bg-amber-50/60 border border-amber-200 rounded-lg px-2.5 py-2 outline-none focus:border-amber-500 focus:bg-white"
+                      >
+                        <option value="Tiro al palo">Tiro al palo</option>
+                        <option value="Tiro al larguero">Tiro al larguero</option>
+                        <option value="Remate de cabeza">Remate de cabeza</option>
+                        <option value="Tiro desde fuera del área">Tiro desde fuera del área</option>
+                        <option value="Mano a mano con el portero">Mano a mano con el portero</option>
+                        <option value="Ocasión clara de gol">Ocasión clara de gol</option>
+                      </select>
+                    </div>
+                  )}
+
                   {/* Minute */}
                   <div>
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
@@ -531,7 +892,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                         {activeForm === "Cambio" ? "Jugador que ENTRA" : "Jugador implicado"}
                       </label>
                       <select
-                        required={activeForm !== "Gol" && activeForm !== "Gol en propia puerta"}
+                        required={activeForm === "Tarjeta Amarilla" || activeForm === "Tarjeta Roja" || activeForm === "Cambio"}
                         value={playerId}
                         onChange={e => setPlayerId(e.target.value)}
                         className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-500 focus:bg-white"
@@ -637,12 +998,15 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                 <div className="absolute left-[34px] top-3.5 bottom-3.5 w-0.5 bg-slate-100" />
 
                 <div className="space-y-4">
-                  {events.map(ev => {
+                  {events.map((ev, idx) => {
                     const icons: Record<string, string> = {
                       Gol: "⚽",
                       Amarilla: "🟨",
                       "Tarjeta Amarilla": "🟨",
                       Cambio: "🔄",
+                      "Ocasión Peligrosa": "⚠️",
+                      Ocasión: "⚠️",
+                      Parada: "🧤",
                       "Tiro al larguero": "🎯",
                       "Tiro al palo": "🎯",
                       Penalti: "🚩",
@@ -652,7 +1016,7 @@ export function LiveTab({ matchId, match, players = [], matchEvents = [], onEven
                     const icon = icons[ev.tipo_evento] || "📌";
                     
                     return (
-                      <div key={ev.id} className="flex items-center gap-3.5 group">
+                      <div key={ev.id ? `${ev.id}-${idx}` : idx} className="flex items-center gap-3.5 group">
                         {/* Minute */}
                         <div className="w-9 text-right shrink-0">
                           <span className="text-[10px] font-black text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">

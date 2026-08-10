@@ -15,7 +15,7 @@ async function processMatches() {
   const { data: profile } = await supabase.from('profiles').select('club_id').limit(1).single();
   const validClubId = profile ? profile.club_id : null;
 
-  const { data: equipos, error } = await supabase.from('equipos').select('*');
+  const { data: equipos, error } = await supabase.from('teams').select('*');
   if (error || !equipos) {
     console.error("Error obteniendo equipos:", error);
     return;
@@ -36,9 +36,6 @@ async function processMatches() {
       continue;
     }
 
-    // Sincronizar con la tabla legacy `teams` para satisfacer la foreign key de `partidos`
-    const { error: upsertError } = await supabase.from('teams').upsert({ id: equipo.id, name: equipo.name, club_id: validClubId, category: 'General' });
-    if (upsertError) console.log(`Error upserting team ${equipo.name}:`, upsertError);
 
     const dataBuffer = fs.readFileSync(path.join(PDF_DIR, file));
     let text = "";

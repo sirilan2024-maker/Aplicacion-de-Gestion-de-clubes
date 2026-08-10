@@ -17,18 +17,28 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   const [elapsedString, setElapsedString] = useState("00:00")
 
   const isFinished = match.estado === 'Finalizado'
-  const isLive = !isFinished && (match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
+  const isDescanso = !isFinished && (match.estado === 'Descanso' || 
+    (match.first_half_duration_seconds !== null && 
+     match.first_half_duration_seconds > 0 &&
+     match.live_timer_elapsed_seconds === match.first_half_duration_seconds && 
+     !match.live_timer_started_at));
+  const isLive = !isFinished && !isDescanso && (match.estado === 'En curso' || match.estado === 'En Curso' || match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
   const isLocal = !/\b(fuera|visitante)\b/i.test(match.lugar || '');
 
   // Cronómetro en vivo
   useEffect(() => {
-    if (!isLive) return
+    if (!isLive && !isDescanso) return
     let interval: NodeJS.Timeout
 
     const updateTimer = () => {
-      if (!match.live_timer_started_at) { setElapsedString("00:00"); return }
-      const started = new Date(match.live_timer_started_at).getTime()
       const base = match.live_timer_elapsed_seconds || 0
+      if (!match.live_timer_started_at) { 
+        const m = Math.floor(base / 60)
+        const s = base % 60
+        setElapsedString(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`)
+        return 
+      }
+      const started = new Date(match.live_timer_started_at).getTime()
       const total = base + Math.floor((Date.now() - started) / 1000)
       const m = Math.floor(total / 60)
       const s = total % 60
@@ -38,39 +48,29 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     updateTimer()
     interval = setInterval(updateTimer, 1000)
     return () => clearInterval(interval)
-  }, [isLive, match.live_timer_started_at, match.live_timer_elapsed_seconds])
+  }, [isLive, isDescanso, match.live_timer_started_at, match.live_timer_elapsed_seconds])
 
-  // Cargar y suscribir eventos si está en directo o finalizado con eventos
+  // Cargar y suscribir eventos en tiempo real
   useEffect(() => {
-    if (!isLive && !isFinished) return
-
     const loadEvents = async () => {
-      // If we already have events from SSR and we are just finished, skip fetching again
-      if (isFinished && match.match_events && match.match_events.length > 0 && events.length > 0) return;
-      
       const { data } = await supabase
         .from('match_events')
         .select('*, player:players(first_name, last_name)')
         .eq('partido_id', match.id)
-        .order('minuto', { ascending: false })
-        .limit(20)
+        .order('minuto', { ascending: true })
       if (data) setEvents(data)
     }
-    
-    // Carga inicial
+
+    // Carga inicial siempre
     loadEvents()
 
+    // Polling cada 3s mientras el partido esté activo (live o descanso)
     let intervalId: NodeJS.Timeout | null = null;
-    
-    // Si está en directo, configuramos un polling de seguridad por si falla el Realtime
-    if (isLive) {
-      intervalId = setInterval(() => {
-        loadEvents();
-      }, 5000);
+    if (isLive || isDescanso) {
+      intervalId = setInterval(loadEvents, 3000);
     }
 
-    if (!isLive) return
-
+    // Realtime: INSERT y DELETE de eventos para el partido
     const channel = supabase
       .channel(`matchday-events-${match.id}-${Math.random().toString(36).substring(7)}`)
       .on('postgres_changes', {
@@ -86,16 +86,23 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
         }
         setEvents(prev => {
           if (prev.some(e => e.id === payload.new.id)) return prev;
-          return [{ ...payload.new, player }, ...prev];
+          const next = [...prev, { ...payload.new, player }];
+          return next.sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
         })
+      })
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'match_events',
+        filter: `partido_id=eq.${match.id}`
+      }, (payload) => {
+        setEvents(prev => prev.filter(e => e.id !== payload.old.id))
       })
       .subscribe()
 
-    return () => { 
+    return () => {
       supabase.removeChannel(channel)
       if (intervalId) clearInterval(intervalId);
     }
-  }, [match.id, isLive, isFinished, supabase])
+  }, [match.id, isLive, isDescanso])
 
   const getEventIcon = (tipo: string) => {
     switch (tipo) {
@@ -125,42 +132,76 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   const liveLocalGoals = match.resultado_propio ?? liveLocalGoalsComputed;
   const liveAwayGoals = match.resultado_rival ?? liveAwayGoalsComputed;
 
-  const ourScore = isLive ? liveLocalGoals : (isLocal ? (match.resultado_propio ?? liveLocalGoals) : (match.resultado_rival ?? liveAwayGoals))
-  const theirScore = isLive ? liveAwayGoals : (isLocal ? (match.resultado_rival ?? liveAwayGoals) : (match.resultado_propio ?? liveLocalGoals))
-  
   const ourName = match.equipo?.name || 'Sporting Saladar'
   const ourCleanName = ourName.replace(/Sporting Saladar\s*/i, '').trim() || 'Sporting Saladar';
   const theirName = match.rival_nombre || 'Rival'
 
   const getGoalsForTeam = (isHomeTeam: boolean) => {
     const isSporting = isHomeTeam === isLocal;
-    const goals = events.filter(e => {
-      if (e.tipo_evento !== 'Gol' && e.tipo_evento !== 'Gol en propia puerta' && e.tipo_evento !== 'Gol en Propia') return false;
+    const targetScore = isSporting ? liveLocalGoals : liveAwayGoals;
 
-      const isSportingPoint = (e.tipo_evento === 'Gol' && e.player_id) || 
-                              ((e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') && !e.player_id);
-                              
+    const goalEvents = events.filter(e => {
+      const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
+      const isGol = tipo.includes('gol') && !tipo.includes('propia');
+      const isAutogol = tipo.includes('propia') || tipo.includes('pp');
+      
+      if (!isGol && !isAutogol) return false;
+
+      const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
       return isSporting ? isSportingPoint : !isSportingPoint;
-    }).sort((a, b) => a.minuto - b.minuto);
+    }).sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
 
-    if (goals.length === 0) return null;
+    if ((targetScore === 0 || targetScore === null) && goalEvents.length === 0) return null;
+
+    // Si faltan eventos de gol con respecto al marcador actual, generamos lineas sinteticas para completar el total
+    const displayItems: any[] = [...goalEvents];
+    const missingCount = Math.max(0, (targetScore || 0) - goalEvents.length);
+
+    for (let k = 0; k < missingCount; k++) {
+      displayItems.push({
+        id: `synth-${k}`,
+        tipo_evento: 'Gol',
+        minuto: 0,
+        isSynthetic: true
+      });
+    }
 
     return (
-      <div className="flex flex-col text-[11px] md:text-xs text-slate-500 mt-2 text-center w-full px-1 space-y-0.5 leading-tight opacity-90">
-        {goals.map((g, i) => {
-          let name = '';
-          const isOwnGoal = g.tipo_evento === 'Gol en propia puerta' || g.tipo_evento === 'Gol en Propia';
+      <div className={`flex flex-col text-[11px] md:text-xs text-slate-700 mt-2.5 w-full space-y-1 ${isSporting ? 'items-start text-left pl-2' : 'items-end text-right pr-2'}`}>
+        {displayItems.map((g, i) => {
+          if (g.isSynthetic) {
+            return (
+              <div key={`synth-${i}`} className="flex items-center gap-1.5 font-bold text-slate-700">
+                {isSporting && <span className="text-slate-400 text-[10px] shrink-0">⚽</span>}
+                <span>{isSporting ? 'Gol' : 'Rival'}</span>
+                {!isSporting && <span className="text-slate-400 text-[10px] shrink-0">⚽</span>}
+              </div>
+            );
+          }
+
+          const tipo = (g.tipo_evento || g.tipo || '').toLowerCase();
+          const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
+          const rawMin = g.minuto || 0;
+          const displayMin = rawMin > 90 ? Math.floor(rawMin / 60) : rawMin;
           
+          let name = '';
           if (isSporting) {
             if (isOwnGoal) name = 'Rival (PP)';
-            else name = g.player ? g.player.first_name : 'Jugador';
+            else name = g.player?.first_name ? g.player.first_name.trim() : 'Jugador';
           } else {
-            if (isOwnGoal) name = g.player ? `${g.player.first_name} (PP)` : 'Sporting (PP)';
+            if (isOwnGoal) name = g.player?.first_name ? `${g.player.first_name} (PP)` : 'Sporting (PP)';
             else name = 'Rival';
           }
           
-          const icon = (g.tipo_evento === 'Penalty' || g.tipo_evento === 'Penalti') ? '🎯' : '⚽';
-          return <span key={i} className="flex items-center justify-center gap-1"><span className="text-slate-400 text-[10px]">{icon}</span> {name} {g.minuto}'</span>
+          const icon = (tipo.includes('penal') || tipo.includes('penalty')) ? '🎯' : '⚽';
+          return (
+            <div key={g.id || i} className="flex items-center gap-1.5 font-bold text-slate-800">
+              {isSporting && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
+              <span>{name}</span> 
+              {displayMin > 0 && <span className="text-slate-400 text-[10px] font-normal">({displayMin}')</span>}
+              {!isSporting && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
+            </div>
+          );
         })}
       </div>
     )
@@ -204,39 +245,51 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           </div>
 
           {/* Time / Score */}
-          <div className="flex flex-col items-center justify-center w-1/3 shrink-0">
-            {isLive || isFinished ? (
-              <div className="flex items-center justify-center gap-3">
-                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : 'text-red-600'}`}>
+          <div className="flex flex-col items-center justify-center w-1/3 shrink-0 text-center mx-auto">
+            {isLive || isDescanso || isFinished ? (
+              <div className="flex items-center justify-center gap-2.5 w-full text-center">
+                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
                   {isLocal ? liveLocalGoals : liveAwayGoals}
                 </span>
-                <span className="text-xl md:text-2xl font-black text-slate-300">-</span>
-                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : 'text-red-600'}`}>
+
+                {(isLive || isDescanso) ? (
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className={`text-xs md:text-sm font-black tabular-nums tracking-tight px-2.5 py-1 rounded-xl border shadow-inner flex items-center gap-1.5 ${isLive ? 'bg-slate-900 text-white border-slate-800' : 'bg-amber-100 text-amber-900 border-amber-200'}`}>
+                      {isLive && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>}
+                      {elapsedString}
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded mt-1.5 ${isDescanso ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
+                      {isDescanso ? 'DESCANSO' : (match.first_half_duration_seconds ? '2ª PARTE' : '1ª PARTE')}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-xl md:text-2xl font-black text-slate-300">-</span>
+                )}
+
+                <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
                   {isLocal ? liveAwayGoals : liveLocalGoals}
                 </span>
               </div>
             ) : (
-              <div className="text-3xl md:text-4xl font-black tracking-tighter text-black tabular-nums">
+              <div className="text-3xl md:text-4xl font-black tracking-tighter text-black tabular-nums text-center w-full">
                 {matchTime}
               </div>
             )}
             
-            <div className="mt-1 flex flex-col items-center">
-              {isLive ? (
-                <div className="flex items-center gap-1.5 bg-red-100 px-2 py-0.5 rounded text-[10px] font-bold text-red-700 uppercase tracking-wider animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                  EN JUEGO • {elapsedString}
-                </div>
-              ) : isFinished ? (
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">
-                  FIN
+            {isFinished && (
+              <div className="mt-1.5 flex flex-col items-center justify-center w-full text-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded mx-auto text-center border border-slate-200">
+                  FINALIZADO
                 </span>
-              ) : (
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              </div>
+            )}
+            {!isLive && !isDescanso && !isFinished && (
+              <div className="mt-1 flex flex-col items-center justify-center w-full text-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mx-auto text-center">
                   CET
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Away Team */}
@@ -265,6 +318,21 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
             <div className="flex-1 w-1/3 flex flex-col items-center">{getGoalsForTeam(false)}</div>
           </div>
         )}
+
+        {/* Date + kick-off time strip — always visible */}
+        <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/70 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+          <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          <span className="capitalize">{matchDate}</span>
+          <span className="text-slate-300">•</span>
+          <span className="font-bold text-slate-700">{matchTime} h</span>
+          {match.lugar && (
+            <>
+              <span className="text-slate-300">•</span>
+              <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span className="truncate max-w-[120px]">{match.lugar}</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Modal Minuto a Minuto */}

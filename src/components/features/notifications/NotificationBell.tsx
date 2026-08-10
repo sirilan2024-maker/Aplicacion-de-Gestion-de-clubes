@@ -5,16 +5,20 @@ import { createPortal } from "react-dom"
 import { Bell, Check, X } from "lucide-react"
 import { getUnreadNotificationsAction, markNotificationAsReadAction, markAllNotificationsAsReadAction } from "@/app/actions/notification-actions"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [userRole, setUserRole] = useState<string>('')
+  const [linkedPlayerId, setLinkedPlayerId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     setMounted(true)
     fetchNotifications()
+    fetchUserContext()
     const interval = setInterval(fetchNotifications, 12000)
     return () => clearInterval(interval)
   }, [])
@@ -26,35 +30,103 @@ export function NotificationBell() {
     }
   }
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const fetchUserContext = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role) setUserRole(profile.role)
+
+      // For family/tutor roles, fetch first linked player
+      const isFamilyRole = ['family', 'familia', 'tutor'].includes(profile?.role || '')
+      if (isFamilyRole) {
+        const { data: players } = await supabase
+          .from('players')
+          .select('id')
+          .eq('tutor_id', user.id)
+          .limit(1)
+
+        if (players && players.length > 0) {
+          setLinkedPlayerId(players[0].id)
+        }
+      }
+    } catch (e) {
+      // silently fail - context is best-effort
+    }
+  }
+
+  const unreadCount = notifications.length
+
+  const getNavigationUrl = (notification: any): string => {
+    const type = notification.type
+    const isFamilyRole = ['family', 'familia', 'tutor'].includes(userRole)
+
+    // Deep link based on notification type
+    switch (type) {
+      case 'reminder':
+        // Entrenamiento/evento reminder → go to eventos page for family
+        if (isFamilyRole && linkedPlayerId) {
+          return `/dashboard/family/e/${linkedPlayerId}/eventos`
+        }
+        return '/dashboard'
+
+      case 'partido':
+      case 'convocatoria':
+        // Match notification → go to partidos page for family
+        if (isFamilyRole && linkedPlayerId) {
+          return `/dashboard/family/e/${linkedPlayerId}/partidos`
+        }
+        return '/dashboard/matches'
+
+      case 'tesoreria':
+        // Treasury notification → go to family perfil (shows pending fees)
+        if (isFamilyRole && linkedPlayerId) {
+          return `/dashboard/family/e/${linkedPlayerId}/perfil`
+        }
+        return '/dashboard/treasury'
+
+      case 'disciplina':
+        return '/dashboard'
+
+      default:
+        return '/dashboard'
+    }
+  }
 
   const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const res = await markNotificationAsReadAction(id)
     if (res.success) {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+      // Remove from state immediately (notification is deleted from DB)
+      setNotifications(prev => prev.filter(n => n.id !== id))
     }
   }
 
   const handleMarkAllAsRead = async () => {
     const res = await markAllNotificationsAsReadAction()
     if (res.success) {
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+      // Clear entire list
+      setNotifications([])
+      setIsOpen(false)
     }
   }
 
   const handleNotificationClick = async (notification: any) => {
-    if (!notification.is_read) {
-      await markNotificationAsReadAction(notification.id)
-      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n))
-    }
+    // Delete the notification
+    await markNotificationAsReadAction(notification.id)
+    setNotifications(prev => prev.filter(n => n.id !== notification.id))
     setIsOpen(false)
-    
-    if (notification.link) {
-      router.push(notification.link)
-    } else if (notification.type === 'disciplina' || notification.type === 'tesoreria') {
-      router.push('/dashboard')
-    }
+
+    // Navigate to the right place
+    const url = getNavigationUrl(notification)
+    router.push(url)
   }
 
   return (
@@ -95,7 +167,7 @@ export function NotificationBell() {
                   onClick={handleMarkAllAsRead}
                   className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
                 >
-                  <Check size={14} /> Marcar todas
+                  <Check size={14} /> Borrar todas
                 </button>
               )}
             </div>
@@ -111,16 +183,12 @@ export function NotificationBell() {
                   <div 
                     key={notif.id} 
                     onClick={() => handleNotificationClick(notif)}
-                    className={`p-3.5 hover:bg-slate-50 cursor-pointer transition-colors relative group ${
-                      !notif.is_read ? "bg-indigo-50/50" : ""
-                    }`}
+                    className="p-3.5 hover:bg-slate-50 cursor-pointer transition-colors relative group bg-indigo-50/50"
                   >
                     <div className="pr-6">
                       <div className="flex items-center gap-1.5 mb-1">
-                        {!notif.is_read && (
-                          <span className="w-2 h-2 bg-indigo-600 rounded-full inline-block"></span>
-                        )}
-                        <p className={`text-xs ${!notif.is_read ? "font-black text-indigo-950" : "font-bold text-slate-800"}`}>
+                        <span className="w-2 h-2 bg-indigo-600 rounded-full inline-block"></span>
+                        <p className="text-xs font-black text-indigo-950">
                           {notif.title}
                         </p>
                       </div>
@@ -130,15 +198,13 @@ export function NotificationBell() {
                       </p>
                     </div>
 
-                    {!notif.is_read && (
-                      <button 
-                        onClick={(e) => handleMarkAsRead(notif.id, e)}
-                        className="absolute right-3 top-3.5 p-1 text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Marcar como leída"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
+                    <button 
+                      onClick={(e) => handleMarkAsRead(notif.id, e)}
+                      className="absolute right-3 top-3.5 p-1 text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Descartar notificación"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 ))
               )}

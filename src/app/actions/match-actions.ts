@@ -144,6 +144,79 @@ export async function saveMatchReport(matchId: string, report: { coach_rating: n
   return { success: true }
 }
 
+export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summaryText: string) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "Usuario no autenticado" }
+
+    const adminSupabase = await createAdminClient()
+
+    // 1. Obtener datos del partido y equipo
+    const { data: partido } = await adminSupabase
+      .from('partidos')
+      .select('id, rival_nombre, resultado_propio, resultado_rival, club_id, equipo:teams(name)')
+      .eq('id', matchId)
+      .single()
+
+    if (!partido) return { success: false, error: "Partido no encontrado" }
+
+    // 2. Obtener el perfil del emisor (entrenador)
+    const { data: coachProfile } = await adminSupabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', user.id)
+      .single()
+
+    const coachName = coachProfile ? `${coachProfile.first_name || ''} ${coachProfile.last_name || ''}`.trim() : 'Entrenador'
+    const teamName = partido.equipo?.name || 'Equipo'
+    const matchScore = (partido.resultado_propio !== null && partido.resultado_rival !== null) 
+      ? `(${partido.resultado_propio} - ${partido.resultado_rival})` 
+      : ''
+
+    // 3. Buscar coordinadores y administradores del club
+    const { data: coordinators } = await adminSupabase
+      .from('profiles')
+      .select('id, phone')
+      .eq('club_id', partido.club_id)
+      .or('role.eq.coordinador,role.eq.admin,role.eq.superadmin')
+
+    if (!coordinators || coordinators.length === 0) {
+      return { success: false, error: "No se encontraron coordinadores o administradores en el club." }
+    }
+
+    // 4. Crear notificaciones internas para los coordinadores
+    const title = `📋 Valoración del Partido: ${teamName} vs ${partido.rival_nombre} ${matchScore}`
+    const fullMessage = `El entrenador ${coachName} ha enviado la valoración general del partido ${teamName} vs ${partido.rival_nombre}:\n\n"${summaryText}"`
+
+    const notifications = coordinators.map(coord => ({
+      user_id: coord.id,
+      title: title,
+      message: fullMessage,
+      link: `/dashboard/matches/${matchId}`,
+      is_read: false
+    }))
+
+    const { error: notifError } = await adminSupabase.from('notifications').insert(notifications)
+    if (notifError) console.error("Error enviando notificaciones a coordinadores:", notifError)
+
+    // Obtener teléfonos de los coordinadores para la opción de WhatsApp
+    const coordinatorPhones = coordinators
+      .map(c => c.phone)
+      .filter(p => p && p.trim().length > 0)
+
+    return { 
+      success: true, 
+      count: coordinators.length,
+      phones: coordinatorPhones,
+      message: `Valoración enviada correctamente a ${coordinators.length} coordinador(es) por mensajería interna.`
+    }
+  } catch (err: any) {
+    console.error("Error enviando valoración a coordinadores:", err)
+    return { success: false, error: err.message || "Error al enviar la valoración." }
+  }
+}
+
 export async function deleteMatchAction(matchId: string, teamId: string) {
   const supabase = await createClient()
   
@@ -498,16 +571,43 @@ export async function getPublicMatchEvents(matchId: string) {
 }
 
 export async function getPublicMatches() {
-  const supabase = await createAdminClient()
-  const { data, error } = await supabase
-    .from('partidos')
-    .select('id, estado, resultado_propio, resultado_rival, live_timer_started_at, live_timer_elapsed_seconds')
-    .eq('estado', 'Programado')
-    .or('live_timer_started_at.not.is.null,live_timer_elapsed_seconds.gt.0');
-    
-  if (error) {
-    console.error("Error fetching public matches:", error);
+  try {
+    const supabase = await createAdminClient()
+    const { data, error } = await supabase
+      .from('partidos')
+      .select('id, estado, resultado_propio, resultado_rival, live_timer_started_at, live_timer_elapsed_seconds, first_half_duration_seconds')
+      .neq('estado', 'Finalizado')
+
+    if (error) {
+      console.error("Error fetching public matches:", error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error("getPublicMatches exception:", e);
     return [];
   }
-  return data || [];
 }
+
+export async function reconcileMatchStatsAction(matchId: string, stats: any[]) {
+  try {
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase.rpc('reconcile_match_and_close', {
+      p_partido_id: matchId,
+      p_stats: stats,
+      p_new_status: 'Finalizado'
+    });
+
+    if (error) {
+      console.error("[reconcileMatchStatsAction] Error running RPC:", error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard', 'layout');
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("[reconcileMatchStatsAction] Exception:", err);
+    return { success: false, error: err.message || "Error interno" };
+  }
+}
+

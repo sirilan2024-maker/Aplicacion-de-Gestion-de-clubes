@@ -247,7 +247,7 @@ export async function sendDisciplineAlertAction(playerId: string, teamId: string
       channel = newChannel
     }
 
-    // 2. Send the message
+    // 2. Send the message to the discipline channel (for coaches/admins)
     const messageContent = `⚠️ AVISO: El jugador **${playerName}** acumula 4 tarjetas amarillas y está apercibido. La próxima amarilla conllevará un partido de sanción.`
     const { data: message, error: messageError } = await adminClient.from('chat_messages').insert({
       channel_id: channel.id,
@@ -257,12 +257,28 @@ export async function sendDisciplineAlertAction(playerId: string, teamId: string
 
     if (messageError) throw messageError
 
-    // 3. Find coaches and coordinators for this team to send notifications
-    // Coaches of this team
+    // 2b. Also send to the regular TEAM channel so family members can see it in their chat
+    const { data: teamChannel } = await adminClient
+      .from('chat_channels')
+      .select('id')
+      .eq('team_id', teamId)
+      .eq('type', 'team')
+      .neq('name', channelName)
+      .limit(1)
+      .maybeSingle()
+
+    if (teamChannel) {
+      await adminClient.from('chat_messages').insert({
+        channel_id: teamChannel.id,
+        sender_id: user.id,
+        content: `⚠️ Aviso disciplinario: El jugador ${playerName} está apercibido por acumulación de tarjetas amarillas.`
+      })
+    }
+
+    // 3. Find coaches and coordinators for this team
     const { data: teamCoaches } = await adminClient.from('team_coaches').select('profile_id').eq('team_id', teamId)
     const coachIds = (teamCoaches || []).map(tc => tc.profile_id)
     
-    // Admins and coordinators of the club
     const { data: adminsCoords } = await adminClient
       .from('profiles')
       .select('id')
@@ -271,12 +287,45 @@ export async function sendDisciplineAlertAction(playerId: string, teamId: string
       
     const adminCoordIds = (adminsCoords || []).map(p => p.id)
     
-    // Combine unique user IDs (excluding sender)
-    const targetUserIds = Array.from(new Set([...coachIds, ...adminCoordIds])).filter(id => id !== user.id)
+    // 4. Find the player's family/tutors to also notify them
+    const { data: playerData } = await adminClient
+      .from('players')
+      .select('tutor_id, player_tutors(tutor_id), parent1_email, parent2_email, email')
+      .eq('id', playerId)
+      .single()
 
-    // 4. Create notifications
-    if (targetUserIds.length > 0) {
-      const notificationsToInsert = targetUserIds.map(targetId => ({
+    const familyUserIds = new Set<string>()
+    if (playerData?.tutor_id) familyUserIds.add(playerData.tutor_id)
+    if (Array.isArray(playerData?.player_tutors)) {
+      (playerData.player_tutors as any[]).forEach(pt => {
+        if (pt?.tutor_id) familyUserIds.add(pt.tutor_id)
+      })
+    }
+
+    // Match family by email in profiles table
+    const emails = [playerData?.parent1_email, playerData?.parent2_email, playerData?.email].filter(Boolean)
+    if (emails.length > 0) {
+      const { data: matchedProfiles } = await adminClient
+        .from('profiles')
+        .select('id')
+        .in('email', emails)
+      ;(matchedProfiles || []).forEach((p: any) => familyUserIds.add(p.id))
+    }
+
+    // Also check player_tutors table directly
+    const { data: ptRows } = await adminClient
+      .from('player_tutors')
+      .select('tutor_id')
+      .eq('player_id', playerId)
+    ;(ptRows || []).forEach((pt: any) => { if (pt.tutor_id) familyUserIds.add(pt.tutor_id) })
+
+    // Combine: coaches+admins (exclude sender) + family
+    const staffTargets = Array.from(new Set([...coachIds, ...adminCoordIds])).filter(id => id !== user.id)
+    const familyTargets = Array.from(familyUserIds)
+
+    // 5a. Notify staff (coaches/admins)
+    if (staffTargets.length > 0) {
+      const staffNotifications = staffTargets.map(targetId => ({
         club_id: profile.club_id,
         user_id: targetId,
         type: 'disciplina',
@@ -284,9 +333,23 @@ export async function sendDisciplineAlertAction(playerId: string, teamId: string
         content: `El jugador ${playerName} (${teamName}) está apercibido.`,
         is_read: false
       }))
+      const { error: notifError } = await adminClient.from('notifications').insert(staffNotifications)
+      if (notifError) console.error("Error inserting staff notifications:", notifError)
+    }
 
-      const { error: notifError } = await adminClient.from('notifications').insert(notificationsToInsert)
-      if (notifError) console.error("Error inserting notifications:", notifError)
+    // 5b. Notify family directly with a family-appropriate message
+    if (familyTargets.length > 0) {
+      const familyNotifications = familyTargets.map(targetId => ({
+        club_id: profile.club_id,
+        user_id: targetId,
+        profile_id: targetId,
+        type: 'disciplina',
+        title: '⚠️ Aviso Disciplinario',
+        content: `Tu jugador ${playerName} ha acumulado tarjetas amarillas y está apercibido. La próxima tarjeta amarilla podría conllevar una sanción de partido.`,
+        is_read: false
+      }))
+      const { error: familyNotifError } = await adminClient.from('notifications').insert(familyNotifications)
+      if (familyNotifError) console.error("Error inserting family notifications:", familyNotifError)
     }
 
     return { success: true, channelId: channel.id }

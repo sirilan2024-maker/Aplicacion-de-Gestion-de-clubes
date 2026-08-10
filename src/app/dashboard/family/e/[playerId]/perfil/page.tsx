@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Loader2, Activity, Calendar, FileText, AlertTriangle, Target, Trophy, Clock, Flame, CreditCard, ShieldAlert, CheckCircle, MapPin, CheckCircle2, XCircle, History, Plus, Goal } from "lucide-react"
+import { Loader2, Activity, Calendar, FileText, AlertTriangle, Target, Trophy, Clock, Flame, CreditCard, ShieldAlert, CheckCircle, MapPin, CheckCircle2, XCircle, History, Plus, Goal, Zap } from "lucide-react"
 import { differenceInDays, parseISO } from "date-fns"
 import Subscriptions from "@/components/features/treasury/Subscriptions"
 import { AddPlayerRequestModal } from "@/components/features/family/AddPlayerRequestModal"
@@ -42,6 +42,8 @@ export default function PlayerDashboardPage() {
   
   const [nextMatch, setNextMatch] = useState<any>(null)
   const [nextMatchCallup, setNextMatchCallup] = useState<any>(null)
+  const [nextEvent, setNextEvent] = useState<any>(null)
+  const [nextEventAttendance, setNextEventAttendance] = useState<any>(null)
   const [matchHistory, setMatchHistory] = useState<any[]>([])
   const [acwrData, setAcwrData] = useState<{ acute: number, chronic: number, acwr: number } | null>(null);
   
@@ -195,7 +197,30 @@ export default function PlayerDashboardPage() {
             setNextMatchCallup(callupData)
           }
 
-          // Match History
+          // Fetch Next Team Event (training, meeting, etc.)
+          const todayStr = new Date().toISOString().split('T')[0]
+          const { data: nextEvData } = await supabase
+            .from("team_events")
+            .select('id, title, date, start_time, event_type, location')
+            .eq("team_id", playerData.team_id)
+            .gte("date", todayStr)
+            .order("date", { ascending: true })
+            .limit(1)
+            .maybeSingle()
+
+          if (nextEvData) {
+            setNextEvent(nextEvData)
+            // Check if player already has attendance for this event
+            const { data: attData } = await supabase
+              .from("attendance")
+              .select('status')
+              .eq("session_id", nextEvData.id)
+              .eq("player_id", playerId)
+              .maybeSingle()
+            setNextEventAttendance(attData)
+          }
+
+
           const { data: historyData, error: historyError } = await supabase
             .from("convocatorias")
             .select('titular, minutos_jugados, goles, asistencias, tarjetas_amarillas, tarjetas_rojas, asistencia_confirmada_familia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado)')
@@ -438,100 +463,199 @@ export default function PlayerDashboardPage() {
       )}
 
 
-      {/* WIDGET: PRÓXIMO PARTIDO */}
-      {nextMatch && (
-        <div 
-          onClick={() => router.push(`/dashboard/family/e/${playerId}/partidos/${nextMatch.id}`)}
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6 hover:shadow-md transition-shadow cursor-pointer"
-        >
-          <div className="bg-gradient-to-r from-blue-700 to-blue-900 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-white font-bold text-xl flex items-center gap-2">
-                <Calendar className="text-blue-200" />
-                Próximo Partido
-              </h2>
-              <p className="text-blue-100 text-sm mt-1">
-                {new Date(nextMatch.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-              </p>
+      {/* WIDGETS DESTACADOS: PRÓXIMO PARTIDO Y PRÓXIMO EVENTO (CALENDARIO) */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* WIDGET: PRÓXIMO PARTIDO */}
+        {nextMatch && (
+          <div 
+            onClick={() => router.push(`/dashboard/family/e/${playerId}/partidos/${nextMatch.id}`)}
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+          >
+            <div className="bg-gradient-to-r from-blue-700 to-blue-900 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-white font-bold text-xl flex items-center gap-2">
+                  <Calendar className="text-blue-200" />
+                  Próximo Partido
+                </h2>
+                <p className="text-blue-100 text-sm mt-1">
+                  {new Date(nextMatch.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
+                <p className="text-white font-bold text-lg">{player.teams?.name} vs {nextMatch.rival_nombre}</p>
+                <p className="text-blue-200 text-sm flex items-center gap-1 mt-0.5">
+                  <MapPin size={14} /> {nextMatch.lugar === 'Local' ? 'En casa' : 'Fuera de casa'}
+                </p>
+              </div>
             </div>
-            <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
-              <p className="text-white font-bold text-lg">{player.teams?.name} vs {nextMatch.rival_nombre}</p>
-              <p className="text-blue-200 text-sm flex items-center gap-1 mt-0.5">
-                <MapPin size={14} /> {nextMatch.lugar === 'Local' ? 'En casa' : 'Fuera de casa'}
-              </p>
-            </div>
-          </div>
-          <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              {nextMatchCallup ? (
-                <>
-                  <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-                    <CheckCircle2 size={24} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-green-700 text-lg">¡Estás convocado!</p>
-                    <p className="text-sm text-gray-500">El entrenador cuenta contigo para este partido.</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center">
-                    <Clock size={24} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-700 text-lg">Convocatoria pendiente</p>
-                    <p className="text-sm text-gray-500">El entrenador aún no ha publicado la lista o no estás convocado.</p>
-                  </div>
-                </>
+            <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {nextMatchCallup ? (
+                  <>
+                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-green-700 text-lg">¡Estás convocado!</p>
+                      <p className="text-sm text-gray-500">El entrenador cuenta contigo para este partido.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center">
+                      <Clock size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-700 text-lg">Convocatoria pendiente</p>
+                      <p className="text-sm text-gray-500">El entrenador aún no ha publicado la lista o no estás convocado.</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              {nextMatchCallup && (
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (nextMatchCallup.asistencia_confirmada_familia === true) return;
+                      const res = await fetch(`/api/matches/${nextMatch.id}/attendance`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playerId, status: true })
+                      });
+                      if (res.ok) window.location.reload();
+                    }}
+                    className={`flex-1 sm:flex-none font-bold py-2.5 px-5 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                      ${nextMatchCallup.asistencia_confirmada_familia === true 
+                        ? 'bg-emerald-600 text-white cursor-default' 
+                        : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+                      }`}
+                  >
+                    {nextMatchCallup.asistencia_confirmada_familia === true && <CheckCircle2 className="w-4 h-4" />}
+                    Sí, asistiré
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (nextMatchCallup.asistencia_confirmada_familia === false) return;
+                      const res = await fetch(`/api/matches/${nextMatch.id}/attendance`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playerId, status: false })
+                      });
+                      if (res.ok) window.location.reload();
+                    }}
+                    className={`flex-1 sm:flex-none font-bold py-2.5 px-5 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                      ${nextMatchCallup.asistencia_confirmada_familia === false
+                        ? 'bg-rose-600 text-white cursor-default'
+                        : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+                      }`}
+                  >
+                    {nextMatchCallup.asistencia_confirmada_familia === false && <span className="text-sm leading-none">❌</span>}
+                    No podré
+                  </button>
+                </div>
               )}
             </div>
-            {nextMatchCallup && (
-              <div className="flex flex-col sm:flex-row items-center gap-2 w-full mt-4">
-                <button 
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (nextMatchCallup.asistencia_confirmada_familia === true) return;
-                    const res = await fetch(`/api/matches/${nextMatch.id}/attendance`, {
+          </div>
+        )}
+
+        {/* WIDGET: PRÓXIMO EVENTO DEL CALENDARIO (Entrenamiento / Reunión / Actividad) */}
+        {nextEvent && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            <div className="bg-gradient-to-r from-teal-700 to-emerald-900 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-white font-bold text-xl flex items-center gap-2">
+                  <Calendar className="text-teal-200" />
+                  Próximo Evento: {nextEvent.event_type || 'Evento'}
+                </h2>
+                <p className="text-teal-100 text-sm mt-1">
+                  {new Date(nextEvent.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} {nextEvent.start_time ? `• ${nextEvent.start_time} hs` : ''}
+                </p>
+              </div>
+              <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
+                <p className="text-white font-bold text-lg">{nextEvent.title}</p>
+                {nextEvent.location && (
+                  <p className="text-teal-200 text-sm flex items-center gap-1 mt-0.5">
+                    <MapPin size={14} /> {nextEvent.location}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {nextEventAttendance?.status === 'Presente' || nextEventAttendance?.status === 'Asistirá' ? (
+                  <>
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-emerald-700 text-lg">Asistencia Confirmada</p>
+                      <p className="text-sm text-gray-500">Has confirmado asistencia a este evento.</p>
+                    </div>
+                  </>
+                ) : nextEventAttendance?.status === 'Ausente' || nextEventAttendance?.status === 'No Asistirá' ? (
+                  <>
+                    <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center">
+                      <span className="text-xl">❌</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-rose-700 text-lg">No Asistiré</p>
+                      <p className="text-sm text-gray-500">Has notificado que no podrás acudir.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+                      <Clock size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-amber-700 text-lg">Asistencia Pendiente</p>
+                      <p className="text-sm text-gray-500">Por favor, confirma tu asistencia para el cuerpo técnico.</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`/api/events/${nextEvent.id}/attendance`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ playerId, status: true })
+                      body: JSON.stringify({ playerId, status: 'Presente' })
                     });
                     if (res.ok) window.location.reload();
                   }}
-                  className={`flex-1 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2
-                    ${nextMatchCallup.asistencia_confirmada_familia === true 
-                      ? 'bg-emerald-600 text-white cursor-default' 
+                  className={`flex-1 sm:flex-none font-bold py-2.5 px-5 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2 ${
+                    nextEventAttendance?.status === 'Presente' || nextEventAttendance?.status === 'Asistirá'
+                      ? 'bg-emerald-600 text-white cursor-default'
                       : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
-                    }`}
+                  }`}
                 >
-                  {nextMatchCallup.asistencia_confirmada_familia === true && <CheckCircle2 className="w-4 h-4" />}
                   Sí, asistiré
                 </button>
-                <button 
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (nextMatchCallup.asistencia_confirmada_familia === false) return;
-                    const res = await fetch(`/api/matches/${nextMatch.id}/attendance`, {
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`/api/events/${nextEvent.id}/attendance`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ playerId, status: false })
+                      body: JSON.stringify({ playerId, status: 'Ausente' })
                     });
                     if (res.ok) window.location.reload();
                   }}
-                  className={`flex-1 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2
-                    ${nextMatchCallup.asistencia_confirmada_familia === false
+                  className={`flex-1 sm:flex-none font-bold py-2.5 px-5 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2 ${
+                    nextEventAttendance?.status === 'Ausente' || nextEventAttendance?.status === 'No Asistirá'
                       ? 'bg-rose-600 text-white cursor-default'
                       : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
-                    }`}
+                  }`}
                 >
-                  {nextMatchCallup.asistencia_confirmada_familia === false && <span className="text-sm leading-none">❌</span>}
                   No podré
                 </button>
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* WIDGETS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

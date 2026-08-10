@@ -4,8 +4,8 @@ import React, { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { MatchdayCard } from "./MatchdayCard"
 import { LiveMatchPanel } from "./LiveMatchPanel"
-import { getPublicMatches } from "@/app/actions/match-actions"
-import { CalendarDays, X, ChevronLeft, ChevronRight, Settings } from "lucide-react"
+import { getPublicMatches, deleteMatchAction } from "@/app/actions/match-actions"
+import { CalendarDays, X, ChevronLeft, ChevronRight, Settings, Trash2 } from "lucide-react"
 import { LiveAdManager } from "@/components/features/admin/LiveAdManager"
 import toast from "react-hot-toast"
 
@@ -27,6 +27,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
   }, [matches])
 
   const [selectedLiveMatchId, setSelectedLiveMatchId] = useState<string | null>(null)
+  const [isClosedByUser, setIsClosedByUser] = useState<boolean>(false)
   const [isMounted, setIsMounted] = useState(false)
   const [showAdManager, setShowAdManager] = useState(false)
 
@@ -42,7 +43,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     const windowEnd = now + h72
 
     const inWindow = matches.filter(m => {
-      if (m.estado !== 'Finalizado' && (m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)) return true;
+      if (m.estado !== 'Finalizado' && (m.estado === 'Descanso' || m.estado === 'En Curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)) return true;
       const t = new Date(m.fecha_hora).getTime()
       return t >= windowStart && t <= windowEnd
     })
@@ -72,9 +73,12 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
             const idx = next.findIndex(m => m.id === liveMatch.id);
             if (idx >= 0) {
               const current = next[idx];
-              if (current.estado !== liveMatch.estado || 
+              if (current.estado !== liveMatch.estado ||
                   current.live_timer_started_at !== liveMatch.live_timer_started_at ||
-                  current.live_timer_elapsed_seconds !== liveMatch.live_timer_elapsed_seconds) {
+                  current.live_timer_elapsed_seconds !== liveMatch.live_timer_elapsed_seconds ||
+                  current.resultado_propio !== liveMatch.resultado_propio ||
+                  current.resultado_rival !== liveMatch.resultado_rival ||
+                  current.first_half_duration_seconds !== liveMatch.first_half_duration_seconds) {
                 next[idx] = { ...current, ...liveMatch };
                 hasChanges = true;
               }
@@ -163,8 +167,9 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                 message = `¡Penalti a favor de ${cleanName}! Falta ${actionSuffix}`;
               }
               icon = '🎯';
-            } else if (evt === 'Ocasión Peligrosa') {
-              message = `¡Ocasión peligrosa ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
+            } else if (evt === 'Ocasión Peligrosa' || evt === 'Ocasión') {
+              const descText = newEvent.notas ? `${newEvent.notas}` : `¡Ocasión peligrosa ${actionSuffix}!`;
+              message = `${descText} (${cleanName} vs ${match.rival_nombre})`;
               icon = '⚠️';
             } else if (evt === 'Palo / Larguero' || evt === 'Palo' || evt === 'Larguero' || evt === 'Tiro al larguero' || evt === 'Tiro al palo') {
               message = `¡Tiro al palo ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
@@ -172,8 +177,11 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
             } else if (evt === 'Parada') {
               message = `¡Parada ${actionSuffix}! ${cleanName} vs ${match.rival_nombre}`;
               icon = '🧤';
+            } else if (evt === 'Comentario del Entrenador' || evt === 'Comentario') {
+              message = newEvent.notas ? `${newEvent.notas} (${cleanName})` : `Comentario del partido (${cleanName})`;
+              icon = '💬';
             } else {
-              message = `${evt} ${actionSuffix}: ${cleanName} vs ${match.rival_nombre}`;
+              message = newEvent.notas ? `${newEvent.notas} (${cleanName})` : `${evt} ${actionSuffix}: ${cleanName} vs ${match.rival_nombre}`;
               icon = '🔔';
             }
 
@@ -203,11 +211,11 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     }
   }, [teams, supabase])
 
-  // Deselect if the match finishes or is no longer in live array
+  // Deselect only if selected match no longer exists in matches
   useEffect(() => {
     if (selectedLiveMatchId) {
-      const isStillLive = matches.find(m => m.id === selectedLiveMatchId && m.estado !== 'Finalizado' && (m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0));
-      if (!isStillLive) setSelectedLiveMatchId(null);
+      const exists = matches.some(m => m.id === selectedLiveMatchId);
+      if (!exists) setSelectedLiveMatchId(null);
     }
   }, [matches, selectedLiveMatchId])
 
@@ -226,8 +234,10 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
   }
 
   // Separate live
-  const live = jornada.filter(m => m.estado !== 'Finalizado' && (m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0))
-  const selectedMatch = selectedLiveMatchId ? live.find(m => m.id === selectedLiveMatchId) : null;
+  const live = jornada.filter(m => m.estado !== 'Finalizado' && (m.estado === 'Descanso' || m.estado === 'En Curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0))
+  const selectedMatch = isClosedByUser 
+    ? (selectedLiveMatchId ? matches.find(m => m.id === selectedLiveMatchId) : null)
+    : ((selectedLiveMatchId ? matches.find(m => m.id === selectedLiveMatchId) : null) || (live.length > 0 ? live[0] : null));
 
   // Group by date
   const groupedByDate: Record<string, any[]> = {};
@@ -296,7 +306,10 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                 )
               })}
               <button 
-                onClick={() => setSelectedLiveMatchId(null)}
+                onClick={() => {
+                  setSelectedLiveMatchId(null);
+                  setIsClosedByUser(true);
+                }}
                 className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-all flex items-center gap-1"
                 title="Cerrar vista detallada"
               >
@@ -327,18 +340,45 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                 {/* Lista de Partidos (1 columna) */}
                 <div className="flex flex-col">
                   {dayMatches.map((match, idx) => {
-                    const isLiveNow = match.estado !== 'Finalizado' && (match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
+                    const isLiveNow = match.estado !== 'Finalizado' && (match.estado === 'Descanso' || match.estado === 'En Curso' || match.live_timer_started_at !== null || match.live_timer_elapsed_seconds > 0);
                     
                     const slotAd = (ads && ads.length > 0) ? ads[globalMatchCount % ads.length] : null;
                     globalMatchCount++;
 
                     return (
-                      <div key={match.id}>
+                      <div key={match.id ? `${match.id}-${idx}` : idx} className="relative group">
                         <MatchdayCard 
                           match={match} 
-                          onClick={isLiveNow ? (id) => setSelectedLiveMatchId(id) : undefined} 
+                          onClick={(id) => {
+                            setIsClosedByUser(false);
+                            setSelectedLiveMatchId(id);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }} 
                           clubLogoUrl={clubLogoUrl}
                         />
+
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`¿Estás seguro de eliminar el partido de ${match.equipo?.name || 'Sporting'} vs ${match.rival_nombre}?`)) {
+                                try {
+                                  await deleteMatchAction(match.id, match.equipo_id);
+                                  setMatches(prev => prev.filter(m => m.id !== match.id));
+                                  toast.success("Partido eliminado correctamente");
+                                } catch (err: any) {
+                                  toast.error("Error al eliminar el partido: " + err.message);
+                                }
+                              }
+                            }}
+                            className="absolute top-3 right-3 p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 shadow-sm opacity-0 group-hover:opacity-100 transition-all z-20 flex items-center gap-1 text-[10px] font-bold"
+                            title="Eliminar partido de la vista en vivo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Eliminar</span>
+                          </button>
+                        )}
                         
                         {/* Banner de Publicidad intercalado */}
                         {slotAd && slotAd.isActive && (

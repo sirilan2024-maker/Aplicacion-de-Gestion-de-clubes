@@ -14,8 +14,10 @@ import { StatsTab } from "@/components/features/matches/match-details/StatsTab"
 import { LiveTab } from "@/components/features/matches/match-details/LiveTab"
 import { ConvocatoriaList } from "@/components/features/matches/ConvocatoriaList"
 import { PostMatchTab } from "@/components/features/matches/match-details/PostMatchTab"
+import { MatchActaTab } from "@/components/features/matches/match-details/MatchActaTab"
 
 export function PremiumMatchManager({ match, players, convocatorias, matchEvents, allMatches }: {
+
   match: any
   players: any[]
   convocatorias: any[]
@@ -35,15 +37,16 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
   });
 
   // Calculate live goals from matchEvents
-  const localGoalsList = matchEvents.filter(e => e.tipo === 'Gol' && e.player_id);
+  const localGoalsList = matchEvents.filter(e => (e.tipo === 'Gol' || e.tipo_evento === 'Gol') && e.player_id);
+  const awayGoalsList = matchEvents.filter(e => (e.tipo === 'Gol' || e.tipo_evento === 'Gol') && !e.player_id);
   const localGoalsCount = localGoalsList.length;
-  const awayGoalsCount = matchEvents.filter(e => e.tipo === 'Gol' && !e.player_id).length;
+  const awayGoalsCount = awayGoalsList.length;
   
   const [localGoals, setLocalGoals] = useState<number>(match.resultado_propio ?? localGoalsCount)
   const [awayGoals, setAwayGoals] = useState<number>(match.resultado_rival ?? awayGoalsCount)
   const [goalsList, setGoalsList] = useState({
     local: localGoalsList.map(e => `${e.player?.first_name || 'Jugador'} (${e.minuto}')`).join(', '),
-    away: "Rival (N/A)"
+    away: awayGoalsList.map(e => `Rival (${e.minuto}')`).join(', ')
   })
 
   const handleLiveEventChange = (local: number, away: number, list: { local: string; away: string }) => {
@@ -101,8 +104,14 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
 
           {/* TAB: EN DIRECTO */}
           {activeTab === "live" && (
-            <LiveTab matchId={matchId} match={match} players={activePlayers} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
+            <LiveTab matchId={matchId} match={match} players={activePlayers} convocatorias={convocatorias} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
           )}
+
+          {/* TAB: ACTA OFICIAL */}
+          {activeTab === "acta" && (
+            <MatchActaTab matchId={matchId} match={match} players={activePlayers} convocatorias={convocatorias} />
+          )}
+
 
           {/* TAB: CONVOCATORIA */}
           {activeTab === "convocatoria" && (
@@ -114,7 +123,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
           {/* TAB: POST-PARTIDO */}
           {activeTab === "post-partido" && (
             <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm font-medium">Cargando informe...</div>}>
-              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={convocatorias} />
+              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={convocatorias} allMatches={allMatches} />
             </Suspense>
           )}
 

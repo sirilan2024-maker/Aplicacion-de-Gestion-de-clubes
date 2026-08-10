@@ -44,6 +44,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .select("*, player:players(id, first_name, last_name, dorsal)")
     .eq("partido_id", matchId)
     .order("minuto", { ascending: true })
+    .order("created_at", { ascending: true })
 
   const { data: equipoCoach } = await supabase
     .from('teams')
@@ -61,12 +62,29 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
       globalTeamIds = [...new Set([...globalTeamIds, ...globalTeams.map(t => t.id)])]
     }
   }
+  
+  if (oldTeamId && !globalTeamIds.includes(oldTeamId)) {
+    globalTeamIds.push(oldTeamId);
+  }
+  if (matchData?.equipo_id && !globalTeamIds.includes(matchData.equipo_id)) {
+    globalTeamIds.push(matchData.equipo_id);
+  }
 
-  const { data: allMatchesData } = await supabase
+  let { data: allMatchesData, error: matchesError } = await supabase
     .from("partidos")
     .select("id, competicion_nombre, fecha_hora, rival_nombre, resultado_propio, resultado_rival, estado")
     .in("equipo_id", globalTeamIds)
     .order("fecha_hora", { ascending: true })
+
+  if (matchesError || !allMatchesData || allMatchesData.length === 0) {
+    const { data: fallbackMatches } = await supabase
+      .from("partidos")
+      .select("id, competicion_nombre, fecha_hora, rival_nombre, resultado_propio, resultado_rival, estado")
+      .eq("equipo_id", matchData?.equipo_id || teamId)
+      .order("fecha_hora", { ascending: true })
+    
+    allMatchesData = fallbackMatches || [];
+  }
 
   const { data: userData } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData?.user?.id).single()

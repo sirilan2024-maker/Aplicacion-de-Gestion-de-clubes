@@ -2,16 +2,20 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { Trophy, Calendar, MapPin, Plus, ChevronRight, Search, Edit2, X, Save } from "lucide-react"
+import { Trophy, Calendar, MapPin, Plus, ChevronRight, Search, Edit2, X, Save, Table } from "lucide-react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { updateMatchDetails } from "@/app/actions/match-actions"
+import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
 
 export default function AdminPartidosPage() {
   const [matches, setMatches] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion'>('partidos')
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [editingMatch, setEditingMatch] = useState<any | null>(null)
@@ -33,6 +37,14 @@ export default function AdminPartidosPage() {
         return
       }
 
+      // Obtener equipos del club
+      const { data: teamsData } = await supabase
+        .from('teams')
+        .select('id, name, ffcv_url')
+        .eq('club_id', profile.club_id)
+      
+      if (teamsData) setTeams(teamsData)
+
       // Obtener temporada activa
       const { data: activeSeason } = await supabase
         .from('seasons')
@@ -46,7 +58,7 @@ export default function AdminPartidosPage() {
         .from("partidos")
         .select(`
           *,
-          equipo:teams(id, name, color)
+          equipo:teams(id, name, color, ffcv_url)
         `)
         .eq("club_id", profile.club_id)
         
@@ -62,10 +74,14 @@ export default function AdminPartidosPage() {
     fetchPartidos()
   }, [])
 
-  const filteredMatches = matches.filter(m => 
-    m.rival_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.equipo?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredMatches = matches.filter(m => {
+    const matchesSearch = m.rival_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.equipo?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesTeam = selectedTeamId === 'all' || m.equipo_id === selectedTeamId
+    return matchesSearch && matchesTeam
+  })
+
+  const selectedTeam = teams.find(t => t.id === selectedTeamId) || teams[0]
 
   const enDirecto = filteredMatches.filter(m => m.estado === 'En Curso' || m.estado === 'Descanso')
   const programados = filteredMatches.filter(m => m.estado === 'Programado')
@@ -181,7 +197,7 @@ export default function AdminPartidosPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">Visión Global de Partidos</h1>
             <p className="mt-2 text-sm text-gray-500">
-              Supervisa el calendario y resultados de todos los equipos del club.
+              Supervisa el calendario, resultados y clasificaciones de todos los equipos del club.
             </p>
           </div>
         </div>
@@ -193,18 +209,67 @@ export default function AdminPartidosPage() {
         </Link>
       </div>
 
-      {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input 
-            placeholder="Filtrar por equipo o rival..." 
-            className="pl-10 bg-white" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* Tabs Selector: Partidos vs Clasificación */}
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('partidos')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
+              viewMode === 'partidos'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            Partidos
+          </button>
+          <button
+            onClick={() => setViewMode('clasificacion')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
+              viewMode === 'clasificacion'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Trophy className="w-4 h-4" />
+            Clasificación
+          </button>
+        </div>
+
+        {/* Filtro por Equipo */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">Equipo:</span>
+          <select
+            value={selectedTeamId}
+            onChange={(e) => setSelectedTeamId(e.target.value)}
+            className="bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="all">Todos los Equipos</option>
+            {teams.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
         </div>
       </div>
+
+      {viewMode === 'clasificacion' ? (
+        <div className="pt-2">
+          <FFCVStandings ffcvUrl={selectedTeam?.ffcv_url} teamName={selectedTeam?.name || "CADETE A"} />
+        </div>
+      ) : (
+        <>
+          {/* Filters & Search */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input 
+                placeholder="Filtrar por equipo o rival..." 
+                className="pl-10 bg-white" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -268,6 +333,8 @@ export default function AdminPartidosPage() {
             </section>
           )}
         </div>
+      )}
+        </>
       )}
 
       {/* MODAL DE EDICIÓN RÁPIDA DE RESULTADOS */}

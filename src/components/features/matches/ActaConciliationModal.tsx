@@ -288,7 +288,7 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                   style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top center" }}
                 >
                   <iframe
-                    src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(signedUrl)}`}
+                    src={`${signedUrl}#toolbar=0&navpanes=0`}
                     className="w-full h-full min-h-[500px] border-0 rounded-lg bg-white shadow-xl"
                     title="Visor Acta Oficial"
                   />

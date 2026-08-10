@@ -675,7 +675,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                     </div>
                   ) : activeSignedUrl ? (
                     <iframe
-                      src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(activeSignedUrl)}`}
+                      src={`${activeSignedUrl}#toolbar=0&navpanes=0`}
                       className="w-full h-full min-h-[450px] md:min-h-[550px] border-0 bg-white rounded-lg shadow-inner"
                       title="Visor de Acta Oficial PDF"
                     />
@@ -728,7 +728,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
           {/* Visor PDF 100% Pantalla */}
           <div className="flex-1 w-full bg-slate-950 relative">
             <iframe
-              src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(activeSignedUrl)}`}
+              src={`${activeSignedUrl}#toolbar=1`}
               className="w-full h-full border-0 bg-white"
               title="Acta Oficial Pantalla Completa"
             />

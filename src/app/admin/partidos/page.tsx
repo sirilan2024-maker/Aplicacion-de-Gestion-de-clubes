@@ -10,12 +10,13 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { updateMatchDetails } from "@/app/actions/match-actions"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
+import { MatchdayView } from "@/components/features/matches/MatchdayView"
 
 export default function AdminPartidosPage() {
   const [matches, setMatches] = useState<any[]>([])
   const [teams, setTeams] = useState<any[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion'>('partidos')
+  const [viewMode, setViewMode] = useState<'partidos' | 'calendario' | 'clasificacion'>('partidos')
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [editingMatch, setEditingMatch] = useState<any | null>(null)
@@ -209,7 +210,7 @@ export default function AdminPartidosPage() {
         </Link>
       </div>
 
-      {/* Tabs Selector: Partidos vs Clasificación */}
+      {/* Tabs Selector: Partidos vs Calendario vs Clasificación */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
         <div className="flex gap-2">
           <button
@@ -224,6 +225,17 @@ export default function AdminPartidosPage() {
             Partidos
           </button>
           <button
+            onClick={() => setViewMode('calendario')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
+              viewMode === 'calendario'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-emerald-500" />
+            Calendario por Jornadas
+          </button>
+          <button
             onClick={() => setViewMode('clasificacion')}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
               viewMode === 'clasificacion'
@@ -231,7 +243,7 @@ export default function AdminPartidosPage() {
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            <Trophy className="w-4 h-4" />
+            <Trophy className="w-4 h-4 text-amber-400" />
             Clasificación
           </button>
         </div>
@@ -252,7 +264,15 @@ export default function AdminPartidosPage() {
         </div>
       </div>
 
-      {viewMode === 'clasificacion' ? (
+      {viewMode === 'calendario' ? (
+        <div className="pt-2">
+          <MatchdayView
+            initialMatches={filteredMatches}
+            teams={teams}
+            isAdmin={true}
+          />
+        </div>
+      ) : viewMode === 'clasificacion' ? (
         <div className="pt-2">
           <FFCVStandings ffcvUrl={selectedTeam?.ffcv_url} teamName={selectedTeam?.name || "CADETE A"} />
         </div>

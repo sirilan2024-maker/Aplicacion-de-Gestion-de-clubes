@@ -108,30 +108,65 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         perf = data || []
       }
 
-      // 6. Fetch Match Data (Convocatorias from finished matches)
+      // 6. Fetch Match Data (From partidos, convocatorias and match_events)
       let matchStats: any[] = []
       if (teamIds.length > 0) {
-        const { data: matchData } = await supabase
-          .from('convocatorias')
-          .select(`
-            player_id, 
-            goals, 
-            yellow_cards, 
-            red_cards, 
-            minutes_played,
-            partidos!inner(estado, equipo_id)
-          `)
-          .in('partidos.equipo_id', teamIds)
-          .eq('partidos.estado', 'Finalizado');
+        const { data: teamMatches } = await supabase
+          .from('partidos')
+          .select('id, equipo_id')
+          .in('equipo_id', teamIds)
+          .eq('estado', 'Finalizado');
+
+        const matchIds = (teamMatches || []).map(m => m.id);
         
-        if (matchData) {
-          matchStats = matchData.map((d: any) => ({
-            player_id: d.player_id,
-            goals: d.goals || 0,
-            yellow_cards: d.yellow_cards || 0,
-            red_cards: d.red_cards || 0,
-            minutes_played: d.minutes_played || 0,
-            team_id: d.partidos.equipo_id
+        if (matchIds.length > 0) {
+          const { data: convocatoriasData } = await supabase
+            .from('convocatorias')
+            .select('player_id, goals, yellow_cards, red_cards, minutes_played, partido_id')
+            .in('partido_id', matchIds);
+
+          const { data: eventsData } = await supabase
+            .from('match_events')
+            .select('player_id, tipo_evento, partido_id')
+            .in('partido_id', matchIds)
+            .not('player_id', 'is', null);
+
+          // Map match ID to team ID
+          const matchTeamMap = new Map();
+          teamMatches?.forEach(m => matchTeamMap.set(m.id, m.equipo_id));
+
+          // Aggregate from match_events and convocatorias
+          const playerStatsAgg = new Map<string, { goals: number; yellow_cards: number; red_cards: number; minutes_played: number; team_id: string; matches_count: number }>();
+
+          // Process convocatorias
+          convocatoriasData?.forEach((c: any) => {
+            const team_id = matchTeamMap.get(c.partido_id);
+            const cur = playerStatsAgg.get(c.player_id) || { goals: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, team_id, matches_count: 0 };
+            cur.goals += (c.goals || 0);
+            cur.yellow_cards += (c.yellow_cards || 0);
+            cur.red_cards += (c.red_cards || 0);
+            cur.minutes_played += (c.minutes_played || 0);
+            cur.matches_count += 1;
+            playerStatsAgg.set(c.player_id, cur);
+          });
+
+          // Also aggregate direct match_events if convocatorias were missing
+          eventsData?.forEach((e: any) => {
+            const team_id = matchTeamMap.get(e.partido_id);
+            const cur = playerStatsAgg.get(e.player_id) || { goals: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, team_id, matches_count: 1 };
+            if (e.tipo_evento === 'Gol' || e.tipo_evento === 'Penalti') cur.goals += 1;
+            else if (e.tipo_evento === 'Tarjeta Amarilla') cur.yellow_cards += 1;
+            else if (e.tipo_evento === 'Tarjeta Roja') cur.red_cards += 1;
+            playerStatsAgg.set(e.player_id, cur);
+          });
+
+          matchStats = Array.from(playerStatsAgg.entries()).map(([player_id, s]) => ({
+            player_id,
+            goals: s.goals,
+            yellow_cards: s.yellow_cards,
+            red_cards: s.red_cards,
+            minutes_played: s.minutes_played,
+            team_id: s.team_id
           }));
         }
       }

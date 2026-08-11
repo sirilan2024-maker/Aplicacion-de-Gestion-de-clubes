@@ -135,30 +135,47 @@ function extractAllDatesFromText(text: string): Date[] {
 
 function extractCategoryFromText(text: string): string | null {
   const upperText = text.toUpperCase();
-  
-  const categories = [
-    "SPORTING SALADAR A", "SPORTING SALADAR B",
-    "CADETE A", "CADETE B",
-    "INFANTIL A", "INFANTIL B", "INFANTIL C",
-    "JUVENIL A", "JUVENIL B",
-    "SENIOR"
-  ];
 
-  for (const cat of categories) {
-    if (upperText.includes(cat)) {
-      return cat;
-    }
+  // 1. Extraer la sección de Clubes del acta FFCV (primeros 500 caracteres)
+  const clubesIdx = upperText.indexOf("CLUBES:");
+  const headerChunk = clubesIdx !== -1 ? upperText.substring(clubesIdx, clubesIdx + 400) : upperText.substring(0, 500);
+
+  // Coincidencias exactas de nombre del equipo en la cabecera
+  if (headerChunk.includes("SPORTING SALADAR \"A\"") || headerChunk.includes("SPORTING SALADAR A")) {
+    if (headerChunk.includes("CADETE")) return "CADETE A";
+    if (headerChunk.includes("JUVENIL")) return "JUVENIL A";
+    if (headerChunk.includes("INFANTIL")) return "INFANTIL A";
   }
 
-  // Fallbacks flexibles
-  if (upperText.includes("CADETE") && upperText.includes("A")) return "CADETE A";
-  if (upperText.includes("CADETE") && upperText.includes("B")) return "CADETE B";
-  if (upperText.includes("JUVENIL") && upperText.includes("A")) return "JUVENIL A";
-  if (upperText.includes("JUVENIL") && upperText.includes("B")) return "JUVENIL B";
-  if (upperText.includes("INFANTIL") && upperText.includes("A")) return "INFANTIL A";
-  if (upperText.includes("INFANTIL") && upperText.includes("B")) return "INFANTIL B";
-  if (upperText.includes("INFANTIL") && upperText.includes("C")) return "INFANTIL C";
-  if (upperText.includes("SENIOR")) return "SENIOR";
+  if (headerChunk.includes("SPORTING SALADAR \"B\"") || headerChunk.includes("SPORTING SALADAR B")) {
+    if (headerChunk.includes("CADETE")) return "CADETE B";
+    if (headerChunk.includes("JUVENIL")) return "JUVENIL B";
+    if (headerChunk.includes("INFANTIL")) return "INFANTIL B";
+  }
+
+  if (headerChunk.includes("SPORTING SALADAR \"C\"") || headerChunk.includes("SPORTING SALADAR C")) {
+    if (headerChunk.includes("INFANTIL")) return "INFANTIL C";
+  }
+
+  // 2. Coincidencias por categoría general en cabecera
+  if (headerChunk.includes("CADETE A") || headerChunk.includes("CADETE \"A\"")) return "CADETE A";
+  if (headerChunk.includes("CADETE B") || headerChunk.includes("CADETE \"B\"")) return "CADETE B";
+  if (headerChunk.includes("JUVENIL A") || headerChunk.includes("JUVENIL \"A\"")) return "JUVENIL A";
+  if (headerChunk.includes("JUVENIL B") || headerChunk.includes("JUVENIL \"B\"")) return "JUVENIL B";
+  if (headerChunk.includes("INFANTIL A") || headerChunk.includes("INFANTIL \"A\"")) return "INFANTIL A";
+  if (headerChunk.includes("INFANTIL B") || headerChunk.includes("INFANTIL \"B\"")) return "INFANTIL B";
+  if (headerChunk.includes("INFANTIL C") || headerChunk.includes("INFANTIL \"C\"")) return "INFANTIL C";
+  if (headerChunk.includes("1ª REGIONAL") || headerChunk.includes("2ª REGIONAL") || headerChunk.includes("TERCERA FEDERACION") || headerChunk.includes("SENIOR")) return "SENIOR";
+
+  // 3. Fallbacks en texto completo con palabras delimitadas (no dentro de nombres de jugadores)
+  if (/\bCADETE\s+A\b/.test(upperText) || /\bCADETE\s+"A"\b/.test(upperText)) return "CADETE A";
+  if (/\bCADETE\s+B\b/.test(upperText) || /\bCADETE\s+"B"\b/.test(upperText)) return "CADETE B";
+  if (/\bJUVENIL\s+A\b/.test(upperText) || /\bJUVENIL\s+"A"\b/.test(upperText)) return "JUVENIL A";
+  if (/\bJUVENIL\s+B\b/.test(upperText) || /\bJUVENIL\s+"B"\b/.test(upperText)) return "JUVENIL B";
+  if (/\bINFANTIL\s+A\b/.test(upperText) || /\bINFANTIL\s+"A"\b/.test(upperText)) return "INFANTIL A";
+  if (/\bINFANTIL\s+B\b/.test(upperText) || /\bINFANTIL\s+"B"\b/.test(upperText)) return "INFANTIL B";
+  if (/\bINFANTIL\s+C\b/.test(upperText) || /\bINFANTIL\s+"C"\b/.test(upperText)) return "INFANTIL C";
+  if (/\bSENIOR\b/.test(upperText)) return "SENIOR";
 
   return null;
 }

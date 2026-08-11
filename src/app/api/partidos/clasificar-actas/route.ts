@@ -133,12 +133,30 @@ function extractAllDatesFromText(text: string): Date[] {
   return dates;
 }
 
-function extractCategoryFromText(text: string): string | null {
+function extractCategoryFromText(text: string, fileName?: string): string | null {
+  // 0. Si el nombre del archivo especifica la categoría (ej. "Acta SENIOR (7).pdf"), priorizarlo 100%
+  if (fileName) {
+    const fnUpper = fileName.toUpperCase();
+    if (fnUpper.includes("SENIOR")) return "SENIOR";
+    if (fnUpper.includes("CADETE A") || fnUpper.includes("CADETE_A")) return "CADETE A";
+    if (fnUpper.includes("CADETE B") || fnUpper.includes("CADETE_B")) return "CADETE B";
+    if (fnUpper.includes("JUVENIL A") || fnUpper.includes("JUVENIL_A")) return "JUVENIL A";
+    if (fnUpper.includes("JUVENIL B") || fnUpper.includes("JUVENIL_B")) return "JUVENIL B";
+    if (fnUpper.includes("INFANTIL A") || fnUpper.includes("INFANTIL_A")) return "INFANTIL A";
+    if (fnUpper.includes("INFANTIL B") || fnUpper.includes("INFANTIL_B")) return "INFANTIL B";
+    if (fnUpper.includes("INFANTIL C") || fnUpper.includes("INFANTIL_C")) return "INFANTIL C";
+  }
+
   const upperText = text.toUpperCase();
 
   // 1. Extraer la sección de Clubes del acta FFCV (primeros 500 caracteres)
   const clubesIdx = upperText.indexOf("CLUBES:");
   const headerChunk = clubesIdx !== -1 ? upperText.substring(clubesIdx, clubesIdx + 400) : upperText.substring(0, 500);
+
+  // Comprobar Senior en cabecera o competición
+  if (headerChunk.includes("1ª REGIONAL") || headerChunk.includes("2ª REGIONAL") || headerChunk.includes("TERCERA FEDERACION") || headerChunk.includes("SENIOR") || headerChunk.includes("SEGUNDA REGIONAL") || headerChunk.includes("PRIMERA REGIONAL")) {
+    return "SENIOR";
+  }
 
   // Coincidencias exactas de nombre del equipo en la cabecera
   if (headerChunk.includes("SPORTING SALADAR \"A\"") || headerChunk.includes("SPORTING SALADAR A")) {
@@ -157,6 +175,12 @@ function extractCategoryFromText(text: string): string | null {
     if (headerChunk.includes("INFANTIL")) return "INFANTIL C";
   }
 
+  // Si en la cabecera figura "Sporting Saladar" sin letra "A", "B", "C" y no es Cadete/Juvenil/Infantil, es SENIOR
+  if ((headerChunk.includes("SPORTING SALADAR") || headerChunk.includes("SALADAR")) &&
+      !headerChunk.includes("CADETE") && !headerChunk.includes("JUVENIL") && !headerChunk.includes("INFANTIL")) {
+    return "SENIOR";
+  }
+
   // 2. Coincidencias por categoría general en cabecera
   if (headerChunk.includes("CADETE A") || headerChunk.includes("CADETE \"A\"")) return "CADETE A";
   if (headerChunk.includes("CADETE B") || headerChunk.includes("CADETE \"B\"")) return "CADETE B";
@@ -165,9 +189,8 @@ function extractCategoryFromText(text: string): string | null {
   if (headerChunk.includes("INFANTIL A") || headerChunk.includes("INFANTIL \"A\"")) return "INFANTIL A";
   if (headerChunk.includes("INFANTIL B") || headerChunk.includes("INFANTIL \"B\"")) return "INFANTIL B";
   if (headerChunk.includes("INFANTIL C") || headerChunk.includes("INFANTIL \"C\"")) return "INFANTIL C";
-  if (headerChunk.includes("1ª REGIONAL") || headerChunk.includes("2ª REGIONAL") || headerChunk.includes("TERCERA FEDERACION") || headerChunk.includes("SENIOR")) return "SENIOR";
 
-  // 3. Fallbacks en texto completo con palabras delimitadas (no dentro de nombres de jugadores)
+  // 3. Fallbacks en texto completo con palabras delimitadas
   if (/\bCADETE\s+A\b/.test(upperText) || /\bCADETE\s+"A"\b/.test(upperText)) return "CADETE A";
   if (/\bCADETE\s+B\b/.test(upperText) || /\bCADETE\s+"B"\b/.test(upperText)) return "CADETE B";
   if (/\bJUVENIL\s+A\b/.test(upperText) || /\bJUVENIL\s+"A"\b/.test(upperText)) return "JUVENIL A";
@@ -216,7 +239,7 @@ export async function POST(req: NextRequest) {
         }
 
         const datesFound = extractAllDatesFromText(parsedText);
-        const extractedCategory = extractCategoryFromText(parsedText);
+        const extractedCategory = extractCategoryFromText(parsedText, fileName);
 
         if (!parsedText.trim()) {
           const pendingUuid = crypto.randomUUID();

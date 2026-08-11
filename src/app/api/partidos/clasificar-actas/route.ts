@@ -429,6 +429,74 @@ export async function POST(req: NextRequest) {
               });
             }
 
+            // Extraer Alineación, Suplentes y Sustituciones FFCV para cálculo de minutos exactos
+            let calculatedMinutesMap = new Map<string, { minutes: number, isTitular: boolean }>();
+            
+            try {
+              const ourTeamNameInPdf = bestMatch.lugar === 'Local' ? ffcvHeader.localTeam : ffcvHeader.awayTeam;
+              if (ourTeamNameInPdf && teamPlayers) {
+                const equipoIdx = parsedText.indexOf(ourTeamNameInPdf);
+                if (equipoIdx !== -1) {
+                  const chunk = parsedText.substring(equipoIdx, equipoIdx + 4000);
+                  const suplentesIdx = chunk.indexOf("Jugadores/as Suplentes");
+                  const titularesText = suplentesIdx !== -1 ? chunk.substring(0, suplentesIdx) : chunk;
+                  const suplentesText = suplentesIdx !== -1 ? chunk.substring(suplentesIdx, chunk.indexOf("Cuerpo Técnico") !== -1 ? chunk.indexOf("Cuerpo Técnico") : chunk.length) : '';
+
+                  const playerRegex = /(\d{1,2})\.\s*([A-ZÁÉÍÓÚÑ\s,]+?)(?=\s*\d{1,2}\.|\s*Jugadores|\s*Cuerpo|\s*$)/g;
+
+                  const titulares: any[] = [];
+                  let mMatch: RegExpExecArray | null;
+                  while ((mMatch = playerRegex.exec(titularesText)) !== null) {
+                    const name = mMatch[2].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    const matchedP = matchPlayerInList(name, teamPlayers);
+                    if (matchedP) titulares.push({ dorsal: parseInt(mMatch[1]), player: matchedP });
+                  }
+
+                  const suplentes: any[] = [];
+                  while ((mMatch = playerRegex.exec(suplentesText)) !== null) {
+                    const name = mMatch[2].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    const matchedP = matchPlayerInList(name, teamPlayers);
+                    if (matchedP) suplentes.push({ dorsal: parseInt(mMatch[1]), player: matchedP });
+                  }
+
+                  // Extraer Sustituciones
+                  const sustIdx = parsedText.indexOf("SUSTITUCIONES EFECTUADAS");
+                  const sustituciones: any[] = [];
+                  if (sustIdx !== -1) {
+                    const sustChunk = parsedText.substring(sustIdx);
+                    const subRegex = /El\s+jugador\s*\(\s*(\d{1,2})\s*\)\s*([^\n]+?)\s*min\.\s*(\d{1,3})\s*sustituye\s+a\s*\(\s*(\d{1,2})\s*\)\s*([^\n]+)/gi;
+                    let sMatch: RegExpExecArray | null;
+                    while ((sMatch = subRegex.exec(sustChunk)) !== null) {
+                      const minSub = parseInt(sMatch[3]);
+                      const pEntra = matchPlayerInList(sMatch[2].trim(), teamPlayers);
+                      const pSale = matchPlayerInList(sMatch[5].trim(), teamPlayers);
+                      sustituciones.push({ minSub, pEntra, pSale });
+                    }
+                  }
+
+                  // Calcular minutos exactos (90 mins total)
+                  const matchTotalMinutes = 90;
+                  titulares.forEach(t => {
+                    calculatedMinutesMap.set(t.player.id, { minutes: matchTotalMinutes, isTitular: true });
+                  });
+                  suplentes.forEach(s => {
+                    calculatedMinutesMap.set(s.player.id, { minutes: 0, isTitular: false });
+                  });
+
+                  sustituciones.forEach(sub => {
+                    if (sub.pSale && calculatedMinutesMap.has(sub.pSale.id)) {
+                      calculatedMinutesMap.set(sub.pSale.id, { ...calculatedMinutesMap.get(sub.pSale.id)!, minutes: sub.minSub });
+                    }
+                    if (sub.pEntra && calculatedMinutesMap.has(sub.pEntra.id)) {
+                      calculatedMinutesMap.set(sub.pEntra.id, { ...calculatedMinutesMap.get(sub.pEntra.id)!, minutes: matchTotalMinutes - sub.minSub });
+                    }
+                  });
+                }
+              }
+            } catch (minErr: any) {
+              console.warn("[clasificar-actas] Error parsing exact minutes:", minErr.message);
+            }
+
             await supabase.from('match_events').delete().eq('partido_id', bestMatch.id);
             if (matchEventsToInsert.length > 0) {
               await supabase.from('match_events').insert(matchEventsToInsert);
@@ -442,8 +510,9 @@ export async function POST(req: NextRequest) {
                 const gCount = pEvents.filter(e => e.tipo_evento === 'Gol').length;
                 const aCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Amarilla').length;
                 const rCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Roja').length;
-                const minutos = conv.status === 'convocado' || pEvents.length > 0 ? 80 : 0;
-                const esTitular = conv.status === 'convocado' || pEvents.length > 0;
+
+                const minutesInfo = calculatedMinutesMap.get(conv.player_id);
+                const minutos = minutesInfo ? minutesInfo.minutes : (conv.status === 'convocado' || pEvents.length > 0 ? 90 : 0);
 
                 await supabase.from('convocatorias').update({
                   minutes_played: minutos,

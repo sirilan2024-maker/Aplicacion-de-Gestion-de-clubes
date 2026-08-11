@@ -138,7 +138,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           // Aggregate from match_events and convocatorias
           const playerStatsAgg = new Map<string, { goals: number; yellow_cards: number; red_cards: number; minutes_played: number; team_id: string; matches_count: number }>();
 
-          // Process convocatorias
+          // Process convocatorias (contains exact goals, cards and minutes parsed from actas for our players)
           convocatoriasData?.forEach((c: any) => {
             const team_id = matchTeamMap.get(c.partido_id);
             const cur = playerStatsAgg.get(c.player_id) || { goals: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, team_id, matches_count: 0 };
@@ -148,16 +148,6 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             cur.minutes_played += (c.minutes_played || 0);
             cur.matches_count += 1;
             playerStatsAgg.set(c.player_id, cur);
-          });
-
-          // Also aggregate direct match_events if convocatorias were missing
-          eventsData?.forEach((e: any) => {
-            const team_id = matchTeamMap.get(e.partido_id);
-            const cur = playerStatsAgg.get(e.player_id) || { goals: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, team_id, matches_count: 1 };
-            if (e.tipo_evento === 'Gol' || e.tipo_evento === 'Penalti') cur.goals += 1;
-            else if (e.tipo_evento === 'Tarjeta Amarilla') cur.yellow_cards += 1;
-            else if (e.tipo_evento === 'Tarjeta Roja') cur.red_cards += 1;
-            playerStatsAgg.set(e.player_id, cur);
           });
 
           matchStats = Array.from(playerStatsAgg.entries()).map(([player_id, s]) => ({

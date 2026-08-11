@@ -14,13 +14,15 @@ export function FFCVStandings({ ffcvUrl, teamName }: FFCVStandingsProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  const isCadeteA = teamName?.toUpperCase().includes("CADETE A") || teamName?.toUpperCase().includes("CADETE \"A\"");
+  
   // Selector de jornada (por defecto '26' o la última disponible)
   const availableJornadas = Object.keys(matchdayStandings).sort((a, b) => parseInt(a) - parseInt(b))
   const [selectedJornada, setSelectedJornada] = useState<string>("26")
-  const [mode, setMode] = useState<'historical' | 'live'>('historical')
+  const [mode, setMode] = useState<'historical' | 'live'>(isCadeteA ? 'historical' : 'live')
 
   const fetchStandings = async () => {
-    if (mode === 'historical') {
+    if (mode === 'historical' && isCadeteA) {
       const historicalData = matchdayStandings[selectedJornada] || []
       setStandings(historicalData.map(item => ({
         position: item.rank,
@@ -39,6 +41,7 @@ export function FFCVStandings({ ffcvUrl, teamName }: FFCVStandingsProps) {
     }
 
     if (!ffcvUrl) {
+      setStandings([])
       setLoading(false)
       return
     }
@@ -76,26 +79,28 @@ export function FFCVStandings({ ffcvUrl, teamName }: FFCVStandingsProps) {
           </h3>
 
           {/* Selector de modo Histórico vs FFCV En Vivo */}
-          <div className="inline-flex bg-slate-200 p-0.5 rounded-lg text-xs font-semibold">
-            <button
-              onClick={() => setMode('historical')}
-              className={`px-3 py-1 rounded-md transition-all ${
-                mode === 'historical' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Por Jornadas
-            </button>
-            {ffcvUrl && (
+          {isCadeteA && (
+            <div className="inline-flex bg-slate-200 p-0.5 rounded-lg text-xs font-semibold">
               <button
-                onClick={() => setMode('live')}
+                onClick={() => setMode('historical')}
                 className={`px-3 py-1 rounded-md transition-all ${
-                  mode === 'live' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  mode === 'historical' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                En Vivo (FFCV)
+                Por Jornadas
               </button>
-            )}
-          </div>
+              {ffcvUrl && (
+                <button
+                  onClick={() => setMode('live')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    mode === 'live' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  En Vivo (FFCV)
+                </button>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Selector de Jornadas (si está en modo histórico) */}

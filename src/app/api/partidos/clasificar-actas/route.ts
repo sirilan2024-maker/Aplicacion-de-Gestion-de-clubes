@@ -237,9 +237,7 @@ export async function POST(req: NextRequest) {
 
         // Búsqueda inteligente de partido coincidente en la BD
         let bestMatch: any = null;
-        let candidateMatches: any[] = [];
 
-        // 1. Intentar hacer coincidir por equipo + fecha (ventana ±5 días) + rival en texto
         const matchingTeam = teams?.find(t => 
           extractedCategory && (
             t.name.toUpperCase().includes(extractedCategory) ||
@@ -247,6 +245,7 @@ export async function POST(req: NextRequest) {
           )
         );
 
+        const ffcvHeader = parseFFCVActaText(parsedText);
         const normalizedPdfText = (parsedText || '')
           .toLowerCase()
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -255,61 +254,64 @@ export async function POST(req: NextRequest) {
           .trim();
 
         if (allMatches && allMatches.length > 0) {
-          for (const matchDate of datesFound) {
-            const timeMs = matchDate.getTime();
-            const minMs = timeMs - 7 * 24 * 60 * 60 * 1000;
-            const maxMs = timeMs + 7 * 24 * 60 * 60 * 1000;
+          // Filtrar candidatos que pertenezcan al equipo detectado
+          const teamCandidates = allMatches.filter(m => !matchingTeam || m.equipo_id === matchingTeam.id);
 
-            const candidates = allMatches.filter((m) => {
-              const mTime = new Date(m.fecha_hora).getTime();
-              const dateMatches = mTime >= minMs && mTime <= maxMs;
-              const teamMatches = !matchingTeam || m.equipo_id === matchingTeam.id;
-              return dateMatches && teamMatches;
-            });
+          // ESTRATEGIA 1: Buscar coincidencia EXACTA del Rival en el texto del acta FFCV
+          const rivalCandidates = teamCandidates.filter(c => {
+            const normRival = (c.rival_nombre || '')
+              .toLowerCase()
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+              .replace(/[^a-z0-9]/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
 
-            if (candidates.length > 0) {
-              candidateMatches = candidates;
+            if (!normRival || normRival === 'descansa') return false;
+
+            // Extraer palabras clave del rival (ej. "COX", "PETRELENSE", "DOLORES")
+            const keywords = normRival.split(' ').filter(w => w.length > 2 && !['c.d.', 'c.f.', 'u.d.', 'a.d.'].includes(w));
+            if (keywords.length === 0) return false;
+
+            // Comprobar si al menos la palabra principal del rival está en el texto del PDF (o cabecera)
+            return keywords.some(kw => normalizedPdfText.includes(kw));
+          });
+
+          if (rivalCandidates.length === 1) {
+            // Si solo hay 1 partido contra ese rival en la BD para ese equipo, es coincidencia 100% segura
+            bestMatch = rivalCandidates[0];
+          } else if (rivalCandidates.length > 1) {
+            // Si hay varios partidos contra el mismo rival (ej. ida y vuelta o varias fechas), usar la fecha exacta o más cercana
+            if (datesFound.length > 0) {
+              const pdfTime = datesFound[0].getTime();
+              let minDiff = Infinity;
               
-              const rivalMatch = candidates.find((c) => {
-                const normRival = (c.rival_nombre || '')
-                  .toLowerCase()
-                  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                  .replace(/[^a-z0-9]/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-                
-                if (!normRival || normRival === 'descansa') return false;
-                const keywords = normRival.split(' ').filter(w => w.length > 3);
-                return keywords.some(kw => normalizedPdfText.includes(kw));
-              });
-
-              if (rivalMatch) {
-                bestMatch = rivalMatch;
-                break;
-              } else if (candidates.length === 1) {
-                bestMatch = candidates[0];
-                break;
+              for (const rc of rivalCandidates) {
+                const matchTime = new Date(rc.fecha_hora).getTime();
+                const diff = Math.abs(matchTime - pdfTime);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  bestMatch = rc;
+                }
               }
+            } else {
+              bestMatch = rivalCandidates[0];
             }
           }
 
-          // 2. Respaldo por Nombre de Rival si la búsqueda por fecha no arrojó resultados
-          if (!bestMatch) {
-            bestMatch = allMatches.find((c) => {
-              const teamMatches = !matchingTeam || c.equipo_id === matchingTeam.id;
-              if (!teamMatches) return false;
+          // ESTRATEGIA 2: Si no coincidió por rival, intentar por fecha cercana (máx 3 días de diferencia) + rival secundario
+          if (!bestMatch && datesFound.length > 0) {
+            const pdfTime = datesFound[0].getTime();
+            const minMs = pdfTime - 3 * 24 * 60 * 60 * 1000;
+            const maxMs = pdfTime + 3 * 24 * 60 * 60 * 1000;
 
-              const normRival = (c.rival_nombre || '')
-                .toLowerCase()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]/g, " ")
-                .replace(/\s+/g, " ")
-                .trim();
-              
-              if (!normRival || normRival === 'descansa') return false;
-              const keywords = normRival.split(' ').filter(w => w.length > 3);
-              return keywords.some(kw => normalizedPdfText.includes(kw));
+            const dateCandidates = teamCandidates.filter(m => {
+              const mTime = new Date(m.fecha_hora).getTime();
+              return mTime >= minMs && mTime <= maxMs;
             });
+
+            if (dateCandidates.length === 1) {
+              bestMatch = dateCandidates[0];
+            }
           }
         }
 

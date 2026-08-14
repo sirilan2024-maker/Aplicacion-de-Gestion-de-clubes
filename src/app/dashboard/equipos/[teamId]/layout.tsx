@@ -131,25 +131,31 @@ export default function TeamLayout({
             })}
           </div>
 
-          {/* TABS NAVIGATION (Mobile Dropdown) */}
+          {/* TABS NAVIGATION (Mobile Dropdown Destacado) */}
           <div className="sm:hidden px-4 pb-4 pt-2">
-            <select 
-              value={tabs.find(tab => pathname.includes(tab.href))?.href || ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  router.push(e.target.value);
-                }
-              }}
-              className="w-full bg-slate-50 border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
-              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25rem' }}
-            >
-              <option value="" disabled>Seleccionar vista...</option>
-              {tabs.map(tab => (
-                <option key={tab.name} value={tab.href}>
-                  {tab.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select 
+                value={tabs.find(tab => pathname.includes(tab.href))?.href || ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    router.push(e.target.value);
+                  }
+                }}
+                className="w-full bg-white border-2 border-blue-600 text-slate-800 font-extrabold text-xs rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer pr-10"
+              >
+                <option value="" disabled className="bg-white text-slate-400">Seleccionar vista del equipo...</option>
+                {tabs.map(tab => (
+                  <option key={tab.name} value={tab.href} className="bg-white text-slate-800 font-bold py-1">
+                    {tab.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-blue-600 font-bold">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       )}

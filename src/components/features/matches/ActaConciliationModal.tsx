@@ -22,6 +22,7 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
 
   const [saving, setSaving] = useState(false)
   const [loadingLive, setLoadingLive] = useState(false)
+  const [mobileTab, setMobileTab] = useState<'pdf' | 'stats'>('stats')
 
   // Estado del formulario de convocados
   const [statsMap, setStatsMap] = useState<Record<string, {
@@ -217,80 +218,121 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
           </button>
         </div>
 
-        {/* Modal Body: Split Screen 50/50 */}
+        {/* Mobile Tab Switcher */}
+        <div className="flex md:hidden bg-slate-800 p-1 border-b border-slate-700">
+          <button
+            onClick={() => setMobileTab('stats')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+              mobileTab === 'stats'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" /> 1. Datos y Estadísticas
+          </button>
+          <button
+            onClick={() => setMobileTab('pdf')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+              mobileTab === 'pdf'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" /> 2. Ver Acta (PDF)
+          </button>
+        </div>
+
+        {/* Modal Body: Split Screen 50/50 en PC, Pestañas en Móvil */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-200 bg-slate-100">
           
-          {/* Panel Izquierdo: Visor de PDF (50% Width) */}
-          <div className="w-full md:w-1/2 flex flex-col bg-slate-900 relative">
-            <div className="px-4 py-2 bg-slate-800/90 text-slate-300 text-xs font-bold flex items-center justify-between border-b border-slate-700">
-              <span className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-400" />
-                Acta Oficial de la Federación (PDF)
-              </span>
-              <div className="flex items-center gap-2">
+          {/* Panel Izquierdo: Visor de PDF */}
+          <div className={`w-full md:w-1/2 flex flex-col bg-slate-900 relative ${mobileTab === 'pdf' ? 'flex h-[calc(100vh-180px)] sm:h-auto' : 'hidden md:flex'}`}>
+            <div className="bg-slate-900 border-b border-slate-800 px-3 py-2 flex items-center justify-between text-slate-300 text-xs font-bold shrink-0 z-20">
+              <span className="text-slate-400 text-[11px]">Zoom: <strong className="text-blue-400">{zoomLevel}%</strong></span>
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setZoomLevel((z) => Math.max(z - 15, 60))}
-                  className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
+                  onClick={() => setZoomLevel((z) => Math.max(z - 25, 75))}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-mono text-xs shadow-xs"
                   title="Alejar"
                 >
-                  <ZoomOut className="w-4 h-4" />
+                  🔍 -
                 </button>
-                <span className="text-[11px] text-slate-400 w-10 text-center font-mono">{zoomLevel}%</span>
                 <button
-                  onClick={() => setZoomLevel((z) => Math.min(z + 15, 180))}
-                  className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
+                  onClick={() => setZoomLevel(100)}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-mono text-[10px]"
+                  title="Restablecer"
+                >
+                  100%
+                </button>
+                <button
+                  onClick={() => setZoomLevel((z) => Math.min(z + 25, 200))}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-mono text-xs shadow-xs"
                   title="Acercar"
                 >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={fetchSignedUrl}
-                  className="ml-2 flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-semibold"
-                  title="Refrescar documento firmado"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Refrescar
+                  🔍 +
                 </button>
                 {signedUrl && (
                   <a
                     href={signedUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="ml-2 flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-2.5 py-1 rounded-lg transition-colors"
-                    title="Abrir PDF en ventana nueva"
+                    className="ml-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm"
                   >
-                    Abrir PDF <ExternalLink className="w-3 h-3" />
+                    Abrir <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto flex items-center justify-center p-2 relative bg-slate-950">
+            {/* Scrollable Viewport encajado al PDF con scroll nativo táctil desbloqueado */}
+            <div 
+              className="flex-1 w-full h-full bg-white overflow-y-auto overflow-x-hidden p-0 relative hide-scrollbar"
+              style={{ 
+                touchAction: 'pan-y pan-x', 
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              <style jsx>{`
+                div::-webkit-scrollbar, iframe::-webkit-scrollbar, object::-webkit-scrollbar {
+                  display: none !important;
+                  width: 0px !important;
+                  height: 0px !important;
+                }
+              `}</style>
               {urlLoading ? (
-                <div className="flex flex-col items-center gap-3 text-slate-400">
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
                   <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
                   <p className="text-sm font-medium">Obteniendo URL firmada del acta...</p>
                 </div>
               ) : urlError ? (
-                <div className="flex flex-col items-center gap-3 p-6 text-center max-w-sm bg-slate-900 border border-slate-800 rounded-2xl">
-                  <AlertTriangle className="w-10 h-10 text-amber-500" />
-                  <h4 className="font-bold text-slate-200">Acta No Disponible</h4>
-                  <p className="text-xs text-slate-400">{urlError}</p>
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center max-w-sm mx-auto">
+                  <AlertTriangle className="w-10 h-10 text-amber-500 mb-2" />
+                  <h4 className="font-bold text-slate-800">Acta No Disponible</h4>
+                  <p className="text-xs text-slate-500">{urlError}</p>
                   <button
                     onClick={fetchSignedUrl}
-                    className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2"
+                    className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Reintentar Carga
                   </button>
                 </div>
               ) : signedUrl ? (
                 <div 
-                  className="w-full h-full flex justify-center transition-transform origin-top"
-                  style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "top center" }}
+                  className="w-full bg-white transition-transform duration-200 origin-top-center overflow-hidden"
+                  style={{ 
+                    transform: `scale(${zoomLevel / 100})`,
+                    transformOrigin: "top center",
+                    width: "100%",
+                    height: `${1850 * (zoomLevel / 100)}px`
+                  }}
                 >
                   <iframe
-                    src={`${signedUrl}#toolbar=0&navpanes=0`}
-                    className="w-full h-full min-h-[500px] border-0 rounded-lg bg-white shadow-xl"
-                    title="Visor Acta Oficial"
+                    src={`${signedUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                    className="w-[calc(100%+24px)] h-full border-0 bg-white -mr-6"
+                    style={{ overflow: 'hidden', scrollbarWidth: 'none' }}
+                    title="Visor Acta Oficial Conciliación"
                   />
                 </div>
               ) : null}
@@ -298,42 +340,42 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
 
           </div>
 
-          {/* Panel Derecho: Formulario de Conciliación (50% Width) */}
-          <div className="w-full md:w-1/2 flex flex-col bg-white overflow-hidden">
+          {/* Panel Derecho: Formulario de Conciliación */}
+          <div className={`w-full md:w-1/2 flex flex-col bg-white overflow-hidden ${mobileTab === 'stats' ? 'flex h-[calc(100vh-180px)] sm:h-auto' : 'hidden md:flex'}`}>
             {/* Action Toolbar Header */}
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div>
-                <h4 className="font-extrabold text-slate-800 text-sm">Registro Definitivo de Jugadores</h4>
-                <p className="text-xs text-slate-500">Machaca borradores anteriores al guardar</p>
+                <h4 className="font-extrabold text-slate-800 text-xs sm:text-sm">Registro Definitivo de Jugadores</h4>
+                <p className="text-[10px] sm:text-xs text-slate-500">Machaca borradores anteriores al guardar</p>
               </div>
               <button
                 onClick={handlePreloadFromLive}
                 disabled={loadingLive}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
               >
-                <Zap className="w-4 h-4 fill-slate-950" />
-                {loadingLive ? "Cargando evento live..." : "Pre-cargar desde En Directo"}
+                <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                {loadingLive ? "Cargando..." : "Pre-cargar En Directo"}
               </button>
             </div>
 
             {/* Table Area */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-              <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500 tracking-wider z-10">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-1 sm:p-4 hide-scrollbar">
+              <table className="w-full text-left border-collapse table-fixed">
+                <thead className="bg-slate-100 border-b border-slate-200 text-[9px] sm:text-[10px] uppercase font-bold text-slate-600 tracking-tighter">
                   <tr>
-                    <th className="py-2.5 px-3">Jugador</th>
-                    <th className="py-2.5 px-2 text-center">Goles</th>
-                    <th className="py-2.5 px-2 text-center">Asist.</th>
-                    <th className="py-2.5 px-2 text-center">🟨 Amar.</th>
-                    <th className="py-2.5 px-2 text-center">🟥 Rojas</th>
-                    <th className="py-2.5 px-2 text-center">Minutos</th>
+                    <th className="py-2 px-1 w-[38%] bg-slate-100">Jugador</th>
+                    <th className="py-2 px-0.5 text-center w-[12%] bg-slate-100">Gol</th>
+                    <th className="py-2 px-0.5 text-center w-[12%] bg-slate-100">Asis</th>
+                    <th className="py-2 px-0.5 text-center w-[12%] bg-slate-100">🟨</th>
+                    <th className="py-2 px-0.5 text-center w-[12%] bg-slate-100">🟥</th>
+                    <th className="py-2 px-0.5 text-center w-[14%] bg-slate-100">Min</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
+                <tbody className="divide-y divide-slate-100 text-xs">
                   {Object.values(statsMap).map((row) => (
                     <tr key={row.player_id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2">
+                      <td className="py-2 px-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <input
                             type="checkbox"
                             checked={row.is_convocado}
@@ -344,19 +386,19 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                                 [row.player_id]: { ...prev[row.player_id], is_convocado: checked }
                               }))
                             }}
-                            className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                            className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 shrink-0"
                           />
-                          <div>
-                            <span className="font-bold text-slate-800 text-xs block">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-slate-800 text-[11px] sm:text-xs block truncate leading-tight">
                               {row.first_name} {row.last_name}
                             </span>
                             {row.dorsal && (
-                              <span className="text-[10px] text-slate-400 font-mono">Dorsal #{row.dorsal}</span>
+                              <span className="text-[9px] text-slate-400 font-mono block">#{row.dorsal}</span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="py-2 px-1 text-center">
+                      <td className="py-2 px-0.5 text-center">
                         <input
                           type="number"
                           min={0}
@@ -369,10 +411,10 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                               [row.player_id]: { ...prev[row.player_id], goals: val }
                             }))
                           }}
-                          className="w-12 text-center border border-slate-200 rounded-lg py-1 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 disabled:opacity-40 bg-white"
+                          className="w-8 sm:w-10 text-center border border-slate-200 rounded py-0.5 text-[11px] font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 disabled:opacity-40 bg-white"
                         />
                       </td>
-                      <td className="py-2 px-1 text-center">
+                      <td className="py-2 px-0.5 text-center">
                         <input
                           type="number"
                           min={0}
@@ -385,10 +427,10 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                               [row.player_id]: { ...prev[row.player_id], assists: val }
                             }))
                           }}
-                          className="w-12 text-center border border-slate-200 rounded-lg py-1 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 disabled:opacity-40 bg-white"
+                          className="w-8 sm:w-10 text-center border border-slate-200 rounded py-0.5 text-[11px] font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 disabled:opacity-40 bg-white"
                         />
                       </td>
-                      <td className="py-2 px-1 text-center">
+                      <td className="py-2 px-0.5 text-center">
                         <input
                           type="number"
                           min={0}
@@ -402,10 +444,10 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                               [row.player_id]: { ...prev[row.player_id], yellow_cards: val }
                             }))
                           }}
-                          className="w-12 text-center border border-slate-200 rounded-lg py-1 text-xs font-bold text-amber-700 bg-amber-50/50 focus:ring-2 focus:ring-amber-500 disabled:opacity-40"
+                          className="w-8 sm:w-10 text-center border border-slate-200 rounded py-0.5 text-[11px] font-bold text-amber-700 bg-amber-50/50 focus:ring-1 focus:ring-amber-500 disabled:opacity-40"
                         />
                       </td>
-                      <td className="py-2 px-1 text-center">
+                      <td className="py-2 px-0.5 text-center">
                         <input
                           type="number"
                           min={0}
@@ -419,10 +461,10 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                               [row.player_id]: { ...prev[row.player_id], red_cards: val }
                             }))
                           }}
-                          className="w-12 text-center border border-slate-200 rounded-lg py-1 text-xs font-bold text-rose-700 bg-rose-50/50 focus:ring-2 focus:ring-rose-500 disabled:opacity-40"
+                          className="w-8 sm:w-10 text-center border border-slate-200 rounded py-0.5 text-[11px] font-bold text-rose-700 bg-rose-50/50 focus:ring-1 focus:ring-rose-500 disabled:opacity-40"
                         />
                       </td>
-                      <td className="py-2 px-1 text-center">
+                      <td className="py-2 px-0.5 text-center">
                         <input
                           type="number"
                           min={0}
@@ -436,7 +478,7 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
                               [row.player_id]: { ...prev[row.player_id], minutes_played: val }
                             }))
                           }}
-                          className="w-16 text-center border border-slate-200 rounded-lg py-1 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 disabled:opacity-40 bg-white"
+                          className="w-10 sm:w-12 text-center border border-slate-200 rounded py-0.5 text-[11px] font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 disabled:opacity-40 bg-white"
                         />
                       </td>
                     </tr>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { 
@@ -12,6 +12,8 @@ import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
 import { UtileriaTab } from "@/components/features/club/UtileriaTab";
+import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
+import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import Subscriptions from "@/components/features/treasury/Subscriptions";
 
 interface PlayerData {
@@ -410,49 +412,45 @@ export default function PlayerProfilePage() {
     }
   };
 
+  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !player) return;
-    
-    // Validar tamaño (máx 5MB) y tipo (imagen)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("La imagen es demasiado grande. Máximo 5MB.");
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      toast.error("El archivo debe ser una imagen.");
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    if (!player) {
+      toast.error("Datos del jugador no cargados");
       return;
     }
 
-    const toastId = toast.loading("Subiendo foto...");
-    const supabase = createClient();
-    
+    const toastId = toast.loading("Subiendo y guardando foto...");
+
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${player.id}-${Math.random()}.${fileExt}`;
-      const filePath = `jugadores/${fileName}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('playerId', player.id);
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
+      const res = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (uploadError) throw uploadError;
+      const data = await res.json();
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      if (!res.ok || !data.publicUrl) {
+        throw new Error(data.error || "No se pudo subir la foto");
+      }
 
-      const { error: updateError } = await supabase
-        .from('players')
-        .update({ avatar_url: publicUrl })
-        .eq('id', player.id);
-
-      if (updateError) throw updateError;
-
-      setPlayer({ ...player, avatar_url: publicUrl });
-      toast.success("Foto actualizada", { id: toastId });
-    } catch (error: any) {
-      toast.error("Error al subir la foto: " + error.message, { id: toastId });
+      setPlayer(prev => prev ? ({ ...prev, avatar_url: data.publicUrl }) : null);
+      toast.success("¡Foto añadida correctamente!", { id: toastId });
+    } catch (err: any) {
+      console.error("Error al subir foto:", err);
+      toast.error("Error al guardar la foto: " + (err.message || "error de conexión"), { id: toastId });
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -515,27 +513,45 @@ export default function PlayerProfilePage() {
             </div>
           </div>
         )}
-        <div className="h-32 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
-        <div className="px-4 sm:px-8 pb-8">
-          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-end -mt-12 mb-4 gap-4">
-            <div className="flex items-end gap-4 sm:gap-6">
-              <div className="relative group min-w-24 w-24 h-24 sm:min-w-28 sm:w-28 sm:h-28 bg-white rounded-2xl shadow-lg border-4 border-white flex items-center justify-center overflow-hidden">
-                {player.avatar_url ? (
-                  <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
-                    <UserIcon size={56} />
-                  </div>
-                )}
-                
-                {/* Botón flotante para subir foto */}
-                <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <Camera size={24} className="mb-1" />
-                  <span className="text-xs font-bold">Cambiar Foto</span>
-                  <input type="file" className="hidden" accept="image/*" onChange={uploadPhoto} />
+        <div className="h-16 sm:h-20 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
+        <div className="px-4 sm:px-8 pb-6">
+          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mb-4 gap-4">
+            <div className="flex items-center gap-6 sm:gap-8">
+              <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden -mt-10 sm:-mt-12 group flex-shrink-0">
+                <label className="w-full h-full cursor-pointer flex items-center justify-center" title="Toca para cambiar foto">
+                  {player.avatar_url ? (
+                    <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                  ) : (
+                    <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                      <UserIcon size={64} />
+                    </div>
+                  )}
+
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={uploadPhoto}
+                  />
                 </label>
+
+                {/* Botón papelera que SOLO aparece al hacer hover con el ratón en PC */}
+                {player.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      deletePhoto();
+                    }}
+                    title="Eliminar foto"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-slate-900/80 hover:bg-rose-600 text-white rounded-full flex items-center justify-center shadow-md cursor-pointer transition-all opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto active:scale-90 z-30"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
-              <div className="pb-2">
+              <div className="flex-1 min-w-0 pt-1 pl-2 sm:pl-3">
                 <div className="flex items-center gap-3">
                   <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
                     {player.first_name} {player.last_name}
@@ -546,7 +562,7 @@ export default function PlayerProfilePage() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium">
+                <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium text-sm flex-wrap">
                   <span className="capitalize">{player.posicion || 'Sin posición'}</span>
                   {edadJugador !== null && (
                     <>
@@ -1649,6 +1665,65 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
+
+      {/* Modal Emergente de Gestión de Foto */}
+      {showPhotoModal && (
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setShowPhotoModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner mb-1">
+              {player.avatar_url ? (
+                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+              ) : (
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                  <UserIcon size={40} />
+                </div>
+              )}
+            </div>
+
+            <h3 className="font-bold text-slate-900 text-sm">Foto de Perfil</h3>
+
+            <div className="flex flex-col w-full gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoModal(false);
+                  fileInputRef.current?.click();
+                }}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
+                <Camera size={14} />
+                <span>Cambiar Foto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoModal(false);
+                  deletePhoto();
+                }}
+                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-rose-200"
+              >
+                <Trash2 size={14} />
+                <span>Eliminar Foto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all mt-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -138,7 +138,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
 
   const getGoalsForTeam = (isHomeTeam: boolean) => {
     const isSporting = isHomeTeam === isLocal;
-    const targetScore = isSporting ? liveLocalGoals : liveAwayGoals;
+    const targetScore = isHomeTeam ? liveLocalGoals : liveAwayGoals;
 
     const goalEvents = events.filter(e => {
       const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
@@ -147,8 +147,19 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
       
       if (!isGol && !isAutogol) return false;
 
-      const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
-      return isSporting ? isSportingPoint : !isSportingPoint;
+      // Determinar si el gol pertenece al equipo Local o al Visitante
+      const notas = e.notas || '';
+      let eventIsHome = false;
+      if (notas.includes('[LOCAL]')) {
+        eventIsHome = isGol ? true : false;
+      } else if (notas.includes('[VISITANTE]')) {
+        eventIsHome = isGol ? false : true;
+      } else {
+        const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
+        eventIsHome = isLocal ? isSportingPoint : !isSportingPoint;
+      }
+
+      return isHomeTeam === eventIsHome;
     }).sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
 
     if ((targetScore === 0 || targetScore === null) && goalEvents.length === 0) return null;
@@ -167,14 +178,14 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     }
 
     return (
-      <div className={`flex flex-col text-[11px] md:text-xs text-slate-700 mt-2.5 w-full space-y-1 ${isSporting ? 'items-start text-left pl-2' : 'items-end text-right pr-2'}`}>
+      <div className={`flex flex-col text-[11px] md:text-xs text-slate-700 mt-2.5 w-full space-y-1 ${isHomeTeam ? 'items-start text-left pl-2' : 'items-end text-right pr-2'}`}>
         {displayItems.map((g, i) => {
           if (g.isSynthetic) {
             return (
               <div key={`synth-${i}`} className="flex items-center gap-1.5 font-bold text-slate-700">
-                {isSporting && <span className="text-slate-400 text-[10px] shrink-0">⚽</span>}
+                {isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">⚽</span>}
                 <span>{isSporting ? 'Gol' : 'Rival'}</span>
-                {!isSporting && <span className="text-slate-400 text-[10px] shrink-0">⚽</span>}
+                {!isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">⚽</span>}
               </div>
             );
           }
@@ -185,21 +196,30 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           const displayMin = rawMin > 90 ? Math.floor(rawMin / 60) : rawMin;
           
           let name = '';
+          const getCleanNameFromNotas = (rawNotes: string) => {
+            let clean = rawNotes.replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '').trim();
+            if (clean.includes(',')) {
+              const parts = clean.split(',').map(p => p.trim());
+              clean = `${parts[1]} ${parts[0]}`;
+            }
+            return clean.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+          };
+
           if (isSporting) {
             if (isOwnGoal) name = 'Rival (PP)';
-            else name = g.player?.first_name ? g.player.first_name.trim() : 'Jugador';
+            else name = g.player?.first_name ? g.player.first_name.trim() : (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador');
           } else {
             if (isOwnGoal) name = g.player?.first_name ? `${g.player.first_name} (PP)` : 'Sporting (PP)';
-            else name = 'Rival';
+            else name = g.notas ? getCleanNameFromNotas(g.notas) : 'Rival';
           }
           
           const icon = (tipo.includes('penal') || tipo.includes('penalty')) ? '🎯' : '⚽';
           return (
             <div key={g.id || i} className="flex items-center gap-1.5 font-bold text-slate-800">
-              {isSporting && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
+              {isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
               <span>{name}</span> 
               {displayMin > 0 && <span className="text-slate-400 text-[10px] font-normal">({displayMin}')</span>}
-              {!isSporting && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
+              {!isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
             </div>
           );
         })}
@@ -249,7 +269,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
             {isLive || isDescanso || isFinished ? (
               <div className="flex items-center justify-center gap-2.5 w-full text-center">
                 <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
-                  {isLocal ? liveLocalGoals : liveAwayGoals}
+                  {liveLocalGoals}
                 </span>
 
                 {(isLive || isDescanso) ? (
@@ -267,7 +287,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
                 )}
 
                 <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
-                  {isLocal ? liveAwayGoals : liveLocalGoals}
+                  {liveAwayGoals}
                 </span>
               </div>
             ) : (

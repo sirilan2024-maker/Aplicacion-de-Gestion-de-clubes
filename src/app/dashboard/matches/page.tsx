@@ -56,9 +56,25 @@ export default async function PartidosPage() {
     }
   }
 
-  const { data: convocatorias } = await supabase
-    .from("convocatorias")
-    .select("*")
+  const matchIds = (matches || []).map(m => m.id);
+  let convocatorias: any[] = [];
+  
+  if (matchIds.length > 0) {
+    let from = 0;
+    const step = 1000;
+    while (true) {
+      const { data: chunk } = await supabase
+        .from("convocatorias")
+        .select("*")
+        .in("partido_id", matchIds)
+        .range(from, from + step - 1);
+        
+      if (!chunk || chunk.length === 0) break;
+      convocatorias.push(...chunk);
+      if (chunk.length < step) break;
+      from += step;
+    }
+  }
 
   const { data: teamCoaches } = await supabase
     .from("team_coaches")

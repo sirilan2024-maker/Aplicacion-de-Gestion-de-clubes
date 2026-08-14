@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, Loader2, Save, UserCheck, Dumbbell, BrainCircuit, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, Save, UserCheck, BrainCircuit, Zap } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { FormativeEvaluationForm } from "@/components/features/formative/FormativeEvaluationForm";
 
 interface Player {
   id: string;
   first_name: string;
   last_name: string;
   dorsal: number | null;
+  avatar_url?: string | null;
 }
 
 interface ClubMetric {
@@ -73,7 +75,7 @@ export default function EntrenamientoDetailPage() {
     if (activeSeason?.id) {
       const { data: historyData } = await supabase
         .from('player_season_history')
-        .select('player_id, players(id, first_name, last_name, dorsal)')
+        .select('player_id, players(id, first_name, last_name, dorsal, avatar_url)')
         .eq('team_id', teamId)
         .neq('status', 'inactive')
         .or(`season_id.eq.${activeSeason.id},season_id.is.null`);
@@ -92,9 +94,6 @@ export default function EntrenamientoDetailPage() {
       if (attData && attData.length > 0) {
         hasAttendance = true;
         attData.forEach(a => { attMap[a.player_id] = a.status; });
-      } else {
-        // Default everyone to 'Presente' initially if no attendance taken yet
-        plData.forEach(p => { attMap[p.id] = 'Presente'; });
       }
       setAttendance(attMap);
 
@@ -102,12 +101,16 @@ export default function EntrenamientoDetailPage() {
         setActiveModule('asistencia');
       }
 
-      // Filter by "Presente"
-      const presentIds = Object.keys(attMap).filter(id => attMap[id] === 'Presente');
-      const presentPlayers = plData.filter(p => presentIds.includes(p.id));
+      // Si hay asistencia tomada, filtrar por los presentes. Si aún no hay lista pasada, mostrar a toda la plantilla
+      const presentIds = Object.keys(attMap).filter(id => attMap[id] === 'Presente' || attMap[id] === 'Retraso');
+      const presentPlayers = (hasAttendance && presentIds.length > 0) ? plData.filter(p => presentIds.includes(p.id)) : plData;
       
       setPlayers(presentPlayers);
-      if (presentPlayers.length > 0) setSelectedPlayerId(presentPlayers[0].id);
+      if (presentPlayers.length > 0) {
+        setSelectedPlayerId(presentPlayers[0].id);
+      } else if (plData.length > 0) {
+        setSelectedPlayerId(plData[0].id);
+      }
     }
 
     // 3. Fetch Club Metrics
@@ -115,7 +118,6 @@ export default function EntrenamientoDetailPage() {
     if (currentProfile) {
       const { data: metricData } = await supabase.from('club_metrics').select('*').eq('club_id', currentProfile.club_id).eq('is_active', true);
       if (metricData) {
-        // Parse options JSONB into array and filter out unwanted metrics
         const parsedMetrics = metricData
           .filter((m: any) => {
             const name = m.name.toLowerCase();
@@ -143,62 +145,15 @@ export default function EntrenamientoDetailPage() {
     setLoading(false);
   };
 
-  const handleMetricChange = (metricId: string, value: string, type: string) => {
-    if (!selectedPlayerId) return;
+  const handleMetricChange = (playerId: string, metricId: string, value: string, type: string) => {
+    if (!playerId) return;
     setPlayerMetrics(prev => ({
       ...prev,
-      [selectedPlayerId]: {
-        ...(prev[selectedPlayerId] || {}),
+      [playerId]: {
+        ...(prev[playerId] || {}),
         [metricId]: value
       }
     }));
-  };
-
-  const saveSelectedPlayerMetrics = async () => {
-    if (!selectedPlayerId) return;
-    setSavingPlayer(selectedPlayerId);
-    const supabase = createClient();
-    
-    const pData = playerMetrics[selectedPlayerId] || {};
-    const relevantMetrics = metrics.filter(m => activeModule === 'rapida' ? (m.name.includes('RPE') || m.name.includes('Minutos')) : m.module_type === activeModule);
-    
-    let hasError = false;
-
-    for (const metric of relevantMetrics) {
-      const rawVal = pData[metric.id];
-      if (rawVal === undefined || rawVal === '') continue; // Skip empty
-      
-      const payload = {
-        event_id: eventId,
-        player_id: selectedPlayerId,
-        metric_id: metric.id,
-        value_number: metric.type === 'number' ? parseFloat(rawVal as string) : null,
-        value_text: metric.type === 'text' ? rawVal : null
-      };
-
-      const { data: existing } = await supabase
-        .from('player_training_metrics')
-        .select('id')
-        .eq('event_id', eventId)
-        .eq('player_id', selectedPlayerId)
-        .eq('metric_id', metric.id)
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase.from('player_training_metrics').update(payload).eq('id', existing.id);
-        if (error) hasError = true;
-      } else {
-        const { error } = await supabase.from('player_training_metrics').insert(payload);
-        if (error) hasError = true;
-      }
-    }
-
-    setSavingPlayer(null);
-    if (hasError) {
-      toast.error("Hubo un error al guardar algunos datos.");
-    } else {
-      toast.success("Evaluación guardada correctamente");
-    }
   };
 
   const saveAllQuickMetrics = async () => {
@@ -227,7 +182,6 @@ export default function EntrenamientoDetailPage() {
         if (existingRpe) await supabase.from('player_training_metrics').update(rpePayload).eq('id', existingRpe.id);
         else await supabase.from('player_training_metrics').insert(rpePayload);
 
-        // If RPE was entered, also save the minutes (defaulting to 90 if untouched)
         const finalMinVal = minVal !== undefined && minVal !== '' ? minVal : 90;
         const { data: existingMin } = await supabase.from('player_training_metrics').select('id').eq('event_id', eventId).eq('player_id', player.id).eq('metric_id', minMetric.id).maybeSingle();
         const minPayload = { event_id: eventId, player_id: player.id, metric_id: minMetric.id, value_number: parseFloat(finalMinVal as string) };
@@ -245,12 +199,21 @@ export default function EntrenamientoDetailPage() {
     setSavingPlayer('asistencia');
     const supabase = createClient();
     
-    const payloads = allPlayers.map(player => ({
+    // Filtrar solo los jugadores marcados o asignar 'Ausente' a los no marcados
+    const markedEntries = Object.entries(attendance).filter(([_, status]) => Boolean(status));
+    
+    if (markedEntries.length === 0) {
+      toast.error("Por favor, marca el estado de asistencia de al menos un jugador");
+      setSavingPlayer(null);
+      return;
+    }
+
+    const payloads = markedEntries.map(([playerId, status]) => ({
       session_id: eventId,
       event_id: eventId,
-      player_id: player.id,
+      player_id: playerId,
       date: eventDetails?.date,
-      status: attendance[player.id],
+      status: status,
       season_id: activeSeasonId
     }));
 
@@ -266,8 +229,7 @@ export default function EntrenamientoDetailPage() {
     setSavingPlayer(null);
     toast.success("Asistencia guardada correctamente");
     
-    // Update players list based on new attendance
-    const presentIds = Object.keys(attendance).filter(id => attendance[id] === 'Presente');
+    const presentIds = Object.keys(attendance).filter(id => attendance[id] === 'Presente' || attendance[id] === 'Retraso');
     const presentPlayers = allPlayers.filter(p => presentIds.includes(p.id));
     setPlayers(presentPlayers);
     if (presentPlayers.length > 0) setSelectedPlayerId(presentPlayers[0].id);
@@ -283,10 +245,6 @@ export default function EntrenamientoDetailPage() {
   }
 
   const selectedPlayer = players.find(p => p.id === selectedPlayerId);
-  
-  // Group metrics by category for the active module
-  const activeMetrics = metrics.filter(m => m.module_type === activeModule);
-  const categories = Array.from(new Set(activeMetrics.map(m => m.category || 'General')));
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -320,84 +278,71 @@ export default function EntrenamientoDetailPage() {
         </div>
 
         {/* MODULE SELECTOR */}
-        <div className="w-full md:w-auto flex flex-col md:flex-row items-start md:items-center gap-4">
-        {/* TABS (Desktop) */}
-        <div className="hidden sm:flex gap-2 pb-2 md:pb-0 border-b md:border-b-0 border-gray-100">
-          <button 
-            onClick={() => setActiveModule('asistencia')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-              activeModule === 'asistencia' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <UserCheck size={18} />
-            Asistencia
-          </button>
-          <button 
-            onClick={() => setActiveModule('rapida')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-              activeModule === 'rapida' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <Zap size={18} />
-            Carga Rápida (RPE)
-          </button>
-          {showFormativo && (
+        <div className="w-full md:w-auto flex flex-col items-stretch md:items-end gap-2">
+          {/* Barra segmentada unificada */}
+          <div className="grid grid-cols-2 sm:flex gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-inner w-full sm:w-auto">
             <button 
-              onClick={() => setActiveModule('formativo')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-                activeModule === 'formativo' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              type="button"
+              onClick={() => setActiveModule('asistencia')}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+                activeModule === 'asistencia' ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
               }`}
             >
-              <BrainCircuit size={18} />
-              Formativo
+              <UserCheck size={16} className={activeModule === 'asistencia' ? "text-blue-600" : "text-slate-400"} />
+              <span>Control Asistencia</span>
             </button>
-          )}
-        </div>
 
-        {/* Formativo Toggle */}
-        <label className="hidden sm:flex items-center cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm text-xs font-bold text-gray-600">
-          <div className="relative">
-            <input type="checkbox" className="sr-only" checked={showFormativo} onChange={(e) => {
-              setShowFormativo(e.target.checked);
-              localStorage.setItem('showFormativo', e.target.checked.toString());
-              if (!e.target.checked && activeModule === 'formativo') setActiveModule('asistencia');
-            }} />
-            <div className={`block w-8 h-5 rounded-full transition-colors ${showFormativo ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
-            <div className={`absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform ${showFormativo ? 'transform translate-x-3' : ''}`}></div>
+            <button 
+              type="button"
+              onClick={() => setActiveModule('rapida')}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+                activeModule === 'rapida' ? 'bg-white text-purple-700 shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              }`}
+            >
+              <Zap size={16} className={activeModule === 'rapida' ? "text-purple-600" : "text-slate-400"} />
+              <span>Carga Rápida (RPE)</span>
+            </button>
+
+            {/* Botón Formativo con su mini interruptor de activación */}
+            <button 
+              type="button"
+              onClick={() => setActiveModule('formativo')}
+              className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+                activeModule === 'formativo' 
+                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/50' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+              }`}
+            >
+              <BrainCircuit size={16} className={activeModule === 'formativo' ? "text-emerald-600" : "text-slate-400"} />
+              <span>Formativo</span>
+
+              {/* Botoncito switch toggle independiente para activar/desactivar */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const nextState = !showFormativo;
+                  setShowFormativo(nextState);
+                  localStorage.setItem('showFormativo', nextState ? 'true' : 'false');
+                  if (nextState) {
+                    setActiveModule('formativo');
+                  }
+                }}
+                title={showFormativo ? "Módulo activado (clic para desactivar)" : "Módulo desactivado (clic para activar)"}
+                className={`w-7 h-4 flex items-center rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ml-1 ${
+                  showFormativo ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start hover:bg-slate-400'
+                }`}
+              >
+                <div className="bg-white w-3 h-3 rounded-full shadow-md" />
+              </div>
+            </button>
           </div>
-          <span className="ml-2">Módulo Formativo</span>
-        </label>
-
-        {/* TABS (Mobile Dropdown) */}
-        <div className="sm:hidden mb-2 flex gap-2 w-full">
-          <select
-             value={activeModule}
-             onChange={(e) => setActiveModule(e.target.value as any)}
-             className="flex-1 bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none shadow-sm cursor-pointer"
-             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25rem' }}
-          >
-             <option value="asistencia">✅ Asistencia</option>
-             <option value="rapida">⚡ Carga Rápida (RPE)</option>
-             {showFormativo && <option value="formativo">🧠 Formativo</option>}
-          </select>
-          <button
-            onClick={() => {
-              const newVal = !showFormativo;
-              setShowFormativo(newVal);
-              localStorage.setItem('showFormativo', newVal.toString());
-              if (!newVal && activeModule === 'formativo') setActiveModule('asistencia');
-            }}
-            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${showFormativo ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-500'}`}
-          >
-            {showFormativo ? 'Ocultar Formativo' : '+ Formativo'}
-          </button>
-        </div>   </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         
-        {/* LEFT COLUMN: PLAYER LIST (Hidden in rapida and asistencia mode) */}
-        {activeModule !== 'rapida' && activeModule !== 'asistencia' && (
+        {/* LEFT COLUMN: PLAYER LIST (Hidden in rapida, asistencia, or disabled formativo) */}
+        {activeModule !== 'rapida' && activeModule !== 'asistencia' && (activeModule !== 'formativo' || showFormativo) && (
         <div className="md:col-span-4 lg:col-span-3 space-y-4">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2">
@@ -430,7 +375,7 @@ export default function EntrenamientoDetailPage() {
         )}
 
         {/* RIGHT COLUMN: EVALUATION FORM */}
-        <div className={(activeModule === 'rapida' || activeModule === 'asistencia') ? "md:col-span-12" : "md:col-span-8 lg:col-span-9"}>
+        <div className={(activeModule === 'rapida' || activeModule === 'asistencia' || (activeModule === 'formativo' && !showFormativo)) ? "md:col-span-12" : "md:col-span-8 lg:col-span-9"}>
           
           {activeModule === 'asistencia' ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -443,75 +388,103 @@ export default function EntrenamientoDetailPage() {
                     Marca quién asistió al entrenamiento antes de evaluar.
                   </p>
                 </div>
-                <button 
-                  onClick={saveAttendance}
-                  disabled={savingPlayer === 'asistencia'}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-70 shadow-md shadow-blue-200"
-                >
-                  {savingPlayer === 'asistencia' ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                  Guardar Asistencia
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allPresent: Record<string, string> = {};
+                      allPlayers.forEach(p => { allPresent[p.id] = 'Presente'; });
+                      setAttendance(allPresent);
+                      toast.success("Todos marcados como Presente");
+                    }}
+                    className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg transition-colors border border-slate-200"
+                  >
+                    Todos Presentes
+                  </button>
+                  <button 
+                    onClick={saveAttendance}
+                    disabled={savingPlayer === 'asistencia'}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-70 shadow-md shadow-blue-200"
+                  >
+                    {savingPlayer === 'asistencia' ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    Guardar Asistencia
+                  </button>
+                </div>
               </div>
               <div className="p-0 overflow-x-auto divide-y divide-gray-100">
                 {allPlayers.map(player => {
                   const currentStatus = attendance[player.id];
                   
                   return (
-                    <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-sm border border-gray-200 shrink-0">
-                          {player.dorsal || '-'}
+                    <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                          {player.avatar_url ? (
+                            <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                          ) : (
+                            <span className="text-slate-600 font-extrabold">{player.dorsal || `${player.first_name?.charAt(0)}${player.last_name?.charAt(0)}`}</span>
+                          )}
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900">{player.first_name} {player.last_name}</p>
+                          <p className="font-bold text-gray-900 leading-tight">{player.first_name} {player.last_name}</p>
+                          {player.dorsal && (
+                            <span className="text-[11px] font-bold text-slate-500">Dorsal {player.dorsal}</span>
+                          )}
                         </div>
                       </div>
                       
-                      {/* Status selectors */}
-                      <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-auto relative border border-gray-200/50 shadow-inner">
-                          <button
-                            onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Presente' }))}
-                            className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                              currentStatus === 'Presente' || currentStatus === 'present'
-                                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
-                                : 'text-gray-600 hover:bg-gray-200/60'
-                            }`}
-                          >
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Presente</span>
-                          </button>
-                          <button
-                            onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Retraso' }))}
-                            className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                              currentStatus === 'Retraso' || currentStatus === 'late'
-                                ? 'bg-orange-500 text-white shadow-sm shadow-orange-100'
-                                : 'text-gray-600 hover:bg-gray-200/60'
-                            }`}
-                          >
-                            <Zap className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Retraso</span>
-                          </button>
+                      {/* Status selectors con texto visible y accesible */}
+                      <div className="grid grid-cols-4 sm:flex bg-slate-100 p-1 rounded-2xl w-full sm:w-auto gap-1 border border-slate-200/70 shadow-inner">
                         <button
-                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Ausente' }))}
-                          className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                            currentStatus === 'Ausente' || currentStatus === 'absent'
-                              ? 'bg-red-500 text-white shadow-sm shadow-red-100'
-                              : 'text-gray-600 hover:bg-gray-200/60'
+                          type="button"
+                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Presente' }))}
+                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                            currentStatus === 'Presente' || currentStatus === 'present'
+                              ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+                              : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
-                          <span className="text-sm leading-none">❌</span>
-                          <span className="hidden sm:inline">Ausente</span>
+                          <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                          <span>Presente</span>
                         </button>
+
                         <button
-                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Lesionado' }))}
-                          className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                            currentStatus === 'Lesionado' || currentStatus === 'excused'
-                              ? 'bg-amber-500 text-white shadow-sm shadow-amber-100'
-                              : 'text-gray-600 hover:bg-gray-200/60'
+                          type="button"
+                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Retraso' }))}
+                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                            currentStatus === 'Retraso' || currentStatus === 'late'
+                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-200'
+                              : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
-                          <span className="text-sm leading-none">⚕️</span>
-                          <span className="hidden sm:inline">Justificado</span>
+                          <Zap className="w-3.5 h-3.5 shrink-0" />
+                          <span>Retraso</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Ausente' }))}
+                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                            currentStatus === 'Ausente' || currentStatus === 'absent'
+                              ? 'bg-rose-500 text-white shadow-sm shadow-rose-200'
+                              : 'text-slate-600 hover:bg-white/60'
+                          }`}
+                        >
+                          <span className="text-xs leading-none shrink-0 font-black">✕</span>
+                          <span>Ausente</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Lesionado' }))}
+                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                            currentStatus === 'Lesionado' || currentStatus === 'excused'
+                              ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
+                              : 'text-slate-600 hover:bg-white/60'
+                          }`}
+                        >
+                          <span className="text-xs leading-none shrink-0">⚕️</span>
+                          <span>Justificado</span>
                         </button>
                       </div>
                     </div>
@@ -539,53 +512,66 @@ export default function EntrenamientoDetailPage() {
                   Guardar Todos
                 </button>
               </div>
-              <div className="p-0 overflow-x-auto">
+
+              <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
-                      <th className="p-4 font-bold">Jugador</th>
-                      <th className="p-4 font-bold w-48">RPE (1-10)</th>
-                      <th className="p-4 font-bold w-48">Minutos</th>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-bold text-gray-600 uppercase">
+                      <th className="p-4">Jugador</th>
+                      <th className="p-4 w-44">Minutos</th>
+                      <th className="p-4 w-44">RPE (1-10)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {players.map(player => {
-                      const rpeMetricId = metrics.find(m => m.name.toLowerCase().includes('rpe'))?.id;
-                      const minMetricId = metrics.find(m => m.name.toLowerCase().includes('minutos'))?.id;
+                  <tbody className="divide-y divide-gray-100 text-sm">
+                    {players.map(p => {
+                      const minutesMetric = metrics.find(m => m.name.toLowerCase().includes('minuto') || m.name.toLowerCase().includes('tiempo'));
+                      const rpeMetric = metrics.find(m => m.name.toLowerCase().includes('rpe') || m.name.toLowerCase().includes('esfuerzo') || m.name.toLowerCase().includes('carga'));
+                      
+                      const minVal = minutesMetric ? (playerMetrics[p.id]?.[minutesMetric.id] ?? '90') : '';
+                      const rpeVal = rpeMetric ? (playerMetrics[p.id]?.[rpeMetric.id] ?? '') : '';
+
                       return (
-                        <tr key={player.id} className="hover:bg-gray-50/50">
+                        <tr key={p.id} className="hover:bg-gray-50/50">
                           <td className="p-4 font-semibold text-gray-900 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
-                              {player.dorsal || '-'}
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
+                              {p.avatar_url ? (
+                                <img src={p.avatar_url} alt={p.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                              ) : (
+                                <span>{p.dorsal || `${p.first_name?.charAt(0)}${p.last_name?.charAt(0)}`}</span>
+                              )}
                             </div>
-                            {player.first_name} {player.last_name}
+                            <span>{p.first_name} {p.last_name}</span>
                           </td>
                           <td className="p-4">
-                            <input
+                            <input 
                               type="number"
-                              min="1" max="10"
-                              value={rpeMetricId ? (playerMetrics[player.id]?.[rpeMetricId] || '') : ''}
-                              onChange={(e) => {
-                                if (rpeMetricId) {
-                                  setPlayerMetrics(prev => ({ ...prev, [player.id]: { ...(prev[player.id] || {}), [rpeMetricId]: e.target.value } }));
-                                }
-                              }}
-                              className="w-full max-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none font-bold"
-                              placeholder="Ej: 7"
+                              value={minVal}
+                              onChange={(e) => minutesMetric && handleMetricChange(p.id, minutesMetric.id, e.target.value, 'number')}
+                              className="w-full max-w-[130px] border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-bold text-slate-900 bg-white"
+                              placeholder="Ej: 90"
                             />
                           </td>
                           <td className="p-4">
-                            <input
-                              type="number"
-                              min="0" max="300"
-                              value={minMetricId ? (playerMetrics[player.id]?.[minMetricId] !== undefined ? playerMetrics[player.id][minMetricId] : 90) : 90}
+                            <input 
+                              type="number" 
+                              min={1} 
+                              max={10} 
+                              value={rpeVal}
                               onChange={(e) => {
-                                if (minMetricId) {
-                                  setPlayerMetrics(prev => ({ ...prev, [player.id]: { ...(prev[player.id] || {}), [minMetricId]: e.target.value } }));
+                                if (!rpeMetric) return;
+                                const raw = e.target.value;
+                                if (raw === '') {
+                                  handleMetricChange(p.id, rpeMetric.id, '', 'number');
+                                  return;
+                                }
+                                const num = parseInt(raw, 10);
+                                if (!isNaN(num)) {
+                                  const clamped = Math.min(10, Math.max(1, num));
+                                  handleMetricChange(p.id, rpeMetric.id, clamped.toString(), 'number');
                                 }
                               }}
-                              className="w-full max-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none font-bold"
-                              placeholder="Ej: 90"
+                              className="w-full max-w-[130px] border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-bold text-slate-900 bg-white"
+                              placeholder="1 - 10"
                             />
                           </td>
                         </tr>
@@ -595,83 +581,48 @@ export default function EntrenamientoDetailPage() {
                 </table>
               </div>
             </div>
-          ) : selectedPlayer ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Evaluación: {selectedPlayer.first_name} {selectedPlayer.last_name}
-                  </h2>
-                  <p className="text-gray-500 text-sm">
-                    Módulo Formativo y Psicológico
-                  </p>
+          ) : activeModule === 'formativo' ? (
+            /* MÓDULO FORMATIVO Y EVALUACIÓN DE APRENDIZAJE INFANTIL */
+            !showFormativo ? (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-12 text-center max-w-xl mx-auto space-y-4">
+                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
+                  <BrainCircuit size={32} />
                 </div>
-                <button 
-                  onClick={saveSelectedPlayerMetrics}
-                  disabled={savingPlayer === selectedPlayer.id}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-70"
+                <h3 className="text-xl font-bold text-slate-900">Módulo Formativo Desactivado</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  El módulo de evaluación pedagógica y rúbricas cualitativas (1-5) está actualmente desactivado para este entrenamiento.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFormativo(true);
+                    localStorage.setItem('showFormativo', 'true');
+                  }}
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-2xl text-sm shadow-md transition-all active:scale-95"
                 >
-                  {savingPlayer === selectedPlayer.id ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                  Guardar Datos
+                  <BrainCircuit size={18} />
+                  <span>Activar Módulo Formativo</span>
                 </button>
               </div>
-
-              <div className="p-6 bg-gray-50/30 space-y-8">
-                {categories.length === 0 ? (
-                  <div className="text-center p-8 text-gray-500">
-                    No hay métricas configuradas para el módulo {activeModule}.
-                  </div>
-                ) : (
-                  categories.map(category => (
-                    <div key={category} className="space-y-4">
-                      <h3 className="text-lg font-bold text-slate-800 border-b border-gray-200 pb-2">
-                        {category}
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                        {activeMetrics.filter(m => (m.category || 'General') === category).map(metric => {
-                          const val = playerMetrics[selectedPlayer.id]?.[metric.id] || '';
-                          
-                          return (
-                            <div key={metric.id} className="flex flex-col gap-1.5">
-                              <label className="text-sm font-bold text-gray-700">
-                                {metric.name} {metric.unit ? <span className="text-gray-400 font-normal">({metric.unit})</span> : ''}
-                              </label>
-                              
-                              {/* DROPDOWN SELECT */}
-                              {metric.options && metric.options.length > 0 ? (
-                                <select
-                                  value={val}
-                                  onChange={(e) => handleMetricChange(metric.id, e.target.value, metric.type)}
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 font-medium"
-                                >
-                                  <option value="">Seleccionar...</option>
-                                  {metric.options.map((opt, i) => (
-                                    <option key={i} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                /* REGULAR INPUT */
-                                <input
-                                  type={metric.type === 'number' ? 'number' : 'text'}
-                                  value={val}
-                                  onChange={(e) => handleMetricChange(metric.id, e.target.value, metric.type)}
-                                  placeholder={metric.type === 'number' ? '0.00' : 'Escribe aquí...'}
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 font-medium"
-                                  step={metric.type === 'number' ? 'any' : undefined}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))
-                )}
+            ) : selectedPlayer ? (
+              <div className="space-y-6">
+                <FormativeEvaluationForm 
+                  playerId={selectedPlayer.id}
+                  playerName={`${selectedPlayer.first_name} ${selectedPlayer.last_name}`}
+                  playerAvatarUrl={selectedPlayer.avatar_url}
+                  dorsal={selectedPlayer.dorsal}
+                  eventId={eventId}
+                />
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm border border-dashed border-gray-300 p-12 text-center text-gray-500">
+                <p className="font-bold text-gray-800 text-lg mb-2">Selecciona un jugador</p>
+                <p className="text-sm">Elige un jugador de la columna izquierda para evaluar sus rúbricas formativas.</p>
+              </div>
+            )
           ) : (
             <div className="bg-white rounded-2xl shadow-sm border border-dashed border-gray-300 p-12 text-center text-gray-500">
-              {players.length === 0 ? "No hay jugadores marcados como 'Presente' en la asistencia de este entrenamiento. Pasa lista primero en la pestaña 'Asistencia'." : "Selecciona un jugador de la lista para comenzar la evaluación."}
+              {players.length === 0 ? "No hay jugadores disponibles." : "Selecciona una opción del menú superior."}
             </div>
           )}
         </div>

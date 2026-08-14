@@ -61,7 +61,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           .from('player_season_history')
           .select(`
             team_id,
-            players!inner (id, first_name, last_name, height, weight, status, posicion_principal, dorsal)
+            players!inner (id, first_name, last_name, height, weight, status, posicion_principal, dorsal, avatar_url)
           `)
           .in('team_id', teamIds)
           .eq('season_id', activeSeason.id)
@@ -611,21 +611,38 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
               <h3 className="font-bold text-red-800 text-sm">Más Tarjetas</h3>
             </div>
             <div className="p-4 flex-1 flex flex-col gap-3">
-              {stats.topDisciplina.length > 0 ? stats.topDisciplina.map((p: any, i: number) => (
-                <div key={p.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
-                    <div className="overflow-hidden">
-                      <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
-                      <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+              {stats.topDisciplina.length > 0 ? stats.topDisciplina.map((p: any, i: number) => {
+                const cyclesComp = Math.floor((p.amarillas || 0) / 5);
+                const currentCycleCardCount = (p.amarillas || 0) % 5;
+                return (
+                  <div key={p.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                          {cyclesComp > 0 && (
+                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                              {cyclesComp} {cyclesComp === 1 ? 'ciclo cumplido' : 'ciclos cumplidos'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {p.amarillas > 0 && (
+                        <div className="flex flex-col items-end">
+                          <span className="font-bold text-yellow-800 bg-yellow-100 px-2 py-0.5 rounded text-xs" title={`Ciclo #${cyclesComp + 1}: ${currentCycleCardCount}/5`}>
+                            {p.amarillas} 🟡
+                          </span>
+                        </div>
+                      )}
+                      {p.rojas > 0 && <span className="font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded text-xs">{p.rojas} 🔴</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {p.amarillas > 0 && <span className="font-bold text-yellow-700 bg-yellow-100 px-1.5 py-0.5 rounded text-xs">{p.amarillas}</span>}
-                    {p.rojas > 0 && <span className="font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded text-xs">{p.rojas}</span>}
-                  </div>
-                </div>
-              )) : <p className="text-xs text-slate-400 text-center py-4">Sin amonestaciones</p>}
+                );
+              }) : <p className="text-xs text-slate-400 text-center py-4">Sin amonestaciones</p>}
             </div>
           </div>
         </div>

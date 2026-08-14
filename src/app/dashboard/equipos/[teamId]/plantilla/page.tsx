@@ -24,6 +24,7 @@ interface Player {
   link_code?: string | null;
   posicion_principal?: string | null;
   status?: string | null;
+  avatar_url?: string | null;
 }
 
 export default function PlantillaEquipoPage() {
@@ -73,7 +74,7 @@ export default function PlantillaEquipoPage() {
           .from("player_season_history")
           .select(`
             status,
-            players!inner (id, first_name, last_name, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code)
+            players!inner (id, first_name, last_name, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
           `)
           .eq("team_id", teamId)
         .neq("status", "inactive");
@@ -261,7 +262,7 @@ export default function PlantillaEquipoPage() {
           <table className="w-full text-left text-sm text-gray-700 border-separate border-spacing-y-3">
             <thead className="text-slate-500 font-semibold uppercase tracking-wider text-[11px] px-2">
               <tr>
-                <th className="px-6 py-2">Dorsal</th>
+                <th className="px-6 py-2">Foto</th>
                 <th className="px-6 py-2">Jugador</th>
                 <th className="px-6 py-2">Posición</th>
                 <th className="px-6 py-2">Rol</th>
@@ -304,18 +305,27 @@ export default function PlantillaEquipoPage() {
                       className="bg-white shadow-sm hover:shadow-md transition-all group cursor-pointer"
                     >
                       <td className="px-6 py-4 rounded-l-xl border-y border-l border-gray-200 group-hover:border-gray-300">
-                        {player.dorsal ? (
-                          <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border-2 border-slate-700">
-                            {player.dorsal}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs ml-2">-</span>
-                        )}
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shadow-xs">
+                          {player.avatar_url ? (
+                            <img
+                              src={player.avatar_url}
+                              alt={player.first_name}
+                              className="w-full h-full object-cover object-[center_25%]"
+                            />
+                          ) : (
+                            <User className={`w-5 h-5 ${esEntrenador ? 'text-blue-500' : 'text-slate-400'}`} />
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors flex items-center gap-2 text-base">
                             {player.first_name} {player.last_name}
+                            {player.dorsal && (
+                              <span className="text-xs font-black bg-slate-900 text-white px-2 py-0.5 rounded-md">
+                                {player.dorsal}
+                              </span>
+                            )}
                           </span>
                         </div>
                       </td>
@@ -397,7 +407,7 @@ export default function PlantillaEquipoPage() {
                     router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                   }
                 }}
-                className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:border-gray-300 hover:shadow-md relative overflow-hidden cursor-pointer transition-all"
+                className="bg-white rounded-2xl p-5 shadow-[0_8px_30px_rgba(37,99,235,0.22)] border border-blue-200/80 hover:shadow-[0_12px_35px_rgba(37,99,235,0.3)] relative overflow-hidden cursor-pointer transition-all active:scale-[0.99]"
               >
                 <div className="absolute top-0 right-0 p-3 opacity-[0.03]">
                   <span className="text-7xl font-black text-slate-900 italic">
@@ -405,16 +415,26 @@ export default function PlantillaEquipoPage() {
                   </span>
                 </div>
                 
-                <div className="flex items-start justify-between relative z-10">
-                  <div className="flex gap-4 items-center">
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shadow-sm ${esEntrenador ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                      {player.dorsal || <User size={24} />}
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="flex gap-4 items-center flex-1 min-w-0">
+                    {/* Avatar con foto o icono más grande */}
+                    <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-100 border-2 border-white shadow-md flex items-center justify-center flex-shrink-0">
+                      {player.avatar_url ? (
+                        <img
+                          src={player.avatar_url}
+                          alt={player.first_name}
+                          className="w-full h-full object-cover object-[center_25%]"
+                        />
+                      ) : (
+                        <User className={`w-9 h-9 ${esEntrenador ? 'text-blue-500' : 'text-slate-400'}`} />
+                      )}
                     </div>
+
                     <div className="flex-1 min-w-0 pr-2">
                       <h3 className="text-slate-900 font-bold text-lg leading-tight break-words">
                         {player.first_name} {player.last_name}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         <span className="text-emerald-700 text-xs font-semibold capitalize bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
                           {player.posicion_principal || 'Sin posición'}
                         </span>
@@ -431,6 +451,14 @@ export default function PlantillaEquipoPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Dorsal a la derecha sin almohadilla */}
+                  {player.dorsal && (
+                    <div className="flex flex-col items-center justify-center min-w-10 px-2.5 py-1 bg-slate-900 text-white rounded-xl shadow-xs ml-3 flex-shrink-0">
+                      <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 leading-none">Dorsal</span>
+                      <span className="text-base font-black leading-tight">{player.dorsal}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs relative z-10">

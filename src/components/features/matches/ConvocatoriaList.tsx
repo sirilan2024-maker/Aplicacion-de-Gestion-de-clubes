@@ -143,6 +143,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
           >
             Desmarcar Todos
           </button>
+          <button 
+            onClick={handleGuardar}
+            disabled={isPending}
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-md shadow-emerald-500/20 flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+          >
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Guardar Cambios
+          </button>
         </div>
       </div>
 

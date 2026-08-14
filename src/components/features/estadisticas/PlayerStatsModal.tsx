@@ -11,6 +11,7 @@ export interface PlayerStatsData {
   posicion_principal?: string;
   posicion?: string;
   dorsal?: number;
+  avatar_url?: string | null;
   minutes_played: number;
   matches_called: number;
   attendance_percentage: number;
@@ -33,8 +34,12 @@ export function PlayerStatsModal({ player, onClose }: PlayerStatsModalProps) {
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shadow-sm border border-blue-200">
-              {player.first_name?.charAt(0) || ''}{player.last_name?.charAt(0) || ''}
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shadow-sm border border-blue-200 shrink-0">
+              {player.avatar_url ? (
+                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+              ) : (
+                <span>{player.first_name?.charAt(0) || ''}{player.last_name?.charAt(0) || ''}</span>
+              )}
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900 leading-tight">

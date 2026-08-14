@@ -296,7 +296,7 @@ export default function RendimientoGlobalPage() {
               >
                 <div className="flex items-center gap-3 mb-4">
                   {player.avatar_url ? (
-                    <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+                    <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover object-[center_25%] border border-gray-200" />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg border border-slate-200">
                       {player.first_name.charAt(0)}{player.last_name.charAt(0)}
@@ -371,7 +371,7 @@ export default function RendimientoGlobalPage() {
               >
                 <div className="flex items-center gap-3 mb-4">
                   {player.avatar_url ? (
-                    <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+                    <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover object-[center_25%] border border-gray-200" />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg border border-slate-200">
                       {player.first_name.charAt(0)}{player.last_name.charAt(0)}

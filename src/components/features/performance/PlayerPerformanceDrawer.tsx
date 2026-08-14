@@ -46,12 +46,20 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
         {/* Header */}
         <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-full border border-slate-200 shadow-sm flex items-center justify-center">
-              <UserIcon className="text-slate-400" />
+            <div className="w-12 h-12 bg-white rounded-full border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
+              {(globalTrainingStats?.avatar_url || globalMatchStats?.avatar_url) ? (
+                <img 
+                  src={globalTrainingStats?.avatar_url || globalMatchStats?.avatar_url} 
+                  alt={pName} 
+                  className="w-full h-full object-cover object-[center_25%]" 
+                />
+              ) : (
+                <UserIcon className="text-slate-400" />
+              )}
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-900">{pName}</h2>
-              <div className="text-xs font-bold text-slate-500 uppercase">Dorsal {globalTrainingStats?.dorsal || '-'}</div>
+              <div className="text-xs font-bold text-slate-500 uppercase">Dorsal {globalTrainingStats?.dorsal || globalMatchStats?.dorsal || '-'}</div>
             </div>
           </div>
           <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm">

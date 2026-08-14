@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, BrainCircuit
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
@@ -14,6 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
 import { UtileriaTab } from "@/components/features/club/UtileriaTab";
+import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
+import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
+import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 
 interface PlayerData {
   id: string;
@@ -105,7 +108,9 @@ export default function GlobalPlayerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
 
-  // Edit states
+  const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<PlayerData>>({});
   const [saving, setSaving] = useState(false);
@@ -530,48 +535,60 @@ export default function GlobalPlayerProfilePage() {
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !player) return;
-    
-    // Validar tamaño (máx 5MB) y tipo (imagen)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("La imagen es demasiado grande. Máximo 5MB.");
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      toast.error("El archivo debe ser una imagen.");
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    if (!player) {
+      toast.error("Datos del jugador no cargados");
       return;
     }
 
-    const toastId = toast.loading("Subiendo foto...");
-    const supabase = createClient();
-    
+    const toastId = toast.loading("Subiendo y guardando foto...");
+
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${player.id}-${Math.random()}.${fileExt}`;
-      const filePath = `jugadores/${fileName}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('playerId', player.id);
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
+      const res = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (uploadError) throw uploadError;
+      const data = await res.json();
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      if (!res.ok || !data.publicUrl) {
+        throw new Error(data.error || "No se pudo subir la foto");
+      }
 
-      const { error: updateError } = await supabase
+      setPlayer(prev => prev ? ({ ...prev, avatar_url: data.publicUrl }) : null);
+      toast.success("¡Foto añadida correctamente!", { id: toastId });
+    } catch (err: any) {
+      console.error("Error al subir foto:", err);
+      toast.error("Error al guardar la foto: " + (err.message || "error de conexión"), { id: toastId });
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const deletePhoto = async () => {
+    if (!player || !player.avatar_url) return;
+    if (!confirm("¿Seguro que deseas eliminar la foto de perfil de este jugador?")) return;
+
+    const toastId = toast.loading("Eliminando foto...");
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
         .from('players')
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: null })
         .eq('id', player.id);
 
-      if (updateError) throw updateError;
-
-      setPlayer({ ...player, avatar_url: publicUrl });
-      toast.success("Foto actualizada", { id: toastId });
-    } catch (error: any) {
-      toast.error("Error al subir la foto: " + error.message, { id: toastId });
+      if (error) throw error;
+      setPlayer({ ...player, avatar_url: null });
+      toast.success("Foto eliminada correctamente", { id: toastId });
+    } catch (err: any) {
+      toast.error("Error al eliminar la foto: " + err.message, { id: toastId });
     }
   };
 
@@ -634,27 +651,49 @@ export default function GlobalPlayerProfilePage() {
             </div>
           </div>
         )}
-        <div className="h-32 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
-        <div className="px-4 sm:px-8 pb-8">
-          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-end mb-4 gap-4">
-            <div className="flex items-end gap-4 sm:gap-6 w-full">
-              <div className="relative group min-w-24 w-24 h-24 sm:min-w-28 sm:w-28 sm:h-28 bg-white rounded-2xl shadow-lg border-4 border-white flex items-center justify-center overflow-hidden -mt-12">
-                {player.avatar_url ? (
-                  <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
-                    <UserIcon size={56} />
-                  </div>
-                )}
-                
-                {/* Botón flotante para subir foto */}
-                <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <Camera size={24} className="mb-1" />
-                  <span className="text-xs font-bold">Cambiar Foto</span>
-                  <input type="file" className="hidden" accept="image/*" onChange={uploadPhoto} />
+        <div className="h-16 sm:h-20 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
+        <div className="px-4 sm:px-8 pb-6">
+          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mb-4 gap-4">
+            <div className="flex items-center gap-6 sm:gap-8 w-full">
+              <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden -mt-10 sm:-mt-12 group flex-shrink-0">
+                <label className="w-full h-full cursor-pointer flex items-center justify-center" title="Toca para cambiar foto">
+                  {player.avatar_url ? (
+                    <img
+                      src={player.avatar_url}
+                      alt={player.first_name}
+                      className="w-full h-full object-cover object-[center_25%]"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                      <UserIcon size={64} />
+                    </div>
+                  )}
+
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={uploadPhoto}
+                  />
                 </label>
+
+                {/* Botón papelera que SOLO aparece al hacer hover con el ratón en PC */}
+                {player.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      deletePhoto();
+                    }}
+                    title="Eliminar foto"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-slate-900/80 hover:bg-rose-600 text-white rounded-full flex items-center justify-center shadow-md cursor-pointer transition-all opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto active:scale-90 z-30"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
-              <div className="pb-2 flex-1 min-w-0">
+              <div className="flex-1 min-w-0 pt-1 pl-2 sm:pl-3">
                 <div className="flex items-center gap-3">
                   <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
                     {player.first_name} {player.last_name}
@@ -665,7 +704,7 @@ export default function GlobalPlayerProfilePage() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium">
+                <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium text-sm flex-wrap">
                   <span className="capitalize">{player.posicion || 'Sin posición'}</span>
                   {edadJugador !== null && (
                     <>
@@ -728,6 +767,7 @@ export default function GlobalPlayerProfilePage() {
           >
             <option value="info">Info Personal</option>
             <option value="medico">Físico & Médico</option>
+            <option value="formativo">🧠 Formativo & Aprendizaje</option>
             {!esEntrenador && <option value="stats">Estadísticas</option>}
             {!esEntrenador && <option value="asistencia">Asistencia</option>}
             {!esEntrenador && <option value="disciplina">Disciplina</option>}
@@ -752,6 +792,14 @@ export default function GlobalPlayerProfilePage() {
             }`}
           >
             <HeartPulse size={18} /> Físico & Médico
+          </button>
+          <button 
+            onClick={() => setActiveTab('formativo' as any)}
+            className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'formativo' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <BrainCircuit size={18} className="text-emerald-600" /> Formativo & Aprendizaje
           </button>
           {!esEntrenador && (
             <>
@@ -1601,6 +1649,14 @@ export default function GlobalPlayerProfilePage() {
           </div>
         )}
 
+        {/* PESTAÑA: FORMATIVO & APRENDIZAJE */}
+        {activeTab === ('formativo' as any) && (
+          <PlayerProgressView 
+            playerId={player.id} 
+            playerName={`${player.first_name} ${player.last_name}`} 
+          />
+        )}
+
         {/* PESTAÑA: ASISTENCIA */}
         {activeTab === 'asistencia' && (
           <div className="space-y-6">
@@ -1781,80 +1837,180 @@ export default function GlobalPlayerProfilePage() {
 // NUEVO COMPONENTE: Pestaña de Disciplina
 // ----------------------------------------------------
 function DisciplineTab({ playerId }: { playerId: string }) {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totals, setTotals] = useState({ yellows: 0, reds: 0, cycleCards: 0, cyclesCompleted: 0 })
+  const [matchesWithCards, setMatchesWithCards] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totals, setTotals] = useState({ totalYellows: 0, totalReds: 0, currentCycleYellows: 0, cyclesCompleted: 0 });
 
   useEffect(() => {
     const fetchDiscipline = async () => {
-      const supabase = createClient()
+      const supabase = createClient();
       
-      const { data, error } = await supabase
-        .from('discipline_cards')
+      const { data: convs } = await supabase
+        .from('convocatorias')
         .select(`
-          id, card_type, reason, created_at,
-          partidos:match_id (
-            id, date, opponent
+          yellow_cards, red_cards,
+          partidos:partido_id (
+            id, fecha_hora, rival_nombre, lugar
           )
         `)
-        .eq('player_id', playerId)
-        .order('created_at', { ascending: false })
+        .eq('player_id', playerId);
 
-      if (!error && data) {
-        setData(data)
-        
-        let y = 0, r = 0
-        data.forEach(c => {
-          if (c.card_type === 'Amarilla') y++
-          if (c.card_type === 'Roja') r++
-        })
-        
-        const cyclesComp = Math.floor(y / 5)
-        const cycleC = y % 5
-        setTotals({ yellows: y, reds: r, cycleCards: cycleC, cyclesCompleted: cyclesComp })
-      }
-      setLoading(false)
-    }
+      const filtered = (convs || [])
+        .filter((c: any) => c.partidos && ((c.yellow_cards || 0) > 0 || (c.red_cards || 0) > 0))
+        .map((c: any) => ({
+          matchId: c.partidos.id,
+          date: c.partidos.fecha_hora,
+          rival: c.partidos.rival_nombre,
+          lugar: c.partidos.lugar,
+          yellows: c.yellow_cards || 0,
+          reds: c.red_cards || 0
+        }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    fetchDiscipline()
-  }, [playerId])
+      setMatchesWithCards(filtered);
+
+      let totalY = 0;
+      let totalR = 0;
+      let accumInCycle = 0;
+      let completedCycles = 0;
+
+      filtered.forEach((m) => {
+        totalR += m.reds;
+        totalY += m.yellows;
+        
+        // Regla del ciclo: 2 amarillas en el mismo partido es expulsión por doble amarilla (no suma al ciclo de 5)
+        if (m.yellows === 1) {
+          accumInCycle++;
+          if (accumInCycle === 5) {
+            completedCycles++;
+            accumInCycle = 0;
+          }
+        }
+      });
+
+      setTotals({
+        totalYellows: totalY,
+        totalReds: totalR,
+        currentCycleYellows: accumInCycle,
+        cyclesCompleted: completedCycles
+      });
+
+      setLoading(false);
+    };
+
+    fetchDiscipline();
+  }, [playerId]);
+
   if (loading) {
-    return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">Cargando historial disciplinario...</div>
+    return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">Cargando historial disciplinario...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-white">
-          <h3 className="font-bold text-slate-800">Registro de Partidos con Amonestación</h3>
+      {/* Resumen de Ciclos Disciplinarios */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Amarillas Totales</span>
+            <div className="w-3.5 h-5 bg-yellow-400 rounded-sm shadow-sm" />
+          </div>
+          <div className="text-3xl font-black text-slate-900">{totals.totalYellows}</div>
+          <p className="text-xs text-slate-500 mt-1">En todas las actas de la temporada</p>
         </div>
-        {data.length === 0 ? (
+
+        <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Ciclo Actual</span>
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-amber-900">{totals.currentCycleYellows}</span>
+            <span className="text-sm font-bold text-amber-700">/ 5 tarjetas</span>
+          </div>
+          <p className="text-xs text-amber-700 mt-1 font-medium">
+            {5 - totals.currentCycleYellows === 1 
+              ? '🚨 ¡A 1 tarjeta de sanción!' 
+              : `Faltan ${5 - totals.currentCycleYellows} tarjetas para cumplir sanción`}
+          </p>
+        </div>
+
+        <div className="bg-indigo-50/60 border border-indigo-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-indigo-800 uppercase tracking-wider">Ciclos Cumplidos</span>
+            <Shield className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div className="text-3xl font-black text-indigo-900">{totals.cyclesCompleted}</div>
+          <p className="text-xs text-indigo-700 mt-1">Sanciones por 5 amarillas ({totals.cyclesCompleted} partidos)</p>
+        </div>
+
+        <div className="bg-red-50/60 border border-red-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-red-800 uppercase tracking-wider">Tarjetas Rojas</span>
+            <div className="w-3.5 h-5 bg-red-500 rounded-sm shadow-sm" />
+          </div>
+          <div className="text-3xl font-black text-red-900">{totals.totalReds}</div>
+          <p className="text-xs text-red-700 mt-1">Expulsiones directas o doble amarilla</p>
+        </div>
+      </div>
+
+      {/* Barra de progreso de ciclo actual */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+          <span>Estado del Ciclo Disciplinario Activo</span>
+          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold">
+            Ciclo #{totals.cyclesCompleted + 1}
+          </span>
+        </h4>
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5].map((slot) => {
+            const isFilled = slot <= totals.currentCycleYellows;
+            return (
+              <div 
+                key={slot}
+                className={`flex-1 h-3 rounded-full transition-all ${
+                  isFilled ? (totals.currentCycleYellows === 4 ? 'bg-amber-500 animate-pulse' : 'bg-yellow-400') : 'bg-slate-100 border border-slate-200'
+                }`}
+                title={`Tarjeta ${slot} del ciclo`}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Historial de Partidos con Amonestaciones */}
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
+          <h3 className="font-bold text-slate-800">Partidos con Amonestación de la Temporada</h3>
+          <span className="text-xs font-semibold text-slate-500">{matchesWithCards.length} partidos</span>
+        </div>
+        {matchesWithCards.length === 0 ? (
           <div className="p-8 text-center text-slate-500 bg-white flex flex-col items-center">
             <CheckCircle className="mb-2 text-emerald-500" size={32} />
             El jugador no ha recibido ninguna tarjeta en los partidos registrados.
           </div>
         ) : (
           <div className="divide-y divide-slate-200 bg-white">
-            {data.map((item, idx) => (
+            {matchesWithCards.map((item, idx) => (
               <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-slate-50 transition-colors gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-800">{item.title}</span>
-                    <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{item.type}</span>
+                    <span className="font-bold text-slate-900">vs {item.rival} ({item.lugar})</span>
                   </div>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     {new Date(item.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 items-center">
                   {item.yellows > 0 && (
-                    <div className="w-6 h-8 bg-yellow-400 rounded-sm shadow-sm border border-yellow-500 flex items-center justify-center font-bold text-yellow-900 text-sm" title={`${item.yellows} Amarillas`}>
-                      {item.yellows}
+                    <div className="px-3 py-1 bg-yellow-50 text-yellow-800 border border-yellow-300 rounded-lg flex items-center gap-1.5 font-bold text-xs">
+                      <div className="w-2.5 h-3.5 bg-yellow-400 rounded-sm shadow-sm" />
+                      <span>{item.yellows} {item.yellows === 1 ? 'Amarilla' : 'Amarillas'}</span>
                     </div>
                   )}
                   {item.reds > 0 && (
-                    <div className="w-6 h-8 bg-red-500 rounded-sm shadow-sm border border-red-600 flex items-center justify-center font-bold text-white text-sm" title={`${item.reds} Rojas`}>
-                      {item.reds}
+                    <div className="px-3 py-1 bg-red-50 text-red-800 border border-red-300 rounded-lg flex items-center gap-1.5 font-bold text-xs">
+                      <div className="w-2.5 h-3.5 bg-red-500 rounded-sm shadow-sm" />
+                      <span>{item.reds} {item.reds === 1 ? 'Roja' : 'Rojas'}</span>
                     </div>
                   )}
                 </div>
@@ -1863,8 +2019,67 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
+
+      {/* Modal Emergente de Gestión de Foto */}
+      {showPhotoModal && (
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setShowPhotoModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner mb-1">
+              {player.avatar_url ? (
+                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+              ) : (
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                  <UserIcon size={40} />
+                </div>
+              )}
+            </div>
+
+            <h3 className="font-bold text-slate-900 text-sm">Foto de Perfil</h3>
+
+            <div className="flex flex-col w-full gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoModal(false);
+                  fileInputRef.current?.click();
+                }}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
+                <Camera size={14} />
+                <span>Cambiar Foto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoModal(false);
+                  deletePhoto();
+                }}
+                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-rose-200"
+              >
+                <Trash2 size={14} />
+                <span>Eliminar Foto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all mt-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
 // ----------------------------------------------------

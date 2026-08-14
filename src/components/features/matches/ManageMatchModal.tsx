@@ -16,7 +16,7 @@ interface ManageMatchModalProps {
 
 export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: ManageMatchModalProps) {
   const [autoRsvp, setAutoRsvp] = useState(false);
-  
+
   if (!match) return null;
 
   const defaultTeamId = match.equipo_id || teamId;

@@ -7,6 +7,7 @@ import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X } 
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO, differenceInDays, addDays, getDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { createTeamEventAction } from "@/app/actions/event-actions";
 
 interface TrainingSession {
   id: string;
@@ -43,6 +44,9 @@ export default function EntrenamientosListPage() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [recurringEndDate, setRecurringEndDate] = useState("");
+  const [autoRsvp, setAutoRsvp] = useState(false);
+  const [rsvpDate, setRsvpDate] = useState("");
+  const [rsvpTime, setRsvpTime] = useState("19:00");
 
   useEffect(() => {
     fetchData();
@@ -159,8 +163,9 @@ export default function EntrenamientosListPage() {
       event_type: "Entrenamiento",
       start_time: newTime,
       end_time: newEndTime || null,
-      lugar: newLocation || null,
-      description: newDescription || null,
+      location: newLocation || null,
+      notes: newDescription || null,
+      rsvp_reminder_time: autoRsvp && rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null
     };
 
     const eventsToInsert = [];
@@ -189,15 +194,11 @@ export default function EntrenamientosListPage() {
       }
     }
 
-    const { data, error } = await supabase
-      .from('team_events')
-      .insert(eventsToInsert)
-      .select();
+    try {
+      for (const ev of eventsToInsert) {
+        await createTeamEventAction(teamId, ev);
+      }
 
-    if (error) {
-      toast.error("Error al crear la sesión: " + error.message);
-      setCreating(false);
-    } else if (data) {
       toast.success(eventsToInsert.length > 1 ? `${eventsToInsert.length} sesiones creadas` : "Sesión creada");
       setCreating(false);
       setShowModal(false);
@@ -208,7 +209,13 @@ export default function EntrenamientosListPage() {
       setNewEndTime("");
       setNewLocation("");
       setNewDescription("");
+      setAutoRsvp(false);
+      setRsvpDate("");
+      setRsvpTime("19:00");
       fetchData();
+    } catch (err: any) {
+      toast.error("Error al crear la sesión: " + (err.message || "Error desconocido"));
+      setCreating(false);
     }
   };
 
@@ -474,6 +481,45 @@ export default function EntrenamientosListPage() {
                   </div>
                 )}
               </div>
+
+              {/* PROGRAMACIÓN AUTOMÁTICA DE ASISTENCIA */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <input 
+                    type="checkbox" 
+                    checked={autoRsvp}
+                    onChange={(e) => setAutoRsvp(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="font-bold text-slate-900 text-sm">Petición asistencia automática</span>
+                </label>
+                
+                {autoRsvp && (
+                  <div className="grid grid-cols-2 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Día de envío</label>
+                      <input 
+                        type="date" 
+                        required={autoRsvp}
+                        value={rsvpDate}
+                        onChange={e => setRsvpDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
+                      <input 
+                        type="time" 
+                        required={autoRsvp}
+                        value={rsvpTime}
+                        onChange={e => setRsvpTime(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="pt-4 flex gap-3">
                 <button 
                   type="button" 

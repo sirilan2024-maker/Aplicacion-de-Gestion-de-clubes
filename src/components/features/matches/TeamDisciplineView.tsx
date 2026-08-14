@@ -125,15 +125,12 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     }
   })
 
-  // Ordenar por apercibidos primero, luego rojas, luego amarillas
+  // Ordenar estrictamente de mayor a menor por total de amarillas, luego rojas, luego nombre
   disciplineData.sort((a, b) => {
-    const aApercibido = a.cycleCards === 4 ? 1 : 0
-    const bApercibido = b.cycleCards === 4 ? 1 : 0
-    if (aApercibido !== bApercibido) return bApercibido - aApercibido
-    if (b.totalRed !== a.totalRed) return b.totalRed - a.totalRed
-    if (b.totalYellow !== a.totalYellow) return b.totalYellow - a.totalYellow
-    return a.player.first_name.localeCompare(b.player.first_name)
-  })
+    if (b.totalYellow !== a.totalYellow) return b.totalYellow - a.totalYellow;
+    if (b.totalRed !== a.totalRed) return b.totalRed - a.totalRed;
+    return a.player.first_name.localeCompare(b.player.first_name);
+  });
 
   // Filtrar por buscador
   const filteredData = disciplineData.filter(d => {
@@ -222,15 +219,17 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
             <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
               <tr>
                 <th className="px-6 py-4">Jugador</th>
-                <th className="px-6 py-4 text-center w-32">
+                <th className="px-5 py-4 text-center w-36">
                   <div className="flex justify-center items-center gap-1">
-                    <div className="w-3 h-4 bg-amber-400 rounded-sm"></div>
-                    <span>Amarillas</span>
+                    <div className="w-3 h-4 bg-amber-400 rounded-sm" />
+                    <span>Amarillas Totales</span>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-center w-32">
+                <th className="px-5 py-4 text-center w-36">Ciclos Cumplidos</th>
+                <th className="px-5 py-4 text-center w-44">Ciclo Actual</th>
+                <th className="px-5 py-4 text-center w-24">
                   <div className="flex justify-center items-center gap-1">
-                    <div className="w-3 h-4 bg-red-500 rounded-sm"></div>
+                    <div className="w-3 h-4 bg-red-500 rounded-sm" />
                     <span>Rojas</span>
                   </div>
                 </th>
@@ -242,7 +241,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                 <tr 
                   key={d.player.id} 
                   onClick={() => handleOpenModal(d.player.id)}
-                  className={`transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
+                  className={`transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50/80 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -257,7 +256,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                         <div className="font-bold text-slate-900 flex items-center gap-2">
                           {d.player.first_name} {d.player.last_name}
                           {d.cycleCards === 4 && (
-                            <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                            <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-700 bg-orange-100 font-bold border border-orange-200 px-2 py-0.5 rounded-md text-[10px] uppercase">
                               <AlertCircle size={10} className="mr-1"/> Apercibido
                             </span>
                           )}
@@ -266,15 +265,38 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center font-bold text-slate-700">
+                  <td className="px-5 py-4 text-center font-black text-slate-900 text-base">
                     {d.totalYellow > 0 ? d.totalYellow : '-'}
-                    {d.cyclesCompleted > 0 && (
-                      <div className="text-[10px] text-slate-400 font-normal mt-0.5" title="Sanciones cumplidas (Ciclos de 5)">
-                        ({d.cyclesCompleted} ciclos)
-                      </div>
+                  </td>
+                  <td className="px-5 py-4 text-center">
+                    {d.cyclesCompleted > 0 ? (
+                      <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg text-xs font-black">
+                        {d.cyclesCompleted} {d.cyclesCompleted === 1 ? 'sanción' : 'sanciones'}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-medium text-xs">0</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-5 py-4 text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-[11px] font-bold text-slate-600">
+                        Ciclo #{d.cyclesCompleted + 1} ({d.cycleCards}/5)
+                      </span>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(slot => (
+                          <div 
+                            key={slot} 
+                            className={`w-3.5 h-3.5 rounded-full border ${
+                              slot <= d.cycleCards 
+                                ? (d.cycleCards === 4 ? 'bg-amber-500 border-amber-600 animate-pulse' : 'bg-yellow-400 border-yellow-500') 
+                                : 'bg-slate-100 border-slate-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-center">
                     <span className={`font-black ${d.totalRed > 0 ? 'text-red-500' : 'text-slate-300'}`}>
                       {d.totalRed}
                     </span>
@@ -300,7 +322,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
               ))}
               {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                     No se encontraron jugadores.
                   </td>
                 </tr>
@@ -347,28 +369,28 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                   </button>
                 )}
               </div>
-              <div className="flex gap-4">
-                <div className="bg-white p-2 rounded-lg flex-1 text-center border border-slate-200 flex flex-col items-center justify-center">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white p-2 rounded-lg text-center border border-slate-200 flex flex-col items-center justify-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm"></div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Amarillas</span>
+                    <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm" />
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Total Amarillas</span>
                   </div>
-                  <div className="font-bold text-slate-700">
+                  <div className="font-black text-slate-800 text-sm">
                     {d.totalYellow > 0 ? d.totalYellow : '-'}
                   </div>
-                  {d.cyclesCompleted > 0 && (
-                    <div className="text-[10px] text-slate-400 font-normal">
-                      ({d.cyclesCompleted} ciclos)
-                    </div>
-                  )}
                 </div>
-                <div className="bg-white p-2 rounded-lg flex-1 text-center border border-slate-200 flex flex-col items-center justify-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <div className="w-2.5 h-3.5 bg-red-500 rounded-sm"></div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Rojas</span>
+
+                <div className="bg-white p-2 rounded-lg text-center border border-slate-200 flex flex-col items-center justify-center">
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase mb-1">Ciclos Cumplidos</span>
+                  <div className="font-black text-indigo-900 text-sm">
+                    {d.cyclesCompleted}
                   </div>
-                  <div className={`font-black ${d.totalRed > 0 ? 'text-red-500' : 'text-slate-300'}`}>
-                    {d.totalRed}
+                </div>
+
+                <div className="bg-white p-2 rounded-lg text-center border border-slate-200 flex flex-col items-center justify-center">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase mb-1">Ciclo #{d.cyclesCompleted + 1}</span>
+                  <div className="font-black text-slate-800 text-sm">
+                    {d.cycleCards}/5
                   </div>
                 </div>
               </div>

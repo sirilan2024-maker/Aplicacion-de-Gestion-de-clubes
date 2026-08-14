@@ -11,6 +11,7 @@ interface Player {
   first_name: string;
   last_name: string;
   dorsal: number | null;
+  avatar_url?: string | null;
 }
 
 interface PastEvent {
@@ -81,7 +82,7 @@ export default function AsistenciaEquipoPage() {
         .select(`
           player_id,
           players (
-            id, first_name, last_name, dorsal
+            id, first_name, last_name, dorsal, avatar_url
           )
         `)
         .eq("team_id", teamId)
@@ -93,7 +94,8 @@ export default function AsistenciaEquipoPage() {
         id: history.players.id,
         first_name: history.players.first_name,
         last_name: history.players.last_name,
-        dorsal: history.players.dorsal
+        dorsal: history.players.dorsal,
+        avatar_url: history.players.avatar_url
       })).sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
 
       setPlayers(mappedPlayers);
@@ -508,8 +510,17 @@ export default function AsistenciaEquipoPage() {
                     >
                       <td className="p-4 font-semibold text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] z-10 flex items-center gap-3">
                         {isExpanded ? <ChevronUp className="w-4 h-4 text-blue-500 shrink-0"/> : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0"/>}
+                        <div className="w-7 h-7 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                          {player.avatar_url ? (
+                            <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-500">
+                              {player.first_name?.charAt(0)}{player.last_name?.charAt(0)}
+                            </span>
+                          )}
+                        </div>
                         {player.dorsal ? (
-                          <span className="text-xs text-gray-400 font-bold w-4 text-right shrink-0">{player.dorsal}</span>
+                          <span className="text-xs text-gray-500 font-extrabold w-4 text-right shrink-0">{player.dorsal}</span>
                         ) : (
                           <span className="text-xs text-gray-400 font-bold w-4 text-right shrink-0"></span>
                         )}

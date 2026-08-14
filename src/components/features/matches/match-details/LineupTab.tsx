@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Users, Save, X, HelpCircle } from "lucide-react"
+import { useState, useTransition, useEffect, useRef } from "react"
+import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import { saveLineup } from "@/app/actions/match-actions"
 
@@ -16,7 +16,7 @@ interface Player {
 
 const INITIAL_PLAYERS: Player[] = []
 
-export const FORMATIONS: Record<string, { id: string; label: string; x: number; y: number }[]> = {
+export const DEFAULT_FORMATIONS: Record<string, { id: string; label: string; x: number; y: number }[]> = {
   "4-3-3": [
     { id: "slot-0", label: "POR", x: 50, y: 88 },
     { id: "slot-1", label: "LD", x: 15, y: 70 },
@@ -125,6 +125,24 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
   
   const initialPlayersList = mappedPlayers.length > 0 ? mappedPlayers : INITIAL_PLAYERS;
 
+  // Cargar sistemas personalizados guardados en localStorage
+  const [customFormations, setCustomFormations] = useState<Record<string, { id: string; label: string; x: number; y: number }[]>>({})
+  const [showSaveTacticModal, setShowSaveTacticModal] = useState(false)
+  const [newTacticName, setNewTacticName] = useState("")
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("custom_lineup_tactics")
+      if (saved) {
+        setCustomFormations(JSON.parse(saved))
+      }
+    } catch (e) {
+      console.error("Error al cargar tácticas personalizadas:", e)
+    }
+  }, [])
+
+  const allFormations = { ...DEFAULT_FORMATIONS, ...customFormations }
+
   // Cargar desde base de datos usando tactical_x y tactical_y si existen
   const initialPitchPlayers: Record<string, { x: number, y: number }> = {};
   
@@ -141,8 +159,8 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
     // Si no hay datos, cargar la táctica inicial
     let i = 0;
     for (const p of initialPlayersList) {
-      if (i < 11 && FORMATIONS["4-3-3"][i]) {
-        initialPitchPlayers[p.id] = { x: FORMATIONS["4-3-3"][i].x, y: FORMATIONS["4-3-3"][i].y };
+      if (i < 11 && DEFAULT_FORMATIONS["4-3-3"][i]) {
+        initialPitchPlayers[p.id] = { x: DEFAULT_FORMATIONS["4-3-3"][i].x, y: DEFAULT_FORMATIONS["4-3-3"][i].y };
         i++;
       }
     }
@@ -151,19 +169,29 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
   const [tactic, setTactic] = useState<string>("4-3-3")
   const [pitchPlayers, setPitchPlayers] = useState<Record<string, { x: number, y: number }>>(initialPitchPlayers)
   const [savedAlert, setSavedAlert] = useState(false)
+  const [limitWarning, setLimitWarning] = useState<string | null>(null)
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null)
+  
+  const pitchRef = useRef<HTMLDivElement>(null)
   const isFamilyView = rol === "familia" || rol === "jugador"
   
   const assignedPlayerIds = Object.keys(pitchPlayers);
   const availablePlayers = initialPlayersList.filter(p => !assignedPlayerIds.includes(p.id));
 
+  // Función para mostrar alerta si se sobrepasa el límite de 11 jugadores
+  const showLimitError = () => {
+    setLimitWarning("Solo pueden haber 11 jugadores en el campo al mismo tiempo.")
+    setTimeout(() => setLimitWarning(null), 4000)
+  }
+
   const handleTacticChange = (newTactic: string) => {
     setTactic(newTactic);
     const newPitchPlayers: Record<string, { x: number, y: number }> = {};
-    const slots = FORMATIONS[newTactic];
-    let slotIdx = 0;
+    const slots = allFormations[newTactic];
+    if (!slots) return;
     
-    // Asignar los jugadores que ya están en el campo a las nuevas posiciones
+    let slotIdx = 0;
     for (const playerId of assignedPlayerIds) {
       if (slotIdx < 11 && slots[slotIdx]) {
         newPitchPlayers[playerId] = { x: slots[slotIdx].x, y: slots[slotIdx].y };
@@ -172,6 +200,44 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
     }
     setPitchPlayers(newPitchPlayers);
     setSelectedPlayerId(null);
+  }
+
+  const handleSaveCustomTactic = () => {
+    const trimmed = newTacticName.trim()
+    if (!trimmed) return
+
+    // Generar un sistema basado en las posiciones actuales en el campo
+    const slots = Object.values(pitchPlayers).map((coords, idx) => ({
+      id: `slot-${idx}`,
+      label: "JUG",
+      x: coords.x,
+      y: coords.y
+    }))
+
+    const updated = { ...customFormations, [trimmed]: slots }
+    setCustomFormations(updated)
+    try {
+      localStorage.setItem("custom_lineup_tactics", JSON.stringify(updated))
+    } catch (e) {
+      console.error("Error al guardar táctica personalizada:", e)
+    }
+    setTactic(trimmed)
+    setNewTacticName("")
+    setShowSaveTacticModal(false)
+  }
+
+  const handleDeleteCustomTactic = (tacticName: string) => {
+    const next = { ...customFormations }
+    delete next[tacticName]
+    setCustomFormations(next)
+    try {
+      localStorage.setItem("custom_lineup_tactics", JSON.stringify(next))
+    } catch (e) {
+      console.error(e)
+    }
+    if (tactic === tacticName) {
+      setTactic("4-3-3")
+    }
   }
 
   const handleSave = () => {
@@ -188,15 +254,9 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
     })
   }
 
-  const handlePitchDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isFamilyView) return;
-    e.preventDefault();
-    const playerId = e.dataTransfer.getData("playerId");
-    if (!playerId) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    let x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-    let y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+  const placePlayerOnPitchAtCoords = (playerId: string, xRatio: number, yRatio: number) => {
+    let x = Math.max(0, Math.min(100, xRatio * 100));
+    let y = Math.max(0, Math.min(100, yRatio * 100));
     
     // Si estamos en Desktop (pitch horizontal), invertimos las coordenadas para guardar en formato vertical
     if (window.innerWidth >= 768) {
@@ -204,7 +264,13 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
       x = 100 - y;
       y = tempX;
     }
-    
+
+    // Verificar si es un jugador nuevo y ya hay 11 en el campo
+    if (!pitchPlayers[playerId] && Object.keys(pitchPlayers).length >= 11) {
+      showLimitError();
+      return;
+    }
+
     setPitchPlayers(prev => ({
       ...prev,
       [playerId]: { x, y }
@@ -212,24 +278,50 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
     setSelectedPlayerId(null);
   }
 
+  const handlePitchDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isFamilyView) return;
+    e.preventDefault();
+    const playerId = e.dataTransfer.getData("playerId") || draggedPlayerId;
+    if (!playerId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const xRatio = (e.clientX - rect.left) / rect.width;
+    const yRatio = (e.clientY - rect.top) / rect.height;
+
+    placePlayerOnPitchAtCoords(playerId, xRatio, yRatio);
+    setDraggedPlayerId(null);
+  }
+
   const handlePitchClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isFamilyView || !selectedPlayerId) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
-    let x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-    let y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+    const xRatio = (e.clientX - rect.left) / rect.width;
+    const yRatio = (e.clientY - rect.top) / rect.height;
+
+    placePlayerOnPitchAtCoords(selectedPlayerId, xRatio, yRatio);
+  }
+
+  // Soporte Touch (Arrastrar en móvil)
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isFamilyView || !draggedPlayerId || !pitchRef.current) return;
+    const touch = e.touches[0];
+    const rect = pitchRef.current.getBoundingClientRect();
     
-    if (window.innerWidth >= 768) {
-      const tempX = x;
-      x = 100 - y;
-      y = tempX;
+    if (
+      touch.clientX >= rect.left &&
+      touch.clientX <= rect.right &&
+      touch.clientY >= rect.top &&
+      touch.clientY <= rect.bottom
+    ) {
+      const xRatio = (touch.clientX - rect.left) / rect.width;
+      const yRatio = (touch.clientY - rect.top) / rect.height;
+      placePlayerOnPitchAtCoords(draggedPlayerId, xRatio, yRatio);
     }
-    
-    setPitchPlayers(prev => ({
-      ...prev,
-      [selectedPlayerId]: { x, y }
-    }));
-    setSelectedPlayerId(null);
+  }
+
+  const handleTouchEnd = () => {
+    setDraggedPlayerId(null);
   }
 
   const handleRemoveFromPitch = (playerId: string) => {
@@ -250,24 +342,50 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
           <div>
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alineación Táctica</h3>
             <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-              {isFamilyView ? "VISTA PREVIA TÁCTICA (MODO LECTURA)" : "MODO EDICIÓN INTERACTIVO (DRAG & DROP LIBRE)"}
+              {isFamilyView ? "VISTA PREVIA TÁCTICA (MODO LECTURA)" : "MODO EDICIÓN INTERACTIVO (TOCA O ARRASTRA)"}
             </p>
           </div>
 
           {!isFamilyView && (
-            <select
-              value={tactic}
-              onChange={e => handleTacticChange(e.target.value)}
-              className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none"
-            >
-              <option value="4-3-3">Sistema: 4-3-3</option>
-              <option value="4-4-2">Sistema: 4-4-2</option>
-              <option value="3-5-2">Sistema: 3-5-2</option>
-              <option value="4-2-3-1">Sistema: 4-2-3-1</option>
-              <option value="3-4-3">Sistema: 3-4-3</option>
-              <option value="4-1-4-1">Sistema: 4-1-4-1</option>
-              <option value="5-3-2">Sistema: 5-3-2</option>
-            </select>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={tactic}
+                onChange={e => handleTacticChange(e.target.value)}
+                className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none"
+              >
+                <optgroup label="Sistemas Predeterminados">
+                  {Object.keys(DEFAULT_FORMATIONS).map(name => (
+                    <option key={name} value={name}>Sistema: {name}</option>
+                  ))}
+                </optgroup>
+                {Object.keys(customFormations).length > 0 && (
+                  <optgroup label="Mis Sistemas Personalizados">
+                    {Object.keys(customFormations).map(name => (
+                      <option key={name} value={name}>⭐ {name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+
+              <button
+                onClick={() => setShowSaveTacticModal(true)}
+                className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg border border-blue-200 text-xs font-bold flex items-center gap-1 transition-colors"
+                title="Guardar alineación como nuevo sistema personalizado"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Guardar Sistema</span>
+              </button>
+
+              {customFormations[tactic] && (
+                <button
+                  onClick={() => handleDeleteCustomTactic(tactic)}
+                  className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg border border-red-200 text-xs font-bold transition-colors"
+                  title="Eliminar este sistema personalizado"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -277,13 +395,63 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
           </div>
         )}
 
+        {/* Modal para Guardar Nuevo Sistema Personalizado */}
+        {showSaveTacticModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 border border-slate-200 animate-in zoom-in-95 duration-150">
+              <h4 className="text-sm font-black text-slate-900 uppercase">Guardar Sistema Personalizado</h4>
+              <p className="text-xs text-slate-500 font-medium">
+                Guarda la disposición actual de los {Object.keys(pitchPlayers).length} jugadores como un nuevo esquema táctico.
+              </p>
+              <input
+                type="text"
+                value={newTacticName}
+                onChange={e => setNewTacticName(e.target.value)}
+                placeholder="Ej. 4-1-2-3 Presión Alta"
+                className="w-full text-xs font-bold px-3 py-2 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setShowSaveTacticModal(false)}
+                  className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveCustomTactic}
+                  disabled={!newTacticName.trim()}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-sm"
+                >
+                  Guardar Sistema
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Pitch Container */}
         <div className="bg-white border border-slate-150 rounded-xl p-5 shadow-sm space-y-4">
+          {/* Badge de contador de titulares */}
+          <div className="flex items-center justify-between text-xs font-bold px-1">
+            <span className="text-slate-500">
+              Titulares en campo: <strong className={assignedPlayerIds.length === 11 ? "text-emerald-600" : "text-slate-800"}>{assignedPlayerIds.length}/11</strong>
+            </span>
+            {selectedPlayerId && (
+              <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-[11px] animate-pulse">
+                Toca una zona del campo para colocar al jugador seleccionado
+              </span>
+            )}
+          </div>
+
           <div 
-            className="relative aspect-[3/4] md:aspect-auto md:w-full md:h-[380px] max-w-[380px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all cursor-pointer md:cursor-default"
+            ref={pitchRef}
+            className="relative aspect-[3/4] md:aspect-auto md:w-full md:h-[380px] max-w-[380px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all cursor-pointer md:cursor-default touch-none"
             onDragOver={isFamilyView ? undefined : e => e.preventDefault()}
             onDrop={handlePitchDrop}
             onClick={handlePitchClick}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             {/* Campo de fútbol marcajes */}
             <div className="absolute inset-4 border border-white/20 pointer-events-none md:-rotate-90 md:origin-center md:scale-[1.3] md:w-[150%] md:-left-[25%]">
@@ -301,7 +469,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
               return (
                 <div
                   key={playerId}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all duration-75"
+                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all duration-75 touch-none"
                   ref={(el) => {
                     if(el) {
                       if (window.innerWidth >= 768) {
@@ -317,9 +485,9 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                   <div className="relative group flex flex-col items-center">
                     <div
                       className={[
-                        "w-10 h-10 rounded-full bg-slate-900 border-2 flex items-center justify-center text-sm font-black shadow-md transition-all duration-200",
+                        "w-10 h-10 rounded-full bg-slate-900 border-2 flex items-center justify-center text-sm font-black shadow-md transition-all duration-200 select-none",
                         isFamilyView ? "cursor-default select-none border-white text-white" : "cursor-grab active:cursor-grabbing",
-                        selectedPlayerId === player.id ? "border-blue-400 text-blue-400 scale-110 shadow-blue-500/50 shadow-lg" : "border-white text-white"
+                        selectedPlayerId === player.id ? "border-blue-400 text-blue-400 scale-110 shadow-blue-500/50 shadow-lg ring-4 ring-blue-500/30" : "border-white text-white"
                       ].join(" ")}
                       draggable={!isFamilyView}
                       onClick={(e) => {
@@ -328,8 +496,14 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                           setSelectedPlayerId(selectedPlayerId === player.id ? null : player.id);
                         }
                       }}
+                      onTouchStart={(e) => {
+                        if (!isFamilyView) {
+                          setDraggedPlayerId(player.id);
+                        }
+                      }}
                       onDragStart={isFamilyView ? undefined : e => {
                         e.dataTransfer.setData("playerId", player.id);
+                        setDraggedPlayerId(player.id);
                         setTimeout(() => {
                            const el = e.target as HTMLElement;
                            if(el.parentElement) el.parentElement.style.opacity = '0.5';
@@ -338,6 +512,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                       onDragEnd={isFamilyView ? undefined : e => {
                          const el = e.target as HTMLElement;
                          if(el.parentElement) el.parentElement.style.opacity = '1';
+                         setDraggedPlayerId(null);
                       }}
                     >
                       {player.number || "?"}
@@ -385,6 +560,14 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
       {/* ── Columna Derecha: Banquillo / Lista (Oculta si familiar) ── */}
       {!isFamilyView && (
         <div className="space-y-4">
+          {/* Alerta de límite de 11 jugadores */}
+          {limitWarning && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{limitWarning}</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Lista de jugadores</h3>
             <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -396,13 +579,13 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
             className="bg-white border border-slate-150 rounded-xl p-4 shadow-sm space-y-3 min-h-[500px]"
             onDragOver={e => e.preventDefault()}
             onDrop={e => {
-              const playerId = e.dataTransfer.getData("playerId");
+              const playerId = e.dataTransfer.getData("playerId") || draggedPlayerId;
               if (playerId) handleRemoveFromPitch(playerId);
             }}
           >
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
               <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
-              Toca un jugador y luego el campo (o arrastra en PC)
+              Toca o arrastra un jugador para colocarlo en el campo
             </p>
 
             <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
@@ -412,11 +595,22 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                   draggable={true}
                   onClick={() => {
                     if (!isFamilyView) {
+                      if (Object.keys(pitchPlayers).length >= 11 && selectedPlayerId !== player.id) {
+                        showLimitError();
+                        return;
+                      }
                       setSelectedPlayerId(selectedPlayerId === player.id ? null : player.id);
                     }
                   }}
-                  onDragStart={e => e.dataTransfer.setData("playerId", player.id)}
-                  className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
+                  onTouchStart={() => {
+                    if (!isFamilyView) setDraggedPlayerId(player.id);
+                  }}
+                  onDragStart={e => {
+                    e.dataTransfer.setData("playerId", player.id);
+                    setDraggedPlayerId(player.id);
+                  }}
+                  onDragEnd={() => setDraggedPlayerId(null)}
+                  className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none touch-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">

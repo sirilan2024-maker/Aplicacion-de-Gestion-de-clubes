@@ -193,44 +193,85 @@ export default function FamilyMatchesPage() {
                   {/* Goleadores del Partido */}
                   {(() => {
                     const mEvents = match.match_events || [];
-                    const homeGoalsList = mEvents.filter((e: any) => {
+                    const goalEvents = mEvents.filter((e: any) => {
                       const t = (e.tipo_evento || e.tipo || '').toLowerCase();
-                      const isGol = t.includes('gol') && !t.includes('propia');
-                      const isAutogol = t.includes('propia') || t.includes('pp');
-                      return (isGol && e.player_id) || (isAutogol && !e.player_id);
+                      return t.includes('gol');
                     });
-                    const awayGoalsList = mEvents.filter((e: any) => {
+
+                    const homeGoalsList = goalEvents.filter((e: any) => {
                       const t = (e.tipo_evento || e.tipo || '').toLowerCase();
                       const isGol = t.includes('gol') && !t.includes('propia');
                       const isAutogol = t.includes('propia') || t.includes('pp');
-                      return (isGol && !e.player_id) || (isAutogol && e.player_id);
+                      const notas = e.notas || '';
+
+                      if (notas.includes('[LOCAL]')) return isGol ? true : false;
+                      if (notas.includes('[VISITANTE]')) return isGol ? false : true;
+
+                      const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
+                      return isLocal ? isSportingPoint : !isSportingPoint;
+                    });
+
+                    const awayGoalsList = goalEvents.filter((e: any) => {
+                      const t = (e.tipo_evento || e.tipo || '').toLowerCase();
+                      const isGol = t.includes('gol') && !t.includes('propia');
+                      const isAutogol = t.includes('propia') || t.includes('pp');
+                      const notas = e.notas || '';
+
+                      if (notas.includes('[VISITANTE]')) return isGol ? true : false;
+                      if (notas.includes('[LOCAL]')) return isGol ? false : true;
+
+                      const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
+                      return isLocal ? !isSportingPoint : isSportingPoint;
                     });
 
                     if (homeGoalsList.length === 0 && awayGoalsList.length === 0) return null;
+
+                    const getCleanName = (rawNotes: string) => {
+                      let clean = rawNotes.replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '').trim();
+                      if (clean.includes(',')) {
+                        const parts = clean.split(',').map(p => p.trim());
+                        clean = `${parts[1]} ${parts[0]}`;
+                      }
+                      return clean.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                    };
 
                     return (
                       <div className="px-2 py-2 grid grid-cols-2 gap-2 text-[11px] border-t border-slate-100 bg-slate-50/50 rounded-lg my-1">
                         <div className="flex flex-col items-start gap-0.5 text-slate-700">
                           {homeGoalsList.map((g: any, i: number) => {
-                            const isPP = (g.tipo_evento || '').toLowerCase().includes('propia');
-                            const pName = isPP ? 'Rival (p.p.)' : (g.player?.first_name ? `${g.player.first_name} ${g.player.last_name || ''}`.trim() : 'Jugador');
+                            const t = (g.tipo_evento || g.tipo || '').toLowerCase();
+                            const isPP = t.includes('propia') || t.includes('pp');
+                            const isSportingPlayer = Boolean(g.player_id);
+                            let pName = '';
+                            if (isSportingPlayer) {
+                              pName = isPP ? 'Sporting (p.p.)' : (g.player?.first_name ? `${g.player.first_name} ${g.player.last_name || ''}`.trim() : (g.notas ? getCleanName(g.notas) : 'Jugador'));
+                            } else {
+                              pName = isPP ? 'Rival (p.p.)' : (g.notas ? getCleanName(g.notas) : 'Rival');
+                            }
                             const min = g.minuto > 120 ? Math.floor(g.minuto / 60) : (g.minuto || 0);
                             return (
                               <span key={i} className="font-bold text-slate-800 flex items-center gap-1">
                                 <span>⚽ {pName}</span>
-                                <span className="text-slate-400 font-normal">({min}')</span>
+                                {min > 0 && <span className="text-slate-400 font-normal">({min}')</span>}
                               </span>
                             );
                           })}
                         </div>
                         <div className="flex flex-col items-end gap-0.5 text-slate-700 text-right">
                           {awayGoalsList.map((g: any, i: number) => {
-                            const isPP = (g.tipo_evento || '').toLowerCase().includes('propia');
-                            const pName = isPP ? 'Sporting (p.p.)' : 'Rival';
+                            const t = (g.tipo_evento || g.tipo || '').toLowerCase();
+                            const isPP = t.includes('propia') || t.includes('pp');
+                            const isSportingPlayer = Boolean(g.player_id);
+                            let pName = '';
+                            if (isSportingPlayer) {
+                              pName = isPP ? 'Sporting (p.p.)' : (g.player?.first_name ? `${g.player.first_name} ${g.player.last_name || ''}`.trim() : (g.notas ? getCleanName(g.notas) : 'Jugador'));
+                            } else {
+                              pName = isPP ? 'Rival (p.p.)' : (g.notas ? getCleanName(g.notas) : 'Rival');
+                            }
                             const min = g.minuto > 120 ? Math.floor(g.minuto / 60) : (g.minuto || 0);
                             return (
                               <span key={i} className="font-bold text-slate-800 flex items-center gap-1">
-                                <span className="text-slate-400 font-normal">({min}')</span>
+                                {min > 0 && <span className="text-slate-400 font-normal">({min}')</span>}
                                 <span>{pName} ⚽</span>
                               </span>
                             );

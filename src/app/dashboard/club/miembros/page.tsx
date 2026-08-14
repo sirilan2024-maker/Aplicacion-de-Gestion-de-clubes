@@ -775,6 +775,7 @@ interface Member {
   team_id?: string | null
   teams?: {id: string, name: string, color?: string}[]
   type: 'staff' | 'player'
+  avatar_url?: string | null
 }
 
 export default function GlobalMembersPage() {
@@ -873,7 +874,7 @@ export default function GlobalMembersPage() {
         const { data: rawPlayers } = await supabase
           .from("players")
           .select(`
-            id, first_name, last_name, parent1_email, posicion_principal, team_id, registration_status, status,
+            id, first_name, last_name, parent1_email, posicion_principal, team_id, registration_status, status, avatar_url,
             teams (name, color, club_id)
           `)
           .eq("club_id", profile.club_id)
@@ -887,6 +888,7 @@ export default function GlobalMembersPage() {
             email: p.parent1_email,
             posicion: p.posicion_principal,
             team_id: p.team_id,
+            avatar_url: p.avatar_url,
             equipos: Array.isArray(p.teams) ? p.teams[0] : p.teams
           }))
         }
@@ -959,6 +961,7 @@ export default function GlobalMembersPage() {
               team_id: p.team_id,
               team_name: p.equipos?.name,
               team_color: p.equipos?.color,
+              avatar_url: p.avatar_url,
               type: 'player'
             })
           })
@@ -1255,15 +1258,24 @@ export default function GlobalMembersPage() {
                 }}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{member.first_name} {member.last_name}</h3>
-                    {member.email?.includes('/register/staff/') ? (
-                      <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-1 inline-block">
-                        Pendiente de confirmación
-                      </span>
-                    ) : (
-                      <p className="text-xs text-gray-500 mt-0.5">{member.email || "Sin email"}</p>
-                    )}
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      {member.avatar_url ? (
+                        <img src={member.avatar_url} alt={member.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                      ) : (
+                        <UserIcon className={`w-6 h-6 ${member.type === 'staff' ? 'text-blue-500' : 'text-slate-400'}`} />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{member.first_name} {member.last_name}</h3>
+                      {member.email?.includes('/register/staff/') ? (
+                        <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-1 inline-block">
+                          Pendiente de confirmación
+                        </span>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-0.5">{member.email || "Sin email"}</p>
+                      )}
+                    </div>
                   </div>
                   <div>{getRoleBadge(member.role)}</div>
                 </div>
@@ -1356,15 +1368,24 @@ export default function GlobalMembersPage() {
                     }}
                   >
                     <td className="px-6 py-4 rounded-l-xl border-y border-l border-gray-200 group-hover:border-gray-300">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-gray-900">{member.first_name} {member.last_name}</span>
-                        {member.email?.includes('/register/staff/') ? (
-                          <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-1 w-max">
-                            Pendiente de confirmación
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-500 mt-0.5">{member.email || "Sin email"}</span>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt={member.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                          ) : (
+                            <UserIcon className={`w-5 h-5 ${member.type === 'staff' ? 'text-blue-500' : 'text-slate-400'}`} />
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-900">{member.first_name} {member.last_name}</span>
+                          {member.email?.includes('/register/staff/') ? (
+                            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-1 w-max">
+                              Pendiente de confirmación
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500 mt-0.5">{member.email || "Sin email"}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">

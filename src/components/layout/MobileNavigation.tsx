@@ -353,43 +353,48 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             
             <div className="flex-1 overflow-y-auto px-6 pb-24">
             {availableRoles.length > 1 && (
-              <div className="mb-6 p-4 bg-slate-800/80 rounded-xl border border-slate-700/50">
-                <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                  Rol Activo
+              <div className="mb-6 p-4 bg-slate-800/90 rounded-2xl border border-emerald-500/30 shadow-md">
+                <label className="text-[11px] font-black uppercase tracking-wider text-emerald-400 block mb-2 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" /> Rol Activo Seleccionado
                 </label>
-                <select 
-                  value={userRole || ''}
-                  onChange={async (e) => {
-                    const newRole = e.target.value;
-                    if (newRole && newRole !== userRole) {
-                      setMenuOpen(false);
-                      setUserRole(newRole); // Update state immediately to prevent hook mismatch
-                      const res = await switchActiveRoleAction(newRole);
-                      if (res.success) {
-                        let targetUrl = '/dashboard';
-                        if (newRole === 'admin' || newRole === 'coordinador') {
-                          targetUrl = '/dashboard/equipos';
-                        } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
-                          targetUrl = '/dashboard/mis-equipos';
-                        } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {
-                          targetUrl = '/dashboard/family';
+                <div className="relative">
+                  <select 
+                    value={userRole || ''}
+                    onChange={async (e) => {
+                      const newRole = e.target.value;
+                      if (newRole && newRole !== userRole) {
+                        setMenuOpen(false);
+                        setUserRole(newRole); // Update state immediately to prevent hook mismatch
+                        const res = await switchActiveRoleAction(newRole);
+                        if (res.success) {
+                          let targetUrl = '/dashboard';
+                          if (newRole === 'admin' || newRole === 'coordinador') {
+                            targetUrl = '/dashboard/equipos';
+                          } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
+                            targetUrl = '/dashboard/mis-equipos';
+                          } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {
+                            targetUrl = '/dashboard/family';
+                          } else {
+                            targetUrl = '/dashboard/mi-perfil';
+                          }
+                          window.location.href = targetUrl;
                         } else {
-                          targetUrl = '/dashboard/mi-perfil';
+                          alert('Error al cambiar de rol: ' + res.error);
                         }
-                        window.location.href = targetUrl;
-                      } else {
-                        alert('Error al cambiar de rol: ' + res.error);
                       }
-                    }
-                  }}
-                  className="w-full text-sm font-bold bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 outline-none cursor-pointer capitalize"
-                >
-                  {availableRoles.map(role => (
-                    <option key={role} value={role} className="bg-slate-900 text-slate-200">
-                      {role === 'admin' ? 'Admin' : role === 'coach' || role === 'entrenador' ? 'Entrenador' : role === 'coordinador' ? 'Coordinador' : role === 'jugador' ? 'Jugador' : role === 'tutor' ? 'Padre/Madre/Tutor' : role}
-                    </option>
-                  ))}
-                </select>
+                    }}
+                    className="w-full text-xs font-black bg-slate-900 border-2 border-emerald-500/50 text-white rounded-xl px-3.5 py-3 outline-none cursor-pointer capitalize appearance-none shadow-sm focus:border-emerald-400 pr-10"
+                  >
+                    {availableRoles.map(role => (
+                      <option key={role} value={role} className="bg-slate-900 text-white font-bold py-1">
+                        {role === 'admin' ? '👑 Administrador' : role === 'coach' || role === 'entrenador' ? '📋 Entrenador' : role === 'coordinador' ? '📊 Coordinador' : role === 'jugador' ? '⚽ Jugador' : role === 'tutor' ? '👨‍👩‍👧 Padre / Madre / Tutor' : role}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-400">
+                    <ChevronDown className="w-5 h-5" />
+                  </div>
+                </div>
               </div>
             )}
 

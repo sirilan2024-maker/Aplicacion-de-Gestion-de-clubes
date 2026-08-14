@@ -159,21 +159,45 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
         {/* Pie (Goleadores Alineados) */}
         {(() => {
           const matchEvents = match?.match_events || [];
-          const localGoalEvents = matchEvents.filter((e: any) => {
-            const isGol = e.tipo_evento === 'Gol' || e.tipo === 'Gol';
-            const isAutogol = e.tipo_evento === 'Gol en propia puerta' || e.tipo === 'Gol en propia puerta';
-            if (isGol) return isLocal ? e.player_id : !e.player_id;
-            if (isAutogol) return isLocal ? !e.player_id : e.player_id;
-            return false;
-          }).sort((a: any, b: any) => a.minuto - b.minuto);
+          const goalEvents = matchEvents.filter((e: any) => {
+            const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
+            return tipo.includes('gol');
+          });
 
-          const awayGoalEvents = matchEvents.filter((e: any) => {
-            const isGol = e.tipo_evento === 'Gol' || e.tipo === 'Gol';
-            const isAutogol = e.tipo_evento === 'Gol en propia puerta' || e.tipo === 'Gol en propia puerta';
-            if (isGol) return !isLocal ? e.player_id : !e.player_id;
-            if (isAutogol) return !isLocal ? !e.player_id : e.player_id;
-            return false;
-          }).sort((a: any, b: any) => a.minuto - b.minuto);
+          const localGoalEvents = goalEvents.filter((e: any) => {
+            const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
+            const isGol = tipo.includes('gol') && !tipo.includes('propia');
+            const isAutogol = tipo.includes('propia') || tipo.includes('pp');
+            const notas = e.notas || '';
+            
+            if (notas.includes('[LOCAL]')) return isGol ? true : false;
+            if (notas.includes('[VISITANTE]')) return isGol ? false : true;
+            
+            const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
+            return isLocal ? isSportingPoint : !isSportingPoint;
+          }).sort((a: any, b: any) => (a.minuto || 0) - (b.minuto || 0));
+
+          const awayGoalEvents = goalEvents.filter((e: any) => {
+            const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
+            const isGol = tipo.includes('gol') && !tipo.includes('propia');
+            const isAutogol = tipo.includes('propia') || tipo.includes('pp');
+            const notas = e.notas || '';
+            
+            if (notas.includes('[VISITANTE]')) return isGol ? true : false;
+            if (notas.includes('[LOCAL]')) return isGol ? false : true;
+            
+            const isSportingPoint = (isGol && e.player_id) || (isAutogol && !e.player_id);
+            return isLocal ? !isSportingPoint : isSportingPoint;
+          }).sort((a: any, b: any) => (a.minuto || 0) - (b.minuto || 0));
+
+          const getCleanNameFromNotas = (rawNotes: string) => {
+            let clean = rawNotes.replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '').trim();
+            if (clean.includes(',')) {
+              const parts = clean.split(',').map(p => p.trim());
+              clean = `${parts[1]} ${parts[0]}`;
+            }
+            return clean.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+          };
 
           return (
             <div className="bg-slate-50/80 px-6 py-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-xs text-slate-700">
@@ -184,8 +208,15 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
                 </div>
                 {localGoalEvents.length > 0 ? (
                   localGoalEvents.map((g: any, i: number) => {
-                    const isOwnGoal = g.tipo_evento === 'Gol en propia puerta' || g.tipo === 'Gol en propia puerta';
-                    const pName = isOwnGoal ? 'Rival (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : 'Jugador');
+                    const tipo = (g.tipo_evento || g.tipo || '').toLowerCase();
+                    const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
+                    const isSportingPlayer = Boolean(g.player_id);
+                    let pName = '';
+                    if (isSportingPlayer) {
+                      pName = isOwnGoal ? 'Sporting (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador'));
+                    } else {
+                      pName = isOwnGoal ? 'Rival (p.p.)' : (g.notas ? getCleanNameFromNotas(g.notas) : 'Rival');
+                    }
                     return (
                       <div key={i} className="flex items-center gap-1.5 text-slate-700 font-medium">
                         <span className="font-bold">{pName}</span>
@@ -193,8 +224,6 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
                       </div>
                     );
                   })
-                ) : goalsList?.local && goalsList.local !== "N/A" && goalsList.local !== "" ? (
-                  <span className="text-slate-600 font-medium">{goalsList.local}</span>
                 ) : (
                   <span className="text-slate-400 italic text-[11px]">Sin goles</span>
                 )}
@@ -207,8 +236,15 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
                 </div>
                 {awayGoalEvents.length > 0 ? (
                   awayGoalEvents.map((g: any, i: number) => {
-                    const isOwnGoal = g.tipo_evento === 'Gol en propia puerta' || g.tipo === 'Gol en propia puerta';
-                    const pName = isOwnGoal ? 'Sporting (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : 'Rival');
+                    const tipo = (g.tipo_evento || g.tipo || '').toLowerCase();
+                    const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
+                    const isSportingPlayer = Boolean(g.player_id);
+                    let pName = '';
+                    if (isSportingPlayer) {
+                      pName = isOwnGoal ? 'Sporting (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador'));
+                    } else {
+                      pName = isOwnGoal ? 'Rival (p.p.)' : (g.notas ? getCleanNameFromNotas(g.notas) : 'Rival');
+                    }
                     return (
                       <div key={i} className="flex items-center gap-1.5 text-slate-700 font-medium justify-end">
                         <span className="text-slate-400 font-semibold text-[11px]">({g.minuto}')</span>
@@ -216,8 +252,6 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
                       </div>
                     );
                   })
-                ) : goalsList?.away && goalsList.away !== "N/A" && goalsList.away !== "Rival (N/A)" && goalsList.away !== "" ? (
-                  <span className="text-slate-600 font-medium">{goalsList.away}</span>
                 ) : (
                   <span className="text-slate-400 italic text-[11px]">Sin goles</span>
                 )}

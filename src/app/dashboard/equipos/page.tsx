@@ -970,12 +970,7 @@ export default function EquiposPage() {
               category: updated.category,
               members: updated.members,
               coaches: updated.coaches,
-              sport: updated.sport,
-              gender: updated.gender,
-              age_group: updated.age_group,
-              format: updated.format,
               color: updated.color,
-              // ffcv_url is intentionally omitted to avoid schema cache error
             })
             .eq('id', updated.id);
           if (error) {

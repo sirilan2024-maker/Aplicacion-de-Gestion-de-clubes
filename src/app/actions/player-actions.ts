@@ -487,3 +487,55 @@ export async function assignPlayerToTeamAction(playerId: string, teamId: string)
   }
 }
 
+export async function uploadPlayerAvatarAction(playerId: string, formData: FormData) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "No autenticado" };
+
+    const file = formData.get('file') as File;
+    if (!file) return { success: false, error: "No se proporcionó archivo de imagen" };
+
+    const adminClient = createAdminClient();
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${playerId}-${Date.now()}.${fileExt}`;
+    const filePath = `jugadores/${fileName}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { error: uploadError } = await adminClient.storage
+      .from('avatars')
+      .upload(filePath, buffer, {
+        contentType: file.type || 'image/jpeg',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error("Admin Storage Upload Error:", uploadError);
+      return { success: false, error: uploadError.message };
+    }
+
+    const { data: { publicUrl } } = adminClient.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    const { error: updateError } = await adminClient
+      .from('players')
+      .update({ avatar_url: publicUrl })
+      .eq('id', playerId);
+
+    if (updateError) {
+      console.error("Admin DB Update Error:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    revalidatePath(`/dashboard/equipos/[teamId]/jugador/${playerId}`, 'page');
+    return { success: true, publicUrl };
+  } catch (err: any) {
+    console.error("uploadPlayerAvatarAction catch error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+

@@ -12,7 +12,8 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .from("partidos")
     .select(`
       *,
-      equipo:teams(id, name, color)
+      equipo:teams(id, name, color),
+      match_events(*, player:players(id, first_name, last_name, dorsal))
     `)
     .eq("id", matchId)
     .single()

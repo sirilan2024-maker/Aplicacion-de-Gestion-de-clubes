@@ -68,10 +68,6 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
             <ChevronLeft className="w-4 h-4 mr-1 stroke-[2.5]" />
             Volver a Partidos
           </Link>
-
-          <div className="bg-amber-50 text-amber-800 text-[10px] font-black px-3 py-1 rounded-full border border-amber-200 uppercase tracking-widest">
-            ⚡ Vista Premium (Conectada a BBDD)
-          </div>
         </div>
 
         {/* ─── 1. HEADER (Scoreboard, carousel, details) ─── */}
@@ -79,7 +75,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
           localGoals={localGoals}
           awayGoals={awayGoals}
           goalsList={goalsList}
-          match={match}
+          match={{ ...match, match_events: match.match_events || matchEvents }}
           allMatches={allMatches}
         />
 

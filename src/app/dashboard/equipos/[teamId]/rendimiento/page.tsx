@@ -7,6 +7,7 @@ import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Targe
 import { differenceInDays, parseISO } from "date-fns";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
+import { isFormativeCategory } from "@/lib/utils";
 
 interface TrainingStats {
   id: string;
@@ -38,18 +39,6 @@ interface MatchStats {
   technicalRating: number | null;
 }
 
-export function isCategoryFormative(categoryName?: string | null): boolean {
-  if (!categoryName) return true; // Por defecto permitir si no está especificada
-  const cat = categoryName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  
-  // Categorías que NO deben tener formativo
-  if (cat.includes('senior') || cat.includes('primer equipo') || cat.includes('amateur') || cat.includes('veterano')) return false;
-  if (cat.includes('juvenil') || cat.includes('u19') || cat.includes('u18') || cat.includes('u17') || cat.includes('sub-19') || cat.includes('sub-18') || cat.includes('sub-17')) return false;
-  if (cat.includes('cadete') || cat.includes('u16') || cat.includes('u15') || cat.includes('sub-16') || cat.includes('sub-15')) return false;
-  
-  return true;
-}
-
 export default function RendimientoGlobalPage() {
   const params = useParams();
   const router = useRouter();
@@ -59,6 +48,7 @@ export default function RendimientoGlobalPage() {
   const [matchStats, setMatchStats] = useState<MatchStats[]>([]);
   const [formativeStats, setFormativeStats] = useState<TeamPlayerFormativeSummary[]>([]);
   const [teamCategory, setTeamCategory] = useState<string>('');
+  const [teamName, setTeamName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
   const [drawerPlayerId, setDrawerPlayerId] = useState<string | null>(null);
@@ -69,6 +59,10 @@ export default function RendimientoGlobalPage() {
       fetchGlobalData();
     }
   }, [teamId]);
+
+  const isFormative = (): boolean => {
+    return isFormativeCategory(teamCategory, teamName);
+  };
 
   const fetchGlobalData = async () => {
     setLoading(true);
@@ -82,8 +76,9 @@ export default function RendimientoGlobalPage() {
       // 1. Fetch team and metrics
       const { data: teamData } = await supabase.from('teams').select('club_id, category, name').eq('id', teamId).single();
       if (!teamData) return;
-      if (teamData.category || teamData.name) {
-        setTeamCategory(teamData.category || teamData.name || '');
+      if (teamData) {
+        setTeamCategory(teamData.category || '');
+        setTeamName(teamData.name || '');
       }
       
       const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
@@ -294,7 +289,7 @@ export default function RendimientoGlobalPage() {
             <Target size={16} className={viewMode === 'partidos' ? 'text-indigo-500' : 'text-gray-400'} />
             <span>Partidos</span>
           </button>
-          {isCategoryFormative(teamCategory) && (
+          {isFormative() && (
             <button
               onClick={() => setViewMode('formativo')}
               className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
@@ -311,7 +306,7 @@ export default function RendimientoGlobalPage() {
       </div>
 
       {/* BLOQUE FORMATIVO & APRENDIZAJE COLECTIVO */}
-      {viewMode === 'formativo' && isCategoryFormative(teamCategory) && (
+      {viewMode === 'formativo' && isFormative() && (
         <section className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">

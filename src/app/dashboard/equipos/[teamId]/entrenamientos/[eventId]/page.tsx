@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Loader2, Save, UserCheck, BrainCircuit, Zap } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FormativeEvaluationForm } from "@/components/features/formative/FormativeEvaluationForm";
+import { isFormativeCategory } from "@/lib/utils";
 
 interface Player {
   id: string;
@@ -47,14 +48,10 @@ export default function EntrenamientoDetailPage() {
   const [showFormativo, setShowFormativo] = useState(false);
   const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
   const [teamCategory, setTeamCategory] = useState<string>('');
+  const [teamName, setTeamName] = useState<string>('');
 
-  const isFormativeCategory = (): boolean => {
-    if (!teamCategory) return true;
-    const cat = teamCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    if (cat.includes('senior') || cat.includes('primer equipo') || cat.includes('amateur') || cat.includes('veterano')) return false;
-    if (cat.includes('juvenil') || cat.includes('u19') || cat.includes('u18') || cat.includes('u17') || cat.includes('sub-19') || cat.includes('sub-18') || cat.includes('sub-17')) return false;
-    if (cat.includes('cadete') || cat.includes('u16') || cat.includes('u15') || cat.includes('sub-16') || cat.includes('sub-15')) return false;
-    return true;
+  const isFormative = (): boolean => {
+    return isFormativeCategory(teamCategory, teamName);
   };
 
   useEffect(() => {
@@ -68,10 +65,11 @@ export default function EntrenamientoDetailPage() {
     setLoading(true);
     const supabase = createClient();
 
-    // 0. Fetch Team Category
+    // 0. Fetch Team Category & Name
     const { data: tData } = await supabase.from('teams').select('category, name').eq('id', teamId).single();
     if (tData) {
-      setTeamCategory(tData.category || tData.name || '');
+      setTeamCategory(tData.category || '');
+      setTeamName(tData.name || '');
     }
 
     // 1. Fetch Event
@@ -320,7 +318,7 @@ export default function EntrenamientoDetailPage() {
             </button>
 
             {/* Botón Formativo con su mini interruptor de activación (solo en categorías hasta infantil 2º año) */}
-            {isFormativeCategory() && (
+            {isFormative() && (
               <button 
                 type="button"
                 onClick={() => setActiveModule('formativo')}

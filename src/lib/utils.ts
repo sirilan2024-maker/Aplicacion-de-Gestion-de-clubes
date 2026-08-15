@@ -82,3 +82,52 @@ export function generateLinkCode(): string {
   }
   return result;
 }
+
+/**
+ * Determina si un equipo o jugador pertenece a categoría formativa (hasta Infantil 2º año / 14 años).
+ * Excluye explícitamente: Cadete, Juvenil, Senior, Sub-15 en adelante y mayores de 14 años.
+ */
+export function isFormativeCategory(teamCategory?: string | null, teamName?: string | null, birthDate?: string | Date | null): boolean {
+  // 1. Analizar texto de categoría o nombre del equipo
+  const combinedText = `${teamCategory || ''} ${teamName || ''}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  if (combinedText) {
+    // Si contiene términos no formativos explícitos -> FALSE
+    const nonFormativeKeywords = [
+      'cadet', 'cadete', 'u15', 'u16', 'sub-15', 'sub-16', 'sub 15', 'sub 16',
+      'juvenil', 'u17', 'u18', 'u19', 'sub-17', 'sub-18', 'sub-19', 'sub 17', 'sub 18', 'sub 19',
+      'senior', 'amateur', 'primer equipo', '1er equipo', 'veteran', 'filial', 'u20', 'u21', 'u23', 'sub-20', 'sub-21', 'sub-23'
+    ];
+
+    for (const kw of nonFormativeKeywords) {
+      if (combinedText.includes(kw)) {
+        return false;
+      }
+    }
+
+    // Si contiene términos formativos explícitos -> TRUE
+    const formativeKeywords = [
+      'infantil', 'alevin', 'benjamin', 'prebenjamin', 'querubin', 'escola', 'escuela', 'iniciacion', 'minibenjamin',
+      'u14', 'u13', 'u12', 'u11', 'u10', 'u9', 'u8', 'u7', 'u6',
+      'sub-14', 'sub-13', 'sub-12', 'sub-11', 'sub-10', 'sub-9', 'sub-8', 'sub-7', 'sub-6'
+    ];
+
+    for (const kw of formativeKeywords) {
+      if (combinedText.includes(kw)) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Si no se puede deducir por nombre/categoría, verificar por edad de nacimiento
+  if (birthDate) {
+    const age = calculateAge(birthDate);
+    if (age > 14) {
+      return false; // Mayor de 14 años = Cadete o superior
+    }
+  }
+
+  // Por defecto si no coincide con no formativos
+  return true;
+}
+

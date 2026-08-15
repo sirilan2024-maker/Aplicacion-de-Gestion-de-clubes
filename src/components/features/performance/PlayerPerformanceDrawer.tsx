@@ -5,11 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, User as UserIcon, X } from "lucide-react";
 
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
+import { isFormativeCategory } from "@/lib/utils";
 
 export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose, globalTrainingStats, globalMatchStats }: any) {
   const [activeTab, setActiveTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>(initialTab || 'entrenamientos');
   const [events, setEvents] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any[]>([]);
+  const [teamCategory, setTeamCategory] = useState<string>('');
+  const [teamName, setTeamName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,6 +21,12 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
       setLoading(true);
       const supabase = createClient();
       
+      const { data: tData } = await supabase.from('teams').select('category, name').eq('id', teamId).single();
+      if (tData) {
+        setTeamCategory(tData.category || '');
+        setTeamName(tData.name || '');
+      }
+
       const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type, title').eq('team_id', teamId).order('date', { ascending: false });
       if (allEvents) setEvents(allEvents);
 
@@ -38,6 +47,7 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
     fetchData();
   }, [playerId, teamId]);
 
+  const isFormative = isFormativeCategory(teamCategory, teamName);
   const pName = globalTrainingStats?.first_name ? `${globalTrainingStats.first_name} ${globalTrainingStats.last_name || ''}` : 'Cargando...';
 
   return (
@@ -77,14 +87,16 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
           <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
             Partidos
           </button>
-          <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
-            🧠 Formativo
-          </button>
+          {isFormative && (
+            <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+              🧠 Formativo
+            </button>
+          )}
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-white">
-          {activeTab === 'formativo' && (
+          {activeTab === 'formativo' && isFormative && (
             <div className="animate-in fade-in">
               <PlayerProgressView playerId={playerId} playerName={pName} />
             </div>

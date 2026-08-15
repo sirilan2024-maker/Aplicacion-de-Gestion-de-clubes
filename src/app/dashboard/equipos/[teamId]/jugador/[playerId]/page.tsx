@@ -17,6 +17,7 @@ import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
+import { isFormativeCategory } from "@/lib/utils";
 
 interface PlayerData {
   id: string;
@@ -161,24 +162,10 @@ export default function GlobalPlayerProfilePage() {
 
   const [playerDocs, setPlayerDocs] = useState<any[]>([]);
   const [teamCategory, setTeamCategory] = useState<string>('');
+  const [teamName, setTeamName] = useState<string>('');
 
   const isFormativeEligible = (): boolean => {
-    // 1. Por categoría de equipo si existe
-    if (teamCategory) {
-      const cat = teamCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-      if (cat.includes('senior') || cat.includes('primer equipo') || cat.includes('amateur') || cat.includes('veterano')) return false;
-      if (cat.includes('juvenil') || cat.includes('u19') || cat.includes('u18') || cat.includes('u17') || cat.includes('sub-19') || cat.includes('sub-18') || cat.includes('sub-17')) return false;
-      if (cat.includes('cadete') || cat.includes('u16') || cat.includes('u15') || cat.includes('sub-16') || cat.includes('sub-15')) return false;
-      return true;
-    }
-    // 2. Por fecha de nacimiento del jugador si no hay categoría de equipo
-    if (player?.birth_date) {
-      const bYear = new Date(player.birth_date).getFullYear();
-      const currentYear = new Date().getFullYear();
-      const age = currentYear - bYear;
-      if (age > 14) return false; // Mayor de 14 años (cadete, juvenil, senior)
-    }
-    return true;
+    return isFormativeCategory(teamCategory, teamName, player?.birth_date);
   };
 
   const fetchPlayer = async () => {
@@ -195,11 +182,28 @@ export default function GlobalPlayerProfilePage() {
       setPlayer(data);
       setEditData(data);
 
-      // Cargar categoría de equipo si teamId está disponible
-      if (teamId) {
-        const { data: tData } = await supabase.from('teams').select('category, name').eq('id', teamId).single();
+      // Cargar categoría y nombre de equipo (por teamId de URL o por player_season_history / data.team_id)
+      const targetTeamId = teamId || data.team_id;
+      if (targetTeamId) {
+        const { data: tData } = await supabase.from('teams').select('category, name').eq('id', targetTeamId).single();
         if (tData) {
-          setTeamCategory(tData.category || tData.name || '');
+          setTeamCategory(tData.category || '');
+          setTeamName(tData.name || '');
+        }
+      } else {
+        // Consultar equipo activo en historial si no tiene team_id directo
+        const { data: histData } = await supabase
+          .from('player_season_history')
+          .select('teams(category, name)')
+          .eq('player_id', playerId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (histData && (histData as any).teams) {
+          const t = (histData as any).teams;
+          setTeamCategory(t.category || '');
+          setTeamName(t.name || '');
         }
       }
 
@@ -784,28 +788,28 @@ export default function GlobalPlayerProfilePage() {
 
       {/* Navegación por pestañas */}
       <div className="mb-6">
-        {/* Selector en móvil con fondo azul destacado */}
+        {/* Selector en móvil con fondo blanco y línea/borde exterior azul */}
         <div className="md:hidden">
           <label htmlFor="tabs" className="sr-only">Seleccionar pestaña</label>
           <div className="relative">
             <select
               id="tabs"
               name="tabs"
-              className="block w-full rounded-2xl border-0 py-3.5 pl-4 pr-10 text-sm bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-black shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none"
+              className="block w-full rounded-2xl border-2 border-blue-600 py-3.5 pl-4 pr-10 text-sm bg-white text-slate-900 font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none"
               value={activeTab}
               onChange={(e) => setActiveTab(e.target.value as any)}
             >
-              <option value="info" className="bg-slate-900 text-white">📋 Info Personal</option>
-              <option value="medico" className="bg-slate-900 text-white">🩺 Físico & Médico</option>
+              <option value="info" className="bg-white text-slate-900">📋 Info Personal</option>
+              <option value="medico" className="bg-white text-slate-900">🩺 Físico & Médico</option>
               {isFormativeEligible() && (
-                <option value="formativo" className="bg-slate-900 text-white">Formativo & Aprendizaje</option>
+                <option value="formativo" className="bg-white text-slate-900">Formativo & Aprendizaje</option>
               )}
-              {!esEntrenador && <option value="stats" className="bg-slate-900 text-white">📊 Estadísticas</option>}
-              {!esEntrenador && <option value="asistencia" className="bg-slate-900 text-white">📅 Asistencia</option>}
-              {!esEntrenador && <option value="disciplina" className="bg-slate-900 text-white">⚠️ Disciplina</option>}
-              {!esEntrenador && <option value="utileria" className="bg-slate-900 text-white">👕 Utillería</option>}
+              {!esEntrenador && <option value="stats" className="bg-white text-slate-900">📊 Estadísticas</option>}
+              {!esEntrenador && <option value="asistencia" className="bg-white text-slate-900">📅 Asistencia</option>}
+              {!esEntrenador && <option value="disciplina" className="bg-white text-slate-900">⚠️ Disciplina</option>}
+              {!esEntrenador && <option value="utileria" className="bg-white text-slate-900">👕 Utillería</option>}
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white">
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-blue-600">
               <ChevronRight size={18} className="rotate-90" />
             </div>
           </div>

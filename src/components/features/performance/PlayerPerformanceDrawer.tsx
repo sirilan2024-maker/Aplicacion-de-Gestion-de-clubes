@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, User as UserIcon, X } from "lucide-react";
 
+import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
+
 export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose, globalTrainingStats, globalMatchStats }: any) {
-  const [activeTab, setActiveTab] = useState<'entrenamientos' | 'partidos'>(initialTab || 'entrenamientos');
+  const [activeTab, setActiveTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>(initialTab || 'entrenamientos');
   const [events, setEvents] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,7 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
   return (
     <>
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity" onClick={onClose}></div>
-      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right overflow-hidden border-l border-slate-200">
+      <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right overflow-hidden border-l border-slate-200">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
@@ -68,17 +70,25 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100">
-          <button onClick={() => setActiveTab('entrenamientos')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'entrenamientos' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+        <div className="flex border-b border-slate-100 bg-slate-50/50">
+          <button onClick={() => setActiveTab('entrenamientos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'entrenamientos' ? 'border-emerald-500 text-emerald-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
             Entrenamientos
           </button>
-          <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-indigo-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+          <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
             Partidos
+          </button>
+          <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+            🧠 Formativo
           </button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-white">
+          {activeTab === 'formativo' && (
+            <div className="animate-in fade-in">
+              <PlayerProgressView playerId={playerId} playerName={pName} />
+            </div>
+          )}
           {activeTab === 'entrenamientos' && (
             <div className="space-y-6 animate-in fade-in">
               <div className="grid grid-cols-2 gap-3">

@@ -309,3 +309,119 @@ export async function getPlayerProgressReport(playerId: string): Promise<PlayerP
     return null;
   }
 }
+
+export interface TeamPlayerFormativeSummary {
+  playerId: string;
+  playerName: string;
+  dorsal: number | null;
+  avatarUrl: string | null;
+  overallAverage: number;
+  evaluationsCount: number;
+  latestPeriod: string | null;
+  latestDate: string | null;
+  moduleAverages: {
+    tecnico: number;
+    tactico: number;
+    fisico: number;
+    socio: number;
+  };
+}
+
+/**
+ * Obtener visión global formativa de todo el equipo
+ */
+export async function getTeamFormativeOverview(teamId: string): Promise<TeamPlayerFormativeSummary[]> {
+  try {
+    const supabase = createAdminClient();
+
+    // 1. Obtener jugadores del equipo
+    const { data: players, error: pErr } = await supabase
+      .from('players')
+      .select('id, first_name, last_name, dorsal, avatar_url, posicion')
+      .eq('team_id', teamId);
+
+    if (pErr || !players) return [];
+
+    const validPlayers = players.filter(p => {
+      const pos = (p.posicion || '').toLowerCase();
+      return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('técnico');
+    });
+
+    const playerIds = validPlayers.map(p => p.id);
+    if (playerIds.length === 0) return [];
+
+    // 2. Módulos y conceptos
+    const { data: concepts } = await supabase
+      .from('evaluation_concepts')
+      .select('id, code, module:evaluation_modules(code)');
+
+    const conceptModuleMap = new Map<string, string>();
+    concepts?.forEach((c: any) => {
+      conceptModuleMap.set(c.id, c.module?.code || '');
+    });
+
+    // 3. Evaluaciones de los jugadores
+    const { data: evals } = await supabase
+      .from('player_evaluations')
+      .select(`
+        id,
+        player_id,
+        evaluation_date,
+        evaluation_period,
+        items:evaluation_items (
+          concept_id,
+          score
+        )
+      `)
+      .in('player_id', playerIds)
+      .order('evaluation_date', { ascending: false });
+
+    // 4. Mapear por jugador
+    const summaryList: TeamPlayerFormativeSummary[] = validPlayers.map(p => {
+      const pEvals = (evals || []).filter(e => e.player_id === p.id);
+      const latest = pEvals.length > 0 ? pEvals[0] : null;
+
+      let tecSum = 0, tecCount = 0;
+      let tacSum = 0, tacCount = 0;
+      let fisSum = 0, fisCount = 0;
+      let socSum = 0, socCount = 0;
+      let allSum = 0, allCount = 0;
+
+      if (latest && latest.items) {
+        latest.items.forEach((it: any) => {
+          const modCode = conceptModuleMap.get(it.concept_id);
+          allSum += it.score;
+          allCount += 1;
+
+          if (modCode === 'tecnico_analitico') { tecSum += it.score; tecCount++; }
+          else if (modCode === 'tactico_global') { tacSum += it.score; tacCount++; }
+          else if (modCode === 'fisico_coordinativo') { fisSum += it.score; fisCount++; }
+          else if (modCode === 'socio_afectivo') { socSum += it.score; socCount++; }
+        });
+      }
+
+      return {
+        playerId: p.id,
+        playerName: `${p.first_name} ${p.last_name}`,
+        dorsal: p.dorsal,
+        avatarUrl: p.avatar_url,
+        overallAverage: allCount > 0 ? Number((allSum / allCount).toFixed(2)) : 0,
+        evaluationsCount: pEvals.length,
+        latestPeriod: latest?.evaluation_period || null,
+        latestDate: latest?.evaluation_date || null,
+        moduleAverages: {
+          tecnico: tecCount > 0 ? Number((tecSum / tecCount).toFixed(2)) : 0,
+          tactico: tacCount > 0 ? Number((tacSum / tacCount).toFixed(2)) : 0,
+          fisico: fisCount > 0 ? Number((fisSum / fisCount).toFixed(2)) : 0,
+          socio: socCount > 0 ? Number((socSum / socCount).toFixed(2)) : 0,
+        }
+      };
+    });
+
+    return summaryList.sort((a, b) => b.overallAverage - a.overallAverage);
+  } catch (err) {
+    console.error("Error al obtener overview formativo de equipo:", err);
+    return [];
+  }
+}
+

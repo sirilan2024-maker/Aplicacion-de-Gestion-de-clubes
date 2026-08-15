@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Target, Crosshair, BarChart2, X } from "lucide-react";
+import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Target, Crosshair, BarChart2, X, BrainCircuit, Sparkles, Flame, Compass, HeartHandshake, CheckCircle2, ChevronRight } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
+import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
 
 interface TrainingStats {
   id: string;
@@ -44,10 +45,11 @@ export default function RendimientoGlobalPage() {
 
   const [trainingStats, setTrainingStats] = useState<TrainingStats[]>([]);
   const [matchStats, setMatchStats] = useState<MatchStats[]>([]);
+  const [formativeStats, setFormativeStats] = useState<TeamPlayerFormativeSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'entrenamientos' | 'partidos'>('entrenamientos');
+  const [viewMode, setViewMode] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
   const [drawerPlayerId, setDrawerPlayerId] = useState<string | null>(null);
-  const [drawerTab, setDrawerTab] = useState<'entrenamientos' | 'partidos'>('entrenamientos');
+  const [drawerTab, setDrawerTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
 
   useEffect(() => {
     if (teamId) {
@@ -60,6 +62,10 @@ export default function RendimientoGlobalPage() {
     const supabase = createClient();
 
     try {
+      // 0. Fetch Formative Team Overview
+      const formSummary = await getTeamFormativeOverview(teamId);
+      setFormativeStats(formSummary);
+
       // 1. Fetch team and metrics
       const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
       if (!teamData) return;
@@ -176,17 +182,17 @@ export default function RendimientoGlobalPage() {
 
         // --- MATCH STATS ---
         const mAtt = playerAtt.filter(a => matches.find(m => m.id === a.event_id));
-        const mPresents = mAtt.filter(a => ['presente', 'present', 'retraso', 'late'].includes(a.status.toLowerCase())).length;
+        const mPresents = mAtt.filter(a => ['presente', 'present', 'retraso', 'late', 'convocado'].includes(a.status.toLowerCase())).length;
         const totalMatches = matches.length;
         const mPct = totalMatches > 0 ? Math.round((mPresents / totalMatches) * 100) : 0;
 
         let totalGoals = 0;
         let totalAssists = 0;
         matches.forEach(ev => {
-          const gol = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase() === 'goles')?.value_number;
-          const ast = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase() === 'asistencias')?.value_number;
-          if (gol) totalGoals += gol;
-          if (ast) totalAssists += ast;
+          const goals = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase() === 'goles')?.value_number;
+          const assists = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase() === 'asistencias')?.value_number;
+          if (goals) totalGoals += goals;
+          if (assists) totalAssists += assists;
         });
 
         mResults.push({
@@ -231,43 +237,225 @@ export default function RendimientoGlobalPage() {
     );
   }
 
+  // Medias globales formativas del equipo
+  const evaluatedPlayers = formativeStats.filter(p => p.overallAverage > 0);
+  const teamFormativeAvg = evaluatedPlayers.length > 0 
+    ? (evaluatedPlayers.reduce((s, p) => s + p.overallAverage, 0) / evaluatedPlayers.length).toFixed(2)
+    : '0.0';
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-gray-200 pb-6">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 border-b border-gray-200 pb-6">
         <div>
           <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
             <Activity className="text-blue-500" />
             Centro de Rendimiento Global
           </h2>
-          <p className="text-gray-500 text-sm mt-1">Análisis detallado de sesiones preparatorias y competición oficial.</p>
+          <p className="text-gray-500 text-sm mt-1">Análisis detallado de sesiones preparatorias, competición oficial y evaluación formativa.</p>
         </div>
 
-        {/* Toggle Switch Píldora */}
-        <div className="flex bg-gray-100 p-1 rounded-full border border-gray-200 shadow-inner">
+        {/* Toggle Switch Píldora (3 Vistas) */}
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner w-full lg:w-auto">
           <button
             onClick={() => setViewMode('entrenamientos')}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               viewMode === 'entrenamientos' 
                 ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <TrendingUp size={16} className={viewMode === 'entrenamientos' ? 'text-emerald-500' : 'text-gray-400'} />
-            Entrenamientos
+            <span>Entrenamientos</span>
           </button>
           <button
             onClick={() => setViewMode('partidos')}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               viewMode === 'partidos' 
                 ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <Target size={16} className={viewMode === 'partidos' ? 'text-indigo-500' : 'text-gray-400'} />
-            Partidos
+            <span>Partidos</span>
+          </button>
+          <button
+            onClick={() => setViewMode('formativo')}
+            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+              viewMode === 'formativo' 
+                ? 'bg-white text-purple-700 shadow-sm border border-gray-200/50' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <BrainCircuit size={16} className={viewMode === 'formativo' ? 'text-purple-600' : 'text-gray-400'} />
+            <span>Formativo</span>
           </button>
         </div>
       </div>
+
+      {/* BLOQUE FORMATIVO & APRENDIZAJE COLECTIVO */}
+      {viewMode === 'formativo' && (
+        <section className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center border border-purple-100 text-purple-600">
+                <BrainCircuit size={22} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Progreso y Rúbricas Formativas Colectivas</h3>
+                <p className="text-sm text-gray-500">Evaluación de competencias técnicas, tácticas, físicas y socio-afectivas de la plantilla.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-purple-50 border border-purple-200/80 px-4 py-2 rounded-2xl self-start sm:self-auto">
+              <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">Media de Plantilla:</span>
+              <span className="text-xl font-black text-purple-900">{teamFormativeAvg} / 5</span>
+            </div>
+          </div>
+
+          {/* Tarjetas de Medias por Módulo del Equipo */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-3xl text-white shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-100">Técnico-Analítico</span>
+                <Flame size={18} className="text-amber-200" />
+              </div>
+              <div className="text-3xl font-black">
+                {evaluatedPlayers.length > 0 
+                  ? (evaluatedPlayers.reduce((s, p) => s + p.moduleAverages.tecnico, 0) / evaluatedPlayers.length).toFixed(1)
+                  : '0.0'}
+                <span className="text-sm font-normal opacity-80"> / 5</span>
+              </div>
+              <p className="text-[11px] text-amber-100 mt-1 font-medium">Controles, pierna débil y golpeo</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-5 rounded-3xl text-white shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-100">Táctico-Global</span>
+                <Compass size={18} className="text-blue-200" />
+              </div>
+              <div className="text-3xl font-black">
+                {evaluatedPlayers.length > 0 
+                  ? (evaluatedPlayers.reduce((s, p) => s + p.moduleAverages.tactico, 0) / evaluatedPlayers.length).toFixed(1)
+                  : '0.0'}
+                <span className="text-sm font-normal opacity-80"> / 5</span>
+              </div>
+              <p className="text-[11px] text-blue-100 mt-1 font-medium">Toma de decisiones y espacios</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-5 rounded-3xl text-white shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">Físico-Coordinativo</span>
+                <Activity size={18} className="text-emerald-200" />
+              </div>
+              <div className="text-3xl font-black">
+                {evaluatedPlayers.length > 0 
+                  ? (evaluatedPlayers.reduce((s, p) => s + p.moduleAverages.fisico, 0) / evaluatedPlayers.length).toFixed(1)
+                  : '0.0'}
+                <span className="text-sm font-normal opacity-80"> / 5</span>
+              </div>
+              <p className="text-[11px] text-emerald-100 mt-1 font-medium">Agilidad, apoyos y frenadas</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-rose-500 to-pink-600 p-5 rounded-3xl text-white shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-100">Socio-Afectivo</span>
+                <HeartHandshake size={18} className="text-rose-200" />
+              </div>
+              <div className="text-3xl font-black">
+                {evaluatedPlayers.length > 0 
+                  ? (evaluatedPlayers.reduce((s, p) => s + p.moduleAverages.socio, 0) / evaluatedPlayers.length).toFixed(1)
+                  : '0.0'}
+                <span className="text-sm font-normal opacity-80"> / 5</span>
+              </div>
+              <p className="text-[11px] text-rose-100 mt-1 font-medium">Comunicación, esfuerzo y respeto</p>
+            </div>
+          </div>
+
+          {/* Desglose Colectivo de Todos los Jugadores */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+            <h4 className="font-extrabold text-slate-900 text-base mb-4 flex items-center gap-2">
+              <Sparkles size={18} className="text-purple-600" />
+              <span>Evaluación Detallada por Futbolista ({formativeStats.length} Jugadores)</span>
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {formativeStats.map(player => {
+                const hasEvals = player.overallAverage > 0;
+
+                return (
+                  <div
+                    key={`form-${player.playerId}`}
+                    onClick={() => {
+                      setDrawerPlayerId(player.playerId);
+                      setDrawerTab('formativo');
+                    }}
+                    className="bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-purple-300 rounded-2xl p-4 transition-all hover:shadow-md cursor-pointer flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-full overflow-hidden bg-white border border-slate-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
+                            {player.avatarUrl ? (
+                              <img src={player.avatarUrl} alt={player.playerName} className="w-full h-full object-cover object-[center_25%]" />
+                            ) : (
+                              <span>{player.dorsal || player.playerName.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div>
+                            <h5 className="font-black text-slate-900 text-sm group-hover:text-purple-700 transition-colors leading-tight">
+                              {player.playerName}
+                            </h5>
+                            <span className="text-[11px] font-bold text-slate-400">
+                              {player.dorsal ? `Dorsal #${player.dorsal}` : 'Sin dorsal'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className={`inline-block text-base font-black px-2.5 py-0.5 rounded-xl border ${
+                            hasEvals 
+                              ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                              : 'bg-slate-100 text-slate-400 border-slate-200'
+                          }`}>
+                            {hasEvals ? `${player.overallAverage} ★` : 'S/E'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mini barras de los 4 módulos */}
+                      <div className="grid grid-cols-4 gap-1.5 my-2 text-center text-[10px]">
+                        <div className="bg-amber-50 border border-amber-100 p-1.5 rounded-lg">
+                          <span className="block text-amber-700 font-bold">Téc</span>
+                          <span className="font-black text-amber-900">{player.moduleAverages.tecnico || '-'}</span>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-100 p-1.5 rounded-lg">
+                          <span className="block text-blue-700 font-bold">Tác</span>
+                          <span className="font-black text-blue-900">{player.moduleAverages.tactico || '-'}</span>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 p-1.5 rounded-lg">
+                          <span className="block text-emerald-700 font-bold">Fís</span>
+                          <span className="font-black text-emerald-900">{player.moduleAverages.fisico || '-'}</span>
+                        </div>
+                        <div className="bg-rose-50 border border-rose-100 p-1.5 rounded-lg">
+                          <span className="block text-rose-700 font-bold">Soc</span>
+                          <span className="font-black text-rose-900">{player.moduleAverages.socio || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 mt-2 font-medium">
+                      <span>{player.evaluationsCount > 0 ? `${player.evaluationsCount} eval. registradas` : 'Sin evaluación'}</span>
+                      <span className="text-purple-600 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                        Ver informe <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* BLOQUE ENTRENAMIENTOS */}
       {viewMode === 'entrenamientos' && (

@@ -344,7 +344,28 @@ export default function EntrenamientoDetailPage() {
         {/* LEFT COLUMN: PLAYER LIST (Hidden in rapida, asistencia, or disabled formativo) */}
         {activeModule !== 'rapida' && activeModule !== 'asistencia' && (activeModule !== 'formativo' || showFormativo) && (
         <div className="md:col-span-4 lg:col-span-3 space-y-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Selector Desplegable para Móviles */}
+          <div className="block md:hidden bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200">
+            <label className="block text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <UserCheck size={14} className="text-emerald-600" />
+              <span>Seleccionar Jugador para Evaluar:</span>
+            </label>
+            <select
+              value={selectedPlayerId || ""}
+              onChange={(e) => setSelectedPlayerId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="" disabled>-- Elige un jugador --</option>
+              {players.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.dorsal ? `#${p.dorsal} ` : ''}{p.first_name} {p.last_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Lista Completa para Pantallas Grandes / Desktop */}
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2">
               <UserCheck size={18} /> Seleccionar Jugador
             </div>

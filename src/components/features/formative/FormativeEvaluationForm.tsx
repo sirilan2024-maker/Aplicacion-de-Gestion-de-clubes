@@ -210,8 +210,9 @@ export function FormativeEvaluationForm({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                Categoría Infantil (12-14 años)
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <BrainCircuit size={12} />
+                Evaluación Formativa
               </span>
               {dorsal && (
                 <span className="text-[11px] font-extrabold text-slate-300 bg-white/10 px-2 py-0.5 rounded-md">
@@ -223,11 +224,11 @@ export function FormativeEvaluationForm({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end sm:self-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <select
             value={evaluationPeriod}
             onChange={(e) => setEvaluationPeriod(e.target.value)}
-            className="bg-white/10 text-white text-xs font-bold px-3 py-2 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400"
+            className="bg-white/10 text-white text-xs font-bold px-3 py-2.5 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400"
           >
             <option value="Trimestre 1" className="text-slate-900">1er Trimestre</option>
             <option value="Trimestre 2" className="text-slate-900">2do Trimestre</option>
@@ -239,16 +240,16 @@ export function FormativeEvaluationForm({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            <span>Guardar Evaluación</span>
+            <span>Guardar</span>
           </button>
         </div>
       </div>
 
-      {/* Pestañas de Módulos */}
-      <div className="flex overflow-x-auto gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
+      {/* Selector de Módulos (Grid Adaptable sin Scroll Obligatorio) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-inner">
         {modules.map(mod => {
           const isActive = mod.code === activeModuleCode;
           const evaluatedInMod = mod.concepts?.filter(c => scores[c.id] !== undefined).length || 0;
@@ -259,17 +260,17 @@ export function FormativeEvaluationForm({
               key={mod.id}
               type="button"
               onClick={() => setActiveModuleCode(mod.code)}
-              className={`flex-1 min-w-[170px] flex items-center justify-between gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${
+              className={`flex items-center justify-between gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs transition-all ${
                 isActive 
                   ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80' 
                   : 'text-slate-500 hover:text-slate-900 hover:bg-white/40'
               }`}
             >
-              <div className="flex items-center gap-2 truncate">
+              <div className="flex items-center gap-1.5 truncate">
                 {getModuleIcon(mod.code)}
                 <span className="truncate">{mod.name.replace('Módulo ', '')}</span>
               </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
                 evaluatedInMod === totalInMod && totalInMod > 0
                   ? 'bg-emerald-100 text-emerald-700'
                   : 'bg-slate-200 text-slate-600'
@@ -301,19 +302,20 @@ export function FormativeEvaluationForm({
                 </div>
                 
                 {currentScore ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                    <CheckCircle2 size={14} /> Nota: {currentScore} / 5
+                  <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                    <CheckCircle2 size={14} /> Puntuación: {currentScore} / 5
                   </span>
                 ) : (
                   <span className="text-[11px] font-bold text-slate-400 italic">Pendiente de calificar</span>
                 )}
               </div>
 
-              {/* Selector de Rúbricas 1 a 5 */}
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-3 mb-4">
+              {/* Selector de Rúbricas 1 a 5 con Feedback Táctil y Hover */}
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-3 mb-3">
                 {[1, 2, 3, 4, 5].map((lvl) => {
                   const rubric = rubrics.find(r => r.score_level === lvl);
                   const isSelected = currentScore === lvl;
+                  const isHovered = hoveredRubric?.conceptId === concept.id && hoveredRubric.rubric.score_level === lvl;
 
                   return (
                     <button
@@ -322,14 +324,17 @@ export function FormativeEvaluationForm({
                       onClick={() => handleScoreSelect(concept.id, lvl)}
                       onMouseEnter={() => rubric && setHoveredRubric({ conceptId: concept.id, rubric })}
                       onMouseLeave={() => setHoveredRubric(null)}
-                      className={`relative flex flex-col items-center justify-center p-2.5 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                      onTouchStart={() => rubric && setHoveredRubric({ conceptId: concept.id, rubric })}
+                      className={`relative flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-2xl border-2 transition-all cursor-pointer select-none ${
                         isSelected 
-                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200 scale-[1.02]' 
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200 scale-[1.03] z-10' 
+                          : isHovered
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                       }`}
                     >
                       <span className="text-base sm:text-lg font-black">{lvl}</span>
-                      <span className={`text-[10px] font-bold truncate max-w-full hidden sm:inline ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                      <span className={`text-[10px] font-bold truncate max-w-full hidden md:inline mt-0.5 ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
                         {rubric?.short_label || `Nivel ${lvl}`}
                       </span>
                     </button>
@@ -343,29 +348,36 @@ export function FormativeEvaluationForm({
                 
                 if (!activeRubric) {
                   return (
-                    <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 text-xs font-medium flex items-center gap-2 border border-dashed border-slate-200">
-                      <HelpCircle size={15} />
-                      <span>Selecciona una puntuación del 1 al 5 para ver la descripción pedagógica del aprendizaje.</span>
+                    <div className="p-3 rounded-2xl bg-slate-50 text-slate-500 text-xs font-medium flex items-center gap-2 border border-dashed border-slate-200">
+                      <HelpCircle size={15} className="shrink-0 text-slate-400" />
+                      <span>Pasa el dedo o pulsa cualquier número (1-5) para ver su criterio pedagógico de aprendizaje.</span>
                     </div>
                   );
                 }
 
                 return (
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200 text-emerald-950 text-xs animate-in fade-in">
-                    <div className="flex items-center gap-1.5 font-bold mb-1 text-emerald-800">
-                      <Info size={14} />
-                      <span>Rúbrica Nivel {activeRubric.score_level} ({activeRubric.short_label}):</span>
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-950 text-xs animate-in fade-in space-y-1">
+                    <div className="flex items-center justify-between font-bold text-emerald-900">
+                      <span className="flex items-center gap-1.5">
+                        <Info size={14} className="text-emerald-600" />
+                        Nivel {activeRubric.score_level}: {activeRubric.short_label}
+                      </span>
+                      {hoveredRubric?.conceptId === concept.id && (
+                        <span className="text-[10px] bg-emerald-200/60 text-emerald-800 px-2 py-0.5 rounded-md font-bold">
+                          Previsualizando
+                        </span>
+                      )}
                     </div>
-                    <p className="leading-relaxed font-medium">{activeRubric.criteria_description}</p>
+                    <p className="leading-relaxed font-medium text-emerald-900/90">{activeRubric.criteria_description}</p>
                   </div>
                 );
               })()}
 
-              {/* Observación cualitativa del entrenador para este concepto */}
+              {/* Observación cualitativa del entrenador */}
               <div className="mt-3">
                 <input
                   type="text"
-                  placeholder="Nota u observación específica sobre este concepto (opcional)..."
+                  placeholder="Nota u observación opcional sobre este concepto..."
                   value={coachNotes[concept.id] || ""}
                   onChange={(e) => handleNoteChange(concept.id, e.target.value)}
                   className="w-full text-xs bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-400 text-slate-800 placeholder:text-slate-400"

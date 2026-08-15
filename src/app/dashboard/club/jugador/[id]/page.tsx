@@ -157,6 +157,24 @@ export default function GlobalPlayerProfilePage() {
   }, [activeTab, playerId]);
 
   const [playerDocs, setPlayerDocs] = useState<any[]>([]);
+  const [teamCategory, setTeamCategory] = useState<string>('');
+
+  const isFormativeEligible = (): boolean => {
+    if (teamCategory) {
+      const cat = teamCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      if (cat.includes('senior') || cat.includes('primer equipo') || cat.includes('amateur') || cat.includes('veterano')) return false;
+      if (cat.includes('juvenil') || cat.includes('u19') || cat.includes('u18') || cat.includes('u17') || cat.includes('sub-19') || cat.includes('sub-18') || cat.includes('sub-17')) return false;
+      if (cat.includes('cadete') || cat.includes('u16') || cat.includes('u15') || cat.includes('sub-16') || cat.includes('sub-15')) return false;
+      return true;
+    }
+    if (player?.birth_date) {
+      const bYear = new Date(player.birth_date).getFullYear();
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - bYear;
+      if (age > 14) return false;
+    }
+    return true;
+  };
 
   const fetchPlayer = async () => {
     setLoading(true);
@@ -171,6 +189,13 @@ export default function GlobalPlayerProfilePage() {
       if (error) throw error;
       setPlayer(data);
       setEditData(data);
+
+      if (data?.team_id) {
+        const { data: tData } = await supabase.from('teams').select('category, name').eq('id', data.team_id).single();
+        if (tData) {
+          setTeamCategory(tData.category || tData.name || '');
+        }
+      }
 
       const { data: docs } = await supabase
         .from('player_documents')
@@ -767,28 +792,35 @@ export default function GlobalPlayerProfilePage() {
 
       {/* Navegación por pestañas */}
       <div className="mb-6">
-        {/* Selector en móvil */}
+        {/* Selector en móvil con fondo azul destacado */}
         <div className="md:hidden">
           <label htmlFor="tabs" className="sr-only">Seleccionar pestaña</label>
-          <select
-            id="tabs"
-            name="tabs"
-            className="block w-full rounded-xl border-gray-300 py-2.5 pl-3 pr-10 text-base focus:border-purple-500 focus:outline-none focus:ring-purple-500 sm:text-sm bg-gray-50 font-bold text-gray-800 shadow-sm"
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value as any)}
-          >
-            <option value="info">Info Personal</option>
-            <option value="medico">Físico & Médico</option>
-            <option value="formativo">Formativo & Aprendizaje</option>
-            {!esEntrenador && <option value="stats">Estadísticas</option>}
-            {!esEntrenador && <option value="asistencia">Asistencia</option>}
-            {!esEntrenador && <option value="disciplina">Disciplina</option>}
-            {!esEntrenador && <option value="utileria">Utillería</option>}
-          </select>
+          <div className="relative">
+            <select
+              id="tabs"
+              name="tabs"
+              className="block w-full rounded-2xl border-0 py-3.5 pl-4 pr-10 text-sm bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-black shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer appearance-none"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as any)}
+            >
+              <option value="info" className="bg-slate-900 text-white">📋 Info Personal</option>
+              <option value="medico" className="bg-slate-900 text-white">🩺 Físico & Médico</option>
+              {isFormativeEligible() && (
+                <option value="formativo" className="bg-slate-900 text-white">Formativo & Aprendizaje</option>
+              )}
+              {!esEntrenador && <option value="stats" className="bg-slate-900 text-white">📊 Estadísticas</option>}
+              {!esEntrenador && <option value="asistencia" className="bg-slate-900 text-white">📅 Asistencia</option>}
+              {!esEntrenador && <option value="disciplina" className="bg-slate-900 text-white">⚠️ Disciplina</option>}
+              {!esEntrenador && <option value="utileria" className="bg-slate-900 text-white">👕 Utillería</option>}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white">
+              <ChevronRight size={18} className="rotate-90" />
+            </div>
+          </div>
         </div>
 
-        {/* Botones en desktop */}
-        <div className="hidden md:flex items-center overflow-x-auto no-scrollbar border-b border-gray-200 gap-4 sm:gap-6 pb-2">
+        {/* Botones en desktop (estilo unificado como los demás) */}
+        <div className="hidden md:flex items-center overflow-x-auto no-scrollbar border-b border-gray-200 gap-6 pb-2">
           <button 
             onClick={() => setActiveTab('info')}
             className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
@@ -806,22 +838,23 @@ export default function GlobalPlayerProfilePage() {
             <HeartPulse size={18} /> Físico & Médico
           </button>
 
-          {/* Pestaña Formativo Destacada */}
-          <button 
-            onClick={() => setActiveTab('formativo' as any)}
-            className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border ${
-              activeTab === 'formativo' 
-                ? 'bg-purple-50 text-purple-700 border-purple-300 shadow-sm' 
-                : 'bg-slate-100/80 text-slate-700 border-slate-200 hover:bg-purple-50/60 hover:text-purple-700 hover:border-purple-200'
-            }`}
-          >
-            <span>Formativo & Aprendizaje</span>
-          </button>
+          {/* Pestaña Formativo (solo visible en categorías hasta infantil 2º año) */}
+          {isFormativeEligible() && (
+            <button 
+              onClick={() => setActiveTab('formativo' as any)}
+              className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                activeTab === 'formativo' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Formativo & Aprendizaje
+            </button>
+          )}
+
           {!esEntrenador && (
             <>
               <button 
                 onClick={() => setActiveTab('stats')}
-                className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                   activeTab === 'stats' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -829,7 +862,7 @@ export default function GlobalPlayerProfilePage() {
               </button>
               <button 
                 onClick={() => setActiveTab('asistencia')}
-                className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                   activeTab === 'asistencia' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -837,7 +870,7 @@ export default function GlobalPlayerProfilePage() {
               </button>
               <button 
                 onClick={() => setActiveTab('disciplina')}
-                className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                   activeTab === 'disciplina' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -845,7 +878,7 @@ export default function GlobalPlayerProfilePage() {
               </button>
               <button 
                 onClick={() => setActiveTab('utileria')}
-                className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
                   activeTab === 'utileria' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >

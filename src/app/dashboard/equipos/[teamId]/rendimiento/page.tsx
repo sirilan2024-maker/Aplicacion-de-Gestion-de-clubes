@@ -38,6 +38,18 @@ interface MatchStats {
   technicalRating: number | null;
 }
 
+export function isCategoryFormative(categoryName?: string | null): boolean {
+  if (!categoryName) return true; // Por defecto permitir si no está especificada
+  const cat = categoryName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  
+  // Categorías que NO deben tener formativo
+  if (cat.includes('senior') || cat.includes('primer equipo') || cat.includes('amateur') || cat.includes('veterano')) return false;
+  if (cat.includes('juvenil') || cat.includes('u19') || cat.includes('u18') || cat.includes('u17') || cat.includes('sub-19') || cat.includes('sub-18') || cat.includes('sub-17')) return false;
+  if (cat.includes('cadete') || cat.includes('u16') || cat.includes('u15') || cat.includes('sub-16') || cat.includes('sub-15')) return false;
+  
+  return true;
+}
+
 export default function RendimientoGlobalPage() {
   const params = useParams();
   const router = useRouter();
@@ -46,6 +58,7 @@ export default function RendimientoGlobalPage() {
   const [trainingStats, setTrainingStats] = useState<TrainingStats[]>([]);
   const [matchStats, setMatchStats] = useState<MatchStats[]>([]);
   const [formativeStats, setFormativeStats] = useState<TeamPlayerFormativeSummary[]>([]);
+  const [teamCategory, setTeamCategory] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
   const [drawerPlayerId, setDrawerPlayerId] = useState<string | null>(null);
@@ -67,8 +80,11 @@ export default function RendimientoGlobalPage() {
       setFormativeStats(formSummary);
 
       // 1. Fetch team and metrics
-      const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
+      const { data: teamData } = await supabase.from('teams').select('club_id, category, name').eq('id', teamId).single();
       if (!teamData) return;
+      if (teamData.category || teamData.name) {
+        setTeamCategory(teamData.category || teamData.name || '');
+      }
       
       const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
 
@@ -278,22 +294,24 @@ export default function RendimientoGlobalPage() {
             <Target size={16} className={viewMode === 'partidos' ? 'text-indigo-500' : 'text-gray-400'} />
             <span>Partidos</span>
           </button>
-          <button
-            onClick={() => setViewMode('formativo')}
-            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-              viewMode === 'formativo' 
-                ? 'bg-white text-purple-700 shadow-sm border border-gray-200/50' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <BrainCircuit size={16} className={viewMode === 'formativo' ? 'text-purple-600' : 'text-gray-400'} />
-            <span>Formativo</span>
-          </button>
+          {isCategoryFormative(teamCategory) && (
+            <button
+              onClick={() => setViewMode('formativo')}
+              className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                viewMode === 'formativo' 
+                  ? 'bg-white text-purple-700 shadow-sm border border-gray-200/50' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <BrainCircuit size={16} className={viewMode === 'formativo' ? 'text-purple-600' : 'text-gray-400'} />
+              <span>Formativo</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* BLOQUE FORMATIVO & APRENDIZAJE COLECTIVO */}
-      {viewMode === 'formativo' && (
+      {viewMode === 'formativo' && isCategoryFormative(teamCategory) && (
         <section className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">

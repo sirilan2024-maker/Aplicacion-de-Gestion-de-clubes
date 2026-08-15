@@ -46,6 +46,16 @@ export default function EntrenamientoDetailPage() {
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [showFormativo, setShowFormativo] = useState(false);
   const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
+  const [teamCategory, setTeamCategory] = useState<string>('');
+
+  const isFormativeCategory = (): boolean => {
+    if (!teamCategory) return true;
+    const cat = teamCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (cat.includes('senior') || cat.includes('primer equipo') || cat.includes('amateur') || cat.includes('veterano')) return false;
+    if (cat.includes('juvenil') || cat.includes('u19') || cat.includes('u18') || cat.includes('u17') || cat.includes('sub-19') || cat.includes('sub-18') || cat.includes('sub-17')) return false;
+    if (cat.includes('cadete') || cat.includes('u16') || cat.includes('u15') || cat.includes('sub-16') || cat.includes('sub-15')) return false;
+    return true;
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem('showFormativo');
@@ -57,6 +67,12 @@ export default function EntrenamientoDetailPage() {
     if (!teamId || !eventId) return;
     setLoading(true);
     const supabase = createClient();
+
+    // 0. Fetch Team Category
+    const { data: tData } = await supabase.from('teams').select('category, name').eq('id', teamId).single();
+    if (tData) {
+      setTeamCategory(tData.category || tData.name || '');
+    }
 
     // 1. Fetch Event
     const { data: evData } = await supabase.from('team_events').select('*').eq('id', eventId).single();
@@ -303,38 +319,40 @@ export default function EntrenamientoDetailPage() {
               <span>Carga Rápida (RPE)</span>
             </button>
 
-            {/* Botón Formativo con su mini interruptor de activación */}
-            <button 
-              type="button"
-              onClick={() => setActiveModule('formativo')}
-              className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
-                activeModule === 'formativo' 
-                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/50' 
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
-              }`}
-            >
-              <BrainCircuit size={16} className={activeModule === 'formativo' ? "text-emerald-600" : "text-slate-400"} />
-              <span>Formativo</span>
-
-              {/* Botoncito switch toggle independiente para activar/desactivar */}
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const nextState = !showFormativo;
-                  setShowFormativo(nextState);
-                  localStorage.setItem('showFormativo', nextState ? 'true' : 'false');
-                  if (nextState) {
-                    setActiveModule('formativo');
-                  }
-                }}
-                title={showFormativo ? "Módulo activado (clic para desactivar)" : "Módulo desactivado (clic para activar)"}
-                className={`w-7 h-4 flex items-center rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ml-1 ${
-                  showFormativo ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start hover:bg-slate-400'
+            {/* Botón Formativo con su mini interruptor de activación (solo en categorías hasta infantil 2º año) */}
+            {isFormativeCategory() && (
+              <button 
+                type="button"
+                onClick={() => setActiveModule('formativo')}
+                className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+                  activeModule === 'formativo' 
+                    ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
                 }`}
               >
-                <div className="bg-white w-3 h-3 rounded-full shadow-md" />
-              </div>
-            </button>
+                <BrainCircuit size={16} className={activeModule === 'formativo' ? "text-emerald-600" : "text-slate-400"} />
+                <span>Formativo</span>
+
+                {/* Botoncito switch toggle independiente para activar/desactivar */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nextState = !showFormativo;
+                    setShowFormativo(nextState);
+                    localStorage.setItem('showFormativo', nextState ? 'true' : 'false');
+                    if (nextState) {
+                      setActiveModule('formativo');
+                    }
+                  }}
+                  title={showFormativo ? "Módulo activado (clic para desactivar)" : "Módulo desactivado (clic para activar)"}
+                  className={`w-7 h-4 flex items-center rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ml-1 ${
+                    showFormativo ? 'bg-emerald-500 justify-end' : 'bg-slate-300 justify-start hover:bg-slate-400'
+                  }`}
+                >
+                  <div className="bg-white w-3 h-3 rounded-full shadow-md" />
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </div>

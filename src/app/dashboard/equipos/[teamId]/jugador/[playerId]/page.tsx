@@ -761,13 +761,13 @@ export default function GlobalPlayerProfilePage() {
           <select
             id="tabs"
             name="tabs"
-            className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-gray-50 font-bold text-gray-700 shadow-sm"
+            className="block w-full rounded-xl border-gray-300 py-2.5 pl-3 pr-10 text-base focus:border-purple-500 focus:outline-none focus:ring-purple-500 sm:text-sm bg-gray-50 font-bold text-gray-800 shadow-sm"
             value={activeTab}
             onChange={(e) => setActiveTab(e.target.value as any)}
           >
             <option value="info">Info Personal</option>
             <option value="medico">Físico & Médico</option>
-            <option value="formativo">🧠 Formativo & Aprendizaje</option>
+            <option value="formativo">Formativo & Aprendizaje</option>
             {!esEntrenador && <option value="stats">Estadísticas</option>}
             {!esEntrenador && <option value="asistencia">Asistencia</option>}
             {!esEntrenador && <option value="disciplina">Disciplina</option>}
@@ -776,10 +776,10 @@ export default function GlobalPlayerProfilePage() {
         </div>
 
         {/* Botones en desktop */}
-        <div className="hidden md:flex overflow-x-auto no-scrollbar border-b border-gray-200 gap-6">
+        <div className="hidden md:flex items-center overflow-x-auto no-scrollbar border-b border-gray-200 gap-4 sm:gap-6 pb-2">
           <button 
             onClick={() => setActiveTab('info')}
-            className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
               activeTab === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -787,19 +787,23 @@ export default function GlobalPlayerProfilePage() {
           </button>
           <button 
             onClick={() => setActiveTab('medico')}
-            className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+            className={`pb-2.5 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
               activeTab === 'medico' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             <HeartPulse size={18} /> Físico & Médico
           </button>
+
+          {/* Pestaña Formativo Destacada */}
           <button 
             onClick={() => setActiveTab('formativo' as any)}
-            className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-              activeTab === 'formativo' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border ${
+              activeTab === 'formativo' 
+                ? 'bg-purple-50 text-purple-700 border-purple-300 shadow-sm' 
+                : 'bg-slate-100/80 text-slate-700 border-slate-200 hover:bg-purple-50/60 hover:text-purple-700 hover:border-purple-200'
             }`}
           >
-            <BrainCircuit size={18} className="text-emerald-600" /> Formativo & Aprendizaje
+            <span>Formativo & Aprendizaje</span>
           </button>
           {!esEntrenador && (
             <>

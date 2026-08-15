@@ -102,7 +102,8 @@ interface PlayerData {
 export default function GlobalPlayerProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const playerId = typeof params.playerId === 'string' ? params.playerId : '';
+  const playerId = typeof params?.playerId === 'string' ? params.playerId : '';
+  const teamId = typeof params?.teamId === 'string' ? params.teamId : '';
 
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);

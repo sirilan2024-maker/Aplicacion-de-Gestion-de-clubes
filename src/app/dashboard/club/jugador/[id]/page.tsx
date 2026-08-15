@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, ChevronRight
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, ChevronRight, BrainCircuit
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
@@ -810,7 +810,7 @@ export default function GlobalPlayerProfilePage() {
               <option value="info" className="bg-white text-slate-900">📋 Info Personal</option>
               <option value="medico" className="bg-white text-slate-900">🩺 Físico & Médico</option>
               {isFormativeEligible() && (
-                <option value="formativo" className="bg-white text-slate-900">Formativo & Aprendizaje</option>
+                <option value="formativo" className="bg-white text-slate-900">🧠 Formativo & Aprendizaje</option>
               )}
               {!esEntrenador && <option value="stats" className="bg-white text-slate-900">📊 Estadísticas</option>}
               {!esEntrenador && <option value="asistencia" className="bg-white text-slate-900">📅 Asistencia</option>}
@@ -850,7 +850,7 @@ export default function GlobalPlayerProfilePage() {
                 activeTab === 'formativo' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Formativo & Aprendizaje
+              <BrainCircuit size={18} /> Formativo & Aprendizaje
             </button>
           )}
 

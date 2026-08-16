@@ -73,6 +73,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   const [clubInfo, setClubInfo] = useState<{id: string, name: string, logo_url: string | null} | null>(null)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
   const [showEditClub, setShowEditClub] = useState(false)
+  const [activePlayerName, setActivePlayerName] = useState<string | null>(null)
   const supabase = createClient()
 
   // Detect active team context
@@ -82,6 +83,18 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   // Detect active family player context
   const familyMatch = pathname.match(/^\/dashboard\/family\/e\/([a-zA-Z0-9-]+)/)
   const activeFamilyPlayerId = familyMatch ? familyMatch[1] : null
+
+  useEffect(() => {
+    if (activeFamilyPlayerId) {
+      const fetchPlayer = async () => {
+        const { data } = await supabase.from('players').select('first_name, last_name').eq('id', activeFamilyPlayerId).single();
+        if (data) setActivePlayerName(`${data.first_name} ${data.last_name}`);
+      };
+      fetchPlayer();
+    } else {
+      setActivePlayerName(null);
+    }
+  }, [activeFamilyPlayerId, supabase]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -293,7 +306,16 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             )}
           </div>
           <div className="flex flex-col justify-center min-w-0 flex-1">
-            {clubInfo ? (
+            {activePlayerName ? (
+              <>
+                <div className="text-[14px] font-extrabold leading-tight uppercase tracking-tight flex flex-col text-slate-100">
+                  <span className="block leading-none py-[1px] truncate">{activePlayerName}</span>
+                </div>
+                <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-400 mt-1">
+                  Jugador / Familia
+                </p>
+              </>
+            ) : clubInfo ? (
               <>
                 <div className="text-[11px] font-extrabold leading-tight uppercase tracking-tight flex flex-col text-slate-100">
                   {clubInfo.name.split(' ').map((word, i) => (

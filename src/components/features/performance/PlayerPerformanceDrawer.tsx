@@ -13,42 +13,56 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
   const [metrics, setMetrics] = useState<any[]>([]);
   const [teamCategory, setTeamCategory] = useState<string>('');
   const [teamName, setTeamName] = useState<string>('');
+  const [playerInfo, setPlayerInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!teamId) return;
+    if (!playerId) return;
     const fetchData = async () => {
       setLoading(true);
       const supabase = createClient();
       
-      const { data: tData } = await supabase.from('teams').select('category, name').eq('id', teamId).single();
-      if (tData) {
-        setTeamCategory(tData.category || '');
-        setTeamName(tData.name || '');
+      if (teamId) {
+        const { data: tData } = await supabase.from('teams').select('category, name').eq('id', teamId).single();
+        if (tData) {
+          setTeamCategory(tData.category || '');
+          setTeamName(tData.name || '');
+        }
+
+        const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type, title').eq('team_id', teamId).order('date', { ascending: false });
+        if (allEvents) setEvents(allEvents);
+
+        try {
+          const res = await fetch('/api/player-metrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playerId, eventIds: allEvents?.map(e => e.id) || [] })
+          });
+          const json = await res.json();
+          setMetrics(json.data || []);
+        } catch (err) {
+          console.error("Error fetching drawer metrics:", err);
+        }
       }
 
-      const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type, title').eq('team_id', teamId).order('date', { ascending: false });
-      if (allEvents) setEvents(allEvents);
-
-      try {
-        const res = await fetch('/api/player-metrics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId, eventIds: allEvents?.map(e => e.id) || [] })
-        });
-        const json = await res.json();
-        setMetrics(json.data || []);
-      } catch (err) {
-        console.error("Error fetching drawer metrics:", err);
-      } finally {
-        setLoading(false);
+      // Si no tenemos los datos del jugador desde props, los cargamos directamente
+      if (!globalTrainingStats && !globalMatchStats) {
+        const { data: pData } = await supabase.from('players').select('first_name, last_name, avatar_url, dorsal').eq('id', playerId).single();
+        if (pData) {
+          setPlayerInfo(pData);
+        }
       }
+
+      setLoading(false);
     };
     fetchData();
   }, [playerId, teamId]);
 
   const isFormative = isFormativeCategory(teamCategory, teamName);
-  const pName = globalTrainingStats?.first_name ? `${globalTrainingStats.first_name} ${globalTrainingStats.last_name || ''}` : 'Cargando...';
+  const effectivePlayer = globalTrainingStats || globalMatchStats || playerInfo;
+  const pName = effectivePlayer?.first_name ? `${effectivePlayer.first_name} ${effectivePlayer.last_name || ''}` : 'Ficha del Jugador';
+  const avatarUrl = effectivePlayer?.avatar_url;
+  const dorsal = effectivePlayer?.dorsal;
 
   return (
     <>
@@ -59,9 +73,9 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
         <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white rounded-full border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
-              {(globalTrainingStats?.avatar_url || globalMatchStats?.avatar_url) ? (
+              {avatarUrl ? (
                 <img 
-                  src={globalTrainingStats?.avatar_url || globalMatchStats?.avatar_url} 
+                  src={avatarUrl} 
                   alt={pName} 
                   className="w-full h-full object-cover object-[center_25%]" 
                 />
@@ -71,7 +85,7 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-900">{pName}</h2>
-              <div className="text-xs font-bold text-slate-500 uppercase">Dorsal {globalTrainingStats?.dorsal || globalMatchStats?.dorsal || '-'}</div>
+              <div className="text-xs font-bold text-slate-500 uppercase">Dorsal {dorsal || '-'}</div>
             </div>
           </div>
           <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm">

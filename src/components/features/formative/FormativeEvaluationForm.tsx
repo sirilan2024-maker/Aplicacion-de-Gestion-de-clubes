@@ -36,6 +36,7 @@ interface FormativeEvaluationFormProps {
   dorsal?: number | null;
   eventId?: string | null;
   onSaved?: () => void;
+  onOpenProfile?: () => void;
 }
 
 export function FormativeEvaluationForm({
@@ -44,7 +45,8 @@ export function FormativeEvaluationForm({
   playerAvatarUrl,
   dorsal,
   eventId,
-  onSaved
+  onSaved,
+  onOpenProfile
 }: FormativeEvaluationFormProps) {
   const [modules, setModules] = useState<EvaluationModule[]>([]);
   const [activeModuleCode, setActiveModuleCode] = useState<string>("tecnico_analitico");
@@ -103,24 +105,18 @@ export function FormativeEvaluationForm({
       }
     } catch (err) {
       console.error("Error al cargar datos formativos:", err);
-      toast.error("Error al cargar la rúbrica formativa");
+      toast.error("No se pudieron cargar las rúbricas formativas");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleScoreSelect = (conceptId: string, level: number) => {
-    setScores(prev => ({
-      ...prev,
-      [conceptId]: level
-    }));
+  const handleScoreSelect = (conceptId: string, score: number) => {
+    setScores(prev => ({ ...prev, [conceptId]: score }));
   };
 
-  const handleNoteChange = (conceptId: string, text: string) => {
-    setCoachNotes(prev => ({
-      ...prev,
-      [conceptId]: text
-    }));
+  const handleNoteChange = (conceptId: string, notes: string) => {
+    setCoachNotes(prev => ({ ...prev, [conceptId]: notes }));
   };
 
   const handleSave = async () => {
@@ -132,15 +128,21 @@ export function FormativeEvaluationForm({
         coach_notes: coachNotes[conceptId] || null
       }));
 
+      if (itemsPayload.length === 0) {
+        toast.error("Debes evaluar al menos un concepto antes de guardar");
+        setSaving(false);
+        return;
+      }
+
       const dto: UpsertEvaluationDTO = {
         id: evaluationId,
         player_id: playerId,
         event_id: eventId || null,
-        evaluation_date: new Date().toISOString().split("T")[0],
+        evaluation_date: new Date().toISOString().split('T')[0],
         evaluation_period: evaluationPeriod,
-        general_feedback: generalFeedback.trim() || null,
-        strengths: strengths.trim() || null,
-        areas_for_improvement: areasForImprovement.trim() || null,
+        general_feedback: generalFeedback || null,
+        strengths: strengths || null,
+        areas_for_improvement: areasForImprovement || null,
         items: itemsPayload
       };
 
@@ -198,10 +200,14 @@ export function FormativeEvaluationForm({
 
   return (
     <div className="space-y-6">
-      {/* Header del Formulario Formativo */}
+      {/* Header del Formulario Formativo con Ficha Clicable */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 flex items-center justify-center font-black text-xl shrink-0 shadow-inner">
+        <div 
+          onClick={onOpenProfile}
+          title={onOpenProfile ? "Haz clic para ver informe completo y evolución" : undefined}
+          className={`flex items-center gap-4 ${onOpenProfile ? "cursor-pointer group hover:opacity-95 transition-all" : ""}`}
+        >
+          <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 flex items-center justify-center font-black text-xl shrink-0 shadow-inner group-hover:border-emerald-400 group-hover:scale-105 transition-all">
             {playerAvatarUrl ? (
               <img src={playerAvatarUrl} alt={playerName} className="w-full h-full object-cover object-[center_25%]" />
             ) : (
@@ -220,7 +226,14 @@ export function FormativeEvaluationForm({
                 </span>
               )}
             </div>
-            <h2 className="text-xl font-black text-white mt-1 leading-tight">{playerName}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <h2 className="text-xl font-black text-white leading-tight group-hover:text-emerald-300 transition-colors">{playerName}</h2>
+              {onOpenProfile && (
+                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded-lg opacity-80 group-hover:opacity-100 transition-opacity">
+                  Ver Ficha ↗
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

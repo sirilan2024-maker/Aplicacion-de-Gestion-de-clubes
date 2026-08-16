@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Loader2, Save, UserCheck, BrainCircuit, Zap, RotateCcw } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FormativeEvaluationForm } from "@/components/features/formative/FormativeEvaluationForm";
+import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { isFormativeCategory } from "@/lib/utils";
 
 interface Player {
@@ -42,6 +43,8 @@ export default function EntrenamientoDetailPage() {
   const [activeModule, setActiveModule] = useState<'asistencia' | 'formativo' | 'rapida'>('asistencia');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [savingPlayer, setSavingPlayer] = useState<string | null>(null);
+  const [drawerPlayerId, setDrawerPlayerId] = useState<string | null>(null);
+  const [drawerTab, setDrawerTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>('formativo');
 
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
@@ -705,6 +708,10 @@ export default function EntrenamientoDetailPage() {
                   playerAvatarUrl={selectedPlayer.avatar_url}
                   dorsal={selectedPlayer.dorsal}
                   eventId={eventId}
+                  onOpenProfile={() => {
+                    setDrawerPlayerId(selectedPlayer.id);
+                    setDrawerTab('formativo');
+                  }}
                 />
               </div>
             ) : (
@@ -720,6 +727,16 @@ export default function EntrenamientoDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Pantalla Emergente Lateral (Drawer) de Rendimiento y Evolución Formativa */}
+      {drawerPlayerId && (
+        <PlayerPerformanceDrawer
+          playerId={drawerPlayerId}
+          teamId={teamId}
+          initialTab={drawerTab}
+          onClose={() => setDrawerPlayerId(null)}
+        />
+      )}
     </div>
   );
 }

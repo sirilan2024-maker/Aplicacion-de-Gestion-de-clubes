@@ -186,79 +186,61 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
         </div>
       </div>
 
-      {/* ─── 2. Gráficos: Radar de Competencias y Evolución Temporal ─── */}
+      {/* ─── 2. Gráficos: Esquema de Competencias (Barras Graduadas 1-5) y Evolución Temporal ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Radar de Competencias Mejorado con Niveles 1-5 Claros */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col">
-          <div className="w-full flex items-center justify-between mb-3">
-            <div>
-              <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <Award className="text-amber-500" size={18} />
-                Perfil de Competencias (Radar 1 - 5)
-              </h4>
-              <p className="text-slate-400 text-xs font-medium mt-0.5">Nivel de dominio de cada concepto formativo</p>
-            </div>
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full shrink-0">
-              Escala 1 a 5
-            </span>
-          </div>
-
-          <div className="w-full h-80 sm:h-96 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={report.radar_data}>
-                <PolarGrid stroke="#cbd5e1" strokeDasharray="3 3" />
-                <PolarAngleAxis 
-                  dataKey="concept_name" 
-                  tick={{ fill: "#1e293b", fontSize: 10, fontWeight: 800 }} 
-                />
-                <PolarRadiusAxis 
-                  angle={90} 
-                  domain={[0, 5]} 
-                  tickCount={6}
-                  stroke="#94a3b8"
-                  tick={{ fill: "#0f172a", fontSize: 11, fontWeight: 900 }} 
-                />
-                <RechartsTooltip 
-                  formatter={(value: any) => [`${value} / 5`, 'Nivel']}
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "1rem", color: "#fff", border: "none", padding: "8px 14px", fontWeight: "bold" }}
-                />
-                <Radar 
-                  name="Nivel de Competencia" 
-                  dataKey="score" 
-                  stroke="#2563eb" 
-                  strokeWidth={2.5}
-                  fill="#3b82f6" 
-                  fillOpacity={0.45} 
-                  dot={{ r: 4, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 2 }}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Desglose Rápido en Mini-Barras para Consulta Inmediata */}
-          {report.radar_data && report.radar_data.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 block mb-2">Desglose de conceptos evaluados</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                {report.radar_data.map((c, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs">
-                    <span className="font-bold text-slate-700 truncate mr-2" title={c.concept_name}>{c.concept_name}</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="w-12 h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full ${
-                            c.score >= 4 ? 'bg-emerald-500' : c.score >= 3 ? 'bg-blue-500' : 'bg-amber-500'
-                          }`}
-                          style={{ width: `${(c.score / 5) * 100}%` }}
-                        />
-                      </div>
-                      <span className="font-black text-slate-900 w-6 text-right">{c.score} <span className="text-[10px] text-slate-400 font-medium">/5</span></span>
-                    </div>
-                  </div>
-                ))}
+        {/* Esquema Visual de Competencias (Mucho más claro que el radar y sin scroll) */}
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="w-full flex items-center justify-between mb-4">
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                  <Award className="text-amber-500" size={18} />
+                  Perfil de Competencias y Dominio
+                </h4>
+                <p className="text-slate-400 text-xs font-medium mt-0.5">Nivel evaluado concepto a concepto (Escala 1 al 5)</p>
               </div>
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full shrink-0">
+                1 - 5 Niveles
+              </span>
             </div>
-          )}
+
+            {/* Lista Desglosada Completa Sin Scroll */}
+            {report.radar_data && report.radar_data.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                {report.radar_data.map((c, idx) => {
+                  const isHigh = c.score >= 4;
+                  const isMid = c.score === 3;
+                  const colorBg = isHigh ? 'bg-emerald-500' : isMid ? 'bg-blue-500' : 'bg-amber-500';
+                  const badgeBg = isHigh ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : isMid ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+
+                  return (
+                    <div key={idx} className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200/80 flex flex-col justify-between gap-2 transition-all hover:bg-slate-100/70">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-slate-800 text-xs leading-snug">{c.concept_name}</span>
+                        <span className={`text-xs font-black px-2 py-0.5 rounded-lg border shrink-0 ${badgeBg}`}>
+                          {c.score} <span className="text-[10px] font-semibold opacity-70">/ 5</span>
+                        </span>
+                      </div>
+                      
+                      {/* Segmentos de Nivel 1 a 5 */}
+                      <div className="grid grid-cols-5 gap-1.5 w-full pt-1">
+                        {[1, 2, 3, 4, 5].map((lvl) => (
+                          <div 
+                            key={lvl}
+                            className={`h-2 rounded-full transition-all ${
+                              lvl <= c.score ? colorBg : 'bg-slate-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-xs italic text-center py-6">No hay conceptos evaluados en esta sesión.</p>
+            )}
+          </div>
         </div>
 
         {/* Evolución Temporal Líneas */}

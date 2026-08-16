@@ -74,7 +74,7 @@ export default function PlantillaEquipoPage() {
           .from("player_season_history")
           .select(`
             status,
-            players!inner (id, first_name, last_name, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
+            players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
           `)
           .eq("team_id", teamId)
         .neq("status", "inactive");
@@ -291,7 +291,7 @@ export default function PlantillaEquipoPage() {
                 </tr>
               ) : (
                 players.map((player) => {
-                  const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
+                  const esEntrenador = (player.posicion_principal || player.posicion)?.toLowerCase().includes('entrenador') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('delegado') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('técnico');
                   return (
                     <tr 
                       key={player.id} 
@@ -396,7 +396,7 @@ export default function PlantillaEquipoPage() {
           </div>
         ) : (
           players.map((player) => {
-            const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
+            const esEntrenador = (player.posicion_principal || player.posicion)?.toLowerCase().includes('entrenador') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('delegado') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('técnico');
             return (
               <div 
                 key={player.id}

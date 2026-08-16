@@ -647,7 +647,7 @@ export default function GlobalPlayerProfilePage() {
     );
   }
 
-  const esEntrenador = player.posicion?.toLowerCase().includes('entrenador') || player.posicion?.toLowerCase().includes('delegado') || player.posicion?.toLowerCase().includes('técnico');
+  const esEntrenador = (player.posicion_principal || player.posicion)?.toLowerCase().includes('entrenador') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('delegado') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('técnico');
 
   const calcularEdad = (fechaNacimiento: string | null) => {
     if (!fechaNacimiento) return null;
@@ -740,7 +740,7 @@ export default function GlobalPlayerProfilePage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium text-sm flex-wrap">
-                  <span className="capitalize">{player.posicion || 'Sin posición'}</span>
+                  <span className="capitalize">{player.posicion_principal || player.posicion || 'Sin posición'}</span>
                   {edadJugador !== null && (
                     <>
                       <span>•</span>

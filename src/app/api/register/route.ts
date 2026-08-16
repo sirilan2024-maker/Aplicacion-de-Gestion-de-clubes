@@ -292,6 +292,7 @@ export async function POST(request: Request) {
       payment_method: paymentMethod || null,
       payment_plan: paymentPlan || null,
       paid_reservation: formData.paidReservation || false,
+      was_in_club: formData.wasInClub || false,
       
       // Consentimientos RGPD con firma electrónica (IP + timestamp)
       consent_rgpd_at: formData.consentRgpd ? new Date().toISOString() : null,
@@ -444,10 +445,10 @@ export async function POST(request: Request) {
     if (email && player) {
       try {
         const emailHtml = getPlayerRegistrationEmailHtml({
-          playerName: `${formData.playerFirstName} ${formData.playerLastName}`,
+          playerName: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`,
           tutorName: formData.tutor1Name ? `${formData.tutor1Name} ${formData.tutor1LastName || ''}`.trim() : undefined,
-          category: categoryTarget || undefined,
-          dorsal: player.dorsal || undefined,
+          category: (formData as any).category || undefined,
+          dorsal: (formData as any).dorsal || undefined,
         });
 
         await sendEmail({

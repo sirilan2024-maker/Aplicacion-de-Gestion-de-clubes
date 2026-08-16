@@ -56,7 +56,7 @@ export default function OfficialReceiptsList() {
     setLoading(true);
     try {
       const data = await getOfficialReceiptsAction();
-      setReceipts(data || []);
+      setReceipts((data as any) || []);
     } catch (err: any) {
       toast.error("Error al cargar registro de recibos: " + err.message);
     } finally {
@@ -126,8 +126,8 @@ export default function OfficialReceiptsList() {
         setManualResult({
           receiptNumber: res.receiptNumber,
           url: res.url,
-          whatsappUrl: res.whatsappUrl,
-          fileName: res.fileName,
+          whatsappUrl: res.whatsappUrl || undefined,
+          fileName: res.fileName || undefined,
         });
         setShowManualModal(false);
         // Reset form
@@ -183,22 +183,22 @@ export default function OfficialReceiptsList() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowManualModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all text-center"
           >
-            <PlusCircle className="w-4 h-4" />
-            Emitir Recibo Eventual
+            <PlusCircle className="w-4 h-4 flex-shrink-0" />
+            <span>Recibo Eventual</span>
           </button>
 
           <button
             onClick={handleExportCsv}
             disabled={exporting}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all disabled:opacity-50"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all disabled:opacity-50 text-center"
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            {exporting ? "Exportando..." : "Exportar CSV Recibos"}
+            <FileSpreadsheet className="w-4 h-4 flex-shrink-0" />
+            <span>{exporting ? "Exportando..." : "Exportar CSV"}</span>
           </button>
         </div>
       </div>
@@ -209,17 +209,17 @@ export default function OfficialReceiptsList() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por Nº recibo (ej. 04082026-0001), socio o concepto..."
+            placeholder="Buscar por Nº recibo, socio o concepto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-slate-50 md:bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1">
+        <div className="grid grid-cols-3 w-full md:w-auto bg-slate-200/70 p-1 rounded-xl gap-1">
           <button
             onClick={() => setStatusFilter("todos")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
               statusFilter === "todos" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
             }`}
           >
@@ -227,7 +227,7 @@ export default function OfficialReceiptsList() {
           </button>
           <button
             onClick={() => setStatusFilter("emitido")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
               statusFilter === "emitido" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600"
             }`}
           >
@@ -235,7 +235,7 @@ export default function OfficialReceiptsList() {
           </button>
           <button
             onClick={() => setStatusFilter("anulado")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
               statusFilter === "anulado" ? "bg-red-600 text-white shadow-sm" : "text-slate-600"
             }`}
           >

@@ -5,7 +5,7 @@ import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export function Step3Fees() {
-  const { register, control, formState: { errors } } = useFormContext<RegistrationFormData>();
+  const { register, control, setValue, formState: { errors } } = useFormContext<RegistrationFormData>();
   
   const wasInClub = useWatch({ control, name: "wasInClub" });
   const paidReservation = useWatch({ control, name: "paidReservation" });
@@ -36,7 +36,11 @@ export function Step3Fees() {
         <div className="space-y-4">
           <div className={`p-4 rounded-xl border-2 transition-all ${wasInClub ? 'border-green-600 bg-green-50' : 'border-gray-200'}`}>
             <div className="flex items-start gap-3">
-              <Checkbox id="wasInClub" {...register("wasInClub")} />
+              <Checkbox
+                id="wasInClub"
+                checked={!!wasInClub}
+                onCheckedChange={(val) => setValue("wasInClub", !!val, { shouldValidate: true, shouldDirty: true })}
+              />
               <div className="flex flex-col">
                 <label htmlFor="wasInClub" className="text-sm font-medium text-gray-700 cursor-pointer">
                   Sí, pertenecí al club la temporada pasada
@@ -54,7 +58,11 @@ export function Step3Fees() {
           <div className={`p-4 rounded-xl border-2 transition-all ${paidReservation ? 'border-orange-600 bg-orange-50' : 'border-gray-200 bg-white'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
-                <Checkbox id="paidReservation" {...register("paidReservation")} />
+                <Checkbox
+                  id="paidReservation"
+                  checked={!!paidReservation}
+                  onCheckedChange={(val) => setValue("paidReservation", !!val, { shouldValidate: true, shouldDirty: true })}
+                />
                 <div className="flex flex-col">
                   <label htmlFor="paidReservation" className="text-sm font-medium text-gray-700 cursor-pointer">
                     ¿Pagó reserva de plaza (50€)?

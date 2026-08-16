@@ -9,12 +9,13 @@ import {
   sendPaymentNotificationAction,
   sendMemberBalanceNotificationAction,
   downloadFeeReceiptAction,
-  updateFeeAmountAction
+  updateFeeAmountAction,
+  deleteFeeAction
 } from "@/app/actions/treasury-actions";
 import {
   Users, Search, Filter, TrendingUp, TrendingDown, Scale, CheckCircle2,
   AlertTriangle, Coins, FileText, ChevronRight, X, Plus, Download, Bell,
-  Calendar, CreditCard, ShieldCheck, Loader2, MessageSquare, ExternalLink, Pencil
+  Calendar, CreditCard, ShieldCheck, Loader2, MessageSquare, ExternalLink, Pencil, Trash2
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -78,6 +79,7 @@ export default function MemberBalances() {
 
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("Contado");
+  const [directPaymentConcept, setDirectPaymentConcept] = useState("Abono a cuenta");
 
   // Edit fee state
   const [editingFee, setEditingFee] = useState<{ id: string; concept: string; amount: string; reason: string } | null>(null);
@@ -177,23 +179,40 @@ export default function MemberBalances() {
 
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFeeForPayment || paymentAmount <= 0) return;
+    if (paymentAmount <= 0) {
+      toast.error("Introduce un importe válido mayor a 0");
+      return;
+    }
 
     try {
-      const toastId = toast.loading("Registrando cobro...");
-      await addPartialPaymentAction(
-        selectedFeeForPayment,
-        Math.round(paymentAmount * 100),
-        paymentMethod
-      );
-      toast.success("Cobro registrado correctamente", { id: toastId });
+      const toastId = toast.loading("Registrando abono / cobro...");
+      if (selectedFeeForPayment && selectedFeeForPayment !== "direct") {
+        await addPartialPaymentAction(
+          selectedFeeForPayment,
+          Math.round(paymentAmount * 100),
+          paymentMethod
+        );
+      } else if (selectedPlayerId) {
+        await createFeeAction({
+          player_id: selectedPlayerId,
+          concept: directPaymentConcept.trim() || "Abono a cuenta de socio",
+          amount_cents: Math.round(paymentAmount * 100),
+          currency: "eur",
+          estado: "pagado",
+          tipo_cargo: "one_time",
+          payment_method: paymentMethod,
+          fecha_pago: new Date().toISOString()
+        });
+      }
+      toast.success("Abono registrado correctamente", { id: toastId });
       setShowAddPaymentModal(false);
       setSelectedFeeForPayment(null);
       setPaymentAmount(0);
+      setDirectPaymentConcept("Abono a cuenta");
       if (selectedPlayerId) fetchStatement(selectedPlayerId);
       fetchBalances();
     } catch (err: any) {
-      toast.error("Error al registrar cobro: " + err.message);
+      toast.error("Error al registrar abono: " + err.message);
     }
   };
 
@@ -228,6 +247,23 @@ export default function MemberBalances() {
       }
     } catch (err: any) {
       toast.error("Error al descargar recibo: " + err.message, { id: toastId });
+    }
+  };
+
+  const handleDeleteFee = async (feeId: string, concept: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la cuota/cargo "${concept}"? Se recalculará el saldo del socio.`)) {
+      return;
+    }
+    try {
+      const toastId = toast.loading("Eliminando cuota...");
+      await deleteFeeAction(feeId);
+      toast.success("Cuota/cargo eliminado correctamente", { id: toastId });
+      if (selectedPlayerId) {
+        fetchStatement(selectedPlayerId);
+      }
+      fetchBalances();
+    } catch (err: any) {
+      toast.error("Error al eliminar cuota: " + err.message);
     }
   };
 
@@ -341,11 +377,11 @@ export default function MemberBalances() {
             </select>
           </div>
 
-          {/* Status Filter buttons (Horizontal Scrollable on Mobile) */}
-          <div className="flex overflow-x-auto pb-1 md:pb-0 scrollbar-none gap-1 bg-slate-200/70 p-1 rounded-xl">
+          {/* Status Filter buttons - 3 columns grid on mobile without scroll */}
+          <div className="grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-xl w-full">
             <button
               onClick={() => setStatusFilter("todos")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+              className={`px-2 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
                 statusFilter === "todos"
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -355,17 +391,17 @@ export default function MemberBalances() {
             </button>
             <button
               onClick={() => setStatusFilter("con_deuda")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+              className={`px-2 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
                 statusFilter === "con_deuda"
                   ? "bg-red-600 text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Con Deuda ({summary.membersConDeuda})
+              Deuda ({summary.membersConDeuda})
             </button>
             <button
               onClick={() => setStatusFilter("al_dia")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+              className={`px-2 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
                 statusFilter === "al_dia"
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -376,10 +412,10 @@ export default function MemberBalances() {
           </div>
         </div>
 
-        {/* ===== MOBILE CARDS VIEW (block md:hidden) ===== */}
-        <div className="block md:hidden divide-y divide-slate-100">
+        {/* ===== MOBILE CARDS VIEW: Tarjetas Individuales con clara separación visual (block md:hidden) ===== */}
+        <div className="block md:hidden p-3 bg-slate-100/70 rounded-2xl space-y-3">
           {filteredMembers.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-sm">
+            <div className="py-8 text-center text-slate-400 text-sm bg-white rounded-xl border border-slate-200">
               No se encontraron socios con los filtros aplicados.
             </div>
           ) : (
@@ -387,33 +423,40 @@ export default function MemberBalances() {
               const charged = (m.total_charged_cents / 100).toFixed(2);
               const paid = (m.total_paid_cents / 100).toFixed(2);
               const balance = (m.balance_cents / 100).toFixed(2);
+              const initials = (m.player_name || "S").split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
               return (
                 <div
                   key={m.player_id}
                   onClick={() => fetchStatement(m.player_id)}
-                  className="p-4 hover:bg-indigo-50/30 transition-colors active:bg-indigo-50/50 space-y-2.5 cursor-pointer"
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all space-y-3 active:scale-[0.99] cursor-pointer"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-bold text-slate-900 text-sm">{m.player_name}</p>
-                      <span className="inline-block mt-0.5 text-[11px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                        {m.team_name}
-                      </span>
+                  {/* Fila Superior: Avatar + Nombre + Equipo + Badge de Estado */}
+                  <div className="flex items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-extrabold flex items-center justify-center text-xs shadow-sm flex-shrink-0">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-slate-900 text-sm truncate">{m.player_name}</p>
+                        <span className="inline-block text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md mt-0.5">
+                          ⚽ {m.team_name}
+                        </span>
+                      </div>
                     </div>
 
-                    <div>
+                    <div className="flex-shrink-0">
                       {m.status === "con_deuda" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
                           <AlertTriangle className="w-3 h-3" />
                           Deuda ({m.pending_fees_count})
                         </span>
                       ) : m.status === "saldo_favor" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
                           Favor
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
                           Al día
                         </span>
@@ -421,19 +464,20 @@ export default function MemberBalances() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center text-xs">
+                  {/* Fila Central: 3 Métricas Clave */}
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 text-center text-xs">
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Cargado</span>
-                      <span className="font-bold text-slate-800">{charged} €</span>
+                      <span className="font-bold text-slate-800 text-sm">{charged} €</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Pagado</span>
-                      <span className="font-bold text-emerald-600">{paid} €</span>
+                      <span className="font-bold text-emerald-600 text-sm">{paid} €</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Saldo</span>
                       <span
-                        className={`font-black ${
+                        className={`font-black text-sm ${
                           m.balance_cents > 0
                             ? "text-red-600"
                             : m.balance_cents < 0
@@ -446,6 +490,7 @@ export default function MemberBalances() {
                     </div>
                   </div>
 
+                  {/* Fila Inferior: Botones de Acción */}
                   <div className="flex items-center justify-between pt-1">
                     {m.status === "con_deuda" ? (
                       <button
@@ -453,10 +498,10 @@ export default function MemberBalances() {
                           e.stopPropagation();
                           setNotifPlayer({ id: m.player_id, name: m.player_name });
                         }}
-                        className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg active:bg-amber-100"
+                        className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl active:bg-amber-100"
                       >
-                        <Bell className="w-3.5 h-3.5" />
-                        Notificar Deuda
+                        <Bell className="w-3.5 h-3.5 text-amber-600" />
+                        Notificar
                       </button>
                     ) : (
                       <span />
@@ -467,7 +512,7 @@ export default function MemberBalances() {
                         e.stopPropagation();
                         fetchStatement(m.player_id);
                       }}
-                      className="flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg active:bg-indigo-100 ml-auto"
+                      className="flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-3.5 py-1.5 rounded-xl active:bg-indigo-200 ml-auto transition-colors"
                     >
                       Ver Extracto
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -479,7 +524,7 @@ export default function MemberBalances() {
           )}
         </div>
 
-        {/* ===== DESKTOP TABLE VIEW (hidden md:table) ===== */}
+        {/* ===== DESKTOP TABLE VIEW (hidden md:block) ===== */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -505,6 +550,7 @@ export default function MemberBalances() {
                   const charged = (m.total_charged_cents / 100).toFixed(2);
                   const paid = (m.total_paid_cents / 100).toFixed(2);
                   const balance = (m.balance_cents / 100).toFixed(2);
+                  const initials = (m.player_name || "S").split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
                   return (
                     <tr
@@ -512,11 +558,16 @@ export default function MemberBalances() {
                       onClick={() => fetchStatement(m.player_id)}
                       className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
                     >
-                      <td className="py-3 px-4 font-bold text-slate-900 group-hover:text-indigo-600 flex items-center gap-2">
-                        {m.player_name}
+                      <td className="py-3 px-4 font-bold text-slate-900 group-hover:text-indigo-600">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
+                            {initials}
+                          </div>
+                          <span>{m.player_name}</span>
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-slate-500 text-xs">
-                        <span className="bg-slate-100 px-2 py-1 rounded-md">{m.team_name}</span>
+                        <span className="bg-slate-100 px-2 py-1 rounded-md font-medium">{m.team_name}</span>
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-slate-700">{charged} €</td>
                       <td className="py-3 px-4 text-right font-medium text-emerald-600">{paid} €</td>
@@ -633,21 +684,42 @@ export default function MemberBalances() {
                 </div>
 
                 {/* Actions Toolbar */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setShowAddChargeModal(true)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Emitir Nuevo Cargo
-                  </button>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setShowAddChargeModal(true)}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all text-center"
+                    >
+                      <Plus className="w-4 h-4 flex-shrink-0" />
+                      <span>+ Emitir Nuevo Cargo</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const firstPending = statementData.fees.find((f: any) => f.estado !== "pagado");
+                        if (firstPending) {
+                          setSelectedFeeForPayment(firstPending.id);
+                          setPaymentAmount(firstPending.pending_cents / 100);
+                        } else {
+                          setSelectedFeeForPayment("direct");
+                          setPaymentAmount(0);
+                        }
+                        setShowAddPaymentModal(true);
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all text-center"
+                    >
+                      <Coins className="w-4 h-4 flex-shrink-0" />
+                      <span>+ Emitir Nuevo Abono</span>
+                    </button>
+                  </div>
+
                   {statementData.summary.balance > 0 && (
                     <button
                       onClick={() => setNotifPlayer({ id: statementData.player.id, name: statementData.player.name })}
-                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+                      className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs rounded-xl shadow-sm transition-all"
                     >
-                      <Bell className="w-4 h-4" />
-                      Enviar Notificación
+                      <Bell className="w-4 h-4 text-amber-600" />
+                      <span>Enviar Notificación de Saldo Pendiente</span>
                     </button>
                   )}
                 </div>
@@ -681,7 +753,7 @@ export default function MemberBalances() {
                           </div>
 
                           <div className="text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                            <div className="flex items-center justify-end gap-1">
                               <p className="font-black text-slate-900 text-base">
                                 {(fee.amount_cents / 100).toFixed(2)} €
                               </p>
@@ -698,6 +770,13 @@ export default function MemberBalances() {
                                 title="Modificar importe de cuota (Ajuste / Error inscripción)"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFee(fee.id, fee.concept)}
+                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                title="Eliminar este cargo / cuota"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                             {fee.estado === "pagado" ? (
@@ -728,7 +807,7 @@ export default function MemberBalances() {
                         )}
 
                         {/* Action buttons per fee */}
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 flex-wrap">
                           {fee.estado !== "pagado" && (
                             <button
                               onClick={() => {
@@ -736,7 +815,7 @@ export default function MemberBalances() {
                                 setPaymentAmount(fee.pending_cents / 100);
                                 setShowAddPaymentModal(true);
                               }}
-                              className="flex items-center gap-1 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                              className="flex items-center gap-1 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors shadow-xs"
                             >
                               <Coins className="w-3.5 h-3.5" />
                               Abonar
@@ -748,6 +827,14 @@ export default function MemberBalances() {
                           >
                             <Download className="w-3.5 h-3.5" />
                             Recibo PDF
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFee(fee.id, fee.concept)}
+                            className="flex items-center gap-1 text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                            title="Eliminar cargo / cuota de este socio"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Quitar Cargo
                           </button>
                         </div>
                       </div>
@@ -861,34 +948,94 @@ export default function MemberBalances() {
       {showAddPaymentModal && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95">
-            <h3 className="text-lg font-bold text-slate-900">Registrar Entrega a Cuenta / Cobro</h3>
-            <form onSubmit={handleAddPayment} className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Importe Abonado (€)</label>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <Coins className="w-5 h-5 text-emerald-600" />
+                  Emitir Nuevo Abono / Cobro
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Socio: <strong className="text-slate-800">{statementData?.player?.name}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddPaymentModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPayment} className="space-y-3.5">
+              {statementData?.fees && statementData.fees.filter((f: any) => f.estado !== "pagado").length > 0 ? (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Destino del Abono</label>
+                  <select
+                    value={selectedFeeForPayment || "direct"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedFeeForPayment(val);
+                      if (val !== "direct") {
+                        const f = statementData.fees.find((item: any) => item.id === val);
+                        if (f) setPaymentAmount(f.pending_cents / 100);
+                      }
+                    }}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium"
+                  >
+                    {statementData.fees.filter((f: any) => f.estado !== "pagado").map((f: any) => (
+                      <option key={f.id} value={f.id}>
+                        📌 Cuota: {f.concept} (Pendiente: {(f.pending_cents / 100).toFixed(2)} €)
+                      </option>
+                    ))}
+                    <option value="direct">✨ Abono / Entrega a cuenta general del socio</option>
+                  </select>
+                </div>
+              ) : null}
+
+              {(!selectedFeeForPayment || selectedFeeForPayment === "direct") && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Concepto del Abono</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: Entrega en mano, Abono cuota mensual..."
+                    value={directPaymentConcept}
+                    onChange={(e) => setDirectPaymentConcept(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Importe Abonado (€) *</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0.01"
                   required
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(parseFloat(e.target.value))}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500"
+                  value={paymentAmount || ""}
+                  onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-base font-extrabold outline-none focus:ring-2 focus:ring-emerald-500 text-emerald-700"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Método de Cobro</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Método de Pago</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium"
                 >
-                  <option value="Contado">Contado / Efectivo</option>
-                  <option value="Transferencia">Transferencia Bancaria</option>
-                  <option value="Tarjeta">Tarjeta</option>
-                  <option value="Stripe">Stripe Online</option>
+                  <option value="Contado">💵 Contado / Efectivo</option>
+                  <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                  <option value="Bizum">📱 Bizum</option>
+                  <option value="Tarjeta">💳 Tarjeta / TPV</option>
+                  <option value="Stripe">🌐 Stripe Online</option>
                 </select>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddPaymentModal(false)}
@@ -898,9 +1045,9 @@ export default function MemberBalances() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700"
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors"
                 >
-                  Registrar Cobro
+                  Confirmar Abono
                 </button>
               </div>
             </form>

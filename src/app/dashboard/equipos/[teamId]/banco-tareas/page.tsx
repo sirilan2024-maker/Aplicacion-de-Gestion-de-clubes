@@ -1,5 +1,7 @@
-import EntrenamientosPage from "../../../entrenamientos/page";
+'use client';
+
+import { BancoTareasModule } from '@/components/features/banco-tareas/BancoTareasModule';
 
 export default function TeamBancoTareasPage() {
-  return <EntrenamientosPage />;
+  return <BancoTareasModule />;
 }

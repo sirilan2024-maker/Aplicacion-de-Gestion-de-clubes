@@ -251,23 +251,23 @@ export default function Payments() {
   return (
     <div className="bg-white rounded-xl shadow-sm space-y-4">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-b border-gray-100">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 sm:p-4 border-b border-gray-100">
         <div>
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Users size={20} className="text-indigo-600" />
+          <h2 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Users size={18} className="text-indigo-600" />
             Estado de Cuentas Global
           </h2>
-          <p className="text-sm text-gray-500">Todas las cuotas de inscripción y cuotas generales unificadas</p>
+          <p className="text-xs text-gray-500 mt-0.5">Todas las cuotas de inscripción y cuotas generales unificadas</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
           <button onClick={() => {
             setConcepto("");
             setImporte(0);
             setIncomeDate(new Date().toISOString().split("T")[0]);
             setPaymentMethod("Transferencia");
             setShowIncomeModal(true);
-          }} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-xs font-medium">
-            + Añadir Ingreso Extra
+          }} className="px-3 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition text-xs font-bold text-center justify-center flex items-center gap-1 shadow-sm">
+            + Ingreso Extra
           </button>
           <button onClick={() => {
             setEditingFeeId(null);
@@ -276,49 +276,152 @@ export default function Payments() {
             setImporte(0);
             setIsPagado(false);
             setShowModal(true);
-          }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-xs font-medium">
+          }} className="px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-xs font-bold text-center justify-center flex items-center gap-1 shadow-sm">
             + Nueva Cuota
           </button>
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         {/* Unified Global Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Facturado</p>
-            <p className="text-xl font-black text-slate-900">{totalFacturado.toFixed(2)} €</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
+          <div className="bg-slate-50 rounded-xl p-2.5 sm:p-3 border border-slate-100 text-center">
+            <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Facturado</p>
+            <p className="text-base sm:text-xl font-black text-slate-900">{totalFacturado.toFixed(2)} €</p>
           </div>
-          <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 text-center">
-            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Cobrado (Abonos)</p>
-            <p className="text-xl font-black text-emerald-700">{totalAbonado.toFixed(2)} €</p>
+          <div className="bg-emerald-50 rounded-xl p-2.5 sm:p-3 border border-emerald-100 text-center">
+            <p className="text-[9px] sm:text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Cobrado</p>
+            <p className="text-base sm:text-xl font-black text-emerald-700">{totalAbonado.toFixed(2)} €</p>
           </div>
-          <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
-            <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Pendiente de Cobro</p>
-            <p className="text-xl font-black text-amber-700">{totalPendiente.toFixed(2)} €</p>
+          <div className="bg-amber-50 rounded-xl p-2.5 sm:p-3 border border-amber-100 text-center">
+            <p className="text-[9px] sm:text-[10px] text-amber-600 font-bold uppercase tracking-wider">Pendiente</p>
+            <p className="text-base sm:text-xl font-black text-amber-700">{totalPendiente.toFixed(2)} €</p>
           </div>
         </div>
 
-        <div className="overflow-x-auto w-full rounded-lg border border-gray-200">
-          <table className="min-w-[700px] w-full divide-y divide-gray-200 whitespace-nowrap">
+        {/* ===== VISTA MÓVIL: Tarjetas Touch-Friendly sin scroll horizontal (block md:hidden) ===== */}
+        <div className="block md:hidden divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-white">
+          {filteredFees.length === 0 ? (
+            <div className="p-6 text-center text-gray-400 text-xs">
+              No hay cuotas o ingresos registrados.
+            </div>
+          ) : (
+            filteredFees.map((fee) => (
+              <div key={fee.id} className="p-3.5 space-y-2.5 hover:bg-slate-50 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{fee.player_name || "Ingreso Extraordinario"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{fee.concept}</p>
+                  </div>
+                  <EstadoBadge estado={fee.estado} />
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Importe</span>
+                    <span className="font-black text-gray-900">{(fee.amount_cents / 100).toFixed(2)} €</span>
+                    {(fee.amount_paid_cents || 0) > 0 && (
+                      <span className="text-[10px] text-green-600 font-bold block">
+                        Abonado: {(fee.amount_paid_cents / 100).toFixed(2)} €
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Método</span>
+                    <span className="text-gray-700 font-semibold">{fee.payment_method || "–"}</span>
+                    <span className="text-[10px] text-gray-400 block">
+                      {fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString("es-ES") : "–"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Acciones en móvil */}
+                <div className="flex items-center justify-end gap-1.5 pt-1">
+                  <button
+                    onClick={() => initiateStatusChange(fee.id, fee.estado)}
+                    className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-bold gap-1 transition-colors ${
+                      fee.estado === "pendiente"
+                        ? "bg-green-100 text-green-800 hover:bg-green-200"
+                        : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                    }`}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>{fee.estado === "pendiente" ? "Cobrar" : "Pendiente"}</span>
+                  </button>
+
+                  {fee.estado === "pendiente" && (
+                    <button
+                      onClick={() => setPartialModalFeeId(fee.id)}
+                      className="flex items-center justify-center p-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100"
+                      title="Añadir Entrega a Cuenta"
+                    >
+                      <Coins className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => viewReceipt(fee.id)}
+                    disabled={fee.estado === "pendiente" && (fee.amount_paid_cents || 0) === 0}
+                    className={`flex items-center justify-center p-2 rounded-lg transition-colors ${
+                      fee.estado === "pendiente" && (fee.amount_paid_cents || 0) === 0
+                        ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                        : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                    title="Descargar Recibo PDF"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={() => setNotifModalFeeId(fee.id)}
+                    className="flex items-center justify-center p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    title="Notificar"
+                  >
+                    <Bell className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={() => handleEditFeeClick(fee)}
+                    className="flex items-center justify-center p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200"
+                    title="Editar"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteFee(fee.id)}
+                    className="flex items-center justify-center p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ===== VISTA ESCRITORIO: Tabla Completa (hidden md:block) ===== */}
+        <div className="hidden md:block overflow-x-auto w-full rounded-lg border border-gray-200">
+          <table className="w-full divide-y divide-gray-200 whitespace-nowrap">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jugador</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Método</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Importe</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jugador</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Método</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Importe</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredFees.map((fee) => (
                   <tr key={fee.id} className="hover:bg-gray-50">
-                    <td className="px-2 py-3 text-sm font-medium text-gray-900 min-w-[120px]">{fee.player_name || '–'}</td>
-                    <td className="px-2 py-3 text-sm text-gray-900 min-w-[140px]">{fee.concept}</td>
-                    <td className="px-2 py-3 text-sm text-gray-500 whitespace-nowrap">{fee.payment_method || '–'}</td>
-                    <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-3 py-3 text-sm font-medium text-gray-900 min-w-[120px]">{fee.player_name || '–'}</td>
+                    <td className="px-3 py-3 text-sm text-gray-900 min-w-[140px]">{fee.concept}</td>
+                    <td className="px-3 py-3 text-sm text-gray-500 whitespace-nowrap">{fee.payment_method || '–'}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700">
                       <div className="font-bold">{(fee.amount_cents / 100).toFixed(2)} €</div>
                       {(fee.amount_paid_cents || 0) > 0 && (
                         <div className="text-xs text-green-600 font-medium">
@@ -326,9 +429,9 @@ export default function Payments() {
                         </div>
                       )}
                     </td>
-                    <td className="px-2 py-3 whitespace-nowrap text-sm"><EstadoBadge estado={fee.estado} /></td>
-                    <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}</td>
-                    <td className="px-2 py-3 whitespace-nowrap text-sm flex gap-1">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm"><EstadoBadge estado={fee.estado} /></td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm flex gap-1">
                       <button onClick={() => initiateStatusChange(fee.id, fee.estado)}
                         className={`flex items-center justify-center w-8 h-8 rounded ${fee.estado === "pendiente" ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"}`}
                         title={fee.estado === "pendiente" ? "Marcar Pagado (Completo)" : "Marcar Pendiente"}

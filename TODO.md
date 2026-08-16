@@ -1,12 +1,11 @@
 # Tareas Pendientes y Mejoras Futuras (TODO)
 
-## Funcionalidades Solicitadas por el Usuario
-- [ ] **Envío automático de invitaciones por email (Integración con Resend)**
-  - *Contexto*: Al importar un archivo Excel (o al invitar un staff manualmente si se tiene su email), el sistema debería enviar un correo automático en lugar de requerir que el admin copie y pegue el enlace manualmente.
-  - *Requisitos*:
-    1. Añadir columna "Email" al importador Excel para entrenadores (y opcionalmente jugadores/padres).
-    2. Instalar el SDK de `resend` en el proyecto (`npm install resend`).
-    3. Crear una API route en Next.js (`/api/send-invite`) o una Edge Function en Supabase.
-    4. Diseñar una plantilla de correo atractiva con los colores del club usando React Email.
-    5. Actualizar `bulkCreateStaffInvitationsAction` para disparar el correo al generar la invitación.
-    6. Actualizar la UI del directorio de miembros para mostrar el estado "Invitación enviada por email".
+## Estado de Funcionalidades de Email (Dejado en pausa a petición del usuario)
+- [x] **Arquitectura y Plantillas de Email Listas**:
+  - `src/lib/email-service.ts`: Servicio dual (SMTP / Resend) con plantillas maquetadas para *Confirmación de Inscripción* y *Avisos de Equipo*.
+  - Disparadores conectados en `/api/register` y en `sendMessageAction`.
+- [ ] **Activación final de credenciales SMTP / Dominio**:
+  - Pendiente de introducir las credenciales SMTP (`SMTP_USER`, `SMTP_PASS`) o verificación de dominio en Resend cuando el usuario lo indique.
+
+## Otras Funcionalidades Solicitadas por el Usuario
+- [ ] **Envío automático de invitaciones por email al importar Excel**

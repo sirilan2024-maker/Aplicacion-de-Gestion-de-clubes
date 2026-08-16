@@ -902,12 +902,12 @@ export async function exportAccountingCsvAction() {
   return { csv, filename };
 }
 
-export async function createAdminFeeForPlayerAction(playerId: string, wasInClub: boolean = false) {
+export async function createAdminFeeForPlayerAction(playerId: string, wasInClub?: boolean) {
   const adminSupabase = await createAdminClient();
 
   const { data: player, error: playerError } = await adminSupabase
     .from("players")
-    .select("id, first_name, last_name, club_id, payment_method, payment_plan, tutor_id, paid_reservation")
+    .select("id, first_name, last_name, club_id, payment_method, payment_plan, tutor_id, paid_reservation, was_in_club")
     .eq("id", playerId)
     .single();
 
@@ -916,111 +916,90 @@ export async function createAdminFeeForPlayerAction(playerId: string, wasInClub:
     return { success: false, error: "Jugador no encontrado" };
   }
 
+  // Comprobar si ya existen cuotas para este jugador
   const { data: existing } = await adminSupabase
     .from("fees")
     .select("id")
-    .ilike("concept", `%Cuota Temporada%${player.first_name}%${player.last_name}%`)
-    .eq("club_id", player.club_id)
+    .eq("player_id", player.id)
     .limit(1)
     .maybeSingle();
 
   if (existing) {
-    return { success: true, message: "Cuota ya existente" };
+    return { success: true, message: "Cuotas ya existentes" };
   }
 
-  let baseAmount = wasInClub ? 195 : 250;
-  const isFractional = player.payment_plan === "Fraccionado";
+  const isRenewal = wasInClub !== undefined ? wasInClub : (player.was_in_club || false);
+  const isReserved = player.paid_reservation || false;
+  const baseAmount = isRenewal ? 195 : 250;
   const profileId = player.tutor_id || null;
 
-  // Si es fraccionado, creamos 2 cuotas. Si no, 1 cuota.
-  const numFees = isFractional ? 2 : 1;
-  const fractionAmount = Math.round(baseAmount / numFees);
-
-  // Compensamos posibles céntimos de redondeo en la primera cuota
-  const firstFeeAmount = baseAmount - (fractionAmount * (numFees - 1));
-
-  let firstFeeId = null;
-
-  for (let i = 0; i < numFees; i++) {
-    const amount = i === 0 ? firstFeeAmount : fractionAmount;
-    
-    // Si es la segunda cuota (índice 1), vence en 30 días
-    const date = new Date();
-    if (i === 1) date.setDate(date.getDate() + 30);
-
-    const suffix = isFractional ? ` (${i + 1}/${numFees})` : '';
-
-    let initialStatus = "pendiente";
-    let initialPaidCents = 0;
-    
-    // Si el método de pago es contado y estamos creando la cuota, algunos clubes lo consideran ya pagado o el admin lo validó
-    if (player.payment_method === 'Contado' && i === 0) {
-      initialStatus = "pagado";
-      initialPaidCents = amount * 100;
-    }
-
-    const feeData: Record<string, any> = {
-      concept: `Cuota Temporada${suffix} – ${player.first_name} ${player.last_name}`,
-      amount_cents: amount * 100,
-      amount_paid_cents: initialPaidCents,
+  // 1. Si abonó la Reserva de Plaza / Inscripción (50€):
+  // Creamos la cuota de reserva como PAGADA (50€) y generamos inmediatamente su recibo oficial descargable
+  if (isReserved) {
+    const reservationFeeData: Record<string, any> = {
+      concept: `Reserva de Plaza / Inscripción – ${player.first_name} ${player.last_name}`,
+      amount_cents: 5000,
+      amount_paid_cents: 5000,
       currency: "eur",
-      estado: initialStatus,
+      estado: "pagado",
       tipo_cargo: "one_time",
-      fecha_pago: initialStatus === "pagado" ? new Date().toISOString() : date.toISOString(),
+      fecha_pago: new Date().toISOString(),
       club_id: player.club_id,
-      payment_method: player.payment_method || "Pendiente",
+      payment_method: player.payment_method || "Reserva de Plaza",
       player_id: player.id,
     };
+    if (profileId) reservationFeeData.profile_id = profileId;
 
-    if (profileId) feeData.profile_id = profileId;
-
-    const { data: insertedFee, error: feeError } = await adminSupabase
+    const { data: insertedReservation, error: resError } = await adminSupabase
       .from("fees")
-      .insert(feeData)
+      .insert(reservationFeeData)
       .select("id")
       .single();
 
-    if (feeError) {
-      console.warn("createAdminFeeForPlayerAction: no se pudo crear la cuota:", feeError.message);
-      return { success: false, error: feeError.message };
-    }
-
-    if (i === 0) firstFeeId = insertedFee.id;
-  }
-
-  // Inyectar Reserva de Plaza si aplica
-  if (player.paid_reservation && firstFeeId) {
-    const reserveAmountCents = 50 * 100;
-    
-    // Crear el payment
-    const { data: payment, error: paymentError } = await adminSupabase
-      .from("fee_payments")
-      .insert({
-        fee_id: firstFeeId,
-        amount_cents: reserveAmountCents,
-        payment_method: "Reserva de Plaza",
-      })
-      .select("id")
-      .single();
-
-    if (!paymentError && payment) {
-      // Actualizar amount_paid_cents de la primera cuota
-      const { data: currentFee } = await adminSupabase.from("fees").select("amount_cents, amount_paid_cents").eq("id", firstFeeId).single();
-      if (currentFee) {
-        const newPaid = currentFee.amount_paid_cents + reserveAmountCents;
-        const newStatus = newPaid >= currentFee.amount_cents ? "pagado" : "pendiente";
-        
-        await adminSupabase.from("fees")
-          .update({ amount_paid_cents: newPaid, estado: newStatus })
-          .eq("id", firstFeeId);
-      }
-      
-      // Generar recibo de la reserva (silenciosamente)
+    if (!resError && insertedReservation) {
       try {
-        await generateAndUploadPaymentReceiptAction(payment.id);
+        await generateAndUploadReceiptAction(insertedReservation.id);
       } catch (e) {
         console.error("Error generando recibo de reserva:", e);
       }
+    }
+  }
+
+  // 2. El importe restante de la temporada a distribuir en cuotas (ej: 195€ - 50€ = 145€)
+  const remainingAmount = isReserved ? Math.max(0, baseAmount - 50) : baseAmount;
+
+  if (remainingAmount > 0) {
+    const isFractional = player.payment_plan === "Fraccionado";
+    const numFees = isFractional ? 2 : 1;
+    const remainingCents = Math.round(remainingAmount * 100);
+    const fractionCents = Math.floor(remainingCents / numFees);
+
+    for (let i = 0; i < numFees; i++) {
+      // Compensamos posibles céntimos impares en la primera cuota
+      const amountCents = i === 0 ? (remainingCents - fractionCents * (numFees - 1)) : fractionCents;
+      
+      // La segunda cuota vence en 30 días
+      const date = new Date();
+      if (i === 1) date.setDate(date.getDate() + 30);
+
+      const suffix = isFractional ? ` (${i + 1}/${numFees})` : (isReserved ? ' (Restante)' : '');
+
+      const feeData: Record<string, any> = {
+        concept: `Cuota Temporada${suffix} – ${player.first_name} ${player.last_name}`,
+        amount_cents: amountCents,
+        amount_paid_cents: 0,
+        currency: "eur",
+        estado: "pendiente",
+        tipo_cargo: "one_time",
+        fecha_pago: date.toISOString(),
+        club_id: player.club_id,
+        payment_method: player.payment_method || "Pendiente",
+        player_id: player.id,
+      };
+
+      if (profileId) feeData.profile_id = profileId;
+
+      await adminSupabase.from("fees").insert(feeData);
     }
   }
 
@@ -1220,7 +1199,8 @@ export async function downloadFeeReceiptAction(feeId: string) {
     .eq("id", feeId)
     .single();
 
-  const playerName = fee?.players ? `${fee.players.first_name}_${fee.players.last_name}` : "Socio";
+  const pObj: any = Array.isArray(fee?.players) ? fee?.players[0] : fee?.players;
+  const playerName = pObj ? `${pObj.first_name}_${pObj.last_name}` : "Socio";
   const sanitizedName = playerName.replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `Recibo_${res.receiptNumber}_${sanitizedName}.pdf`;
 
@@ -1430,7 +1410,10 @@ export async function getOfficialReceiptsAction() {
       .or("estado.eq.pagado,amount_paid_cents.gt.0");
 
     if (paidFees && paidFees.length > 0) {
-      const clubFees = paidFees.filter(f => f.club_id === clubId || f.players?.club_id === clubId);
+      const clubFees = paidFees.filter((f: any) => {
+        const pClub = Array.isArray(f.players) ? f.players[0]?.club_id : f.players?.club_id;
+        return f.club_id === clubId || pClub === clubId;
+      });
 
       for (const fee of clubFees) {
         const { data: existing } = await adminSupabase
@@ -1462,8 +1445,9 @@ export async function getOfficialReceiptsAction() {
   if (!error && receipts && receipts.length > 0) {
     return receipts.map((r: any) => {
       let playerName = "General";
-      if (r.players) {
-        playerName = `${r.players.first_name} ${r.players.last_name}`;
+      const pObj = Array.isArray(r.players) ? r.players[0] : r.players;
+      if (pObj) {
+        playerName = `${pObj.first_name} ${pObj.last_name}`;
       } else if (r.concept && r.concept.includes("Pagador:")) {
         const parts = r.concept.split("Pagador:");
         playerName = parts[1].trim();
@@ -1492,7 +1476,10 @@ export async function getOfficialReceiptsAction() {
     .or("estado.eq.pagado,amount_paid_cents.gt.0")
     .order("creado_en", { ascending: false });
 
-  const clubFallbackFees = (fallbackFees || []).filter(f => f.club_id === clubId || f.players?.club_id === clubId);
+  const clubFallbackFees = (fallbackFees || []).filter((f: any) => {
+    const pClub = Array.isArray(f.players) ? f.players[0]?.club_id : f.players?.club_id;
+    return f.club_id === clubId || pClub === clubId;
+  });
 
   return clubFallbackFees.map((f: any, idx: number) => {
     const d = new Date(f.creado_en || Date.now());

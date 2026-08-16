@@ -107,15 +107,15 @@ export default function ExpensesList({ refreshBalances }: { refreshBalances: () 
   if (loading) return <div className="text-center p-8">Cargando gastos...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+        <h2 className="text-base sm:text-xl font-bold text-gray-800 flex items-center gap-2">
           <Euro className="w-5 h-5 text-red-500" /> Historial de Gastos
         </h2>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+            className="px-3.5 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition text-xs sm:text-sm font-bold text-center justify-center flex items-center"
           >
             Exportar CSV
           </button>
@@ -126,16 +126,57 @@ export default function ExpensesList({ refreshBalances }: { refreshBalances: () 
               setAmount(0);
               setShowModal(true);
             }}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition"
+            className="bg-red-600 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-red-700 flex items-center justify-center gap-1.5 transition shadow-sm"
           >
             <Plus className="w-4 h-4" /> Registrar Gasto
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* ===== VISTA MÓVIL: Tarjetas de Gastos (block md:hidden) ===== */}
+      <div className="block md:hidden divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-white">
+        {expenses.length === 0 ? (
+          <div className="p-6 text-center text-gray-400 text-xs">No hay gastos registrados.</div>
+        ) : (
+          expenses.map((exp) => (
+            <div key={exp.id} className="p-3.5 space-y-2 hover:bg-slate-50 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{exp.concept}</p>
+                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700">
+                    <Tag className="w-3 h-3" /> {exp.category || "Material"}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-red-600">-{(exp.amount_cents / 100).toFixed(2)} €</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{new Date(exp.date).toLocaleDateString('es-ES')}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-1 pt-1 border-t border-slate-100">
+                <button
+                  onClick={() => handleEditClick(exp)}
+                  className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold flex items-center gap-1"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Editar</span>
+                </button>
+                <button
+                  onClick={() => handleDelete(exp.id)}
+                  className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-xs font-semibold flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar</span>
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* ===== VISTA ESCRITORIO: Tabla Completa (hidden md:block) ===== */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+          <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
               <tr>
                 <th className="p-4 font-semibold">Fecha</th>

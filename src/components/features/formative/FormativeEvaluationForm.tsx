@@ -272,6 +272,74 @@ export function FormativeEvaluationForm({
         </div>
       </div>
 
+      {/* ─── Niveles alcanzados por el jugador (Resumen Inmediato al ingresar datos) ─── */}
+      {(() => {
+        const scoreValues = Object.values(scores);
+        const totalEvaluated = scoreValues.length;
+        if (totalEvaluated === 0) return null;
+
+        const avg = (scoreValues.reduce((a, b) => a + b, 0) / totalEvaluated).toFixed(1);
+        const count5 = scoreValues.filter(s => s === 5).length;
+        const count4 = scoreValues.filter(s => s === 4).length;
+        const count3 = scoreValues.filter(s => s === 3).length;
+        const count2 = scoreValues.filter(s => s === 2).length;
+        const count1 = scoreValues.filter(s => s === 1).length;
+
+        return (
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-2.5 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Niveles de Aprendizaje Actuales
+                </span>
+                <span className="text-xs font-bold text-slate-400">({totalEvaluated} conceptos calificados)</span>
+              </div>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                <span className="text-xs font-bold text-slate-500">Promedio de dominio:</span>
+                <span className="text-sm font-black bg-slate-900 text-white px-2.5 py-0.5 rounded-lg">
+                  {avg} <span className="text-[10px] text-slate-300 font-medium">/ 5</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Badges de Niveles Actuales */}
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              {count5 > 0 && (
+                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-300 text-emerald-800 px-3 py-1.5 rounded-xl font-bold">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center">5</span>
+                  <span>{count5} en Dominio</span>
+                </div>
+              )}
+              {count4 > 0 && (
+                <div className="flex items-center gap-1 bg-teal-50 border border-teal-300 text-teal-800 px-3 py-1.5 rounded-xl font-bold">
+                  <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-black flex items-center justify-center">4</span>
+                  <span>{count4} Consolidados</span>
+                </div>
+              )}
+              {count3 > 0 && (
+                <div className="flex items-center gap-1 bg-blue-50 border border-blue-300 text-blue-800 px-3 py-1.5 rounded-xl font-bold">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center">3</span>
+                  <span>{count3} En Progresión</span>
+                </div>
+              )}
+              {count2 > 0 && (
+                <div className="flex items-center gap-1 bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1.5 rounded-xl font-bold">
+                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-black flex items-center justify-center">2</span>
+                  <span>{count2} En Desarrollo</span>
+                </div>
+              )}
+              {count1 > 0 && (
+                <div className="flex items-center gap-1 bg-rose-50 border border-rose-300 text-rose-800 px-3 py-1.5 rounded-xl font-bold">
+                  <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center">1</span>
+                  <span>{count1} En Iniciación</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Selector de Módulos (Grid Adaptable sin Scroll Obligatorio) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-inner">
         {modules.map(mod => {

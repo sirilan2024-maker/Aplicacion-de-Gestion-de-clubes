@@ -280,9 +280,9 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       {/* Top Header */}
       <header className="h-22 min-h-[88px] py-2 bg-slate-900 text-white flex items-center justify-between px-4 fixed top-0 w-full z-40 shadow-md">
         <div 
-          className="flex items-center gap-3 font-bold min-w-0 cursor-pointer flex-1 mr-2"
+          className={`flex items-center gap-3 font-bold min-w-0 flex-1 mr-2 ${userRole === 'admin' ? 'cursor-pointer' : ''}`}
           onClick={() => {
-            if (clubInfo) setShowEditClub(true);
+            if (clubInfo && userRole === 'admin') setShowEditClub(true);
           }}
         >
           <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden p-0.5 shadow-sm border border-slate-200">

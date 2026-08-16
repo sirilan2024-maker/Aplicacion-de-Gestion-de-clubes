@@ -733,7 +733,8 @@ export default function EntrenamientoDetailPage() {
         <PlayerPerformanceDrawer
           playerId={drawerPlayerId}
           teamId={teamId}
-          initialTab={drawerTab}
+          initialTab="formativo"
+          onlyFormative={true}
           onClose={() => setDrawerPlayerId(null)}
         />
       )}

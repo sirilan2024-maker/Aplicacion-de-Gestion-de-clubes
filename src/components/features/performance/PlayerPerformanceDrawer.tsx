@@ -7,8 +7,18 @@ import { Loader2, User as UserIcon, X } from "lucide-react";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
 
-export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose, globalTrainingStats, globalMatchStats }: any) {
-  const [activeTab, setActiveTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>(initialTab || 'entrenamientos');
+export function PlayerPerformanceDrawer({ 
+  playerId, 
+  teamId, 
+  initialTab, 
+  onClose, 
+  globalTrainingStats, 
+  globalMatchStats,
+  onlyFormative = false
+}: any) {
+  const [activeTab, setActiveTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>(
+    onlyFormative ? 'formativo' : (initialTab || 'entrenamientos')
+  );
   const [events, setEvents] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any[]>([]);
   const [teamCategory, setTeamCategory] = useState<string>('');
@@ -29,19 +39,21 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
           setTeamName(tData.name || '');
         }
 
-        const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type, title').eq('team_id', teamId).order('date', { ascending: false });
-        if (allEvents) setEvents(allEvents);
+        if (!onlyFormative) {
+          const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type, title').eq('team_id', teamId).order('date', { ascending: false });
+          if (allEvents) setEvents(allEvents);
 
-        try {
-          const res = await fetch('/api/player-metrics', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ playerId, eventIds: allEvents?.map(e => e.id) || [] })
-          });
-          const json = await res.json();
-          setMetrics(json.data || []);
-        } catch (err) {
-          console.error("Error fetching drawer metrics:", err);
+          try {
+            const res = await fetch('/api/player-metrics', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ playerId, eventIds: allEvents?.map(e => e.id) || [] })
+            });
+            const json = await res.json();
+            setMetrics(json.data || []);
+          } catch (err) {
+            console.error("Error fetching drawer metrics:", err);
+          }
         }
       }
 
@@ -56,7 +68,7 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
       setLoading(false);
     };
     fetchData();
-  }, [playerId, teamId]);
+  }, [playerId, teamId, onlyFormative]);
 
   const isFormative = isFormativeCategory(teamCategory, teamName);
   const effectivePlayer = globalTrainingStats || globalMatchStats || playerInfo;
@@ -85,7 +97,9 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-900">{pName}</h2>
-              <div className="text-xs font-bold text-slate-500 uppercase">Dorsal {dorsal || '-'}</div>
+              <div className="text-xs font-bold text-slate-500 uppercase">
+                {onlyFormative ? 'Informe Formativo & Evolución' : `Dorsal ${dorsal || '-'}`}
+              </div>
             </div>
           </div>
           <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm">
@@ -93,29 +107,31 @@ export function PlayerPerformanceDrawer({ playerId, teamId, initialTab, onClose,
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-slate-100 bg-slate-50/50">
-          <button onClick={() => setActiveTab('entrenamientos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'entrenamientos' ? 'border-emerald-500 text-emerald-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
-            Entrenamientos
-          </button>
-          <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
-            Partidos
-          </button>
-          {isFormative && (
-            <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
-              🧠 Formativo
+        {/* Tabs (Solo se muestran si no estamos en modo exclusivo formativo) */}
+        {!onlyFormative && (
+          <div className="flex border-b border-slate-100 bg-slate-50/50">
+            <button onClick={() => setActiveTab('entrenamientos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'entrenamientos' ? 'border-emerald-500 text-emerald-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+              Entrenamientos
             </button>
-          )}
-        </div>
+            <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+              Partidos
+            </button>
+            {isFormative && (
+              <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+                🧠 Formativo
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-white">
-          {activeTab === 'formativo' && isFormative && (
+          {(activeTab === 'formativo' || onlyFormative) && (
             <div className="animate-in fade-in">
               <PlayerProgressView playerId={playerId} playerName={pName} />
             </div>
           )}
-          {activeTab === 'entrenamientos' && (
+          {!onlyFormative && activeTab === 'entrenamientos' && (
             <div className="space-y-6 animate-in fade-in">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">

@@ -30,7 +30,8 @@ import {
   Timer,
   Menu,
   X,
-  FolderOpen
+  FolderOpen,
+  Radio
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -206,20 +207,24 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   if (activeTeamId) {
     secondaryLinks = [
       { name: "Volver a Inicio", href: "/dashboard", icon: LayoutDashboard },
+      { name: "En directo", href: "/live", icon: Radio },
       { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
       { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
       { name: "Disciplina", href: `/dashboard/equipos/${activeTeamId}/partidos?view=disciplina`, icon: AlertTriangle },
       { name: "Estadísticas", href: `/dashboard/equipos/${activeTeamId}/estadisticas`, icon: BarChart3 },
       { name: "Mensajes", href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
+      { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
     ]
   } else if (activeFamilyPlayerId) {
     secondaryLinks = [
       { name: "Volver a Inicio", href: "/dashboard", icon: LayoutDashboard },
+      { name: "En directo", href: "/live", icon: Radio },
       { name: "Eventos", href: `/dashboard/family/e/${activeFamilyPlayerId}/eventos`, icon: CalendarDays },
       { name: "Entrenamientos", href: `/dashboard/family/e/${activeFamilyPlayerId}/entrenamientos`, icon: Target },
       { name: "Equipación/Ropa", href: `/dashboard/family/e/${activeFamilyPlayerId}/ropa`, icon: Shirt },
       { name: "Ficha Técnica", href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },
       { name: "Mensajes", href: `/dashboard/family/e/${activeFamilyPlayerId}/mensajes`, icon: MessageSquare },
+      { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
     ]
   } else {
     // Todos los de la DB que NO estén ya en el bottom bar
@@ -229,6 +234,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       // Hardcode admin secondary links since they are not in DB usually
       secondaryLinks = [
         { name: "Inicio", href: getHref("Inicio", "/dashboard"), icon: LayoutDashboard },
+        { name: "En directo", href: "/live", icon: Radio },
         { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
         { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
@@ -253,8 +259,13 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       );
     }
     
+    // Asegurar que En directo siempre esté disponible si no está en el bottom bar
+    if (!bottomHrefs.includes("/live") && !secondaryLinks.some(s => s.href === "/live")) {
+      secondaryLinks.push({ name: "En directo", href: "/live", icon: Radio });
+    }
+
     // Asegurar que Ajustes siempre esté disponible si no está en el bottom bar
-    if (!bottomHrefs.includes("/dashboard/mi-perfil") && !secondaryLinks.some(s => s.href === "/dashboard/mi-perfil")) {
+    if (!bottomHrefs.includes("/dashboard/mi-perfil") && !secondaryLinks.some(s => s.href === "/dashboard/mi-perfil" || s.href.includes("/ajustes"))) {
        secondaryLinks.push({ name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings });
     }
 
@@ -262,7 +273,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     if (isStaff && !secondaryLinks.some(s => s.href === "/dashboard/utilleria")) {
       secondaryLinks.push({ name: "Utillería", href: "/dashboard/utilleria", icon: Shirt });
     }
-    }
+  }
     
   return (
     <div className="md:hidden">

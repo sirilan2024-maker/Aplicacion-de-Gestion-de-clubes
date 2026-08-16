@@ -32,6 +32,7 @@ interface MemberBalance {
   status: "al_dia" | "con_deuda" | "saldo_favor";
   fees_count: number;
   pending_fees_count: number;
+  pending_verification_count?: number;
 }
 
 interface Summary {
@@ -40,6 +41,7 @@ interface Summary {
   totalPending: number;
   membersAlDia: number;
   membersConDeuda: number;
+  membersPorVerificar?: number;
   totalMembers: number;
 }
 
@@ -51,6 +53,7 @@ export default function MemberBalances() {
     totalPending: 0,
     membersAlDia: 0,
     membersConDeuda: 0,
+    membersPorVerificar: 0,
     totalMembers: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -58,7 +61,7 @@ export default function MemberBalances() {
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTeam, setSelectedTeam] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "con_deuda" | "al_dia">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "con_deuda" | "al_dia" | "por_verificar">("todos");
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
 
   // Statement Drawer / Modal
@@ -298,12 +301,14 @@ export default function MemberBalances() {
 
   // Filter members
   const filteredMembers = members.filter((m) => {
-    const matchesSearch = m.player_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      m.player_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.team_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTeam = selectedTeam === "all" || m.team_id === selectedTeam;
-    const matchesStatus =
-      statusFilter === "todos" ||
-      (statusFilter === "con_deuda" && m.status === "con_deuda") ||
-      (statusFilter === "al_dia" && m.status !== "con_deuda");
+    let matchesStatus = true;
+    if (statusFilter === "con_deuda") matchesStatus = m.status === "con_deuda";
+    else if (statusFilter === "al_dia") matchesStatus = m.status !== "con_deuda";
+    else if (statusFilter === "por_verificar") matchesStatus = (m.pending_verification_count || 0) > 0;
     return matchesSearch && matchesTeam && matchesStatus;
   });
 
@@ -406,8 +411,8 @@ export default function MemberBalances() {
             </select>
           </div>
 
-          {/* Status Filter buttons - 3 columns grid on mobile without scroll */}
-          <div className="grid grid-cols-3 gap-1 bg-slate-200/70 p-1 rounded-xl w-full">
+          {/* Status Filter buttons - 4 columns grid on mobile without scroll */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-200/70 p-1.5 rounded-xl w-full">
             <button
               onClick={() => setStatusFilter("todos")}
               className={`px-2 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate ${
@@ -437,6 +442,21 @@ export default function MemberBalances() {
               }`}
             >
               Al Día ({summary.membersAlDia})
+            </button>
+            <button
+              onClick={() => setStatusFilter("por_verificar")}
+              className={`px-2 py-1.5 text-xs font-bold rounded-lg transition-all text-center truncate flex items-center justify-center gap-1 ${
+                statusFilter === "por_verificar"
+                  ? "bg-amber-500 text-white shadow-sm font-black"
+                  : ((summary as any).membersPorVerificar > 0 ? "bg-amber-100 text-amber-900 border border-amber-300 font-black animate-pulse" : "text-slate-600 hover:text-slate-900")
+              }`}
+            >
+              <span>⏳ Por Verificar</span>
+              {((summary as any).membersPorVerificar || 0) > 0 && (
+                <span className="bg-amber-700 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+                  {(summary as any).membersPorVerificar}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -474,7 +494,12 @@ export default function MemberBalances() {
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0">
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      {(m.pending_verification_count || 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-xs animate-pulse">
+                          ⏳ {m.pending_verification_count} Por Verificar
+                        </span>
+                      )}
                       {m.status === "con_deuda" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
                           <AlertTriangle className="w-3 h-3" />
@@ -614,21 +639,28 @@ export default function MemberBalances() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {m.status === "con_deuda" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
-                            <AlertTriangle className="w-3 h-3" />
-                            Deuda ({m.pending_fees_count})
-                          </span>
-                        ) : m.status === "saldo_favor" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                            Favor
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Al día
-                          </span>
-                        )}
+                        <div className="flex flex-col items-center gap-1">
+                          {(m.pending_verification_count || 0) > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-xs animate-pulse">
+                              ⏳ {m.pending_verification_count} Por Verificar
+                            </span>
+                          )}
+                          {m.status === "con_deuda" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                              <AlertTriangle className="w-3 h-3" />
+                              Deuda ({m.pending_fees_count})
+                            </span>
+                          ) : m.status === "saldo_favor" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                              Favor
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Al día
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
@@ -645,7 +677,7 @@ export default function MemberBalances() {
                             onClick={() => fetchStatement(m.player_id)}
                             className="flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
                           >
-                            Ver extracto
+                            <span>Ver Extracto</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -659,21 +691,16 @@ export default function MemberBalances() {
         </div>
       </div>
 
-      {/* ====== DRAWER / EXTRACTO CONTABLE DEL SOCIO ====== */}
+      {/* ====== DRAWER / MODAL EXTRACTO DEL SOCIO ====== */}
       {selectedPlayerId && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-200">
-          <div className="w-full md:max-w-2xl bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex justify-end">
+          <div className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             {/* Header Drawer */}
-            <div className="p-4 md:p-5 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between shrink-0">
+            <div className="p-4 md:p-6 bg-slate-900 text-white flex items-center justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <Coins className="w-5 h-5 text-indigo-400" />
-                  <h2 className="text-base md:text-lg font-bold">
-                    {loadingStatement ? "Cargando extracto..." : statementData?.player?.name}
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {statementData?.player?.team_name} · Cuenta Corriente Individual
+                <h2 className="text-lg md:text-xl font-black">{statementData?.player?.name || "Cargando..."}</h2>
+                <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                  {statementData?.player?.team_name ? `⚽ ${statementData.player.team_name}` : "Extracto contable y movimientos"}
                 </p>
               </div>
               <button
@@ -690,6 +717,30 @@ export default function MemberBalances() {
               </div>
             ) : statementData ? (
               <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 bg-slate-50">
+                {/* Banner de Verificación de Reserva si aplica */}
+                {statementData.fees?.some((f: any) => f.estado === "pdte_verif" || f.estado === "pendiente_verificacion") && (
+                  <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">⚠️</span>
+                      <div>
+                        <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Abono Pendiente de Verificación Bancaria</p>
+                        <p className="text-xs text-amber-800">Hay 50,00 € declarados por la familia que requieren confirmación en cuenta o caja.</p>
+                      </div>
+                    </div>
+                    {statementData.fees?.filter((f: any) => f.estado === "pdte_verif" || f.estado === "pendiente_verificacion").map((f: any) => (
+                      <button
+                        key={f.id}
+                        onClick={() => handleVerifyReservation(f.id, f.concept)}
+                        disabled={verifyingFeeId === f.id}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs transition-all disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={15} />
+                        {verifyingFeeId === f.id ? "Validando..." : "✅ Validar Ingreso (50€)"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Summary Card */}
                 <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-3 gap-2 text-center">
                   <div>

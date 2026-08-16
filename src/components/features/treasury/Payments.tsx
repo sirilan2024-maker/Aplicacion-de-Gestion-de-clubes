@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getClubFeesAction, getClubPlayersAction, createFeeAction, getInscriptionFeesAction, updateFeeStatusAction, getReceiptSignedUrlAction, sendPaymentNotificationAction, generateAndUploadReceiptAction, addPartialPaymentAction, downloadFeeReceiptAction, updateFeeDetailsAction, deleteFeeAction } from "@/app/actions/treasury-actions";
-import { CheckCircle, Users, FileText, Calendar, Bell, Download, Coins, Pencil, Trash2 } from "lucide-react";
+import { getClubFeesAction, getClubPlayersAction, createFeeAction, getInscriptionFeesAction, updateFeeStatusAction, getReceiptSignedUrlAction, sendPaymentNotificationAction, generateAndUploadReceiptAction, addPartialPaymentAction, downloadFeeReceiptAction, updateFeeDetailsAction, deleteFeeAction, verifyAndApproveReservationFeeAction } from "@/app/actions/treasury-actions";
+import { CheckCircle, Users, FileText, Calendar, Bell, Download, Coins, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 function EstadoBadge({ estado }: { estado: string }) {
@@ -242,13 +242,41 @@ export default function Payments() {
     }
   };
 
+  const handleVerifyReservation = async (feeId: string, concept: string) => {
+    if (!confirm(`¿Confirmas haber comprobado el ingreso de los 50.00 € de "${concept}" en la cuenta/caja del club?\n\nAl validar se sumará a los cobros y se emitirá el recibo oficial correlativo.`)) {
+      return;
+    }
+    const toastId = toast.loading("Validando ingreso y generando recibo oficial...");
+    try {
+      const res = await verifyAndApproveReservationFeeAction(feeId, "Transferencia comprobada");
+      if (res.success) {
+        toast.success("¡Ingreso validado y Recibo Oficial generado!", { id: toastId });
+        fetchFees();
+      } else {
+        toast.error(res.error || "Error al validar cuota", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error("Error: " + err.message, { id: toastId });
+    }
+  };
+
   if (loading) return <div className="p-6 text-center">Cargando cuotas...</div>;
 
-  const filteredFees = fees.filter(f => filter === "todos" || f.estado === filter);
+  const filteredFees = fees.filter(f => {
+    if (filter === "todos") return true;
+    if (filter === "pendiente") return f.estado === "pendiente";
+    if (filter === "pagado") return f.estado === "pagado";
+    if (filter === "pdte_verif") return f.estado === "pdte_verif" || f.estado === "pendiente_verificacion";
+    return f.estado === filter;
+  });
 
   const totalFacturado = fees.reduce((sum, f) => sum + (f.amount_cents / 100), 0);
   const totalAbonado = fees.reduce((sum, f) => sum + ((f.amount_paid_cents || 0) / 100), 0);
   const totalPendiente = totalFacturado - totalAbonado;
+
+  const countPendientes = fees.filter(f => f.estado === "pendiente").length;
+  const countPagados = fees.filter(f => f.estado === "pagado").length;
+  const countPorVerificar = fees.filter(f => f.estado === "pdte_verif" || f.estado === "pendiente_verificacion").length;
 
   return (
     <div className="bg-white rounded-xl shadow-sm space-y-4">
@@ -286,7 +314,7 @@ export default function Payments() {
 
       <div className="p-3 sm:p-4">
         {/* Unified Global Summary */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
           <div className="bg-slate-50 rounded-xl p-2.5 sm:p-3 border border-slate-100 text-center">
             <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Facturado</p>
             <p className="text-base sm:text-xl font-black text-slate-900">{totalFacturado.toFixed(2)} €</p>
@@ -301,11 +329,54 @@ export default function Payments() {
           </div>
         </div>
 
+        {/* Quick Filter Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-100 p-1.5 rounded-xl mb-4">
+          <button
+            onClick={() => setFilter("todos")}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all text-center ${
+              filter === "todos" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Todos ({fees.length})
+          </button>
+          <button
+            onClick={() => setFilter("pendiente")}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all text-center ${
+              filter === "pendiente" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Pendientes ({countPendientes})
+          </button>
+          <button
+            onClick={() => setFilter("pagado")}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all text-center ${
+              filter === "pagado" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Pagados ({countPagados})
+          </button>
+          <button
+            onClick={() => setFilter("pdte_verif")}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
+              filter === "pdte_verif"
+                ? "bg-amber-500 text-white shadow-sm font-black"
+                : (countPorVerificar > 0 ? "bg-amber-100 text-amber-900 border border-amber-300 font-black animate-pulse" : "text-slate-600 hover:text-slate-900")
+            }`}
+          >
+            <span>⏳ Por Verificar</span>
+            {countPorVerificar > 0 && (
+              <span className="bg-amber-700 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+                {countPorVerificar}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* ===== VISTA MÓVIL: Tarjetas Touch-Friendly sin scroll horizontal (block md:hidden) ===== */}
         <div className="block md:hidden divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-white">
           {filteredFees.length === 0 ? (
             <div className="p-6 text-center text-gray-400 text-xs">
-              No hay cuotas o ingresos registrados.
+              No hay cuotas o ingresos registrados con este filtro.
             </div>
           ) : (
             filteredFees.map((fee) => (
@@ -338,18 +409,29 @@ export default function Payments() {
                 </div>
 
                 {/* Acciones en móvil */}
-                <div className="flex items-center justify-end gap-1.5 pt-1">
-                  <button
-                    onClick={() => initiateStatusChange(fee.id, fee.estado)}
-                    className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-bold gap-1 transition-colors ${
-                      fee.estado === "pendiente"
-                        ? "bg-green-100 text-green-800 hover:bg-green-200"
-                        : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-                    }`}
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>{fee.estado === "pendiente" ? "Cobrar" : "Pendiente"}</span>
-                  </button>
+                <div className="flex items-center justify-end gap-1.5 pt-1 flex-wrap">
+                  {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") && (
+                    <button
+                      onClick={() => handleVerifyReservation(fee.id, fee.concept)}
+                      className="flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-black gap-1 transition-colors bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>✅ Validar (50€)</span>
+                    </button>
+                  )}
+                  {fee.estado !== "pdte_verif" && fee.estado !== "pendiente_verificacion" && (
+                    <button
+                      onClick={() => initiateStatusChange(fee.id, fee.estado)}
+                      className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-bold gap-1 transition-colors ${
+                        fee.estado === "pendiente"
+                          ? "bg-green-100 text-green-800 hover:bg-green-200"
+                          : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                      }`}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>{fee.estado === "pendiente" ? "Cobrar" : "Pendiente"}</span>
+                    </button>
+                  )}
 
                   {fee.estado === "pendiente" && (
                     <button
@@ -434,12 +516,23 @@ export default function Payments() {
                     <td className="px-3 py-3 whitespace-nowrap text-sm"><EstadoBadge estado={fee.estado} /></td>
                     <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}</td>
                     <td className="px-3 py-3 whitespace-nowrap text-sm flex gap-1">
-                      <button onClick={() => initiateStatusChange(fee.id, fee.estado)}
-                        className={`flex items-center justify-center w-8 h-8 rounded ${fee.estado === "pendiente" ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"}`}
-                        title={fee.estado === "pendiente" ? "Marcar Pagado (Completo)" : "Marcar Pendiente"}
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </button>
+                      {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") ? (
+                        <button
+                          onClick={() => handleVerifyReservation(fee.id, fee.concept)}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors shadow-xs"
+                          title="Validar comprobante de transferencia y generar recibo oficial"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Validar (50€)</span>
+                        </button>
+                      ) : (
+                        <button onClick={() => initiateStatusChange(fee.id, fee.estado)}
+                          className={`flex items-center justify-center w-8 h-8 rounded ${fee.estado === "pendiente" ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"}`}
+                          title={fee.estado === "pendiente" ? "Marcar Pagado (Completo)" : "Marcar Pendiente"}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      )}
                       {fee.estado === "pendiente" && (
                         <button onClick={() => setPartialModalFeeId(fee.id)} className="flex items-center justify-center w-8 h-8 bg-purple-50 text-purple-700 rounded hover:bg-purple-100" title="Añadir Entrega a Cuenta">
                           <Coins className="w-4 h-4" />

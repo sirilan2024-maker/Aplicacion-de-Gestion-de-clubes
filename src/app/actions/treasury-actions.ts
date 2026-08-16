@@ -1327,6 +1327,7 @@ export async function getMemberBalancesAction() {
     let totalChargedCents = 0;
     let totalPaidCents = 0;
     let pendingFeesCount = 0;
+    let pendingVerificationCount = 0;
 
     playerFees.forEach((f: any) => {
       totalChargedCents += f.amount_cents || 0;
@@ -1339,6 +1340,8 @@ export async function getMemberBalancesAction() {
 
       if (f.estado === "pendiente") {
         pendingFeesCount++;
+      } else if (f.estado === "pdte_verif" || f.estado === "pendiente_verificacion") {
+        pendingVerificationCount++;
       }
     });
 
@@ -1360,6 +1363,7 @@ export async function getMemberBalancesAction() {
       status,
       fees_count: playerFees.length,
       pending_fees_count: pendingFeesCount,
+      pending_verification_count: pendingVerificationCount,
     };
   });
 
@@ -1369,6 +1373,7 @@ export async function getMemberBalancesAction() {
   const totalPending = memberBalances.reduce((acc, m) => acc + Math.max(0, m.balance_cents), 0) / 100;
   const membersAlDia = memberBalances.filter(m => m.status === "al_dia" || m.status === "saldo_favor").length;
   const membersConDeuda = memberBalances.filter(m => m.status === "con_deuda").length;
+  const membersPorVerificar = memberBalances.filter(m => m.pending_verification_count > 0).length;
 
   return {
     success: true,
@@ -1379,6 +1384,7 @@ export async function getMemberBalancesAction() {
       totalPending,
       membersAlDia,
       membersConDeuda,
+      membersPorVerificar,
       totalMembers: memberBalances.length,
     },
   };

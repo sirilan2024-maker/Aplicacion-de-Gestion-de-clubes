@@ -417,7 +417,7 @@ export default function PlayerDashboardPage() {
       <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-6 w-full text-center md:text-left">
           {player.avatar_url ? (
-            <div className="w-24 h-32 md:w-32 md:h-40 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white shrink-0 relative">
+            <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden flex-shrink-0">
               <img 
                 src={player.avatar_url} 
                 alt={`Foto de ${player.first_name}`} 
@@ -425,8 +425,10 @@ export default function PlayerDashboardPage() {
               />
             </div>
           ) : (
-            <div className="w-24 h-32 md:w-32 md:h-40 rounded-3xl bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl flex items-center justify-center shrink-0">
-              <span className="text-4xl md:text-5xl drop-shadow-sm">⚽</span>
+            <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden flex-shrink-0">
+              <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
             </div>
           )}
           

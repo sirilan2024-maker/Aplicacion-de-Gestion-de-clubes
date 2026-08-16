@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, Loader2, Save, UserCheck, BrainCircuit, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, Save, UserCheck, BrainCircuit, Zap, RotateCcw } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FormativeEvaluationForm } from "@/components/features/formative/FormativeEvaluationForm";
 import { isFormativeCategory } from "@/lib/utils";
@@ -425,7 +425,7 @@ export default function EntrenamientoDetailPage() {
                     Marca quién asistió al entrenamiento antes de evaluar.
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -434,10 +434,24 @@ export default function EntrenamientoDetailPage() {
                       setAttendance(allPresent);
                       toast.success("Todos marcados como Presente");
                     }}
-                    className="inline-flex items-center justify-center text-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm active:scale-95 whitespace-nowrap min-h-[40px]"
+                    className="inline-flex items-center justify-center text-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 rounded-xl transition-all border border-slate-200 shadow-xs active:scale-95 whitespace-nowrap min-h-[40px]"
                   >
                     Todos Presentes
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttendance({});
+                      toast("Asistencia desmarcada", { icon: "🧹" });
+                    }}
+                    title="Desmarcar todos los estados de asistencia"
+                    className="inline-flex items-center justify-center gap-1.5 text-center text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2.5 rounded-xl transition-all border border-rose-200 shadow-xs active:scale-95 whitespace-nowrap min-h-[40px]"
+                  >
+                    <RotateCcw size={14} className="shrink-0" />
+                    <span>Desmarcar</span>
+                  </button>
+
                   <button 
                     onClick={saveAttendance}
                     disabled={savingPlayer === 'asistencia'}
@@ -534,7 +548,19 @@ export default function EntrenamientoDetailPage() {
               </div>
 
               {/* Botón inferior para guardar asistencia cómodamente al final de la lista */}
-              <div className="p-4 sm:p-5 bg-slate-50 border-t border-gray-100 flex items-center justify-end">
+              <div className="p-4 sm:p-5 bg-slate-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttendance({});
+                    toast("Asistencia desmarcada", { icon: "🧹" });
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-4 py-2.5 rounded-xl border border-rose-200 transition-all active:scale-95"
+                >
+                  <RotateCcw size={14} />
+                  <span>Desmarcar Todos</span>
+                </button>
+
                 <button 
                   onClick={saveAttendance}
                   disabled={savingPlayer === 'asistencia'}

@@ -425,7 +425,8 @@ export default function EntrenamientoDetailPage() {
                     Marca quién asistió al entrenamiento antes de evaluar.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                {/* Botones de acción perfectamente estructurados y simétricos */}
+                <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -434,9 +435,10 @@ export default function EntrenamientoDetailPage() {
                       setAttendance(allPresent);
                       toast.success("Todos marcados como Presente");
                     }}
-                    className="inline-flex items-center justify-center text-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 rounded-xl transition-all border border-slate-200 shadow-xs active:scale-95 whitespace-nowrap min-h-[40px]"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2.5 rounded-xl transition-all border border-slate-200 shadow-xs active:scale-95 whitespace-nowrap h-10 sm:h-11"
                   >
-                    Todos Presentes
+                    <UserCheck size={15} className="text-emerald-600 shrink-0" />
+                    <span>Todos Presentes</span>
                   </button>
 
                   <button
@@ -446,7 +448,7 @@ export default function EntrenamientoDetailPage() {
                       toast("Asistencia desmarcada", { icon: "🧹" });
                     }}
                     title="Desmarcar todos los estados de asistencia"
-                    className="inline-flex items-center justify-center gap-1.5 text-center text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-2.5 rounded-xl transition-all border border-rose-200 shadow-xs active:scale-95 whitespace-nowrap min-h-[40px]"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-2.5 rounded-xl transition-all border border-rose-200 shadow-xs active:scale-95 whitespace-nowrap h-10 sm:h-11"
                   >
                     <RotateCcw size={14} className="shrink-0" />
                     <span>Desmarcar</span>
@@ -455,7 +457,7 @@ export default function EntrenamientoDetailPage() {
                   <button 
                     onClick={saveAttendance}
                     disabled={savingPlayer === 'asistencia'}
-                    className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all disabled:opacity-70 shadow-md shadow-blue-500/20 active:scale-95 whitespace-nowrap min-h-[40px]"
+                    className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all disabled:opacity-70 shadow-md shadow-blue-500/20 active:scale-95 whitespace-nowrap h-10 sm:h-11"
                   >
                     {savingPlayer === 'asistencia' ? <Loader2 size={16} className="animate-spin shrink-0" /> : <Save size={16} className="shrink-0" />}
                     <span>Guardar Asistencia</span>

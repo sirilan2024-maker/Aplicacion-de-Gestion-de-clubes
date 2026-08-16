@@ -25,7 +25,9 @@ import {
   Flame, 
   Compass, 
   Activity, 
-  HeartHandshake 
+  HeartHandshake,
+  X,
+  Layers
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -62,6 +64,7 @@ export function FormativeEvaluationForm({
   const [strengths, setStrengths] = useState("");
   const [areasForImprovement, setAreasForImprovement] = useState("");
   const [hoveredRubric, setHoveredRubric] = useState<{ conceptId: string; rubric: ConceptRubric } | null>(null);
+  const [selectedModalLevel, setSelectedModalLevel] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -371,71 +374,121 @@ export function FormativeEvaluationForm({
               </div>
             </div>
 
-            {/* Tarjetas Explicativas por Nivel */}
+            {/* Tarjetas Explicativas Clicables por Nivel (Abren Ventana Emergente de Conceptos) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
-              <div className={`p-3 rounded-2xl border transition-all ${count5 > 0 ? 'bg-emerald-50/80 border-emerald-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
-                <div className="flex items-center justify-between mb-1">
+              <div 
+                onClick={() => setSelectedModalLevel(5)}
+                title="Haz clic para ver los conceptos evaluados en Nivel 5"
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-98 ${
+                  count5 > 0 ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-500/20' : 'bg-slate-50/60 border-slate-200 opacity-60 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center">5</span>
-                    <span className="font-extrabold text-xs text-emerald-900">Dominio</span>
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs">5</span>
+                    <span className="font-extrabold text-xs text-emerald-950">Dominio</span>
                   </div>
-                  <span className="text-xs font-black text-emerald-700 bg-emerald-200/70 px-2 py-0.5 rounded-lg">{count5}</span>
+                  <span className="text-xs font-black text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded-lg border border-emerald-300">{count5}</span>
                 </div>
                 <p className="text-[10.5px] text-emerald-900/80 font-medium leading-tight">
                   Referente y autónomo. Resuelve con maestría y creatividad bajo máxima oposición.
                 </p>
+                <div className="mt-2 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                  <span>Ver conceptos</span>
+                  <ChevronRight size={12} />
+                </div>
               </div>
 
-              <div className={`p-3 rounded-2xl border transition-all ${count4 > 0 ? 'bg-teal-50/80 border-teal-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
-                <div className="flex items-center justify-between mb-1">
+              <div 
+                onClick={() => setSelectedModalLevel(4)}
+                title="Haz clic para ver los conceptos evaluados en Nivel 4"
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-98 ${
+                  count4 > 0 ? 'bg-teal-50/90 border-teal-300 ring-2 ring-teal-500/20' : 'bg-slate-50/60 border-slate-200 opacity-60 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-black flex items-center justify-center">4</span>
-                    <span className="font-extrabold text-xs text-teal-900">Consolidado</span>
+                    <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs">4</span>
+                    <span className="font-extrabold text-xs text-teal-950">Consolidado</span>
                   </div>
-                  <span className="text-xs font-black text-teal-700 bg-teal-200/70 px-2 py-0.5 rounded-lg">{count4}</span>
+                  <span className="text-xs font-black text-teal-800 bg-teal-200/80 px-2 py-0.5 rounded-lg border border-teal-300">{count4}</span>
                 </div>
                 <p className="text-[10.5px] text-teal-900/80 font-medium leading-tight">
                   Alta efectividad. Buena toma de decisiones y precisión habitual en juego real.
                 </p>
+                <div className="mt-2 text-[10px] font-bold text-teal-700 flex items-center gap-1">
+                  <span>Ver conceptos</span>
+                  <ChevronRight size={12} />
+                </div>
               </div>
 
-              <div className={`p-3 rounded-2xl border transition-all ${count3 > 0 ? 'bg-blue-50/80 border-blue-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
-                <div className="flex items-center justify-between mb-1">
+              <div 
+                onClick={() => setSelectedModalLevel(3)}
+                title="Haz clic para ver los conceptos evaluados en Nivel 3"
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-98 ${
+                  count3 > 0 ? 'bg-blue-50/90 border-blue-300 ring-2 ring-blue-500/20' : 'bg-slate-50/60 border-slate-200 opacity-60 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center">3</span>
-                    <span className="font-extrabold text-xs text-blue-900">En Progresión</span>
+                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs">3</span>
+                    <span className="font-extrabold text-xs text-blue-950">En Progresión</span>
                   </div>
-                  <span className="text-xs font-black text-blue-700 bg-blue-200/70 px-2 py-0.5 rounded-lg">{count3}</span>
+                  <span className="text-xs font-black text-blue-800 bg-blue-200/80 px-2 py-0.5 rounded-lg border border-blue-300">{count3}</span>
                 </div>
                 <p className="text-[10.5px] text-blue-900/80 font-medium leading-tight">
                   Aplica el concepto con autonomía en situaciones estándar de entrenamiento y partido.
                 </p>
+                <div className="mt-2 text-[10px] font-bold text-blue-700 flex items-center gap-1">
+                  <span>Ver conceptos</span>
+                  <ChevronRight size={12} />
+                </div>
               </div>
 
-              <div className={`p-3 rounded-2xl border transition-all ${count2 > 0 ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
-                <div className="flex items-center justify-between mb-1">
+              <div 
+                onClick={() => setSelectedModalLevel(2)}
+                title="Haz clic para ver los conceptos evaluados en Nivel 2"
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-98 ${
+                  count2 > 0 ? 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-500/20' : 'bg-slate-50/60 border-slate-200 opacity-60 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-black flex items-center justify-center">2</span>
-                    <span className="font-extrabold text-xs text-amber-900">En Desarrollo</span>
+                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs">2</span>
+                    <span className="font-extrabold text-xs text-amber-950">En Desarrollo</span>
                   </div>
-                  <span className="text-xs font-black text-amber-700 bg-amber-200/70 px-2 py-0.5 rounded-lg">{count2}</span>
+                  <span className="text-xs font-black text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-lg border border-amber-300">{count2}</span>
                 </div>
                 <p className="text-[10.5px] text-amber-900/80 font-medium leading-tight">
                   Intenta el gesto o la decisión pero muestra inconsistencias en ritmo o ejecución.
                 </p>
+                <div className="mt-2 text-[10px] font-bold text-amber-700 flex items-center gap-1">
+                  <span>Ver conceptos</span>
+                  <ChevronRight size={12} />
+                </div>
               </div>
 
-              <div className={`p-3 rounded-2xl border transition-all ${count1 > 0 ? 'bg-rose-50/80 border-rose-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
-                <div className="flex items-center justify-between mb-1">
+              <div 
+                onClick={() => setSelectedModalLevel(1)}
+                title="Haz clic para ver los conceptos evaluados en Nivel 1"
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-98 ${
+                  count1 > 0 ? 'bg-rose-50/90 border-rose-300 ring-2 ring-rose-500/20' : 'bg-slate-50/60 border-slate-200 opacity-60 hover:opacity-100'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center">1</span>
-                    <span className="font-extrabold text-xs text-rose-900">Iniciación</span>
+                    <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs">1</span>
+                    <span className="font-extrabold text-xs text-rose-950">Iniciación</span>
                   </div>
-                  <span className="text-xs font-black text-rose-700 bg-rose-200/70 px-2 py-0.5 rounded-lg">{count1}</span>
+                  <span className="text-xs font-black text-rose-800 bg-rose-200/80 px-2 py-0.5 rounded-lg border border-rose-300">{count1}</span>
                 </div>
                 <p className="text-[10.5px] text-rose-900/80 font-medium leading-tight">
                   Fase de descubrimiento. Requiere guía paso a paso y demostración continua.
                 </p>
+                <div className="mt-2 text-[10px] font-bold text-rose-700 flex items-center gap-1">
+                  <span>Ver conceptos</span>
+                  <ChevronRight size={12} />
+                </div>
               </div>
             </div>
 
@@ -659,6 +712,163 @@ export function FormativeEvaluationForm({
           </button>
         </div>
       </div>
+
+      {/* ─── Ventana Emergente (Modal) con los Conceptos del Nivel Seleccionado ─── */}
+      {selectedModalLevel !== null && (() => {
+        // Encontrar todos los conceptos de todos los módulos que tienen exactamente este nivel
+        const conceptsInLevel: { concept: EvaluationConcept; module: EvaluationModule; rubric?: ConceptRubric; note?: string }[] = [];
+        
+        modules.forEach(m => {
+          m.concepts?.forEach(c => {
+            if (scores[c.id] === selectedModalLevel) {
+              const rub = c.rubrics?.find(r => r.score_level === selectedModalLevel);
+              conceptsInLevel.push({
+                concept: c,
+                module: m,
+                rubric: rub,
+                note: coachNotes[c.id]
+              });
+            }
+          });
+        });
+
+        const levelMetadata: Record<number, { title: string; desc: string; bgBadge: string; textBadge: string; borderBadge: string }> = {
+          5: { 
+            title: "Nivel 5: Dominio Excepcional", 
+            desc: "Conceptos en los que el jugador es referente con autonomía total, fluidez y creatividad bajo máxima oposición.",
+            bgBadge: "bg-emerald-600",
+            textBadge: "text-emerald-700 bg-emerald-50",
+            borderBadge: "border-emerald-300"
+          },
+          4: { 
+            title: "Nivel 4: Consolidado", 
+            desc: "Conceptos aplicados con alta efectividad, precisión técnica y buena toma de decisiones en situaciones reales de juego.",
+            bgBadge: "bg-teal-600",
+            textBadge: "text-teal-700 bg-teal-50",
+            borderBadge: "border-teal-300"
+          },
+          3: { 
+            title: "Nivel 3: En Progresión", 
+            desc: "Conceptos aplicados correctamente con autonomía en situaciones estándar de entrenamiento y competición.",
+            bgBadge: "bg-blue-600",
+            textBadge: "text-blue-700 bg-blue-50",
+            borderBadge: "border-blue-300"
+          },
+          2: { 
+            title: "Nivel 2: En Desarrollo", 
+            desc: "Conceptos en fase de desarrollo activo. El jugador intenta la acción pero muestra inconsistencias en ritmo o ejecución.",
+            bgBadge: "bg-amber-600",
+            textBadge: "text-amber-700 bg-amber-50",
+            borderBadge: "border-amber-300"
+          },
+          1: { 
+            title: "Nivel 1: Iniciación", 
+            desc: "Conceptos en fase de descubrimiento. Requiere orientación directa, demostración y guía constante.",
+            bgBadge: "bg-rose-600",
+            textBadge: "text-rose-700 bg-rose-50",
+            borderBadge: "border-rose-300"
+          }
+        };
+
+        const meta = levelMetadata[selectedModalLevel] || levelMetadata[3];
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+              
+              {/* Modal Header */}
+              <div className="p-5 sm:p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-2xl ${meta.bgBadge} text-white font-black text-lg flex items-center justify-center shadow-md shrink-0`}>
+                    {selectedModalLevel}
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+                      {meta.title}
+                    </h3>
+                    <p className="text-slate-500 text-xs font-medium mt-0.5">
+                      {conceptsInLevel.length} {conceptsInLevel.length === 1 ? 'concepto evaluado' : 'conceptos evaluados'} en este nivel
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedModalLevel(null)}
+                  className="p-2 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shadow-xs"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Description */}
+              <div className="px-5 sm:px-6 py-3 bg-slate-50/70 border-b border-slate-100 text-xs text-slate-600 font-medium">
+                💡 <span className="font-bold text-slate-700">Criterio Pedagógico:</span> {meta.desc}
+              </div>
+
+              {/* Modal List of Concepts */}
+              <div className="p-5 sm:p-6 overflow-y-auto divide-y divide-slate-100 space-y-4">
+                {conceptsInLevel.length > 0 ? (
+                  conceptsInLevel.map(({ concept, module, rubric, note }) => (
+                    <div key={concept.id} className="pt-3 first:pt-0 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-extrabold text-slate-900">
+                            {concept.name}
+                          </span>
+                        </div>
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border self-start sm:self-auto ${meta.textBadge} ${meta.borderBadge}`}>
+                          {module.name}
+                        </span>
+                      </div>
+
+                      {rubric && (
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs text-slate-700 leading-relaxed font-medium">
+                          <span className="font-bold text-slate-900 block mb-0.5">
+                            Rúbrica ({rubric.short_label}):
+                          </span>
+                          {rubric.criteria_description}
+                        </div>
+                      )}
+
+                      {note && (
+                        <div className="p-2.5 bg-amber-50/80 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium italic">
+                          📝 &ldquo;{note}&rdquo;
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-10 space-y-2">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                      <Layers size={22} />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">Sin conceptos en el Nivel {selectedModalLevel}</p>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      Ningún concepto ha sido calificado todavía con la puntuación {selectedModalLevel} para este jugador.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400">
+                  Jugador: <strong className="text-slate-800">{playerName}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedModalLevel(null)}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-xs"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

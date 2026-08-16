@@ -261,32 +261,32 @@ export default function EntrenamientoDetailPage() {
   const selectedPlayer = players.find(p => p.id === selectedPlayerId);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="bottom-right" />
       
       {/* HEADER */}
       <button 
         onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos`)}
-        className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-6 font-medium transition-colors"
+        className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-4 sm:mb-6 font-semibold text-sm sm:text-base transition-colors px-1"
       >
         <ArrowLeft size={18} /> Volver a Entrenamientos
       </button>
 
-      <div className="flex flex-col md:flex-row items-start justify-between gap-6 mb-8">
+      <div className="flex flex-col md:flex-row items-start justify-between gap-4 sm:gap-6 mb-6 sm:mb-8 px-1">
         <div>
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-gray-900">{eventDetails?.title || 'Evaluación de Sesión'}</h1>
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">{eventDetails?.title || 'Evaluación de Sesión'}</h1>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/feedback/${eventId}`);
                 toast.success("Enlace copiado al portapapeles");
               }}
-              className="text-xs font-bold bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors"
+              className="text-xs font-bold bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition-colors shadow-xs"
             >
-              Copiar Enlace Jugadores
+              Copiar Enlace
             </button>
           </div>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 text-xs sm:text-sm font-medium mt-1">
             {eventDetails?.date ? new Date(eventDetails.date).toLocaleDateString('es-ES') : ''} • Selecciona un módulo y un jugador para registrar sus datos.
           </p>
         </div>
@@ -355,7 +355,7 @@ export default function EntrenamientoDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8">
         
         {/* LEFT COLUMN: PLAYER LIST (Hidden in rapida, asistencia, or disabled formativo) */}
         {activeModule !== 'rapida' && activeModule !== 'asistencia' && (activeModule !== 'formativo' || showFormativo) && (
@@ -415,7 +415,7 @@ export default function EntrenamientoDetailPage() {
         <div className={(activeModule === 'rapida' || activeModule === 'asistencia' || (activeModule === 'formativo' && !showFormativo)) ? "md:col-span-12" : "md:col-span-8 lg:col-span-9"}>
           
           {activeModule === 'asistencia' ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white sticky top-0 z-10">
                 <div className="space-y-1">
                   <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
@@ -453,75 +453,79 @@ export default function EntrenamientoDetailPage() {
                   const currentStatus = attendance[player.id];
                   
                   return (
-                    <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                    <div key={player.id} className="p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
                           {player.avatar_url ? (
                             <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
                           ) : (
-                            <span className="text-slate-600 font-extrabold">{player.dorsal || `${player.first_name?.charAt(0)}${player.last_name?.charAt(0)}`}</span>
+                            <span className="text-slate-700 font-black text-base">{player.dorsal || `${player.first_name?.charAt(0)}${player.last_name?.charAt(0)}`}</span>
                           )}
                         </div>
-                        <div>
-                          <p className="font-bold text-gray-900 leading-tight">{player.first_name} {player.last_name}</p>
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-slate-900 text-base sm:text-base leading-tight truncate">
+                            {player.first_name} {player.last_name}
+                          </p>
                           {player.dorsal && (
-                            <span className="text-[11px] font-bold text-slate-500">Dorsal {player.dorsal}</span>
+                            <span className="inline-block mt-0.5 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                              Dorsal {player.dorsal}
+                            </span>
                           )}
                         </div>
                       </div>
                       
-                      {/* Status selectors con texto visible y accesible */}
-                      <div className="grid grid-cols-4 sm:flex bg-slate-100 p-1 rounded-2xl w-full sm:w-auto gap-1 border border-slate-200/70 shadow-inner">
+                      {/* Status selectors optimizados para móvil sin desbordar texto */}
+                      <div className="grid grid-cols-4 sm:flex bg-slate-100/90 p-1 rounded-2xl w-full sm:w-auto gap-1 border border-slate-200/80 shadow-inner">
                         <button
                           type="button"
                           onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Presente' }))}
-                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                          className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
                             currentStatus === 'Presente' || currentStatus === 'present'
-                              ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+                              ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200 scale-[1.02]'
                               : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
                           <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                          <span>Presente</span>
+                          <span className="truncate">Presente</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Retraso' }))}
-                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                          className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
                             currentStatus === 'Retraso' || currentStatus === 'late'
-                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-200'
+                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-200 scale-[1.02]'
                               : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
                           <Zap className="w-3.5 h-3.5 shrink-0" />
-                          <span>Retraso</span>
+                          <span className="truncate">Retraso</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Ausente' }))}
-                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                          className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
                             currentStatus === 'Ausente' || currentStatus === 'absent'
-                              ? 'bg-rose-500 text-white shadow-sm shadow-rose-200'
+                              ? 'bg-rose-500 text-white shadow-sm shadow-rose-200 scale-[1.02]'
                               : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
                           <span className="text-xs leading-none shrink-0 font-black">✕</span>
-                          <span>Ausente</span>
+                          <span className="truncate">Ausente</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Lesionado' }))}
-                          className={`flex items-center justify-center gap-1 px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all ${
+                          className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
                             currentStatus === 'Lesionado' || currentStatus === 'excused'
-                              ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
+                              ? 'bg-amber-500 text-white shadow-sm shadow-amber-200 scale-[1.02]'
                               : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
                           <span className="text-xs leading-none shrink-0">⚕️</span>
-                          <span>Justificado</span>
+                          <span className="truncate">Justificado</span>
                         </button>
                       </div>
                     </div>

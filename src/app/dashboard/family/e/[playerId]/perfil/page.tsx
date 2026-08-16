@@ -420,11 +420,21 @@ export default function PlayerDashboardPage() {
             <span className="flex items-center gap-2">
               <span className="text-3xl md:text-4xl">⚽</span> {player.first_name} {player.last_name}
             </span>
-            {player.teams?.name && (
-              <span className="text-sm md:text-base px-4 py-1.5 bg-blue-100/80 text-blue-800 rounded-full font-bold border border-blue-200 shadow-sm mt-2 md:mt-0">
-                {player.teams.name}
-              </span>
-            )}
+            <div className="flex items-center gap-2 mt-2 md:mt-0">
+              {player.dorsal && (
+                <span className="text-lg md:text-xl font-black text-slate-400">#{player.dorsal}</span>
+              )}
+              {player.teams?.name && (
+                <span className="text-sm md:text-base px-4 py-1.5 bg-blue-100/80 text-blue-800 rounded-full font-bold border border-blue-200 shadow-sm">
+                  {player.teams.name}
+                </span>
+              )}
+              {player.posicion_principal && (
+                <span className="text-sm md:text-base px-4 py-1.5 bg-slate-100 text-slate-700 rounded-full font-bold border border-slate-200 shadow-sm">
+                  {player.posicion_principal}
+                </span>
+              )}
+            </div>
           </h1>
           <p className="text-slate-500 mt-3 font-medium text-sm md:text-base">Resumen completo de la temporada</p>
         </div>

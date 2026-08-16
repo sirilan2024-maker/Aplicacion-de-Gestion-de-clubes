@@ -272,69 +272,188 @@ export function FormativeEvaluationForm({
         </div>
       </div>
 
-      {/* ─── Niveles alcanzados por el jugador (Resumen Inmediato al ingresar datos) ─── */}
+      {/* ─── Panel Explicativo y Resumen de Niveles de Aprendizaje del Jugador ─── */}
       {(() => {
-        const scoreValues = Object.values(scores);
-        const totalEvaluated = scoreValues.length;
-        if (totalEvaluated === 0) return null;
+        const scoreEntries = Object.entries(scores);
+        const totalEvaluated = scoreEntries.length;
 
-        const avg = (scoreValues.reduce((a, b) => a + b, 0) / totalEvaluated).toFixed(1);
+        // Calcular promedios por módulos
+        const moduleAverages = modules.map(m => {
+          const modScores = m.concepts
+            ?.filter(c => scores[c.id] !== undefined)
+            .map(c => scores[c.id]) || [];
+          const avg = modScores.length > 0
+            ? (modScores.reduce((a, b) => a + b, 0) / modScores.length).toFixed(1)
+            : null;
+          return {
+            id: m.id,
+            name: m.name,
+            code: m.code,
+            evaluated: modScores.length,
+            total: m.concepts?.length || 0,
+            avg
+          };
+        });
+
+        if (totalEvaluated === 0) {
+          return (
+            <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <BrainCircuit size={16} className="text-emerald-600 shrink-0" />
+                <span className="font-semibold text-slate-700">Sin calificaciones en esta sesión. Califica los conceptos inferiores para ver su perfil.</span>
+              </div>
+              <span className="text-[11px] font-bold text-slate-400">Escala de 1 a 5 (Iniciación a Dominio)</span>
+            </div>
+          );
+        }
+
+        const scoreValues = scoreEntries.map(([, s]) => s);
+        const avgNum = scoreValues.reduce((a, b) => a + b, 0) / totalEvaluated;
+        const avg = avgNum.toFixed(1);
+        
         const count5 = scoreValues.filter(s => s === 5).length;
         const count4 = scoreValues.filter(s => s === 4).length;
         const count3 = scoreValues.filter(s => s === 3).length;
         const count2 = scoreValues.filter(s => s === 2).length;
         const count1 = scoreValues.filter(s => s === 1).length;
 
+        const getGlobalLevelTitle = (num: number) => {
+          if (num >= 4.5) return { text: "Dominio Excepcional", color: "text-emerald-700 bg-emerald-100 border-emerald-300" };
+          if (num >= 3.8) return { text: "Nivel Consolidado", color: "text-teal-700 bg-teal-100 border-teal-300" };
+          if (num >= 2.8) return { text: "En Progresión Adecuada", color: "text-blue-700 bg-blue-100 border-blue-300" };
+          if (num >= 1.8) return { text: "En Desarrollo Activo", color: "text-amber-700 bg-amber-100 border-amber-300" };
+          return { text: "Fase de Iniciación", color: "text-rose-700 bg-rose-100 border-rose-300" };
+        };
+
+        const globalLevel = getGlobalLevelTitle(avgNum);
+
         return (
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-2.5 animate-in fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Niveles de Aprendizaje Actuales
-                </span>
-                <span className="text-xs font-bold text-slate-400">({totalEvaluated} conceptos calificados)</span>
+          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 animate-in fade-in">
+            {/* Header del Panel con Nota Media y Diagnóstico */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Diagnóstico Formativo y Niveles Alcanzados
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    ({totalEvaluated} de {modules.reduce((acc, m) => acc + (m.concepts?.length || 0), 0)} conceptos evaluados)
+                  </span>
+                </div>
+                <p className="text-slate-500 text-xs mt-0.5 font-medium">
+                  Estado de aprendizaje en base a las rúbricas formativas del club
+                </p>
               </div>
-              <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                <span className="text-xs font-bold text-slate-500">Promedio de dominio:</span>
-                <span className="text-sm font-black bg-slate-900 text-white px-2.5 py-0.5 rounded-lg">
-                  {avg} <span className="text-[10px] text-slate-300 font-medium">/ 5</span>
+
+              <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                <span className={`text-xs font-black px-3 py-1 rounded-xl border ${globalLevel.color}`}>
+                  {globalLevel.text}
+                </span>
+                <span className="text-base font-black bg-slate-900 text-white px-3 py-1 rounded-xl shadow-xs">
+                  {avg} <span className="text-xs text-slate-300 font-medium">/ 5</span>
                 </span>
               </div>
             </div>
 
-            {/* Badges de Niveles Actuales */}
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              {count5 > 0 && (
-                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-300 text-emerald-800 px-3 py-1.5 rounded-xl font-bold">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center">5</span>
-                  <span>{count5} en Dominio</span>
+            {/* Barra de Distribución Porcentual Visual */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                <span>Distribución por Niveles:</span>
+                <span>{totalEvaluated} conceptos calificados</span>
+              </div>
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex gap-0.5 p-0.5">
+                {count5 > 0 && <div style={{ width: `${(count5 / totalEvaluated) * 100}%` }} className="bg-emerald-500 h-full rounded-full transition-all" title={`${count5} en Nivel 5`} />}
+                {count4 > 0 && <div style={{ width: `${(count4 / totalEvaluated) * 100}%` }} className="bg-teal-500 h-full rounded-full transition-all" title={`${count4} en Nivel 4`} />}
+                {count3 > 0 && <div style={{ width: `${(count3 / totalEvaluated) * 100}%` }} className="bg-blue-500 h-full rounded-full transition-all" title={`${count3} en Nivel 3`} />}
+                {count2 > 0 && <div style={{ width: `${(count2 / totalEvaluated) * 100}%` }} className="bg-amber-500 h-full rounded-full transition-all" title={`${count2} en Nivel 2`} />}
+                {count1 > 0 && <div style={{ width: `${(count1 / totalEvaluated) * 100}%` }} className="bg-rose-500 h-full rounded-full transition-all" title={`${count1} en Nivel 1`} />}
+              </div>
+            </div>
+
+            {/* Tarjetas Explicativas por Nivel */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
+              <div className={`p-3 rounded-2xl border transition-all ${count5 > 0 ? 'bg-emerald-50/80 border-emerald-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center">5</span>
+                    <span className="font-extrabold text-xs text-emerald-900">Dominio</span>
+                  </div>
+                  <span className="text-xs font-black text-emerald-700 bg-emerald-200/70 px-2 py-0.5 rounded-lg">{count5}</span>
                 </div>
-              )}
-              {count4 > 0 && (
-                <div className="flex items-center gap-1 bg-teal-50 border border-teal-300 text-teal-800 px-3 py-1.5 rounded-xl font-bold">
-                  <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-black flex items-center justify-center">4</span>
-                  <span>{count4} Consolidados</span>
+                <p className="text-[10.5px] text-emerald-900/80 font-medium leading-tight">
+                  Referente y autónomo. Resuelve con maestría y creatividad bajo máxima oposición.
+                </p>
+              </div>
+
+              <div className={`p-3 rounded-2xl border transition-all ${count4 > 0 ? 'bg-teal-50/80 border-teal-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-black flex items-center justify-center">4</span>
+                    <span className="font-extrabold text-xs text-teal-900">Consolidado</span>
+                  </div>
+                  <span className="text-xs font-black text-teal-700 bg-teal-200/70 px-2 py-0.5 rounded-lg">{count4}</span>
                 </div>
-              )}
-              {count3 > 0 && (
-                <div className="flex items-center gap-1 bg-blue-50 border border-blue-300 text-blue-800 px-3 py-1.5 rounded-xl font-bold">
-                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center">3</span>
-                  <span>{count3} En Progresión</span>
+                <p className="text-[10.5px] text-teal-900/80 font-medium leading-tight">
+                  Alta efectividad. Buena toma de decisiones y precisión habitual en juego real.
+                </p>
+              </div>
+
+              <div className={`p-3 rounded-2xl border transition-all ${count3 > 0 ? 'bg-blue-50/80 border-blue-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center">3</span>
+                    <span className="font-extrabold text-xs text-blue-900">En Progresión</span>
+                  </div>
+                  <span className="text-xs font-black text-blue-700 bg-blue-200/70 px-2 py-0.5 rounded-lg">{count3}</span>
                 </div>
-              )}
-              {count2 > 0 && (
-                <div className="flex items-center gap-1 bg-amber-50 border border-amber-300 text-amber-800 px-3 py-1.5 rounded-xl font-bold">
-                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-black flex items-center justify-center">2</span>
-                  <span>{count2} En Desarrollo</span>
+                <p className="text-[10.5px] text-blue-900/80 font-medium leading-tight">
+                  Aplica el concepto con autonomía en situaciones estándar de entrenamiento y partido.
+                </p>
+              </div>
+
+              <div className={`p-3 rounded-2xl border transition-all ${count2 > 0 ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-black flex items-center justify-center">2</span>
+                    <span className="font-extrabold text-xs text-amber-900">En Desarrollo</span>
+                  </div>
+                  <span className="text-xs font-black text-amber-700 bg-amber-200/70 px-2 py-0.5 rounded-lg">{count2}</span>
                 </div>
-              )}
-              {count1 > 0 && (
-                <div className="flex items-center gap-1 bg-rose-50 border border-rose-300 text-rose-800 px-3 py-1.5 rounded-xl font-bold">
-                  <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center">1</span>
-                  <span>{count1} En Iniciación</span>
+                <p className="text-[10.5px] text-amber-900/80 font-medium leading-tight">
+                  Intenta el gesto o la decisión pero muestra inconsistencias en ritmo o ejecución.
+                </p>
+              </div>
+
+              <div className={`p-3 rounded-2xl border transition-all ${count1 > 0 ? 'bg-rose-50/80 border-rose-300' : 'bg-slate-50/60 border-slate-200 opacity-50'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center">1</span>
+                    <span className="font-extrabold text-xs text-rose-900">Iniciación</span>
+                  </div>
+                  <span className="text-xs font-black text-rose-700 bg-rose-200/70 px-2 py-0.5 rounded-lg">{count1}</span>
                 </div>
-              )}
+                <p className="text-[10.5px] text-rose-900/80 font-medium leading-tight">
+                  Fase de descubrimiento. Requiere guía paso a paso y demostración continua.
+                </p>
+              </div>
+            </div>
+
+            {/* Mini-Desglose por Módulos Evaluados */}
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-3">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Medias por Módulo:</span>
+              {moduleAverages.map(mod => (
+                <div key={mod.id} className="flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1 rounded-xl text-xs">
+                  <span className="font-bold text-slate-700">{mod.name}:</span>
+                  {mod.avg ? (
+                    <span className="font-black text-slate-900 bg-white px-1.5 py-0.2 rounded-md shadow-xs border border-slate-200/60">
+                      {mod.avg} <span className="text-[10px] text-slate-400">/ 5</span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 italic text-[11px]">Sin evaluar</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         );

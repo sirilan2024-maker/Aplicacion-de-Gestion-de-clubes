@@ -31,7 +31,8 @@ import {
   Menu,
   X,
   FolderOpen,
-  Radio
+  Radio,
+  UserPlus
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -224,6 +225,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       { name: "Equipación/Ropa", href: `/dashboard/family/e/${activeFamilyPlayerId}/ropa`, icon: Shirt },
       { name: "Ficha Técnica", href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },
       { name: "Mensajes", href: `/dashboard/family/e/${activeFamilyPlayerId}/mensajes`, icon: MessageSquare },
+      { name: "Añadir Jugador", href: "/dashboard/family/nuevo-jugador", icon: UserPlus },
       { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
     ]
   } else {

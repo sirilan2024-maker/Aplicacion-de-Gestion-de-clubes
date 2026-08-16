@@ -470,17 +470,6 @@ export default function PlayerDashboardPage() {
         
         <div className="flex flex-col sm:flex-row justify-center md:justify-end shrink-0 w-full md:w-auto px-4 sm:px-0">
           <button 
-            onClick={() => {
-              if (window.confirm('Estás a punto de añadir un nuevo jugador a tu cuenta familiar. ¿Deseas continuar y abrir el formulario de inscripción?')) {
-                router.push('/dashboard/family/nuevo-jugador')
-              }
-            }}
-            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all shadow-sm w-full sm:w-auto"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            Añadir Jugador
-          </button>
-          <button 
             onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha`)}
             className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-sm"
           >

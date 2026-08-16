@@ -416,16 +416,16 @@ export default function EntrenamientoDetailPage() {
           
           {activeModule === 'asistencia' ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+              <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white sticky top-0 z-10">
+                <div className="space-y-1">
+                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
                     Control de Asistencia
                   </h2>
-                  <p className="text-gray-500 text-sm">
+                  <p className="text-gray-500 text-xs sm:text-sm font-medium">
                     Marca quién asistió al entrenamiento antes de evaluar.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -434,17 +434,17 @@ export default function EntrenamientoDetailPage() {
                       setAttendance(allPresent);
                       toast.success("Todos marcados como Presente");
                     }}
-                    className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg transition-colors border border-slate-200"
+                    className="inline-flex items-center justify-center text-center text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm active:scale-95 whitespace-nowrap min-h-[40px]"
                   >
                     Todos Presentes
                   </button>
                   <button 
                     onClick={saveAttendance}
                     disabled={savingPlayer === 'asistencia'}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-70 shadow-md shadow-blue-200"
+                    className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all disabled:opacity-70 shadow-md shadow-blue-500/20 active:scale-95 whitespace-nowrap min-h-[40px]"
                   >
-                    {savingPlayer === 'asistencia' ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                    Guardar Asistencia
+                    {savingPlayer === 'asistencia' ? <Loader2 size={16} className="animate-spin shrink-0" /> : <Save size={16} className="shrink-0" />}
+                    <span>Guardar Asistencia</span>
                   </button>
                 </div>
               </div>
@@ -531,22 +531,22 @@ export default function EntrenamientoDetailPage() {
             </div>
           ) : activeModule === 'rapida' ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+              <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white sticky top-0 z-10">
+                <div className="space-y-1">
+                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
                     Carga Rápida (Tabla de RPE)
                   </h2>
-                  <p className="text-gray-500 text-sm">
+                  <p className="text-gray-500 text-xs sm:text-sm font-medium">
                     Introduce el RPE y Minutos de todos los jugadores de golpe.
                   </p>
                 </div>
                 <button 
                   onClick={saveAllQuickMetrics}
                   disabled={savingPlayer === 'all'}
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-70 shadow-md shadow-purple-200"
+                  className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all disabled:opacity-70 shadow-md shadow-purple-500/20 active:scale-95 whitespace-nowrap shrink-0 min-h-[40px]"
                 >
-                  {savingPlayer === 'all' ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                  Guardar Todos
+                  {savingPlayer === 'all' ? <Loader2 size={16} className="animate-spin shrink-0" /> : <Save size={16} className="shrink-0" />}
+                  <span>Guardar Todos</span>
                 </button>
               </div>
 

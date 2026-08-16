@@ -382,34 +382,36 @@ export default function GlobalPlayerProfilePage() {
       if (attData) {
         attData.forEach((a) => {
           if (a.events && a.events.event_type === 'Entrenamiento') {
-            const evId = a.event_id;
-            const met = metricsMap.get(evId) || { rpe: 7, minutes: 90 };
-            const rpe = met.rpe ?? 7;
-            const mins = met.minutes ?? 90;
-            const wl = mins * rpe;
+            const evId = a.event_id || a.events.id;
+            if (evId && !processedEvents.has(evId)) {
+              const met = metricsMap.get(evId) || { rpe: 7, minutes: 90 };
+              const rpe = met.rpe ?? 7;
+              const mins = met.minutes ?? 90;
+              const wl = mins * rpe;
 
-            const evDate = new Date(a.events.date || a.events.start_time);
-            if (evDate >= d7) acuteWorkload += wl;
-            if (evDate >= d28) chronicWorkload += wl;
+              const evDate = new Date(a.events.date || a.events.start_time);
+              if (evDate >= d7) acuteWorkload += wl;
+              if (evDate >= d28) chronicWorkload += wl;
 
-            const attStatus = (a.status || '').toLowerCase() === 'presente' ? 'Presente' : ((a.status || '').toLowerCase() === 'ausente' ? 'Ausente' : 'Justificado');
+              const attStatus = (a.status || '').toLowerCase() === 'presente' ? 'Presente' : ((a.status || '').toLowerCase() === 'ausente' ? 'Ausente' : 'Justificado');
 
-            tHistory.push({
-              ...a.events,
-              id: evId,
-              date: a.events.date || a.events.start_time,
-              title: a.events.title || 'Entrenamiento',
-              attendance: attStatus,
-              rpe: rpe,
-              minutes: mins
-            });
-            processedEvents.add(evId);
+              tHistory.push({
+                ...a.events,
+                id: evId,
+                date: a.events.date || a.events.start_time,
+                title: a.events.title || 'Entrenamiento',
+                attendance: attStatus,
+                rpe: rpe,
+                minutes: mins
+              });
+              processedEvents.add(evId);
+            }
           }
         });
       }
 
       teamEvents.forEach(e => {
-        if (!processedEvents.has(e.id)) {
+        if (e.id && !processedEvents.has(e.id)) {
           const met = metricsMap.get(e.id) || { rpe: 7, minutes: 90 };
           tHistory.push({
             ...e,
@@ -1487,8 +1489,8 @@ export default function GlobalPlayerProfilePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map(t => (
-                            <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                          {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map((t, idx) => (
+                            <tr key={t.id ? `${t.id}-${idx}` : idx} className="hover:bg-slate-50 transition-colors">
                               <td className="px-6 py-4 font-medium text-slate-900">{new Date(t.date).toLocaleDateString('es-ES')}</td>
                               <td className="px-6 py-4">{t.title}</td>
                               <td className="px-6 py-4 text-center">
@@ -1506,8 +1508,8 @@ export default function GlobalPlayerProfilePage() {
 
                     {/* Vista Móvil (Tarjetas) */}
                     <div className="block md:hidden divide-y divide-slate-100">
-                      {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map(t => (
-                        <div key={t.id} className="p-4 hover:bg-slate-50 transition-colors">
+                      {(showAllTrainings ? trainingHistory : trainingHistory.slice(0, 10)).map((t, idx) => (
+                        <div key={t.id ? `m-${t.id}-${idx}` : idx} className="p-4 hover:bg-slate-50 transition-colors">
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <div className="font-bold text-slate-900">{t.title}</div>
@@ -1615,8 +1617,8 @@ export default function GlobalPlayerProfilePage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                              {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map(m => (
-                                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                              {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map((m, idx) => (
+                                <tr key={m.id ? `${m.id}-${idx}` : idx} className="hover:bg-slate-50 transition-colors">
                                   <td className="px-6 py-4 font-medium text-slate-900">{new Date(m.date).toLocaleDateString('es-ES')}</td>
                                   <td className="px-6 py-4">{m.title}</td>
                                   <td className="px-6 py-4 text-center">
@@ -1640,8 +1642,8 @@ export default function GlobalPlayerProfilePage() {
 
                         {/* Vista Móvil (Tarjetas) */}
                         <div className="block md:hidden divide-y divide-slate-100">
-                          {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map(m => (
-                            <div key={m.id} className="p-4 hover:bg-slate-50 transition-colors">
+                          {(showAllMatches ? matchHistory : matchHistory.slice(0, 10)).map((m, idx) => (
+                            <div key={m.id ? `m-${m.id}-${idx}` : idx} className="p-4 hover:bg-slate-50 transition-colors">
                               <div className="flex justify-between items-start mb-2">
                                 <div>
                                   <div className="font-bold text-slate-900">{m.title}</div>

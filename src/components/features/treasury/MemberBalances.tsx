@@ -113,6 +113,30 @@ export default function MemberBalances() {
     }
   };
 
+  const handleRejectReservation = async (feeId: string, concept: string) => {
+    if (!confirm(`¿Confirmas que NO has recibido el ingreso de "${concept}"? La cuota volverá a estado "Pendiente".`)) {
+      return;
+    }
+    
+    setVerifyingFeeId(feeId);
+    try {
+      const res = await rejectReservationFeeAction(feeId);
+      if (res.success) {
+        toast.success("Cuota rechazada. Ha vuelto a estado Pendiente.");
+        if (selectedPlayerId) {
+          fetchStatement(selectedPlayerId);
+        }
+        fetchBalances();
+      } else {
+        toast.error(res.error || "Error al rechazar la cuota.");
+      }
+    } catch (err: any) {
+      toast.error("Error al rechazar: " + err.message);
+    } finally {
+      setVerifyingFeeId(null);
+    }
+  };
+
   // Edit fee state
   const [editingFee, setEditingFee] = useState<{ id: string; concept: string; amount: string; reason: string } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -728,15 +752,24 @@ export default function MemberBalances() {
                       </div>
                     </div>
                     {statementData.fees?.filter((f: any) => f.estado === "pdte_verif" || f.estado === "pendiente_verificacion").map((f: any) => (
-                      <button
-                        key={f.id}
-                        onClick={() => handleVerifyReservation(f.id, f.concept)}
-                        disabled={verifyingFeeId === f.id}
-                        className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs transition-all disabled:opacity-50"
-                      >
-                        <CheckCircle2 size={15} />
-                        {verifyingFeeId === f.id ? "Validando..." : "✅ Validar Ingreso (50€)"}
-                      </button>
+                      <div key={f.id} className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleRejectReservation(f.id, f.concept)}
+                          disabled={verifyingFeeId === f.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-bold rounded-xl transition-all disabled:opacity-50"
+                        >
+                          <X className="w-4 h-4" />
+                          Rechazar
+                        </button>
+                        <button
+                          onClick={() => handleVerifyReservation(f.id, f.concept)}
+                          disabled={verifyingFeeId === f.id}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs transition-all disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={15} />
+                          {verifyingFeeId === f.id ? "Procesando..." : "✅ Validar Ingreso (50€)"}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -893,14 +926,24 @@ export default function MemberBalances() {
                         {/* Action buttons per fee */}
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 flex-wrap">
                           {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") && (
-                            <button
-                              onClick={() => handleVerifyReservation(fee.id, fee.concept)}
-                              disabled={verifyingFeeId === fee.id}
-                              className="flex items-center gap-1.5 text-xs font-black bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-3.5 py-1.5 rounded-lg transition-all shadow-xs disabled:opacity-50"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              {verifyingFeeId === fee.id ? "Validando..." : "✅ Validar Ingreso (50€)"}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleRejectReservation(fee.id, fee.concept)}
+                                disabled={verifyingFeeId === fee.id}
+                                className="flex items-center gap-1.5 text-xs font-bold bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Rechazar
+                              </button>
+                              <button
+                                onClick={() => handleVerifyReservation(fee.id, fee.concept)}
+                                disabled={verifyingFeeId === fee.id}
+                                className="flex items-center gap-1.5 text-xs font-black bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-3.5 py-1.5 rounded-lg transition-all shadow-xs disabled:opacity-50"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                {verifyingFeeId === fee.id ? "Procesando..." : "✅ Validar Ingreso (50€)"}
+                              </button>
+                            </>
                           )}
                           {fee.estado !== "pagado" && fee.estado !== "pdte_verif" && fee.estado !== "pendiente_verificacion" && (
                             <button

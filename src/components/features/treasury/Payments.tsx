@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getClubFeesAction, getClubPlayersAction, createFeeAction, getInscriptionFeesAction, updateFeeStatusAction, getReceiptSignedUrlAction, sendPaymentNotificationAction, generateAndUploadReceiptAction, addPartialPaymentAction, downloadFeeReceiptAction, updateFeeDetailsAction, deleteFeeAction, verifyAndApproveReservationFeeAction } from "@/app/actions/treasury-actions";
-import { CheckCircle, Users, FileText, Calendar, Bell, Download, Coins, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { getClubFeesAction, getClubPlayersAction, createFeeAction, getInscriptionFeesAction, updateFeeStatusAction, getReceiptSignedUrlAction, sendPaymentNotificationAction, generateAndUploadReceiptAction, addPartialPaymentAction, downloadFeeReceiptAction, updateFeeDetailsAction, deleteFeeAction, verifyAndApproveReservationFeeAction, rejectReservationFeeAction } from "@/app/actions/treasury-actions";
+import { CheckCircle, Users, FileText, Calendar, Bell, Download, Coins, Pencil, Trash2, CheckCircle2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 function EstadoBadge({ estado }: { estado: string }) {
@@ -260,6 +260,24 @@ export default function Payments() {
     }
   };
 
+  const handleRejectReservation = async (feeId: string, concept: string) => {
+    if (!confirm(`¿Confirmas que NO has recibido el ingreso de "${concept}"? La cuota volverá a estado "Pendiente".`)) {
+      return;
+    }
+    const toastId = toast.loading("Rechazando cuota...");
+    try {
+      const res = await rejectReservationFeeAction(feeId);
+      if (res.success) {
+        toast.success("Cuota rechazada. Vuelve a estado Pendiente.", { id: toastId });
+        fetchFees();
+      } else {
+        toast.error(res.error || "Error al rechazar", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error("Error: " + err.message, { id: toastId });
+    }
+  };
+
   if (loading) return <div className="p-6 text-center">Cargando cuotas...</div>;
 
   const filteredFees = fees.filter(f => {
@@ -411,13 +429,22 @@ export default function Payments() {
                 {/* Acciones en móvil */}
                 <div className="flex items-center justify-end gap-1.5 pt-1 flex-wrap">
                   {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") && (
-                    <button
-                      onClick={() => handleVerifyReservation(fee.id, fee.concept)}
-                      className="flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-black gap-1 transition-colors bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>✅ Validar (50€)</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleRejectReservation(fee.id, fee.concept)}
+                        className="flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold gap-1 transition-colors bg-red-100 hover:bg-red-200 text-red-800 shadow-xs"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Rechazar</span>
+                      </button>
+                      <button
+                        onClick={() => handleVerifyReservation(fee.id, fee.concept)}
+                        className="flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-black gap-1 transition-colors bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>✅ Validar (50€)</span>
+                      </button>
+                    </>
                   )}
                   {fee.estado !== "pdte_verif" && fee.estado !== "pendiente_verificacion" && (
                     <button
@@ -517,14 +544,24 @@ export default function Payments() {
                     <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}</td>
                     <td className="px-3 py-3 whitespace-nowrap text-sm flex gap-1">
                       {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") ? (
-                        <button
-                          onClick={() => handleVerifyReservation(fee.id, fee.concept)}
-                          className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors shadow-xs"
-                          title="Validar comprobante de transferencia y generar recibo oficial"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Validar (50€)</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleRejectReservation(fee.id, fee.concept)}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-800 font-bold text-xs rounded transition-colors shadow-xs"
+                            title="Rechazar comprobante y marcar como Pendiente"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Rechazar</span>
+                          </button>
+                          <button
+                            onClick={() => handleVerifyReservation(fee.id, fee.concept)}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors shadow-xs"
+                            title="Validar comprobante de transferencia y generar recibo oficial"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Validar (50€)</span>
+                          </button>
+                        </>
                       ) : (
                         <button onClick={() => initiateStatusChange(fee.id, fee.estado)}
                           className={`flex items-center justify-center w-8 h-8 rounded ${fee.estado === "pendiente" ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"}`}

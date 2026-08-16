@@ -1096,9 +1096,6 @@ export async function verifyAndApproveReservationFeeAction(feeId: string, confir
     console.error("Error generando recibo tras verificar reserva:", e);
   }
 
-  revalidatePath("/dashboard/treasury");
-  revalidatePath("/dashboard/inscripciones");
-
   return { success: true, receipt: receiptResult };
 }
 
@@ -1118,9 +1115,9 @@ export async function rejectReservationFeeAction(feeId: string) {
     return { success: false, error: error.message };
   }
 
-  revalidatePath("/dashboard/treasury");
   return { success: true };
 }
+
 
 export async function updateFeeDetailsAction(id: string, updates: { concept?: string; amount_cents?: number; due_date?: string }) {
   const adminSupabase = await createAdminClient();

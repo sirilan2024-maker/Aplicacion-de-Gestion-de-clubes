@@ -1,12 +1,5 @@
 import { Resend } from 'resend';
 
-// Inicializar cliente Resend si la clave existe
-const resendApiKey = process.env.RESEND_API_KEY;
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
-
-// Remitente por defecto (usar dominio verificado o correo por defecto de Resend para pruebas)
-const DEFAULT_FROM = process.env.EMAIL_FROM || 'Sporting Saladar <onboarding@resend.dev>';
-
 export interface SendEmailParams {
   to: string | string[];
   subject: string;
@@ -25,13 +18,19 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
       return { success: false, error: 'No recipients provided' };
     }
 
-    if (!resend) {
-      console.info(`[Email MOCK] RESEND_API_KEY no configurada. Simulación de envío a ${recipients.join(', ')}: "${subject}"`);
-      return { success: true, mock: true, message: 'Simulado en consola (configura RESEND_API_KEY en .env)' };
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
+      console.warn(`[Email MOCK] RESEND_API_KEY no detectada en entorno. Simulación de envío a ${recipients.join(', ')}: "${subject}"`);
+      return { success: false, mock: true, error: 'RESEND_API_KEY no configurada en las variables de entorno de Vercel/local' };
     }
 
+    const resend = new Resend(apiKey);
+    const fromAddress = process.env.EMAIL_FROM || 'Sporting Saladar <onboarding@resend.dev>';
+
+    console.log(`[Email] Intentando enviar email a: ${recipients.join(', ')} con remitente ${fromAddress}`);
+
     const { data, error } = await resend.emails.send({
-      from: DEFAULT_FROM,
+      from: fromAddress,
       to: recipients,
       subject,
       html,
@@ -39,14 +38,14 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
     });
 
     if (error) {
-      console.error('[Email Error] Error enviando email con Resend:', error);
+      console.error('[Email Error] Error devuelto por Resend:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`[Email OK] Enviado con éxito a ${recipients.join(', ')} (ID: ${data?.id})`);
+    console.log(`[Email OK] Email enviado con éxito por Resend. ID: ${data?.id}`);
     return { success: true, data };
   } catch (err: any) {
-    console.error('[Email Exception] Error en sendEmail:', err);
+    console.error('[Email Exception] Excepción en sendEmail:', err);
     return { success: false, error: err.message || 'Error desconocido al enviar email' };
   }
 }

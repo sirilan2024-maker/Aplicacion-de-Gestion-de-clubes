@@ -727,7 +727,7 @@ export default function UtilleriaDashboardPage() {
             </div>
 
             {/* MOBILE VIEW: PLAYER CARDS (Se desplazan de forma natural con la página en móviles) */}
-            <div className="lg:hidden space-y-4">
+            <div className="lg:hidden space-y-4 pb-48">
               {filteredPlayers.length === 0 ? (
                 <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 font-semibold shadow-sm">
                   No se encontraron jugadores que coincidan con la búsqueda.

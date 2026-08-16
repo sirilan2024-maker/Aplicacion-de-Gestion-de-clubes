@@ -224,16 +224,27 @@ export function FormativeEvaluationForm({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end flex-wrap sm:flex-nowrap">
           <select
             value={evaluationPeriod}
             onChange={(e) => setEvaluationPeriod(e.target.value)}
-            className="bg-white/10 text-white text-xs font-bold px-3 py-2.5 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400"
+            className="bg-white/10 text-white text-xs font-bold px-3 py-2.5 rounded-xl border border-white/20 outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
           >
-            <option value="Trimestre 1" className="text-slate-900">1er Trimestre</option>
-            <option value="Trimestre 2" className="text-slate-900">2do Trimestre</option>
-            <option value="Trimestre 3" className="text-slate-900">3er Trimestre</option>
-            <option value="Evaluacion Continua" className="text-slate-900">Evaluación Continua</option>
+            <optgroup label="Trimestral / Anual" className="bg-slate-900 text-white">
+              <option value="Trimestre 1">1er Trimestre (Oct - Dic)</option>
+              <option value="Trimestre 2">2do Trimestre (Ene - Mar)</option>
+              <option value="Trimestre 3">3er Trimestre (Abr - Jun)</option>
+              <option value="Evaluacion Anual">Evaluación Anual (Final)</option>
+            </optgroup>
+            <optgroup label="Diario / Sesión" className="bg-slate-900 text-white">
+              <option value="Sesion">Sesión del día</option>
+              <option value="Evaluacion Continua">Evaluación Continua</option>
+            </optgroup>
+            <optgroup label="Por Semanas" className="bg-slate-900 text-white">
+              {Array.from({ length: 40 }, (_, i) => i + 1).map(w => (
+                <option key={w} value={`Semana ${w}`}>Semana {w}</option>
+              ))}
+            </optgroup>
           </select>
 
           <button

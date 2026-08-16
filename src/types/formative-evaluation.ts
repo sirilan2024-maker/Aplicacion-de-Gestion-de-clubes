@@ -1,3 +1,5 @@
+export type FormativeTimeGrouping = 'sesion' | 'semana' | 'trimestre' | 'anual';
+
 export interface EvaluationModule {
   id: string;
   code: string;
@@ -40,7 +42,7 @@ export interface PlayerEvaluation {
   evaluator_id?: string | null;
   event_id?: string | null;
   evaluation_date: string;
-  evaluation_period: string; // Ej: '1er Trimestre', '2do Trimestre', 'Final', 'Entrenamiento'
+  evaluation_period: string; // Ej: 'Sesión 14/05', 'Semana 12', '1er Trimestre', '2do Trimestre', 'Anual'
   general_feedback?: string | null;
   strengths?: string | null;
   areas_for_improvement?: string | null;
@@ -74,16 +76,21 @@ export interface ModuleProgressSummary {
   evaluated_concepts: number;
 }
 
+export interface HistoricalEvolutionPoint {
+  period_label: string;
+  date: string;
+  module_scores: Record<string, number>;
+  overall_average: number;
+  evaluations_count: number;
+}
+
 export interface PlayerProgressReport {
   player_id: string;
+  grouping: FormativeTimeGrouping;
+  total_evaluations: number;
   latest_evaluation?: PlayerEvaluation | null;
   module_summaries: ModuleProgressSummary[];
-  historical_evolution: {
-    evaluation_date: string;
-    evaluation_period: string;
-    module_scores: Record<string, number>; // { 'tecnico_analitico': 3.8, 'tactico_global': 4.2 }
-    overall_average: number;
-  }[];
+  historical_evolution: HistoricalEvolutionPoint[];
   radar_data: {
     concept_name: string;
     module_name: string;
@@ -91,3 +98,4 @@ export interface PlayerProgressReport {
     full_mark: number;
   }[];
 }
+

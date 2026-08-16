@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { PlayerProgressReport } from "@/types/formative-evaluation";
+import { PlayerProgressReport, FormativeTimeGrouping } from "@/types/formative-evaluation";
 import { getPlayerProgressReport } from "@/app/actions/formative-actions";
 import { 
   ResponsiveContainer, 
@@ -31,7 +31,9 @@ import {
   Calendar, 
   Award,
   CheckCircle2,
-  AlertCircle
+  Clock,
+  Layers,
+  Filter
 } from "lucide-react";
 
 interface PlayerProgressViewProps {
@@ -41,16 +43,17 @@ interface PlayerProgressViewProps {
 
 export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewProps) {
   const [report, setReport] = useState<PlayerProgressReport | null>(null);
+  const [grouping, setGrouping] = useState<FormativeTimeGrouping>("trimestre");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadReport();
-  }, [playerId]);
+    loadReport(grouping);
+  }, [playerId, grouping]);
 
-  const loadReport = async () => {
+  const loadReport = async (selectedGrouping: FormativeTimeGrouping) => {
     setLoading(true);
     try {
-      const data = await getPlayerProgressReport(playerId);
+      const data = await getPlayerProgressReport(playerId, selectedGrouping);
       setReport(data);
     } catch (err) {
       console.error("Error al cargar informe:", err);
@@ -59,7 +62,7 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
     }
   };
 
-  if (loading) {
+  if (loading && !report) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-slate-200">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-3" />
@@ -92,6 +95,58 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
 
   return (
     <div className="space-y-6">
+      {/* ─── Control de Unificación Temporal (Sesión, Semanas, Trimestres, Anual) ─── */}
+      <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-sm">
+            <Clock size={18} />
+          </div>
+          <div>
+            <h4 className="font-black text-slate-900 text-sm leading-tight">Unificación y Progresión Temporal</h4>
+            <p className="text-slate-500 text-xs font-medium">Agrupa los datos según el marco evolutivo deseado</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:flex p-1 bg-white rounded-2xl border border-slate-200 shadow-xs gap-1 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setGrouping("sesion")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
+              grouping === "sesion" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Diario / Sesión
+          </button>
+          <button
+            type="button"
+            onClick={() => setGrouping("semana")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
+              grouping === "semana" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Por Semanas
+          </button>
+          <button
+            type="button"
+            onClick={() => setGrouping("trimestre")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
+              grouping === "trimestre" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Por Trimestres
+          </button>
+          <button
+            type="button"
+            onClick={() => setGrouping("anual")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
+              grouping === "anual" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Visión Anual
+          </button>
+        </div>
+      </div>
+
       {/* ─── 1. Tarjetas Resumen por Módulos ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-3xl text-white shadow-md">
@@ -173,7 +228,7 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={report.historical_evolution}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="evaluation_period" tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }} />
+                <XAxis dataKey="period_label" tick={{ fill: "#64748b", fontSize: 11, fontWeight: 700 }} />
                 <YAxis domain={[0, 5]} tick={{ fill: "#64748b", fontSize: 11 }} />
                 <RechartsTooltip 
                   contentStyle={{ backgroundColor: "#0f172a", borderRadius: "1rem", color: "#fff", border: "none" }}
@@ -182,6 +237,8 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
                 <Line type="monotone" dataKey="overall_average" name="Promedio Global" stroke="#0f172a" strokeWidth={3} dot={{ r: 5 }} />
                 <Line type="monotone" dataKey="module_scores.tecnico_analitico" name="Técnico" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="module_scores.tactico_global" name="Táctico" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="module_scores.fisico_coordinativo" name="Físico" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="module_scores.socio_afectivo" name="Socio-Afectivo" stroke="#f43f5e" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

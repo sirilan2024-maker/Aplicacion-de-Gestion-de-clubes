@@ -181,9 +181,16 @@ export async function upsertEvaluationAction(dto: UpsertEvaluationDTO): Promise<
 }
 
 /**
- * Consulta agregada para el informe y evolución del aprendizaje del jugador
+ * Consulta agregada para el informe y evolución del aprendizaje del jugador con soporte de agrupación temporal:
+ * - 'sesion': Muestra cada entrenamiento/día registrado.
+ * - 'semana': Unifica todas las evaluaciones dentro de la misma semana.
+ * - 'trimestre': Agrupa las notas por trimestre académico/deportivo.
+ * - 'anual': Agrupación anual desglosada por trimestres para ver la progresión del año completo.
  */
-export async function getPlayerProgressReport(playerId: string): Promise<PlayerProgressReport | null> {
+export async function getPlayerProgressReport(
+  playerId: string, 
+  grouping: 'sesion' | 'semana' | 'trimestre' | 'anual' = 'trimestre'
+): Promise<PlayerProgressReport | null> {
   try {
     const supabase = createAdminClient();
 
@@ -266,39 +273,131 @@ export async function getPlayerProgressReport(playerId: string): Promise<PlayerP
       };
     });
 
-    // 4. Evolución temporal histórica
-    const historical_evolution = allEvals.map((ev: any) => {
-      const modScores: Record<string, { total: number; count: number }> = {};
-      let totalScores = 0;
-      let totalCount = 0;
+    // 4. Helper para determinar la clave y etiqueta de agrupación temporal
+    const getGroupKey = (evDateStr: string, evPeriod: string) => {
+      const d = new Date(evDateStr || new Date());
+      const y = d.getFullYear();
+      const month = d.getMonth(); // 0-11
+      const day = d.getDate();
+
+      if (grouping === 'sesion') {
+        return {
+          key: `${y}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+          label: d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+          date: evDateStr
+        };
+      }
+
+      if (grouping === 'semana') {
+        // Cálculo de número de semana ISO
+        const startOfYear = new Date(y, 0, 1);
+        const pastDays = (d.getTime() - startOfYear.getTime()) / 86400000;
+        const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
+        return {
+          key: `${y}-W${weekNum}`,
+          label: `Semana ${weekNum} (${d.toLocaleDateString('es-ES', { month: 'short' })})`,
+          date: evDateStr
+        };
+      }
+
+      if (grouping === 'anual' || grouping === 'trimestre') {
+        // Agrupación por Trimestre
+        // T1: Septiembre (8) - Diciembre (11)
+        // T2: Enero (0) - Marzo (2)
+        // T3: Abril (3) - Junio (5) / Verano (6-7)
+        let tNum = 1;
+        let tName = '1er Trimestre';
+        if (month >= 8 && month <= 11) {
+          tNum = 1;
+          tName = '1T (Oct-Dic)';
+        } else if (month >= 0 && month <= 2) {
+          tNum = 2;
+          tName = '2T (Ene-Mar)';
+        } else {
+          tNum = 3;
+          tName = '3T (Abr-Jun)';
+        }
+
+        // Si la evaluación tenía un periodo explícito como 'Trimestre 1', respetarlo
+        if (evPeriod && evPeriod.toLowerCase().includes('trimestre 1')) tName = '1er Trimestre';
+        if (evPeriod && evPeriod.toLowerCase().includes('trimestre 2')) tName = '2do Trimestre';
+        if (evPeriod && evPeriod.toLowerCase().includes('trimestre 3')) tName = '3er Trimestre';
+
+        return {
+          key: `${y}-T${tNum}`,
+          label: grouping === 'anual' ? `${tName} ${y}` : tName,
+          date: evDateStr
+        };
+      }
+
+      return {
+        key: evDateStr,
+        label: evPeriod || evDateStr,
+        date: evDateStr
+      };
+    };
+
+    // 5. Agrupar evaluaciones según el criterio seleccionado
+    const groupsMap = new Map<string, {
+      label: string;
+      date: string;
+      moduleSums: Record<string, { total: number; count: number }>;
+      totalScore: number;
+      totalCount: number;
+      evalCount: number;
+    }>();
+
+    allEvals.forEach((ev: any) => {
+      const { key, label, date } = getGroupKey(ev.evaluation_date, ev.evaluation_period);
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          label,
+          date,
+          moduleSums: {},
+          totalScore: 0,
+          totalCount: 0,
+          evalCount: 0
+        });
+      }
+
+      const grp = groupsMap.get(key)!;
+      grp.evalCount += 1;
 
       (ev.items || []).forEach((it: any) => {
         const meta = conceptMap.get(it.concept_id);
         if (meta) {
-          if (!modScores[meta.module_code]) modScores[meta.module_code] = { total: 0, count: 0 };
-          modScores[meta.module_code].total += it.score;
-          modScores[meta.module_code].count += 1;
+          if (!grp.moduleSums[meta.module_code]) {
+            grp.moduleSums[meta.module_code] = { total: 0, count: 0 };
+          }
+          grp.moduleSums[meta.module_code].total += it.score;
+          grp.moduleSums[meta.module_code].count += 1;
 
-          totalScores += it.score;
-          totalCount += 1;
+          grp.totalScore += it.score;
+          grp.totalCount += 1;
         }
       });
+    });
 
+    // 6. Formatear puntos de evolución temporal
+    const historical_evolution = Array.from(groupsMap.values()).map(grp => {
       const formattedModScores: Record<string, number> = {};
-      Object.entries(modScores).forEach(([code, scoreObj]) => {
+      Object.entries(grp.moduleSums).forEach(([code, scoreObj]) => {
         formattedModScores[code] = scoreObj.count > 0 ? Number((scoreObj.total / scoreObj.count).toFixed(2)) : 0;
       });
 
       return {
-        evaluation_date: ev.evaluation_date,
-        evaluation_period: ev.evaluation_period,
+        period_label: grp.label,
+        date: grp.date,
         module_scores: formattedModScores,
-        overall_average: totalCount > 0 ? Number((totalScores / totalCount).toFixed(2)) : 0
+        overall_average: grp.totalCount > 0 ? Number((grp.totalScore / grp.totalCount).toFixed(2)) : 0,
+        evaluations_count: grp.evalCount
       };
     });
 
     return {
       player_id: playerId,
+      grouping,
+      total_evaluations: allEvals.length,
       latest_evaluation: latestEval as PlayerEvaluation,
       module_summaries,
       historical_evolution,

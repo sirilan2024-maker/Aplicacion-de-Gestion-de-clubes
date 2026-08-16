@@ -414,22 +414,24 @@ export default function PlayerDashboardPage() {
         </div>
       )}
 
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-10 flex flex-col items-center justify-center text-center gap-5">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            ⚽ {player.first_name} {player.last_name}
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex flex-col md:flex-row items-center justify-center gap-3">
+            <span className="flex items-center gap-2">
+              <span className="text-3xl md:text-4xl">⚽</span> {player.first_name} {player.last_name}
+            </span>
             {player.teams?.name && (
-              <span className="text-sm px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-bold self-center mt-1 border border-blue-200">
+              <span className="text-sm md:text-base px-4 py-1.5 bg-blue-100/80 text-blue-800 rounded-full font-bold border border-blue-200 shadow-sm mt-2 md:mt-0">
                 {player.teams.name}
               </span>
             )}
           </h1>
-          <p className="text-gray-500 mt-1">Resumen completo de la temporada</p>
+          <p className="text-slate-500 mt-3 font-medium text-sm md:text-base">Resumen completo de la temporada</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-1 w-full sm:w-auto px-4 sm:px-0">
           <button 
             onClick={() => router.push('/dashboard/family/nuevo-jugador')}
-            className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all shadow-sm w-full sm:w-auto"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
             Añadir Jugador

@@ -344,13 +344,13 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Equipación/Ropa", href: `/dashboard/family/e/${activeFamilyPlayerId}/ropa`, icon: Shirt },
           { name: "Ficha Técnica",href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },
           { name: "Mi Perfil",    href: `/dashboard/family/e/${activeFamilyPlayerId}/perfil`, icon: User },
+          { name: "Añadir Jugador", href: "/dashboard/family/nuevo-jugador", icon: UserPlus },
         ],
       },
       {
         label: "TEAMS CLUB",
         items: [
           { name: "En directo", href: "/live", icon: Trophy },
-          { name: "Añadir Jugador", href: "/dashboard/family/nuevo-jugador", icon: UserPlus },
           { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]

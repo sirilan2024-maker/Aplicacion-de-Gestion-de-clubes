@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { createAdminFeeForPlayerAction } from '@/app/actions/treasury-actions';
+import { sendEmail, getPlayerRegistrationEmailHtml } from '@/lib/email-service';
 
 // Inicializar Stripe solo si existe la clave (para evitar fallos si no está configurada)
 import Stripe from 'stripe';
@@ -439,7 +440,27 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Revalidar cachés para que Secretaría y Tesorería se actualicen al instante
+    // 3. Enviar correo electrónico de confirmación / bienvenida automático
+    if (email && player) {
+      try {
+        const emailHtml = getPlayerRegistrationEmailHtml({
+          playerName: `${formData.playerFirstName} ${formData.playerLastName}`,
+          tutorName: formData.tutor1Name ? `${formData.tutor1Name} ${formData.tutor1LastName || ''}`.trim() : undefined,
+          category: categoryTarget || undefined,
+          dorsal: player.dorsal || undefined,
+        });
+
+        await sendEmail({
+          to: email,
+          subject: `⚽ Inscripción Confirmada: ${formData.playerFirstName} ${formData.playerLastName} - Sporting Saladar`,
+          html: emailHtml,
+        });
+      } catch (emailErr) {
+        console.error('Error disparando email automático de bienvenida:', emailErr);
+      }
+    }
+
+    // 4. Revalidar cachés para que Secretaría y Tesorería se actualicen al instante
     revalidatePath('/dashboard/inscripciones');
     revalidatePath('/dashboard/treasury');
     revalidatePath('/dashboard/equipos');

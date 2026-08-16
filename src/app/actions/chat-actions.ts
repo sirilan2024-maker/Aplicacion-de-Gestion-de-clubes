@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { sendEmail, getTeamMessageEmailHtml } from "@/lib/email-service"
 
 /**
  * Gets all chat channels for a user based on their club and role.
@@ -198,6 +199,67 @@ export async function sendMessageAction(channelId: string, content: string) {
       user_id: user.id,
       last_read_at: new Date().toISOString()
     }, { onConflict: 'channel_id,user_id' })
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Envío automático de notificación por Email a las Familias / Jugadores
+    // ──────────────────────────────────────────────────────────────────────────
+    try {
+      const { data: senderProfile } = await adminClient.from('profiles').select('first_name, last_name, role').eq('id', user.id).single()
+      const senderName = senderProfile ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() : 'Cuerpo Técnico'
+      const senderRole = senderProfile?.role || 'Entrenador'
+
+      let recipientEmails: string[] = []
+      let channelTitle = channel?.name || 'Canal de Comunicación'
+
+      if (channel?.team_id) {
+        // Obtener equipo y jugadores
+        const { data: teamObj } = await adminClient.from('teams').select('name').eq('id', channel.team_id).single()
+        if (teamObj?.name) channelTitle = teamObj.name
+
+        // Emails de tutores directos en tabla players
+        const { data: teamPlayers } = await adminClient
+          .from('players')
+          .select('email, tutor_email, tutor:profiles!players_tutor_id_fkey(email)')
+          .eq('team_id', channel.team_id)
+
+        teamPlayers?.forEach(p => {
+          if (p.email) recipientEmails.push(p.email)
+          if (p.tutor_email) recipientEmails.push(p.tutor_email)
+          if (p.tutor && (p.tutor as any).email) recipientEmails.push((p.tutor as any).email)
+        })
+
+        // Emails de tutores vinculados en player_tutors
+        const { data: linkedTutors } = await adminClient
+          .from('player_tutors')
+          .select('tutor:profiles(email), players!inner(team_id)')
+          .eq('players.team_id', channel.team_id)
+
+        linkedTutors?.forEach((lt: any) => {
+          if (lt.tutor?.email) recipientEmails.push(lt.tutor.email)
+        })
+      }
+
+      // Eliminar duplicados y excluir al propio remitente
+      const uniqueEmails = Array.from(new Set(recipientEmails.map(e => e?.toLowerCase().trim()).filter(Boolean)))
+        .filter(e => e !== user.email?.toLowerCase().trim())
+
+      if (uniqueEmails.length > 0) {
+        const emailHtml = getTeamMessageEmailHtml({
+          senderName: senderName || 'Cuerpo Técnico',
+          senderRole: senderRole,
+          teamName: channelTitle,
+          messageContent: content.trim(),
+        })
+
+        await sendEmail({
+          to: uniqueEmails,
+          subject: `📢 [${channelTitle}] Nuevo mensaje de ${senderName}`,
+          html: emailHtml,
+        })
+      }
+    } catch (emailErr) {
+      console.error('Error enviando notificación por email del mensaje:', emailErr)
+    }
 
     return { success: true, data }
   } catch (err: any) {

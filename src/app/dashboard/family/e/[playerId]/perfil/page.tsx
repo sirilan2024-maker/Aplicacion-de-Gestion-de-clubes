@@ -417,15 +417,15 @@ export default function PlayerDashboardPage() {
       <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-6 w-full text-center md:text-left">
           {player.avatar_url ? (
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white shrink-0 relative">
+            <div className="w-24 h-32 md:w-32 md:h-40 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white shrink-0 relative">
               <img 
                 src={player.avatar_url} 
                 alt={`Foto de ${player.first_name}`} 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-[center_25%]"
               />
             </div>
           ) : (
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl flex items-center justify-center shrink-0">
+            <div className="w-24 h-32 md:w-32 md:h-40 rounded-3xl bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl flex items-center justify-center shrink-0">
               <span className="text-4xl md:text-5xl drop-shadow-sm">⚽</span>
             </div>
           )}

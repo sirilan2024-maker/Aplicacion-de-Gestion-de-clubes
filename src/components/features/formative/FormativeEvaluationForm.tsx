@@ -492,21 +492,61 @@ export function FormativeEvaluationForm({
               </div>
             </div>
 
-            {/* Mini-Desglose por Módulos Evaluados */}
-            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-3">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Medias por Módulo:</span>
-              {moduleAverages.map(mod => (
-                <div key={mod.id} className="flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1 rounded-xl text-xs">
-                  <span className="font-bold text-slate-700">{mod.name}:</span>
-                  {mod.avg ? (
-                    <span className="font-black text-slate-900 bg-white px-1.5 py-0.2 rounded-md shadow-xs border border-slate-200/60">
-                      {mod.avg} <span className="text-[10px] text-slate-400">/ 5</span>
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 italic text-[11px]">Sin evaluar</span>
-                  )}
-                </div>
-              ))}
+            {/* ─── Medias por Módulo Compactas (Cuadros Resumidos Téc / Tác / Fís / Soc) ─── */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span>Medias por Módulo:</span>
+                <span className="text-[10px] text-slate-400 font-semibold lowercase">haz clic en un cuadro para evaluar ese módulo</span>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                {moduleAverages.map(mod => {
+                  const getBoxStyle = (code: string) => {
+                    switch (code) {
+                      case "tecnico_analitico":
+                        return "bg-amber-50/90 border-amber-200 text-amber-900 hover:border-amber-400";
+                      case "tactico_global":
+                        return "bg-blue-50/90 border-blue-200 text-blue-900 hover:border-blue-400";
+                      case "fisico_coordinativo":
+                        return "bg-emerald-50/90 border-emerald-200 text-emerald-900 hover:border-emerald-400";
+                      case "socio_afectivo":
+                        return "bg-rose-50/90 border-rose-200 text-rose-900 hover:border-rose-400";
+                      default:
+                        return "bg-purple-50/90 border-purple-200 text-purple-900 hover:border-purple-400";
+                    }
+                  };
+
+                  const getShortName = (name: string) => {
+                    const n = name.toLowerCase();
+                    if (n.includes('técn') || n.includes('tecn')) return 'Téc';
+                    if (n.includes('táct') || n.includes('tact')) return 'Tác';
+                    if (n.includes('fís') || n.includes('fis')) return 'Fís';
+                    if (n.includes('soc')) return 'Soc';
+                    return name.slice(0, 4);
+                  };
+
+                  const isCurrentActive = mod.code === activeModuleCode;
+
+                  return (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      onClick={() => setActiveModuleCode(mod.code)}
+                      title={`Ir a evaluar el módulo ${mod.name}`}
+                      className={`p-2.5 rounded-2xl border transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-0.5 ${getBoxStyle(mod.code)} ${
+                        isCurrentActive ? 'ring-2 ring-slate-900 shadow-xs' : 'hover:shadow-xs'
+                      }`}
+                    >
+                      <span className="text-[11px] font-extrabold uppercase tracking-wide opacity-80">
+                        {getShortName(mod.name)}
+                      </span>
+                      <span className="text-base font-black leading-none">
+                        {mod.avg !== null ? mod.avg : '-'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         );

@@ -10,7 +10,9 @@ import {
   sendMemberBalanceNotificationAction,
   downloadFeeReceiptAction,
   updateFeeAmountAction,
-  deleteFeeAction
+  deleteFeeAction,
+  verifyAndApproveReservationFeeAction,
+  rejectReservationFeeAction
 } from "@/app/actions/treasury-actions";
 import {
   Users, Search, Filter, TrendingUp, TrendingDown, Scale, CheckCircle2,
@@ -80,6 +82,33 @@ export default function MemberBalances() {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("Contado");
   const [directPaymentConcept, setDirectPaymentConcept] = useState("Abono a cuenta");
+
+  // Reservation Verification
+  const [verifyingFeeId, setVerifyingFeeId] = useState<string | null>(null);
+
+  const handleVerifyReservation = async (feeId: string, concept: string) => {
+    if (!confirm(`¿Confirmas haber verificado el ingreso de los 50.00 € de "${concept}" en la cuenta/caja del club?\n\nAl validar:\n1. Se sumará al Total Abonado del socio y del club.\n2. El saldo pendiente disminuirá en 50€.\n3. Se generará automáticamente el Recibo Oficial correlativo.`)) {
+      return;
+    }
+
+    setVerifyingFeeId(feeId);
+    try {
+      const res = await verifyAndApproveReservationFeeAction(feeId, "Transferencia comprobada");
+      if (res.success) {
+        toast.success("¡Ingreso de 50€ validado correctamente y Recibo Oficial generado!");
+        if (selectedPlayerId) {
+          fetchStatement(selectedPlayerId);
+        }
+        fetchBalances();
+      } else {
+        toast.error(res.error || "Error al validar el ingreso.");
+      }
+    } catch (err: any) {
+      toast.error("Error al validar el ingreso: " + err.message);
+    } finally {
+      setVerifyingFeeId(null);
+    }
+  };
 
   // Edit fee state
   const [editingFee, setEditingFee] = useState<{ id: string; concept: string; amount: string; reason: string } | null>(null);
@@ -783,6 +812,10 @@ export default function MemberBalances() {
                               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
                                 ✅ Pagado
                               </span>
+                            ) : (fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") ? (
+                              <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-2.5 py-0.5 rounded-full animate-pulse">
+                                ⏳ Pendiente Verificación ({(fee.amount_cents / 100).toFixed(2)} €)
+                              </span>
                             ) : (
                               <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
                                 ⏳ Pendiente ({(fee.pending_cents / 100).toFixed(2)} €)
@@ -808,7 +841,17 @@ export default function MemberBalances() {
 
                         {/* Action buttons per fee */}
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 flex-wrap">
-                          {fee.estado !== "pagado" && (
+                          {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") && (
+                            <button
+                              onClick={() => handleVerifyReservation(fee.id, fee.concept)}
+                              disabled={verifyingFeeId === fee.id}
+                              className="flex items-center gap-1.5 text-xs font-black bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-3.5 py-1.5 rounded-lg transition-all shadow-xs disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {verifyingFeeId === fee.id ? "Validando..." : "✅ Validar Ingreso (50€)"}
+                            </button>
+                          )}
+                          {fee.estado !== "pagado" && fee.estado !== "pdte_verif" && fee.estado !== "pendiente_verificacion" && (
                             <button
                               onClick={() => {
                                 setSelectedFeeForPayment(fee.id);
@@ -821,13 +864,15 @@ export default function MemberBalances() {
                               Abonar
                             </button>
                           )}
-                          <button
-                            onClick={() => handleDownloadReceipt(fee.id)}
-                            className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Recibo PDF
-                          </button>
+                          {fee.estado === "pagado" && (
+                            <button
+                              onClick={() => handleDownloadReceipt(fee.id)}
+                              className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Recibo PDF
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteFee(fee.id, fee.concept)}
                             className="flex items-center gap-1 text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors"

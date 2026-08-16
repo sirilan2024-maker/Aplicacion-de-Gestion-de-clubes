@@ -13,6 +13,8 @@ function EstadoBadge({ estado }: { estado: string }) {
   const colors: Record<string, string> = {
     pagado: "bg-green-100 text-green-700 border border-green-200",
     pendiente: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+    pdte_verif: "bg-amber-100 text-amber-900 border border-amber-300 font-black animate-pulse",
+    pendiente_verificacion: "bg-amber-100 text-amber-900 border border-amber-300 font-black animate-pulse",
     fallido: "bg-red-100 text-red-700 border border-red-200",
     cancelado: "bg-red-100 text-red-700 border border-red-200",
   };
@@ -20,11 +22,13 @@ function EstadoBadge({ estado }: { estado: string }) {
   const icons: Record<string, string> = {
     pagado: "✅",
     pendiente: "⏳",
+    pdte_verif: "🔍",
+    pendiente_verificacion: "🔍",
     fallido: "❌",
     cancelado: "❌",
   };
   const icon = icons[estado] ?? "•";
-  const label = estado.charAt(0).toUpperCase() + estado.slice(1);
+  const label = (estado === 'pdte_verif' || estado === 'pendiente_verificacion') ? 'Por Verificar' : (estado.charAt(0).toUpperCase() + estado.slice(1));
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full ${className}`}>
       <span className="text-sm leading-none flex items-center justify-center mb-[1px]">{icon}</span>

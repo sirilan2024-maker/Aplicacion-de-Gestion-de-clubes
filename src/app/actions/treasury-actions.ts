@@ -933,19 +933,25 @@ export async function createAdminFeeForPlayerAction(playerId: string, wasInClub?
   const baseAmount = isRenewal ? 195 : 250;
   const profileId = player.tutor_id || null;
 
-  // 1. Si abonó la Reserva de Plaza / Inscripción (50€):
-  // Creamos la cuota de reserva como PAGADA (50€) y generamos inmediatamente su recibo oficial descargable
+  // 1. Si marcó Reserva de Plaza / Inscripción (50€):
+  // Si fue por Stripe/tarjeta online se marca directamente pagada con recibo.
+  // Si fue en efectivo/transferencia se crea como 'pendiente_verificacion' (0€ abonados)
+  // hasta que el administrador pulse "Validar Ingreso" en Tesorería.
   if (isReserved) {
+    const isInstantStripe = player.payment_method === 'Stripe' || player.payment_method === 'Tarjeta';
+    const initialStatus = isInstantStripe ? 'pagado' : 'pdte_verif';
+    const initialPaidCents = isInstantStripe ? 5000 : 0;
+
     const reservationFeeData: Record<string, any> = {
       concept: `Reserva de Plaza / Inscripción – ${player.first_name} ${player.last_name}`,
       amount_cents: 5000,
-      amount_paid_cents: 5000,
+      amount_paid_cents: initialPaidCents,
       currency: "eur",
-      estado: "pagado",
+      estado: initialStatus,
       tipo_cargo: "one_time",
-      fecha_pago: new Date().toISOString(),
+      fecha_pago: isInstantStripe ? new Date().toISOString() : null,
       club_id: player.club_id,
-      payment_method: player.payment_method || "Reserva de Plaza",
+      payment_method: player.payment_method || "Pendiente Verificación",
       player_id: player.id,
     };
     if (profileId) reservationFeeData.profile_id = profileId;
@@ -956,7 +962,7 @@ export async function createAdminFeeForPlayerAction(playerId: string, wasInClub?
       .select("id")
       .single();
 
-    if (!resError && insertedReservation) {
+    if (!resError && insertedReservation && isInstantStripe) {
       try {
         await generateAndUploadReceiptAction(insertedReservation.id);
       } catch (e) {
@@ -1051,6 +1057,69 @@ export async function generateAndUploadPaymentReceiptAction(paymentId: string) {
   await adminSupabase.from("fee_payments").update({ receipt_path: path }).eq("id", paymentId);
 
   return { success: true, path };
+}
+
+export async function verifyAndApproveReservationFeeAction(feeId: string, confirmedPaymentMethod: string = "Transferencia") {
+  const adminSupabase = await createAdminClient();
+
+  const { data: fee, error: feeErr } = await adminSupabase
+    .from("fees")
+    .select("id, amount_cents, estado, club_id, player_id, concept, payment_method")
+    .eq("id", feeId)
+    .single();
+
+  if (feeErr || !fee) {
+    return { success: false, error: "Cuota de reserva no encontrada" };
+  }
+
+  // Actualizar la cuota a pagada con el importe completo y fecha actual
+  const { error: updateErr } = await adminSupabase
+    .from("fees")
+    .update({
+      estado: "pagado",
+      amount_paid_cents: fee.amount_cents,
+      fecha_pago: new Date().toISOString(),
+      payment_method: confirmedPaymentMethod || fee.payment_method || "Transferencia",
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq("id", feeId);
+
+  if (updateErr) {
+    return { success: false, error: "Error actualizando cuota: " + updateErr.message };
+  }
+
+  // Generar automáticamente el recibo oficial correlativo en PDF
+  let receiptResult = null;
+  try {
+    receiptResult = await generateAndUploadReceiptAction(feeId);
+  } catch (e) {
+    console.error("Error generando recibo tras verificar reserva:", e);
+  }
+
+  revalidatePath("/dashboard/treasury");
+  revalidatePath("/dashboard/inscripciones");
+
+  return { success: true, receipt: receiptResult };
+}
+
+export async function rejectReservationFeeAction(feeId: string) {
+  const adminSupabase = await createAdminClient();
+
+  const { error } = await adminSupabase
+    .from("fees")
+    .update({
+      estado: "pendiente",
+      amount_paid_cents: 0,
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq("id", feeId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/dashboard/treasury");
+  return { success: true };
 }
 
 export async function updateFeeDetailsAction(id: string, updates: { concept?: string; amount_cents?: number; due_date?: string }) {

@@ -9,11 +9,13 @@ function EstadoBadge({ estado }: { estado: string }) {
   const colors: Record<string, string> = {
     pagado: "bg-green-100 text-green-800",
     pendiente: "bg-yellow-100 text-yellow-800",
+    pdte_verif: "bg-amber-100 text-amber-900 border border-amber-300 font-bold",
+    pendiente_verificacion: "bg-amber-100 text-amber-900 border border-amber-300 font-bold",
     fallido: "bg-red-100 text-red-800",
     cancelado: "bg-red-100 text-red-800",
   };
   const className = colors[estado] ?? "bg-gray-100 text-gray-800";
-  const label = estado.charAt(0).toUpperCase() + estado.slice(1);
+  const label = (estado === 'pdte_verif' || estado === 'pendiente_verificacion') ? '⏳ Por Verificar' : (estado.charAt(0).toUpperCase() + estado.slice(1));
   return <span className={`px-2 py-1 text-xs font-medium rounded ${className}`}>{label}</span>;
 }
 

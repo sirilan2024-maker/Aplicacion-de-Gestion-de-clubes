@@ -417,7 +417,7 @@ export default function PlayerDashboardPage() {
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            ⚽ Dashboard de {player.first_name}
+            ⚽ {player.first_name} {player.last_name}
             {player.teams?.name && (
               <span className="text-sm px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-bold self-center mt-1 border border-blue-200">
                 {player.teams.name}

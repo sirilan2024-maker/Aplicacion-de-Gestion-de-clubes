@@ -809,35 +809,79 @@ export function FormativeEvaluationForm({
               {/* Modal List of Concepts */}
               <div className="p-5 sm:p-6 overflow-y-auto divide-y divide-slate-100 space-y-4">
                 {conceptsInLevel.length > 0 ? (
-                  conceptsInLevel.map(({ concept, module, rubric, note }) => (
-                    <div key={concept.id} className="pt-3 first:pt-0 space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-extrabold text-slate-900">
-                            {concept.name}
-                          </span>
+                  conceptsInLevel.map(({ concept, module, rubric, note }) => {
+                    const getModuleBadgeStyle = (code: string) => {
+                      switch (code) {
+                        case "tecnico_analitico":
+                          return "bg-amber-50 text-amber-800 border-amber-300";
+                        case "tactico_global":
+                          return "bg-blue-50 text-blue-800 border-blue-300";
+                        case "fisico_coordinativo":
+                          return "bg-emerald-50 text-emerald-800 border-emerald-300";
+                        case "socio_afectivo":
+                          return "bg-rose-50 text-rose-800 border-rose-300";
+                        default:
+                          return "bg-purple-50 text-purple-800 border-purple-300";
+                      }
+                    };
+
+                    return (
+                      <div key={concept.id} className="pt-3.5 first:pt-0 space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-6 h-6 rounded-lg ${meta.bgBadge} text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0`}>
+                              {selectedModalLevel}
+                            </span>
+                            <span className="text-sm font-black text-slate-900">
+                              {concept.name}
+                            </span>
+                          </div>
+
+                          {/* Insignia del Módulo/Botón correspondiente con icono */}
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveModuleCode(module.code);
+                                setSelectedModalLevel(null);
+                              }}
+                              title={`Ir al módulo ${module.name}`}
+                              className={`text-[11px] font-extrabold px-3 py-1 rounded-xl border flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all ${getModuleBadgeStyle(module.code)}`}
+                            >
+                              {getModuleIcon(module.code)}
+                              <span>{module.name}</span>
+                              <ChevronRight size={12} className="opacity-70" />
+                            </button>
+                          </div>
                         </div>
-                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border self-start sm:self-auto ${meta.textBadge} ${meta.borderBadge}`}>
-                          {module.name}
-                        </span>
+
+                        {/* Rúbrica descriptiva del Nivel alcanzado */}
+                        {rubric && (
+                          <div className="p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200 text-xs text-slate-700 leading-relaxed font-medium">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-extrabold text-slate-900">
+                                Rúbrica Evaluada:
+                              </span>
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-200/80 text-slate-800 px-2 py-0.5 rounded-md">
+                                {rubric.short_label} (Nivel {rubric.score_level}/5)
+                              </span>
+                            </div>
+                            <p className="text-slate-600">
+                              {rubric.criteria_description}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Nota del Entrenador */}
+                        {note && (
+                          <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-200/80 text-xs text-amber-900 font-medium">
+                            <span className="font-black text-amber-950 block mb-0.5">Observación del Cuerpo Técnico:</span>
+                            <p className="italic">&ldquo;{note}&rdquo;</p>
+                          </div>
+                        )}
                       </div>
-
-                      {rubric && (
-                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs text-slate-700 leading-relaxed font-medium">
-                          <span className="font-bold text-slate-900 block mb-0.5">
-                            Rúbrica ({rubric.short_label}):
-                          </span>
-                          {rubric.criteria_description}
-                        </div>
-                      )}
-
-                      {note && (
-                        <div className="p-2.5 bg-amber-50/80 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium italic">
-                          📝 &ldquo;{note}&rdquo;
-                        </div>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center py-10 space-y-2">
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">

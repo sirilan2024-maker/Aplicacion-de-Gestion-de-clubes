@@ -414,45 +414,59 @@ export default function PlayerDashboardPage() {
         </div>
       )}
 
-      <div className="mb-10 flex flex-col items-center justify-center text-center gap-5">
-        <div>
-          <div className="flex flex-col items-center gap-4">
-            {player.avatar_url ? (
-              <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-white shrink-0">
-                <img 
-                  src={player.avatar_url} 
-                  alt={`Foto de ${player.first_name}`} 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-center justify-center shrink-0">
-                <span className="text-4xl md:text-5xl">⚽</span>
+      <div className="mb-10 flex flex-col items-center justify-center text-center">
+        <div className="flex flex-col items-center w-full max-w-xl mx-auto">
+          {player.avatar_url ? (
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white shrink-0 mb-4 relative">
+              <img 
+                src={player.avatar_url} 
+                alt={`Foto de ${player.first_name}`} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl flex items-center justify-center shrink-0 mb-4">
+              <span className="text-4xl md:text-5xl drop-shadow-sm">⚽</span>
+            </div>
+          )}
+          
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-5">
+            {player.first_name} {player.last_name}
+          </h1>
+
+          <div className="flex items-center justify-center bg-white border border-slate-200/60 shadow-sm rounded-2xl p-4 w-full md:w-auto gap-4 md:gap-8">
+            {player.dorsal && (
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Dorsal</span>
+                <span className="text-2xl font-black text-slate-800 leading-none">{player.dorsal}</span>
               </div>
             )}
             
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex flex-col items-center justify-center gap-2">
-              <span>{player.first_name} {player.last_name}</span>
-              <div className="flex items-center justify-center flex-wrap gap-2 mt-1">
-                {player.dorsal && (
-                  <span className="text-lg md:text-xl font-black text-slate-400">#{player.dorsal}</span>
-                )}
-                {player.teams?.name && (
-                  <span className="text-sm md:text-base px-4 py-1.5 bg-blue-100/80 text-blue-800 rounded-full font-bold border border-blue-200 shadow-sm">
-                    {player.teams.name}
-                  </span>
-                )}
-                {player.posicion_principal && (
-                  <span className="text-sm md:text-base px-4 py-1.5 bg-slate-100 text-slate-700 rounded-full font-bold border border-slate-200 shadow-sm">
-                    {player.posicion_principal}
-                  </span>
-                )}
+            {player.dorsal && player.teams?.name && (
+              <div className="w-px h-10 bg-slate-200 hidden md:block" />
+            )}
+            
+            {player.teams?.name && (
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Equipo</span>
+                <span className="text-lg font-bold text-blue-700 leading-none">{player.teams.name}</span>
               </div>
-            </h1>
+            )}
+
+            {player.teams?.name && player.posicion_principal && (
+              <div className="w-px h-10 bg-slate-200 hidden md:block" />
+            )}
+
+            {player.posicion_principal && (
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Posición</span>
+                <span className="text-lg font-bold text-slate-800 leading-none capitalize">{player.posicion_principal}</span>
+              </div>
+            )}
           </div>
-          <p className="text-slate-500 mt-4 font-medium text-sm md:text-base">Resumen completo de la temporada</p>
         </div>
-        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-1 w-full sm:w-auto px-4 sm:px-0">
+        
+        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-8 w-full sm:w-auto px-4 sm:px-0">
           <button 
             onClick={() => router.push('/dashboard/family/nuevo-jugador')}
             className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all shadow-sm w-full sm:w-auto"

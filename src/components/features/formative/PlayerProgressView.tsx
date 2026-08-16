@@ -321,6 +321,96 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
           </div>
         )}
       </div>
+
+      {/* ─── 4. Leyenda de Niveles de Aprendizaje y Competencias ─── */}
+      <div className="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Layers className="text-emerald-400" size={18} />
+            <h4 className="font-extrabold text-sm text-white">
+              Escala y Leyenda de Niveles de Aprendizaje
+            </h4>
+          </div>
+          <span className="text-[11px] font-bold text-slate-400">
+            Criterios formativos del club
+          </span>
+        </div>
+
+        {/* Distribución actual del jugador por niveles */}
+        {report.radar_data && report.radar_data.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap text-xs bg-slate-800/80 p-3 rounded-2xl border border-slate-700/60">
+            <span className="text-slate-400 font-bold text-[11px] uppercase tracking-wider mr-1">Estado actual:</span>
+            <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-xl font-black">
+              {report.radar_data.filter(c => c.score === 5).length} Nivel 5 (Dominio)
+            </span>
+            <span className="bg-teal-950/80 text-teal-300 border border-teal-500/40 px-2.5 py-1 rounded-xl font-black">
+              {report.radar_data.filter(c => c.score === 4).length} Nivel 4 (Consolidado)
+            </span>
+            <span className="bg-blue-950/80 text-blue-300 border border-blue-500/40 px-2.5 py-1 rounded-xl font-black">
+              {report.radar_data.filter(c => c.score === 3).length} Nivel 3 (En Progresión)
+            </span>
+            <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-xl font-black">
+              {report.radar_data.filter(c => c.score === 2).length} Nivel 2 (En Desarrollo)
+            </span>
+            <span className="bg-rose-950/80 text-rose-300 border border-rose-500/40 px-2.5 py-1 rounded-xl font-black">
+              {report.radar_data.filter(c => c.score === 1).length} Nivel 1 (Iniciación)
+            </span>
+          </div>
+        )}
+
+        {/* Guía Explicativa de Niveles */}
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 pt-1">
+          <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex flex-col justify-between space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 font-black text-xs flex items-center justify-center">1</span>
+              <span className="font-extrabold text-xs text-rose-300">Iniciación</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+              Descubrimiento del concepto. Necesita guía y demostración continua.
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex flex-col justify-between space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 font-black text-xs flex items-center justify-center">2</span>
+              <span className="font-extrabold text-xs text-amber-300">En Desarrollo</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+              Intenta la acción pero con inconsistencias en ritmo o toma de decisiones.
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex flex-col justify-between space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/40 font-black text-xs flex items-center justify-center">3</span>
+              <span className="font-extrabold text-xs text-blue-300">En Progresión</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+              Aplica el concepto con autonomía en situaciones estándar de juego.
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex flex-col justify-between space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-teal-500/20 text-teal-400 border border-teal-500/40 font-black text-xs flex items-center justify-center">4</span>
+              <span className="font-extrabold text-xs text-teal-300">Consolidado</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+              Alta efectividad, buena toma de decisiones y precisión bajo oposición.
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/50 flex flex-col justify-between space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-black text-xs flex items-center justify-center">5</span>
+              <span className="font-extrabold text-xs text-emerald-300">Dominio</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+              Referente técnico-táctico. Resuelve con maestría y creatividad bajo máxima presión.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

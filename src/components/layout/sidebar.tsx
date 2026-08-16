@@ -30,7 +30,8 @@ import {
   Brain,
   Globe,
   Timer,
-  FolderOpen
+  FolderOpen,
+  UserPlus
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -349,6 +350,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         label: "TEAMS CLUB",
         items: [
           { name: "En directo", href: "/live", icon: Trophy },
+          { name: "Añadir Jugador", href: "/dashboard/family/nuevo-jugador", icon: UserPlus },
           { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]

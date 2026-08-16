@@ -414,10 +414,10 @@ export default function PlayerDashboardPage() {
         </div>
       )}
 
-      <div className="mb-10 flex flex-col items-center justify-center text-center">
-        <div className="flex flex-col items-center w-full max-w-xl mx-auto">
+      <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8">
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-6 w-full text-center md:text-left">
           {player.avatar_url ? (
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white shrink-0 mb-4 relative">
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white shrink-0 relative">
               <img 
                 src={player.avatar_url} 
                 alt={`Foto de ${player.first_name}`} 
@@ -425,48 +425,50 @@ export default function PlayerDashboardPage() {
               />
             </div>
           ) : (
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl flex items-center justify-center shrink-0 mb-4">
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl flex items-center justify-center shrink-0">
               <span className="text-4xl md:text-5xl drop-shadow-sm">⚽</span>
             </div>
           )}
           
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-5">
-            {player.first_name} {player.last_name}
-          </h1>
+          <div className="flex flex-col justify-center flex-1">
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-4 md:mb-5">
+              {player.first_name} {player.last_name}
+            </h1>
 
-          <div className="flex items-center justify-center bg-white border border-slate-200/60 shadow-sm rounded-2xl p-4 w-full md:w-auto gap-4 md:gap-8">
-            {player.dorsal && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Dorsal</span>
-                <span className="text-2xl font-black text-slate-800 leading-none">{player.dorsal}</span>
-              </div>
-            )}
-            
-            {player.dorsal && player.teams?.name && (
-              <div className="w-px h-10 bg-slate-200 hidden md:block" />
-            )}
-            
-            {player.teams?.name && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Equipo</span>
-                <span className="text-lg font-bold text-blue-700 leading-none">{player.teams.name}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-center md:justify-start bg-white border border-slate-200/60 shadow-sm rounded-2xl p-4 w-full md:w-auto md:inline-flex gap-4 md:gap-8">
+              {player.dorsal && (
+                <div className="flex flex-col items-center md:items-start">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Dorsal</span>
+                  <span className="text-2xl font-black text-slate-800 leading-none">{player.dorsal}</span>
+                </div>
+              )}
+              
+              {player.dorsal && player.teams?.name && (
+                <div className="w-px h-10 bg-slate-200" />
+              )}
+              
+              {player.teams?.name && (
+                <div className="flex flex-col items-center md:items-start">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Equipo</span>
+                  <span className="text-lg font-bold text-blue-700 leading-none">{player.teams.name}</span>
+                </div>
+              )}
 
-            {player.teams?.name && player.posicion_principal && (
-              <div className="w-px h-10 bg-slate-200 hidden md:block" />
-            )}
+              {player.teams?.name && player.posicion_principal && (
+                <div className="w-px h-10 bg-slate-200" />
+              )}
 
-            {player.posicion_principal && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Posición</span>
-                <span className="text-lg font-bold text-slate-800 leading-none capitalize">{player.posicion_principal}</span>
-              </div>
-            )}
+              {player.posicion_principal && (
+                <div className="flex flex-col items-center md:items-start">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Posición</span>
+                  <span className="text-lg font-bold text-slate-800 leading-none capitalize">{player.posicion_principal}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-8 w-full sm:w-auto px-4 sm:px-0">
+        <div className="flex flex-col sm:flex-row justify-center md:justify-end shrink-0 w-full md:w-auto px-4 sm:px-0">
           <button 
             onClick={() => router.push('/dashboard/family/nuevo-jugador')}
             className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 active:scale-95 transition-all shadow-sm w-full sm:w-auto"

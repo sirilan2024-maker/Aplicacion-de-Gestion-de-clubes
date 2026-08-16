@@ -528,6 +528,18 @@ export default function EntrenamientoDetailPage() {
                   );
                 })}
               </div>
+
+              {/* Botón inferior para guardar asistencia cómodamente al final de la lista */}
+              <div className="p-4 sm:p-5 bg-slate-50 border-t border-gray-100 flex items-center justify-end">
+                <button 
+                  onClick={saveAttendance}
+                  disabled={savingPlayer === 'asistencia'}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-70 shadow-md shadow-blue-500/20 active:scale-95 min-h-[44px]"
+                >
+                  {savingPlayer === 'asistencia' ? <Loader2 size={18} className="animate-spin shrink-0" /> : <Save size={18} className="shrink-0" />}
+                  <span>Guardar Asistencia</span>
+                </button>
+              </div>
             </div>
           ) : activeModule === 'rapida' ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -616,6 +628,18 @@ export default function EntrenamientoDetailPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Botón inferior para guardar carga rápida al final de la tabla */}
+              <div className="p-4 sm:p-5 bg-slate-50 border-t border-gray-100 flex items-center justify-end">
+                <button 
+                  onClick={saveAllQuickMetrics}
+                  disabled={savingPlayer === 'all'}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-70 shadow-md shadow-purple-500/20 active:scale-95 min-h-[44px]"
+                >
+                  {savingPlayer === 'all' ? <Loader2 size={18} className="animate-spin shrink-0" /> : <Save size={18} className="shrink-0" />}
+                  <span>Guardar Todos</span>
+                </button>
               </div>
             </div>
           ) : activeModule === 'formativo' ? (

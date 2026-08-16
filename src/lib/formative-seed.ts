@@ -171,9 +171,39 @@ export async function seedFormativeEvaluationData(): Promise<SeedDataResult> {
         category_target: 'Infantil (12-14)',
         display_order: 1,
         rubrics: [
-          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Movimientos descoordinados en cambios de dirección bruscos o saltos.' },
-          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Buena agilidad de pies y equilibrio tras disputa de balón o sprint corto.' },
-          { score_level: 5, short_label: 'Dominio', criteria_description: 'Excelente destreza motriz, fluidez en desaceleración y aceleración instantánea.' }
+          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Movimientos descoordinados en cambios de dirección bruscos, caídas de ritmo o tropiezos en apoyos rápidos.' },
+          { score_level: 2, short_label: 'Básico', criteria_description: 'Mantiene la coordinación en desplazamientos lineales, pero pierde estabilidad o velocidad al frenar y girar.' },
+          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Buena agilidad de pies, coordinación dinámica y equilibrio tras disputa de balón o sprint corto.' },
+          { score_level: 4, short_label: 'Avanzado', criteria_description: 'Gran destreza motriz, cambios de sentido rápidos y fluidez en aceleraciones/desaceleraciones continuas.' },
+          { score_level: 5, short_label: 'Dominio', criteria_description: 'Excelente destreza y economía de movimiento; ejecuta apoyos explosivos y equilibrio impecable bajo máxima exigencia física.' }
+        ]
+      },
+      {
+        module_code: 'fisico_coordinativo',
+        code: 'velocidad_reaccion_desplazamiento',
+        name: 'Velocidad de Reacción y Cambios de Ritmo',
+        category_target: 'Infantil (12-14)',
+        display_order: 2,
+        rubrics: [
+          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Tarda en reaccionar ante estímulos visuales o sonoros del juego; arranque lento.' },
+          { score_level: 2, short_label: 'Básico', criteria_description: 'Arranca a tiempo pero le cuesta mantener la velocidad punta en distancias medias.' },
+          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Buena respuesta reactiva en los primeros metros y cambios de ritmo adecuados para ganar la posición.' },
+          { score_level: 4, short_label: 'Avanzado', criteria_description: 'Anticipación rápida y aceleración explosiva para llegar antes que el oponente a balones divididos.' },
+          { score_level: 5, short_label: 'Dominio', criteria_description: 'Velocidad de reacción sobresaliente; cambios de ritmo impredecibles y máxima potencia en transiciones rápidas.' }
+        ]
+      },
+      {
+        module_code: 'fisico_coordinativo',
+        code: 'fuerza_duelos_equilibrio',
+        name: 'Fuerza Útil en Disputas y Protección Corporal',
+        category_target: 'Infantil (12-14)',
+        display_order: 3,
+        rubrics: [
+          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Cede fácilmente en el choque o contacto físico; le cuesta mantener el centro de gravedad bajo.' },
+          { score_level: 2, short_label: 'Básico', criteria_description: 'Aguanta disputas leves pero pierde el equilibrio cuando el oponente ejerce presión corporal fuerte.' },
+          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Utiliza el cuerpo para proteger la posesión y gana un porcentaje adecuado de duelos individuales.' },
+          { score_level: 4, short_label: 'Avanzado', criteria_description: 'Fuerte en balones divididos y juego aéreo, buena estabilidad sobre un solo apoyo en carrera.' },
+          { score_level: 5, short_label: 'Dominio', criteria_description: 'Dominio corporal completo en disputas; protege el balón con maestría y se impone con potencia y limpieza.' }
         ]
       },
 
@@ -181,13 +211,43 @@ export async function seedFormativeEvaluationData(): Promise<SeedDataResult> {
       {
         module_code: 'socio_afectivo',
         code: 'actitud_resiliencia',
-        name: 'Actitud, Resiliencia y Compañerismo',
+        name: 'Actitud, Resiliencia y Superación del Error',
         category_target: 'Infantil (12-14)',
         display_order: 1,
         rubrics: [
-          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Se frustra fácilmente ante el error propio o de compañeros; desiste del esfuerzo.' },
-          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Mantiene buena actitud, escucha correcciones del cuerpo técnico y anima al grupo.' },
-          { score_level: 5, short_label: 'Dominio', criteria_description: 'Liderazgo positivo ejemplar, capacidad de superación ante la adversidad y máxima entrega.' }
+          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Se frustra fácilmente ante el error propio o de compañeros; baja los brazos o se desconecta tras fallar.' },
+          { score_level: 2, short_label: 'Básico', criteria_description: 'Acepta el error pero necesita estímulo externo del entrenador o compañeros para recuperar la intensidad.' },
+          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Mantiene buena actitud continua, asimila las correcciones del cuerpo técnico y reacciona positivamente.' },
+          { score_level: 4, short_label: 'Avanzado', criteria_description: 'Alta resiliencia competitiva; asume retos difíciles con entusiasmo y mantiene el esfuerzo en marcadores adversos.' },
+          { score_level: 5, short_label: 'Dominio', criteria_description: 'Ejemplo de superación y madurez emocional; contagia entusiasmo y perseverancia a toda la plantilla.' }
+        ]
+      },
+      {
+        module_code: 'socio_afectivo',
+        code: 'comunicacion_asertiva_apoyo',
+        name: 'Comunicación Asertiva y Compañerismo',
+        category_target: 'Infantil (12-14)',
+        display_order: 2,
+        rubrics: [
+          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Juega en silencio sin comunicarse o realiza reproches negativos a compañeros tras un fallo.' },
+          { score_level: 2, short_label: 'Básico', criteria_description: 'Se comunica sólo cuando se le pide o en situaciones muy evidentes; tímido en el apoyo verbal.' },
+          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Avisa de marcas, pide el balón con claridad y anima a los compañeros activamente durante la sesión.' },
+          { score_level: 4, short_label: 'Avanzado', criteria_description: 'Excelente comunicación orientativa en el campo; genera clima de confianza y ayuda a integrar a todos.' },
+          { score_level: 5, short_label: 'Dominio', criteria_description: 'Liderazgo constructivo indiscutible; transmite instrucciones claras con respeto y potencia el rendimiento colectivo.' }
+        ]
+      },
+      {
+        module_code: 'socio_afectivo',
+        code: 'respeto_compromiso_disciplina',
+        name: 'Respeto a Normas, Rivales y Compromiso con el Club',
+        category_target: 'Infantil (12-14)',
+        display_order: 3,
+        rubrics: [
+          { score_level: 1, short_label: 'Iniciación', criteria_description: 'Interrumpe explicaciones, muestra poco cuidado del material deportivo o protesta decisiones arbitrales.' },
+          { score_level: 2, short_label: 'Básico', criteria_description: 'Cumple las normas básicas pero necesita llamadas de atención ocasionales sobre concentración y puntualidad.' },
+          { score_level: 3, short_label: 'En desarrollo', criteria_description: 'Respeta siempre las decisiones arbitrales, cuida las instalaciones del club y muestra puntualidad y compromiso.' },
+          { score_level: 4, short_label: 'Avanzado', criteria_description: 'Comportamiento deportivo ejemplar dentro y fuera del terreno de juego; cuida a los compañeros y rivales.' },
+          { score_level: 5, short_label: 'Dominio', criteria_description: 'Embajador de los valores del club; juego limpio impecable, máximo respeto cívico y compromiso absoluto con el equipo.' }
         ]
       }
     ];

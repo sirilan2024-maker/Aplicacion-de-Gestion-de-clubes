@@ -10,13 +10,15 @@ import {
   ModuleProgressSummary 
 } from '@/types/formative-evaluation';
 
+import { seedFormativeEvaluationData } from '@/lib/formative-seed';
+
 /**
  * Obtener todos los módulos maestros con sus conceptos y rúbricas descriptivas 1-5
  */
 export async function getEvaluationModulesWithRubrics(): Promise<EvaluationModule[]> {
   const supabase = createAdminClient();
   
-  const { data: modules, error } = await supabase
+  let { data: modules, error } = await supabase
     .from('evaluation_modules')
     .select(`
       id,
@@ -43,7 +45,47 @@ export async function getEvaluationModulesWithRubrics(): Promise<EvaluationModul
     .eq('is_active', true)
     .order('display_order', { ascending: true });
 
-  if (error) {
+  // Comprobar si faltan rúbricas o niveles (ej: menos de 5 rúbricas por concepto)
+  const needsReSeed = !modules || modules.length === 0 || modules.some((m: any) => 
+    !m.concepts || m.concepts.length === 0 || m.concepts.some((c: any) => !c.rubrics || c.rubrics.length < 5)
+  );
+
+  if (needsReSeed) {
+    try {
+      await seedFormativeEvaluationData();
+      const retry = await supabase
+        .from('evaluation_modules')
+        .select(`
+          id,
+          code,
+          name,
+          display_order,
+          is_active,
+          concepts:evaluation_concepts (
+            id,
+            module_id,
+            code,
+            name,
+            category_target,
+            display_order,
+            rubrics:concept_rubrics (
+              id,
+              concept_id,
+              score_level,
+              short_label,
+              criteria_description
+            )
+          )
+        `)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      if (retry.data) modules = retry.data;
+    } catch (e) {
+      console.error("Error auto-seeding formative rubrics:", e);
+    }
+  }
+
+  if (error && !modules) {
     console.error("Error al obtener módulos formativos:", error);
     return [];
   }

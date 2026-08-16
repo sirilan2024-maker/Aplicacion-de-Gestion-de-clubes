@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
 export interface SendEmailParams {
@@ -5,6 +6,30 @@ export interface SendEmailParams {
   subject: string;
   html: string;
   replyTo?: string;
+}
+
+/**
+ * Obtener transportador SMTP configurado
+ */
+function getSmtpTransporter() {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+
+  if (user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: {
+        user: user.trim(),
+        pass: pass.trim().replace(/\s+/g, ''), // Eliminar posibles espacios de contraseñas de app de Google
+      },
+    });
+  }
+
+  return null;
 }
 
 /**
@@ -18,35 +43,54 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
       return { success: false, error: 'No recipients provided' };
     }
 
-    const apiKey = process.env.RESEND_API_KEY?.trim();
-    if (!apiKey) {
-      console.warn(`[Email MOCK] RESEND_API_KEY no detectada en entorno. Simulación de envío a ${recipients.join(', ')}: "${subject}"`);
-      return { success: false, mock: true, error: 'RESEND_API_KEY no configurada en las variables de entorno de Vercel/local' };
+    // 1. Intentar envío prioritario por SMTP / Gmail del Club si está configurado
+    const smtpTransporter = getSmtpTransporter();
+    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+
+    if (smtpTransporter && smtpUser) {
+      console.log(`[Email SMTP] Enviando vía SMTP (${smtpUser}) a: ${recipients.join(', ')}`);
+      const fromName = process.env.EMAIL_FROM_NAME || 'Sporting Saladar';
+      const info = await smtpTransporter.sendMail({
+        from: `"${fromName}" <${smtpUser.trim()}>`,
+        to: recipients.join(', '),
+        subject,
+        html,
+        replyTo: replyTo || smtpUser.trim(),
+      });
+
+      console.log(`[Email SMTP OK] Enviado con éxito. MessageId: ${info.messageId}`);
+      return { success: true, messageId: info.messageId, provider: 'smtp' };
     }
 
-    const resend = new Resend(apiKey);
-    const fromAddress = process.env.EMAIL_FROM || 'Sporting Saladar <onboarding@resend.dev>';
+    // 2. Fallback a Resend si la clave existe
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
+    if (resendApiKey) {
+      const resend = new Resend(resendApiKey);
+      const fromAddress = process.env.EMAIL_FROM || 'Sporting Saladar <onboarding@resend.dev>';
 
-    console.log(`[Email] Intentando enviar email a: ${recipients.join(', ')} con remitente ${fromAddress}`);
+      console.log(`[Email Resend] Enviando vía Resend a: ${recipients.join(', ')}`);
+      const { data, error } = await resend.emails.send({
+        from: fromAddress,
+        to: recipients,
+        subject,
+        html,
+        replyTo: replyTo || 'info@sportingsaladar.com',
+      });
 
-    const { data, error } = await resend.emails.send({
-      from: fromAddress,
-      to: recipients,
-      subject,
-      html,
-      replyTo: replyTo || 'info@sportingsaladar.com',
-    });
+      if (error) {
+        console.error('[Email Resend Error]:', error);
+        return { success: false, error: error.message };
+      }
 
-    if (error) {
-      console.error('[Email Error] Error devuelto por Resend:', error);
-      return { success: false, error: error.message };
+      console.log(`[Email Resend OK] ID: ${data?.id}`);
+      return { success: true, data, provider: 'resend' };
     }
 
-    console.log(`[Email OK] Email enviado con éxito por Resend. ID: ${data?.id}`);
-    return { success: true, data };
+    console.warn(`[Email MOCK] Sin proveedor configurado. Simulación a ${recipients.join(', ')}: "${subject}"`);
+    return { success: false, mock: true, error: 'Configura SMTP_USER y SMTP_PASS en .env para activar el correo' };
   } catch (err: any) {
-    console.error('[Email Exception] Excepción en sendEmail:', err);
-    return { success: false, error: err.message || 'Error desconocido al enviar email' };
+    console.error('[Email Exception]:', err);
+    return { success: false, error: err.message || 'Error al enviar email' };
   }
 }
 

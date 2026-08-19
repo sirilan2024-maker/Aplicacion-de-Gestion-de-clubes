@@ -21,13 +21,24 @@ import {
   Layers,
   HelpCircle,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Check,
+  Trash2,
+  FileCode,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2
 } from "lucide-react";
+import { importExerciseBatchAction, verifyExerciseAction, deleteExerciseAction } from "@/app/actions/methodology-actions";
 
 export default function BibliotecaEjercicios() {
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Tab: Homologados vs Pendientes
+  const [activeTab, setActiveTab] = useState<"verified" | "pending">("verified");
+
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -40,9 +51,17 @@ export default function BibliotecaEjercicios() {
   // Detail Modal
   const [selectedExercise, setSelectedExercise] = useState<any | null>(null);
 
+  // Import Modal State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<{ success?: boolean; message?: string; errors?: any[]; warnings?: any[] } | null>(null);
+
   // Stats for the top bar
   const [stats, setStats] = useState({ 
     total: 0, 
+    verified: 0,
+    pending: 0,
     byCategory: {} as Record<string, number>,
     byFamily: {} as Record<string, number> 
   });
@@ -90,6 +109,9 @@ export default function BibliotecaEjercicios() {
       if (data) {
         setExercises(data);
         
+        const verifiedCount = data.filter(e => e.is_verified !== false).length;
+        const pendingCount = data.filter(e => e.is_verified === false).length;
+
         // Calculate basic stats on initial full load (when no filters)
         if (!searchTerm && selectedCategory === "all" && selectedType === "all" && selectedFamily === "all") {
           const catCount = data.reduce((acc: any, curr) => {
@@ -102,13 +124,80 @@ export default function BibliotecaEjercicios() {
             acc[fam] = (acc[fam] || 0) + 1;
             return acc;
           }, {});
-          setStats({ total: data.length, byCategory: catCount, byFamily: famCount });
+          setStats({ 
+            total: data.length, 
+            verified: verifiedCount,
+            pending: pendingCount,
+            byCategory: catCount, 
+            byFamily: famCount 
+          });
         }
       }
     } catch (error) {
       console.error("Error fetching exercises:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const filteredByTab = exercises.filter((ex) => {
+    if (activeTab === "verified") {
+      return ex.is_verified !== false;
+    }
+    return ex.is_verified === false;
+  });
+
+  const handleVerifyExercise = async (id: string, approve: boolean) => {
+    try {
+      await verifyExerciseAction(id, approve);
+      await fetchExercises();
+      if (selectedExercise?.id === id) {
+        setSelectedExercise({ ...selectedExercise, is_verified: approve });
+      }
+    } catch (err: any) {
+      alert(`Error al procesar el ejercicio: ${err.message || err}`);
+    }
+  };
+
+  const handleDeleteExercise = async (id: string) => {
+    if (!confirm("¿Deseas eliminar definitivamente este ejercicio del banco?")) return;
+    try {
+      await deleteExerciseAction(id);
+      setSelectedExercise(null);
+      await fetchExercises();
+    } catch (err: any) {
+      alert(`Error al eliminar: ${err.message || err}`);
+    }
+  };
+
+  const handleProcessImport = async () => {
+    if (!importJsonText.trim()) return;
+    setIsImporting(true);
+    setImportFeedback(null);
+    try {
+      let parsed: any;
+      try {
+        parsed = JSON.parse(importJsonText);
+      } catch (jsonErr) {
+        throw new Error("El texto introducido no es un formato JSON válido.");
+      }
+
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      const res = await importExerciseBatchAction(items);
+      setImportFeedback({
+        success: true,
+        message: `Se importaron con éxito ${res.insertedCount} ejercicio(s) candidato(s) pendientes de homologación.`,
+        warnings: res.duplicateWarnings
+      });
+      setImportJsonText("");
+      await fetchExercises();
+    } catch (err: any) {
+      setImportFeedback({
+        success: false,
+        message: err.message || "Error al procesar el lote."
+      });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -188,7 +277,7 @@ export default function BibliotecaEjercicios() {
             <span className="bg-blue-100 text-blue-800 text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-md">
               Metodología OS v1.0
             </span>
-            <span className="text-slate-400 text-xs font-bold">• 100 Ejercicios de Referencia</span>
+            <span className="text-slate-400 text-xs font-bold">• Repositorio Metodológico Homologado</span>
           </div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3 mt-1">
             <BookOpen className="w-8 h-8 text-blue-600" />
@@ -197,6 +286,20 @@ export default function BibliotecaEjercicios() {
           <p className="text-slate-500 font-medium mt-1">
             Repositorio estructurado de tareas conectado con el modelo de juego, currículo y periodización.
           </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setIsImportModalOpen(true);
+              setImportFeedback(null);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition-all shadow-sm cursor-pointer"
+          >
+            <Upload className="w-4 h-4" />
+            Importar JSON / Candidatos
+          </button>
         </div>
       </div>
 
@@ -214,21 +317,21 @@ export default function BibliotecaEjercicios() {
 
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black">
-            <Target className="w-5 h-5" />
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-black text-slate-900">U6 → Senior</div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">8 Categorías</div>
+            <div className="text-2xl font-black text-slate-900">{stats.verified}</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Homologadas</div>
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 font-black">
-            <Brain className="w-5 h-5" />
+            <ShieldAlert className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-black text-slate-900">100%</div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Taxonomía Validada</div>
+            <div className="text-2xl font-black text-slate-900">{stats.pending}</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Por Homologar</div>
           </div>
         </div>
 
@@ -237,8 +340,8 @@ export default function BibliotecaEjercicios() {
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-black text-slate-900">Calidad Pro</div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Metodología Élite</div>
+            <div className="text-2xl font-black text-slate-900">U6 → Senior</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">8 Categorías</div>
           </div>
         </div>
       </div>
@@ -355,32 +458,80 @@ export default function BibliotecaEjercicios() {
         </div>
       </div>
 
+      {/* Tabs Homologados vs Pendientes de Homologación */}
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("verified")}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl transition-all cursor-pointer ${
+              activeTab === "verified"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Homologados ({stats.verified})
+          </button>
+
+          <button
+            onClick={() => setActiveTab("pending")}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl transition-all cursor-pointer ${
+              activeTab === "pending"
+                ? "bg-amber-600 text-white shadow-sm"
+                : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            Candidatos Pendientes ({stats.pending})
+          </button>
+        </div>
+
+        <span className="text-xs font-bold text-slate-400">
+          Mostrando {filteredByTab.length} ejercicios
+        </span>
+      </div>
+
       {/* Grid of Exercises */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-400 font-bold text-sm mt-3">Cargando biblioteca metodológica...</p>
         </div>
-      ) : exercises.length === 0 ? (
+      ) : filteredByTab.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center max-w-md mx-auto">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-          <h3 className="text-lg font-black text-slate-900">No se encontraron tareas</h3>
-          <p className="text-sm text-slate-500 mt-1">Prueba a relajar los filtros de búsqueda o seleccionar otra categoría.</p>
+          <h3 className="text-lg font-black text-slate-900">
+            {activeTab === "pending" ? "No hay candidatos pendientes" : "No se encontraron tareas"}
+          </h3>
+          <p className="text-sm text-slate-500 mt-1">
+            {activeTab === "pending" 
+              ? "Todos los ejercicios importados están homologados y verificados." 
+              : "Prueba a relajar los filtros de búsqueda o seleccionar otra categoría."}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exercises.map((ex) => (
+          {filteredByTab.map((ex) => (
             <div
               key={ex.id}
               onClick={() => setSelectedExercise(ex)}
-              className="bg-white border border-slate-200 hover:border-blue-400 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+              className={`bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group ${
+                ex.is_verified === false ? "border-amber-300 ring-1 ring-amber-300/40 bg-amber-50/20" : "border-slate-200 hover:border-blue-400"
+              }`}
             >
               <div className="space-y-3">
                 {/* Top Badges */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                    {ex.age_category || (ex.categoria_edad && ex.categoria_edad[0]) || 'General'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                      {ex.age_category || (ex.categoria_edad && ex.categoria_edad[0]) || 'General'}
+                    </span>
+                    {ex.is_verified === false && (
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300">
+                        Pendiente
+                      </span>
+                    )}
+                  </div>
                   {getDifficultyBadge(ex.dificultad || 2)}
                 </div>
 
@@ -560,22 +711,124 @@ export default function BibliotecaEjercicios() {
             </div>
 
             {/* Actions Bottom */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-              <button
-                onClick={() => setSelectedExercise(null)}
-                className="py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cerrar
-              </button>
-              <a
-                href="/admin/metodologia/sesiones/nueva"
-                className="py-2.5 px-5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-sm flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                Añadir al Constructor de Sesiones
-              </a>
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                {selectedExercise.is_verified === false ? (
+                  <button
+                    onClick={() => handleVerifyExercise(selectedExercise.id, true)}
+                    className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    Aprobar y Homologar
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleVerifyExercise(selectedExercise.id, false)}
+                    className="py-2 px-3 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ShieldAlert className="w-4 h-4" />
+                    Deshomologar
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleDeleteExercise(selectedExercise.id)}
+                  className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedExercise(null)}
+                  className="py-2.5 px-4 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Cerrar
+                </button>
+                <a
+                  href="/admin/metodologia/sesiones/nueva"
+                  className="py-2.5 px-5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-sm flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  Añadir a Sesión
+                </a>
+              </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT MODAL */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white">
+                  <FileCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">
+                    Importador Estructurado de Ejercicios
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Valida campos pedagógicos, rangos y procedencia antes de insertar como candidato
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {importFeedback && (
+              <div className={`p-4 rounded-2xl text-xs font-bold ${
+                importFeedback.success 
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                  : 'bg-rose-50 text-rose-800 border border-rose-200'
+              }`}>
+                {importFeedback.message}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">
+                Pega el objeto o array JSON de ejercicios:
+              </label>
+              <textarea
+                rows={10}
+                value={importJsonText}
+                onChange={(e) => setImportJsonText(e.target.value)}
+                placeholder='[&#10;  {&#10;    "nombre": "Rondo 4v2 con Tercer Hombre",&#10;    "tipo": "rondo",&#10;    "bloque_sesion": "calentamiento",&#10;    "carga_fisica": 2,&#10;    "carga_cognitiva": 3,&#10;    "oposicion": 2,&#10;    "representatividad": 3,&#10;    "age_category": "cadete",&#10;    "source": "RFEF Curso Nivel 2",&#10;    "author": "Área Metodológica"&#10;  }&#10;]'
+                className="w-full p-3 font-mono text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleProcessImport}
+                disabled={isImporting || !importJsonText.trim()}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer"
+              >
+                {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Validar e Importar Candidatos
+              </button>
+            </div>
           </div>
         </div>
       )}

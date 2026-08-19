@@ -9,6 +9,7 @@ import {
   Sliders, Copy, RefreshCw, Layers, ShieldCheck
 } from "lucide-react";
 import { simulateScenario } from "@/lib/methodology/methodologyScenarioSimulationService";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import { compareScenarios } from "@/lib/methodology/methodologyScenarioComparisonService";
 import { generateAIScenarioReview } from "@/lib/methodology/ai/methodologyAIScenarioReviewService";
 
@@ -105,19 +106,23 @@ export default function MethodologySimulatorPage() {
           </p>
         </div>
 
-        <select
-          value={selectedTeamId}
-          onChange={(e) => {
-            setSelectedTeamId(e.target.value);
-            const t = teams.find(team => team.id === e.target.value);
-            if (t) initScenarios(t);
-          }}
-          className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-500"
-        >
-          {teams.map(t => (
-            <option key={t.id} value={t.id}>{t.name} ({t.category})</option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
+          <select
+            value={selectedTeamId}
+            onChange={(e) => {
+              setSelectedTeamId(e.target.value);
+              const t = teams.find(team => team.id === e.target.value);
+              if (t) initScenarios(t);
+            }}
+            className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            {teams.map(t => (
+              <option key={t.id} value={t.id}>{t.name} ({t.category})</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {aiReview && (

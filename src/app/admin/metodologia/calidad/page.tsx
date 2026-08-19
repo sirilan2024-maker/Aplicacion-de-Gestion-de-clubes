@@ -11,6 +11,7 @@ import {
   Scale, Compass, GitMerge, FileQuestion, HelpCircle, Briefcase, Network, RefreshCw, Zap, BookmarkCheck, CheckSquare
 } from "lucide-react";
 import Link from "next/link";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import {
   assessDataQuality,
   DataQualityAssessmentResult
@@ -105,6 +106,8 @@ export default function MethodologyQualityAssurancePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
           <select
             value={selectedSeasonId}
             onChange={(e) => setSelectedSeasonId(e.target.value)}

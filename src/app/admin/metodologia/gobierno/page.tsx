@@ -11,6 +11,7 @@ import {
   Scale, Compass, GitMerge, FileQuestion, HelpCircle, Briefcase, Network, RefreshCw, Zap, BookmarkCheck
 } from "lucide-react";
 import Link from "next/link";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import { 
   buildSeasonMethodologyReportFromData,
   SeasonMethodologyReport 
@@ -151,6 +152,8 @@ export default function MethodologyInstitutionalGovernancePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
           <select
             value={selectedSeasonId}
             onChange={(e) => setSelectedSeasonId(e.target.value)}

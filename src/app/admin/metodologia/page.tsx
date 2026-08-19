@@ -24,69 +24,103 @@ import {
   Trophy,
   Building2,
   Sliders,
-  Play
+  Play,
+  ShieldCheck,
+  CheckCircle,
+  LineChart
 } from "lucide-react";
 import Link from "next/link";
-import { getMethodologyAnalytics } from "@/lib/methodology/methodologyService";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 
-export default function MetodologiaDashboard() {
-  const [stats, setStats] = useState({
+interface MethodologyStats {
+  teams: number;
+  players: number;
+  sessionsThisWeek: number;
+  exercises: number;
+}
+
+export default function MethodologyDashboard() {
+  const [stats, setStats] = useState<MethodologyStats>({
     teams: 0,
     players: 0,
     sessionsThisWeek: 0,
     exercises: 0,
   });
   const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+  const [exerciseCategories, setExerciseCategories] = useState<{ [key: string]: number }>({});
   const [analytics, setAnalytics] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const supabase = createClient();
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
-    const supabase = createClient();
+    setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      let clubId = userData.user?.user_metadata?.club_id;
-      if (!clubId && userData.user) {
-        const { data: profile } = await supabase.from("profiles").select("club_id").eq("id", userData.user.id).single();
-        clubId = profile?.club_id;
+      // 1. Fetch Teams Count
+      const { count: teamsCount } = await supabase
+        .from("teams")
+        .select("*", { count: "exact", head: true });
+
+      // 2. Fetch Players Count
+      const { count: playersCount } = await supabase
+        .from("players")
+        .select("*", { count: "exact", head: true });
+
+      // 3. Fetch Exercises Count & Category Breakdown
+      const { data: exercisesData, count: exercisesCount } = await supabase
+        .from("banco_ejercicios")
+        .select("id, tipo");
+
+      const categoriesCount: { [key: string]: number } = {};
+      if (exercisesData) {
+        exercisesData.forEach((ex: any) => {
+          const type = ex.tipo || "otros";
+          categoriesCount[type] = (categoriesCount[type] || 0) + 1;
+        });
       }
 
-      const [
-        { count: teamsCount },
-        { count: playersCount },
-        { count: exercisesCount },
-        { data: recentSessions },
-        analyticsData
-      ] = await Promise.all([
-        supabase.from("teams").select("*", { count: "exact", head: true }),
-        supabase.from("players").select("*", { count: "exact", head: true }),
-        supabase.from("banco_ejercicios").select("*", { count: "exact", head: true }),
-        supabase.from("training_sessions").select("*, teams(name)").order("date_time", { ascending: false }).limit(6),
-        clubId ? getMethodologyAnalytics(clubId) : Promise.resolve(null)
-      ]);
+      // 4. Fetch Recent Sessions
+      const { data: sessionsData } = await supabase
+        .from("training_sessions")
+        .select("id, date_time, duration_minutes, microcycle_day, intensity_load, objective, coach_notes, estimated_load, teams(name)")
+        .order("date_time", { ascending: false })
+        .limit(5);
 
       setStats({
         teams: teamsCount || 0,
         players: playersCount || 0,
-        sessionsThisWeek: recentSessions?.length || 0,
-        exercises: exercisesCount || 100,
+        sessionsThisWeek: sessionsData?.length || 0,
+        exercises: exercisesCount || 0,
       });
 
-      setUpcomingSessions(recentSessions || []);
-      setAnalytics(analyticsData);
-      
-      setAlerts([
-        { id: 1, type: "info", message: "Motor de planificación determinista activo con 100 ejercicios de referencia." },
-        { id: 2, type: "warning", message: "Comprobar que todas las sesiones de MD-3 respeten la carga de fuerza/tensión." },
-        { id: 3, type: "success", message: "Taxonomía metodológica unificada para todas las categorías (U6 a Senior)." },
-      ]);
+      setUpcomingSessions(sessionsData || []);
+      setExerciseCategories(categoriesCount);
 
-    } catch (error) {
-      console.error("Error fetching methodology data:", error);
+      // Generate simple methodological alerts
+      const generatedAlerts = [];
+      if (exercisesCount === 0) {
+        generatedAlerts.push({
+          id: 1,
+          type: "warning",
+          message: "La biblioteca de ejercicios está vacía. Añade o importa tareas para comenzar.",
+        });
+      }
+      if (teamsCount && teamsCount > 0 && (!sessionsData || sessionsData.length === 0)) {
+        generatedAlerts.push({
+          id: 2,
+          type: "info",
+          message: "No hay sesiones programadas recientemente. Planifica un nuevo microciclo.",
+        });
+      }
+      setAlerts(generatedAlerts);
+
+    } catch (err) {
+      console.error("Error fetching methodology dashboard data:", err);
     } finally {
       setLoading(false);
     }
@@ -105,7 +139,7 @@ export default function MetodologiaDashboard() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
       
-      {/* Header */}
+      {/* Header con Navegación Transversal */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -117,47 +151,42 @@ export default function MetodologiaDashboard() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-1">Methodology OS</h1>
           <p className="text-slate-500 font-medium capitalize">{currentDate}</p>
         </div>
-        <div className="flex flex-wrap gap-2.5">
-          <Link href="/admin/metodologia/operativa" className="flex items-center gap-2 py-2.5 px-4 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-xl transition-all shadow-sm">
-            <Activity className="w-4 h-4" />
-            Centro Operativo
-          </Link>
-          <Link href="/admin/metodologia/direccion" className="flex items-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl transition-all shadow-sm">
-            <Building2 className="w-4 h-4" />
-            Dirección Deportiva
-          </Link>
-          <Link href="/admin/metodologia/simulador" className="flex items-center gap-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm">
-            <Sliders className="w-4 h-4" />
-            Simulador
-          </Link>
-        </div>
+        <MethodologyNavHeader />
       </div>
 
-      {/* Hub de Navegación Rápida Modular */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Link href="/admin/metodologia/operativa" className="p-3.5 bg-white border border-slate-200 hover:border-purple-300 rounded-xl shadow-sm transition-all text-center space-y-1 group">
+      {/* Hub de Navegación Rápida Modular Completo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <Link href="/admin/metodologia/operativa" className="p-3.5 bg-white border border-slate-200 hover:border-purple-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
           <Activity className="w-5 h-5 text-purple-600 mx-auto group-hover:scale-110 transition-transform" />
           <span className="text-xs font-bold text-slate-900 block">Operativa</span>
         </Link>
-        <Link href="/admin/metodologia/planificacion" className="p-3.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl shadow-sm transition-all text-center space-y-1 group">
-          <CalendarDays className="w-5 h-5 text-blue-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Planificación</span>
-        </Link>
-        <Link href="/admin/metodologia/sesiones" className="p-3.5 bg-white border border-slate-200 hover:border-emerald-300 rounded-xl shadow-sm transition-all text-center space-y-1 group">
-          <Layers className="w-5 h-5 text-emerald-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Sesiones</span>
-        </Link>
-        <Link href="/admin/metodologia/inteligencia" className="p-3.5 bg-white border border-slate-200 hover:border-indigo-300 rounded-xl shadow-sm transition-all text-center space-y-1 group">
+        <Link href="/admin/metodologia/ejecutiva" className="p-3.5 bg-white border border-slate-200 hover:border-indigo-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
           <Brain className="w-5 h-5 text-indigo-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Inteligencia</span>
+          <span className="text-xs font-bold text-slate-900 block">Ejecutiva</span>
         </Link>
-        <Link href="/admin/metodologia/simulador" className="p-3.5 bg-white border border-slate-200 hover:border-amber-300 rounded-xl shadow-sm transition-all text-center space-y-1 group">
+        <Link href="/admin/metodologia/centro-control" className="p-3.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <LayoutDashboard className="w-5 h-5 text-blue-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Control 360º</span>
+        </Link>
+        <Link href="/admin/metodologia/evolucion" className="p-3.5 bg-white border border-slate-200 hover:border-emerald-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <TrendingUp className="w-5 h-5 text-emerald-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Evolución</span>
+        </Link>
+        <Link href="/admin/metodologia/gobierno" className="p-3.5 bg-white border border-slate-200 hover:border-purple-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <ShieldCheck className="w-5 h-5 text-purple-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Gobierno</span>
+        </Link>
+        <Link href="/admin/metodologia/calidad" className="p-3.5 bg-white border border-slate-200 hover:border-teal-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <CheckCircle className="w-5 h-5 text-teal-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Calidad</span>
+        </Link>
+        <Link href="/admin/metodologia/optimizacion" className="p-3.5 bg-white border border-slate-200 hover:border-indigo-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <LineChart className="w-5 h-5 text-indigo-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Optimización</span>
+        </Link>
+        <Link href="/admin/metodologia/simulador" className="p-3.5 bg-white border border-slate-200 hover:border-amber-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
           <Sliders className="w-5 h-5 text-amber-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Simulador</span>
-        </Link>
-        <Link href="/admin/metodologia/biblioteca" className="p-3.5 bg-white border border-slate-200 hover:border-slate-400 rounded-xl shadow-sm transition-all text-center space-y-1 group">
-          <BookOpen className="w-5 h-5 text-slate-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Biblioteca</span>
+          <span className="text-xs font-bold text-slate-900 block">Simulación</span>
         </Link>
       </div>
 

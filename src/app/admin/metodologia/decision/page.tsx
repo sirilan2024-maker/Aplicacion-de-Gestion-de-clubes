@@ -11,6 +11,7 @@ import {
   Scale, Compass, GitMerge, FileQuestion, HelpCircle
 } from "lucide-react";
 import Link from "next/link";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import { 
   buildSeasonMethodologyReportFromData,
   SeasonMethodologyReport 
@@ -179,19 +180,14 @@ export default function MethodologyDecisionCenterPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
           <Link
             href="/admin/metodologia/gobernanza"
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
           >
             <ShieldCheck className="w-4 h-4" />
             Gobernanza
-          </Link>
-          <Link
-            href="/admin/metodologia/simulador"
-            className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition-all"
-          >
-            <Sliders className="w-4 h-4" />
-            Simulador Avanzado
           </Link>
         </div>
       </div>

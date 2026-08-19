@@ -11,6 +11,7 @@ import {
   Scale, Compass, GitMerge, FileQuestion, HelpCircle, Briefcase, Network, RefreshCw, Zap, BookmarkCheck
 } from "lucide-react";
 import Link from "next/link";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import {
   runMethodologyScenarioSimulation,
   ScenarioSimulationResult
@@ -72,6 +73,8 @@ export default function MethodologyScenarioSimulationPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
           <Link
             href="/admin/metodologia/gobierno"
             className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition-all"

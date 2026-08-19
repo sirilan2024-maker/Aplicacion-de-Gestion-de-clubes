@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { calculatePlannedVsExecutedFeedback } from "@/lib/methodology/sessionExecutionFeedbackService";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import { generatePostSessionFeedback } from "@/lib/methodology/ai/methodologyAIPostSessionService";
 
 export default function MethodologyOperativeDashboardPage() {
@@ -94,6 +95,8 @@ export default function MethodologyOperativeDashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
           <select
             value={selectedTeamId}
             onChange={(e) => {
@@ -109,18 +112,10 @@ export default function MethodologyOperativeDashboardPage() {
 
           <Link
             href="/admin/metodologia/sesiones/nueva"
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all"
           >
             <Plus className="w-4 h-4" />
             Nueva Sesión
-          </Link>
-
-          <Link
-            href="/admin/metodologia/simulador"
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
-          >
-            <Sliders className="w-4 h-4" />
-            Simulador
           </Link>
         </div>
       </div>

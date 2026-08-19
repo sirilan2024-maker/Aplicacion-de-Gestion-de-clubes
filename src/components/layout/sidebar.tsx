@@ -279,11 +279,12 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         label: "METODOLOGÍA",
         items: [
           { name: "Dashboard Metodológico", href: "/admin/metodologia", icon: Brain },
-          { name: "Biblioteca", href: "/admin/metodologia/biblioteca", icon: BookOpen },
+          { name: "Centro Operativo", href: "/admin/metodologia/operativa", icon: Activity },
+          { name: "Dirección Deportiva", href: "/admin/metodologia/direccion", icon: Building2 },
+          { name: "Simulación & Escenarios", href: "/admin/metodologia/simulador", icon: Sliders },
           { name: "Planificación", href: "/admin/metodologia/planificacion", icon: Layers },
-          { name: "Sesiones", href: "/admin/metodologia/sesiones", icon: ClipboardList },
-          { name: "Currículo", href: "/admin/metodologia/curriculo", icon: Compass },
-          { name: "Principios", href: "/admin/metodologia/principios", icon: Target },
+          { name: "Biblioteca", href: "/admin/metodologia/biblioteca", icon: BookOpen },
+          { name: "Currículo y Principios", href: "/admin/metodologia/curriculo", icon: Compass },
           { name: "Evaluación", href: "/admin/metodologia/evaluacion", icon: LineChart },
           { name: "Jugadores", href: "/admin/metodologia/jugadores", icon: Users },
         ]

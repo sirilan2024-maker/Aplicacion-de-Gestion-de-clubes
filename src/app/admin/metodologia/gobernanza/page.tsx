@@ -10,6 +10,7 @@ import {
   Eye, CheckCircle, Sliders, Play, ArrowRight, ShieldCheck, UserCheck
 } from "lucide-react";
 import Link from "next/link";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import { 
   buildSeasonMethodologyReportFromData,
   SeasonMethodologyReport 
@@ -191,6 +192,8 @@ export default function MethodologyGovernancePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <MethodologyNavHeader />
+
           <select
             value={selectedSeasonId}
             onChange={(e) => setSelectedSeasonId(e.target.value)}
@@ -200,13 +203,6 @@ export default function MethodologyGovernancePage() {
               <option key={s.id} value={s.id}>{s.name} {s.is_active ? "(Activa)" : ""}</option>
             ))}
           </select>
-          <Link
-            href="/admin/metodologia/operativa"
-            className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
-          >
-            <Activity className="w-4 h-4" />
-            Centro Operativo
-          </Link>
         </div>
       </div>
 

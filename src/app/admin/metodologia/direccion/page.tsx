@@ -25,6 +25,7 @@ import {
   TransversalAlert,
   ClubMonthlyEvolutionPoint
 } from "@/lib/methodology/sportsDirectionService";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 import { buildClubDirectionAIContext } from "@/lib/methodology/ai/methodologyAIContextBuilder";
 import { MethodologyAIResponse } from "@/lib/methodology/ai/types";
 
@@ -284,8 +285,10 @@ export default function SportsDirectionDashboardPage() {
           </p>
         </div>
 
-        {/* Filtros y Exportación */}
+        {/* Filtros, Navegación y Exportación */}
         <div className="flex flex-wrap items-center gap-2.5 print:hidden">
+          <MethodologyNavHeader />
+
           <select
             value={selectedSeasonId}
             onChange={(e) => setSelectedSeasonId(e.target.value)}

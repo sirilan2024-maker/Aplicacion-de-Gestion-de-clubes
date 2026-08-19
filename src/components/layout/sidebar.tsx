@@ -36,7 +36,9 @@ import {
   Layers,
   Compass,
   LineChart,
-  ClipboardList
+  ClipboardList,
+  Building2,
+  Sliders
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {

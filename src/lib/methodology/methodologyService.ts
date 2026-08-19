@@ -622,9 +622,49 @@ export async function getTeamMethodologyHistory(teamId: string, filters: Analyti
     query = query.eq("microcycle_day", filters.microcycleDay);
   }
 
-  const { data: rawSessions, error } = await query.limit(200);
-  if (error) {
-    console.error("Error fetching team methodology history:", error);
+  let rawSessions: any[] = [];
+  try {
+    const { data, error } = await query.limit(200);
+    if (error) {
+      console.warn("Aviso en consulta anidada de historial metodológico:", error.message || error);
+      // Fallback defensivo: consultar training_sessions de forma directa sin nested deep joins
+      let fallbackQuery = supabase
+        .from("training_sessions")
+        .select(`
+          id,
+          team_id,
+          season_id,
+          microcycle_id,
+          date_time,
+          duration_minutes,
+          age_category,
+          microcycle_day,
+          intensity_load,
+          objective,
+          objectives_secondary,
+          num_players,
+          estimated_load,
+          is_completed
+        `)
+        .eq("team_id", teamId)
+        .order("date_time", { ascending: true });
+
+      if (filters.startDate) fallbackQuery = fallbackQuery.gte("date_time", filters.startDate);
+      if (filters.endDate) fallbackQuery = fallbackQuery.lte("date_time", filters.endDate);
+      if (filters.microcycleId) fallbackQuery = fallbackQuery.eq("microcycle_id", filters.microcycleId);
+      if (filters.microcycleDay) fallbackQuery = fallbackQuery.eq("microcycle_day", filters.microcycleDay);
+
+      const { data: fallbackData, error: fbError } = await fallbackQuery.limit(200);
+      if (fbError) {
+        console.warn("Aviso en fallback de sesiones:", fbError.message || fbError);
+        return [];
+      }
+      rawSessions = fallbackData || [];
+    } else {
+      rawSessions = data || [];
+    }
+  } catch (err) {
+    console.warn("Excepción capturada en getTeamMethodologyHistory:", err);
     return [];
   }
 

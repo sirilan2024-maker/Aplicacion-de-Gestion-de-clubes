@@ -42,6 +42,7 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -183,31 +184,52 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
   const totalPendiente = totalFacturado - totalAbonado;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       
       {/* Resumen Analítico adaptado a móvil y escritorio sin desbordamiento */}
       <div className="grid grid-cols-3 gap-2 md:gap-4">
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 md:p-4 text-center">
-          <p className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate">Total Cargado</p>
+          <p className="text-[10px] md:text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 truncate">Inscripción</p>
           <p className="text-sm sm:text-lg md:text-2xl font-black text-slate-800">{totalFacturado.toFixed(2)} €</p>
         </div>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 md:p-4 text-center">
-          <p className="text-[10px] md:text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1 truncate">Total Abonado</p>
+          <p className="text-[10px] md:text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1 truncate">Total Pagado</p>
           <p className="text-sm sm:text-lg md:text-2xl font-black text-emerald-700">{totalAbonado.toFixed(2)} €</p>
         </div>
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 md:p-4 text-center">
-          <p className="text-[10px] md:text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-1 truncate">Saldo Pendiente</p>
+          <p className="text-[10px] md:text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-1 truncate">Total Pendiente</p>
           <p className="text-sm sm:text-lg md:text-2xl font-black text-rose-700">{totalPendiente.toFixed(2)} €</p>
         </div>
       </div>
 
-      {fees.length === 0 ? (
-        <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-gray-200">
-          <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium">No hay cuotas registradas aún.</p>
-          <p className="text-xs mt-1">Cuando Secretaría genere un cobro, aparecerá aquí.</p>
-        </div>
-      ) : (
+      {/* Botón desplegable para ver/ocultar el detalle */}
+      <div className="pt-1">
+        <button
+          onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-700 transition-all shadow-2xs"
+        >
+          <span className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-emerald-600" />
+            {isDetailsOpen ? "Ocultar detalle de cuotas y recibos" : "Ver detalle de cuotas y recibos"}
+          </span>
+          {isDetailsOpen ? (
+            <ChevronUp className="w-4 h-4 text-slate-500" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-500" />
+          )}
+        </button>
+      </div>
+
+      {/* Contenido desplegable */}
+      {isDetailsOpen && (
+        <div className="pt-2 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          {fees.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-gray-200">
+              <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">No hay cuotas registradas aún.</p>
+              <p className="text-xs mt-1">Cuando Secretaría genere un cobro, aparecerá aquí.</p>
+            </div>
+          ) : (
         <>
           {/* ===== VISTA MÓVIL (block md:hidden): Tarjetas táctiles individuales SIN scrollbar horizontal ===== */}
           <div className="block md:hidden space-y-3">
@@ -427,6 +449,8 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
             </table>
           </div>
         </>
+      )}
+        </div>
       )}
     </div>
   );

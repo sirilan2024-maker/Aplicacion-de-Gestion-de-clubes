@@ -9,8 +9,6 @@ import { generateDrillEmbedding } from '@/services/drillSearchService';
 import type { FootballCategory, MicrocycleDay } from '@/types/microcycle';
 import type { TacticalBoardData } from '@/types/exercises';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
 export interface ImportDrillResult {
   success: boolean;
   count?: number;

@@ -31,7 +31,12 @@ import {
   Globe,
   Timer,
   FolderOpen,
-  UserPlus
+  UserPlus,
+  BookOpen,
+  Layers,
+  Compass,
+  LineChart,
+  ClipboardList
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -50,7 +55,12 @@ const IconMap: Record<string, React.ComponentType<any>> = {
   Brain: Brain,
   Globe: Globe,
   Timer: Timer,
-  FolderOpen: FolderOpen
+  FolderOpen: FolderOpen,
+  BookOpen: BookOpen,
+  Layers: Layers,
+  Compass: Compass,
+  LineChart: LineChart,
+  ClipboardList: ClipboardList
 }
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
@@ -266,14 +276,28 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       },
 
       {
+        label: "METODOLOGÍA",
+        items: [
+          { name: "Dashboard Metodológico", href: "/admin/metodologia", icon: Brain },
+          { name: "Biblioteca", href: "/admin/metodologia/biblioteca", icon: BookOpen },
+          { name: "Planificación", href: "/admin/metodologia/planificacion", icon: Layers },
+          { name: "Sesiones", href: "/admin/metodologia/sesiones", icon: ClipboardList },
+          { name: "Currículo", href: "/admin/metodologia/curriculo", icon: Compass },
+          { name: "Principios", href: "/admin/metodologia/principios", icon: Target },
+          { name: "Evaluación", href: "/admin/metodologia/evaluacion", icon: LineChart },
+          { name: "Jugadores", href: "/admin/metodologia/jugadores", icon: Users },
+        ]
+      },
+
+      {
         label: "GESTION",
         items: [
           { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
           { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
           { name: "Expedientes (Doc)", href: "/admin/secretaria", icon: FolderOpen },
-          { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
           { name: "Configuracion de roles", href: "/admin/configuracion/roles", icon: Shield },
           { name: "Temporadas", href: "/admin/temporadas", icon: Timer },
+          { name: "Archivo Histórico", href: "/dashboard/archivo", icon: Database },
           { name: "Calendario FFCV", href: "/admin/calendario-ffcv", icon: Database },
         ]
       },

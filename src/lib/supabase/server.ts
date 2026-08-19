@@ -1,16 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// Evitar problemas de TLS en el entorno local (Windows) durante el desarrollo
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-const originalEmitWarning = process.emitWarning;
-// @ts-ignore
-process.emitWarning = function(warning: any, ...args: any[]) {
-  if (typeof warning === 'string' && warning.includes('NODE_TLS_REJECT_UNAUTHORIZED')) return;
-  // @ts-ignore
-  return originalEmitWarning.call(process, warning, ...args);
-};
-
 export async function createClient() {
   const cookieStore = await cookies()
 

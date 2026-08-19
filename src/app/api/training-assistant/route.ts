@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { searchDrillsSemantic } from '@/services/drillSearchService';
 import type { FootballCategory, MicrocycleDay } from '@/types/microcycle';
-
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+import { createClient } from '@/lib/supabase/server';
 
 const PEDAGOGY_SYSTEM_PROMPT = `Eres el Director de Metodología de Fútbol y Entrenador UEFA PRO del Club Sporting Saladar.
 Tu misión es diseñar sesiones de entrenamiento de MÁXIMO RIGOR TÉCNICO, DIDÁCTICO Y METODOLÓGICO, adaptadas a la categoría evolutiva y al día del microciclo.

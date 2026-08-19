@@ -1876,6 +1876,65 @@ export default function GlobalPlayerProfilePage() {
         )}
 
       </div>
+
+      {/* Modal Emergente de Gestión de Foto */}
+      {showPhotoModal && (
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setShowPhotoModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner mb-1">
+              {player.avatar_url ? (
+                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+              ) : (
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                  <UserIcon size={40} />
+                </div>
+              )}
+            </div>
+
+            <h3 className="font-bold text-slate-900 text-sm">Foto de Perfil</h3>
+
+            <div className="flex flex-col w-full gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoModal(false);
+                  fileInputRef.current?.click();
+                }}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
+                <Camera size={14} />
+                <span>Cambiar Foto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoModal(false);
+                  deletePhoto();
+                }}
+                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-rose-200"
+              >
+                <Trash2 size={14} />
+                <span>Eliminar Foto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all mt-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2066,65 +2125,6 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
-
-      {/* Modal Emergente de Gestión de Foto */}
-      {showPhotoModal && (
-        <div 
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in"
-          onClick={() => setShowPhotoModal(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 border border-slate-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner mb-1">
-              {player.avatar_url ? (
-                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
-              ) : (
-                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
-                  <UserIcon size={40} />
-                </div>
-              )}
-            </div>
-
-            <h3 className="font-bold text-slate-900 text-sm">Foto de Perfil</h3>
-
-            <div className="flex flex-col w-full gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPhotoModal(false);
-                  fileInputRef.current?.click();
-                }}
-                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
-              >
-                <Camera size={14} />
-                <span>Cambiar Foto</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPhotoModal(false);
-                  deletePhoto();
-                }}
-                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-rose-200"
-              >
-                <Trash2 size={14} />
-                <span>Eliminar Foto</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowPhotoModal(false)}
-                className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all mt-1"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

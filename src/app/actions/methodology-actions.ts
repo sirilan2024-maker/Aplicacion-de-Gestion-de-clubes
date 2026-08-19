@@ -499,3 +499,77 @@ export async function upsertTeamObjective(data: {
   return { success: true };
 }
 
+// ─── BANCO DE EJERCICIOS & IMPORTACIÓN ──────────────────────────────────────────
+
+export async function importExerciseBatchAction(items: any[]) {
+  const { supabase, profile, clubId } = await getClubAndRole();
+  requireMethodologyRole(profile.role);
+
+  // Consultar ejercicios existentes para detección de duplicados
+  const { data: existing } = await supabase
+    .from('banco_ejercicios')
+    .select('id, nombre')
+    .eq('club_id', clubId);
+
+  // Validación estricta mediante el motor
+  const { validateExerciseBatch } = await import('@/lib/methodology/exerciseValidationEngine');
+  const validation = validateExerciseBatch(items, existing || []);
+
+  if (validation.validCount === 0 && validation.invalidCount > 0) {
+    throw new Error(`Ningún ejercicio superó la validación. Errores detectados: ${validation.errors.map(e => `${e.name}: ${e.errors.join(', ')}`).join(' | ')}`);
+  }
+
+  // Preparar inserción con club_id y estado is_verified=false por defecto para candidatos
+  const toInsert = validation.validExercises.map(ex => ({
+    ...ex,
+    club_id: clubId,
+    is_verified: ex.is_verified ?? false
+  }));
+
+  const { data: inserted, error } = await supabase
+    .from('banco_ejercicios')
+    .insert(toInsert)
+    .select('id, nombre, is_verified');
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/admin/metodologia/biblioteca');
+  return {
+    success: true,
+    insertedCount: inserted?.length || 0,
+    invalidCount: validation.invalidCount,
+    errors: validation.errors,
+    duplicateWarnings: validation.duplicateWarnings
+  };
+}
+
+export async function verifyExerciseAction(exerciseId: string, isVerified: boolean = true) {
+  const { supabase, profile, clubId } = await getClubAndRole();
+  requireMethodologyRole(profile.role);
+
+  const { error } = await supabase
+    .from('banco_ejercicios')
+    .update({ is_verified: isVerified })
+    .eq('id', exerciseId)
+    .eq('club_id', clubId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/admin/metodologia/biblioteca');
+  return { success: true };
+}
+
+export async function deleteExerciseAction(exerciseId: string) {
+  const { supabase, profile, clubId } = await getClubAndRole();
+  requireMethodologyRole(profile.role);
+
+  const { error } = await supabase
+    .from('banco_ejercicios')
+    .delete()
+    .eq('id', exerciseId)
+    .eq('club_id', clubId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/admin/metodologia/biblioteca');
+  return { success: true };
+}
+

@@ -461,19 +461,19 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
   return (
     <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-4">
       {/* Controles de vista */}
-      <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-200/80 pb-3">
         <div className="flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-red-500" />
+          <MapPin className="w-4 h-4 text-red-500 shrink-0" />
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
             Localización Anatómica Interactiva
           </span>
         </div>
 
-        <div className="inline-flex p-0.5 bg-slate-200 rounded-xl">
+        <div className="inline-flex p-0.5 bg-slate-200 rounded-xl w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setActiveView("front")}
-            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeView === "front"
                 ? "bg-white text-slate-900 shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
@@ -484,7 +484,7 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
           <button
             type="button"
             onClick={() => setActiveView("back")}
-            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeView === "back"
                 ? "bg-white text-slate-900 shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
@@ -603,7 +603,7 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
             <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5">
               Lateralidad
             </label>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
               {(
                 [
                   { id: "izquierda", label: "Izquierda" },

@@ -366,23 +366,23 @@ export function PlayerInjuriesSection({
   return (
     <div className="space-y-6">
       {/* 1. CABECERA & BADGE DE DISPONIBILIDAD DEPORTIVA */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-gray-100 pb-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-red-600" />
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h3 className="text-base sm:text-lg font-black text-gray-900 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-red-600 shrink-0" />
               Módulo de Lesiones Deportivas
             </h3>
 
             {/* Badge de Disponibilidad Deportiva */}
             {activeInjuries.length > 0 ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-white" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-white" />
                 🔴 BAJA POR LESIÓN
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 🟢 SIN LESIONES ACTIVAS
               </span>
             )}
@@ -396,7 +396,7 @@ export function PlayerInjuriesSection({
         {canManage && (
           <button
             onClick={() => setIsNewModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-red-200 cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-red-200 cursor-pointer w-full sm:w-auto shrink-0"
           >
             <Plus className="w-4 h-4" />
             Registrar Nueva Lesión
@@ -405,14 +405,14 @@ export function PlayerInjuriesSection({
       </div>
 
       {error && (
-        <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {loading ? (
-        <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 flex flex-col items-center justify-center gap-2">
+        <div className="p-6 sm:p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 flex flex-col items-center justify-center gap-2">
           <Loader2 className="w-6 h-6 animate-spin text-red-500" />
           <span className="text-xs text-gray-400 font-medium">Consultando historial médico deportivo...</span>
         </div>
@@ -422,41 +422,41 @@ export function PlayerInjuriesSection({
           {activeInjuries.length > 0 && (
             <div className="space-y-4">
               <span className="text-xs font-extrabold uppercase tracking-wider text-red-700 flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-red-600" />
+                <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
                 Lesión Activa en Seguimiento ({activeInjuries.length})
               </span>
 
               {activeInjuries.map(act => (
                 <div
                   key={act.id}
-                  className="bg-gradient-to-r from-red-50/90 via-rose-50/70 to-orange-50/80 border-2 border-red-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4"
+                  className="bg-gradient-to-r from-red-50/90 via-rose-50/70 to-orange-50/80 border-2 border-red-300 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 shadow-sm space-y-4"
                 >
                   {/* Fila Principal */}
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-red-300">
-                        <Activity className="w-6 h-6" />
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-red-300">
+                        <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-lg font-black text-slate-950">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h4 className="text-base sm:text-lg font-black text-slate-950 break-words">
                             {act.injuryType}
                           </h4>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${getSeverityBadgeClass(act.severity)}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${getSeverityBadgeClass(act.severity)}`}>
                             {act.severity || "Por determinar"}
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white">
                             En Recuperación
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700 mt-1">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-700 mt-1">
                           <span className="font-extrabold text-red-950 flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-red-600" />
+                            <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
                             {formatLocationLabel(act)}
                           </span>
                           <span className="text-slate-500">
-                            Fecha de lesión: <strong>{formatDate(act.injuryDate)}</strong>
+                            Fecha: <strong>{formatDate(act.injuryDate)}</strong>
                           </span>
                         </div>
                       </div>
@@ -464,14 +464,14 @@ export function PlayerInjuriesSection({
 
                     {/* Botones de acción rápida */}
                     {canManage && (
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                         <button
                           onClick={() => {
                             setSelectedInjuryForAction(act)
                             setNewForecastDate(act.expectedReturnDate || "")
                             setIsEvolutionModalOpen(true)
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer w-full sm:w-auto"
                         >
                           <MessageSquarePlus className="w-3.5 h-3.5 text-blue-600" />
                           Registrar Evolución
@@ -483,7 +483,7 @@ export function PlayerInjuriesSection({
                             setActualReturnDate(new Date().toISOString().split("T")[0])
                             setIsResolveModalOpen(true)
                           }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shadow-emerald-200 cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shadow-emerald-200 cursor-pointer w-full sm:w-auto"
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           Marcar como Recuperado
@@ -493,7 +493,7 @@ export function PlayerInjuriesSection({
                   </div>
 
                   {/* Panel de Previsión y Estimación Orientativa */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-red-200/80 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-3 border-t border-red-200/80 text-xs">
                     {/* Previsión Actual */}
                     <div className="bg-white/80 rounded-2xl p-3 border border-red-200/60 space-y-1">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
@@ -586,7 +586,7 @@ export function PlayerInjuriesSection({
             ) : (
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs min-w-[620px]">
                     <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase">
                       <tr>
                         <th className="px-4 py-3">Fecha</th>

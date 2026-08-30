@@ -674,33 +674,33 @@ export default function GlobalPlayerProfilePage() {
   const edadJugador = calcularEdad(player.birth_date);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-5xl mx-auto px-2.5 sm:px-4 py-4 sm:py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="top-right" />
       
       {/* Navegación */}
       <button 
         onClick={() => router.back()}
-        className="flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors mb-6 group"
+        className="flex items-center text-xs sm:text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors mb-4 sm:mb-6 group"
       >
         <ArrowLeft size={16} className="mr-1 group-hover:-translate-x-1 transition-transform" />
         Volver a la plantilla
       </button>
 
       {/* Cabecera del Perfil */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6 relative">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-5 sm:mb-6 relative">
         {player.status === 'inactive' && (
-          <div className="bg-orange-50 border-b border-orange-200 p-4 text-center">
-            <div className="flex items-center justify-center gap-2 text-orange-800 font-medium">
-              <AlertCircle size={20} />
+          <div className="bg-orange-50 border-b border-orange-200 p-3 sm:p-4 text-center">
+            <div className="flex items-center justify-center gap-2 text-orange-800 font-medium text-xs sm:text-sm">
+              <AlertCircle size={18} className="shrink-0" />
               <span>Este jugador está en el Archivo Histórico. Sus datos son de solo lectura. Para editarlo, debes restaurarlo primero.</span>
             </div>
           </div>
         )}
         <div className="h-16 sm:h-20 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
-        <div className="px-4 sm:px-8 pb-6">
-          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mb-4 gap-4">
-            <div className="flex items-center gap-6 sm:gap-8 w-full">
-              <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden -mt-10 sm:-mt-12 group flex-shrink-0">
+        <div className="px-3 sm:px-8 pb-4 sm:pb-6">
+          <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mb-3 sm:mb-4 gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-6 w-full">
+              <div className="relative min-w-20 w-20 h-20 sm:min-w-28 sm:w-28 sm:h-28 md:min-w-32 md:w-32 md:h-32 bg-white rounded-2xl sm:rounded-3xl shadow-xl border-2 sm:border-4 border-white flex items-center justify-center overflow-hidden -mt-7 sm:-mt-12 group flex-shrink-0">
                 <label className="w-full h-full cursor-pointer flex items-center justify-center" title="Toca para cambiar foto">
                   {player.avatar_url ? (
                     <img
@@ -710,7 +710,7 @@ export default function GlobalPlayerProfilePage() {
                     />
                   ) : (
                     <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
-                      <UserIcon size={64} />
+                      <UserIcon className="w-10 h-10 sm:w-16 sm:h-16" />
                     </div>
                   )}
 
@@ -738,41 +738,36 @@ export default function GlobalPlayerProfilePage() {
                   </button>
                 )}
               </div>
-              <div className="flex-1 min-w-0 pt-1 pl-2 sm:pl-3">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+              <div className="flex-1 min-w-0 pt-1 pl-1 sm:pl-3">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
+                  <h1 className="text-lg sm:text-2xl md:text-3xl font-black text-gray-900 tracking-tight break-words line-clamp-2">
                     {player.first_name} {player.last_name}
                   </h1>
                   {player.dorsal && (
-                    <span className="bg-gray-900 text-white font-bold px-2 py-0.5 rounded text-lg">
+                    <span className="bg-gray-900 text-white font-bold px-2 py-0.5 rounded text-xs sm:text-sm md:text-base shrink-0">
                       {player.dorsal}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-gray-600 font-medium text-sm flex-wrap">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 text-gray-600 font-medium text-xs sm:text-sm">
                   <span className="capitalize">{player.posicion_principal || player.posicion || 'Sin posición'}</span>
                   {edadJugador !== null && (
-                    <>
-                      <span>•</span>
-                      <span>{edadJugador} años</span>
-                    </>
+                    <span className="text-gray-400">• {edadJugador} años</span>
                   )}
-                  <span>•</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-bold ${
                     player.status === 'inactive' ? 'bg-gray-100 text-gray-700' :
                     player.status === 'Sancionado' ? 'bg-orange-100 text-orange-700' :
                     'bg-green-100 text-green-700'
                   }`}>
                     {player.status === 'active' || player.status === 'Activo' ? 'Activo' : player.status || 'Activo'}
                   </span>
-                  <span>•</span>
                   {hasActiveInjury ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
-                      <span className="w-2 h-2 rounded-full bg-white" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
                       🔴 BAJA POR LESIÓN
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                       🟢 SIN LESIONES ACTIVAS
                     </span>
@@ -784,7 +779,7 @@ export default function GlobalPlayerProfilePage() {
               <button 
                 onClick={() => setIsEditing(true)}
                 disabled={player.status === 'inactive'}
-                className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 sm:mt-0"
+                className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 sm:mt-0 text-xs sm:text-sm"
                 title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
               >
                 <Edit3 size={16} /> Editar Perfil
@@ -793,14 +788,14 @@ export default function GlobalPlayerProfilePage() {
               <div className="flex w-full sm:w-auto gap-2 mt-2 sm:mt-0">
                 <button 
                   onClick={() => setIsEditing(false)}
-                  className="flex-1 sm:flex-none px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors text-center"
+                  className="flex-1 sm:flex-none px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors text-center text-xs sm:text-sm"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm"
                 >
                   <Save size={16} /> {saving ? 'Guardando...' : 'Guardar'}
                 </button>
@@ -910,14 +905,14 @@ export default function GlobalPlayerProfilePage() {
       </div>
 
       {/* Contenido de las pestañas */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3.5 sm:p-6 md:p-8 overflow-hidden">
         
         {/* PESTAÑA: INFO PERSONAL */}
         {activeTab === 'info' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
             <div className="space-y-6">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Datos del Jugador</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2">Datos del Jugador</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nombre</label>
                   {isEditing ? (
@@ -966,7 +961,7 @@ export default function GlobalPlayerProfilePage() {
                     <input type="text" value={editData.posicion_principal || ''} onChange={e => setEditData({...editData, posicion_principal: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
                   ) : <div className="text-gray-900 font-medium">{player.posicion_principal || '-'}</div>}
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Clubes Anteriores</label>
                   {isEditing ? (
                     <input type="text" value={editData.clubes_anteriores || ''} onChange={e => setEditData({...editData, clubes_anteriores: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-sm text-slate-900" />
@@ -1225,23 +1220,23 @@ export default function GlobalPlayerProfilePage() {
 
         {/* PESTAÑA: FÍSICO & MÉDICO */}
         {activeTab === 'medico' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             <div className="md:col-span-1 space-y-6">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2">Antropometría</h3>
-              <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <div className="flex items-center gap-4">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2">Antropometría</h3>
+              <div className="flex flex-col gap-3.5 bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <div className="flex-1">
                     <span className="block text-xs font-bold text-gray-500 uppercase">Altura (m)</span>
                     {isEditing ? (
-                      <input type="number" step="0.01" value={editData.altura || ''} onChange={e => setEditData({...editData, altura: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
-                    ) : <span className="text-2xl font-bold text-gray-900">{player.altura ? `${player.altura}m` : '-'}</span>}
+                      <input type="number" step="0.01" value={editData.altura || ''} onChange={e => setEditData({...editData, altura: Number(e.target.value)})} className="w-full border rounded p-1 text-base sm:text-lg font-bold bg-white w-24 text-slate-900" />
+                    ) : <span className="text-xl sm:text-2xl font-bold text-gray-900">{player.altura ? `${player.altura}m` : '-'}</span>}
                   </div>
-                  <div className="w-px h-12 bg-gray-200"></div>
+                  <div className="w-px h-10 sm:h-12 bg-gray-200"></div>
                   <div className="flex-1 pl-2">
                     <span className="block text-xs font-bold text-gray-500 uppercase">Peso (kg)</span>
                     {isEditing ? (
-                      <input type="number" step="0.1" value={editData.peso || ''} onChange={e => setEditData({...editData, peso: Number(e.target.value)})} className="w-full border rounded p-1 text-lg font-bold bg-white w-24 text-slate-900" />
-                    ) : <span className="text-2xl font-bold text-gray-900">{player.peso ? `${player.peso}kg` : '-'}</span>}
+                      <input type="number" step="0.1" value={editData.peso || ''} onChange={e => setEditData({...editData, peso: Number(e.target.value)})} className="w-full border rounded p-1 text-base sm:text-lg font-bold bg-white w-24 text-slate-900" />
+                    ) : <span className="text-xl sm:text-2xl font-bold text-gray-900">{player.peso ? `${player.peso}kg` : '-'}</span>}
                   </div>
                 </div>
                 
@@ -1249,8 +1244,8 @@ export default function GlobalPlayerProfilePage() {
                 {(!isEditing && player.altura && player.peso && player.altura > 0) && (
                   <div className="pt-3 border-t border-gray-200">
                     <span className="block text-xs font-bold text-gray-500 uppercase mb-1">IMC (Índice de Masa Corporal)</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl font-bold text-gray-900">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-lg sm:text-xl font-bold text-gray-900">
                         {(() => {
                           const alt = player.altura > 3 ? player.altura / 100 : player.altura;
                           return (player.peso / (alt * alt)).toFixed(1);
@@ -1270,33 +1265,46 @@ export default function GlobalPlayerProfilePage() {
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estado Actual</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Estado Actual</label>
                 {isEditing ? (
-                  <select value={editData.status || ''} onChange={e => setEditData({...editData, status: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-slate-900">
+                  <select value={editData.status || ''} onChange={e => setEditData({...editData, status: e.target.value})} className="w-full border rounded p-2 bg-gray-50 text-slate-900 text-xs sm:text-sm">
                     <option value="Activo">Activo</option>
                     <option value="Lesionado">Lesionado</option>
                     <option value="Sancionado">Sancionado</option>
                   </select>
                 ) : (
-                  <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold ${
-                    player.status === 'Lesionado' ? 'bg-red-50 text-red-700 border border-red-200' :
-                    player.status === 'Sancionado' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
-                    'bg-green-50 text-green-700 border border-green-200'
-                  }`}>
-                    <CheckCircle size={16} /> {player.status || 'Activo'}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold ${
+                      player.status === 'Lesionado' ? 'bg-red-50 text-red-700 border border-red-200' :
+                      player.status === 'Sancionado' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
+                      'bg-green-50 text-green-700 border border-green-200'
+                    }`}>
+                      <CheckCircle size={16} /> {player.status || 'Activo'}
+                    </span>
+                    {hasActiveInjury ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                        🔴 BAJA POR LESIÓN
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        🟢 SIN LESIONES ACTIVAS
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
 
             <div className="md:col-span-2 space-y-6">
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
                 <FileText size={18} className="text-gray-400" />
                 Historial y Notas Médicas
               </h3>
               {isEditing ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">SIP</label>
                       <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.sip || ''} onChange={e => setEditData({...editData, sip: e.target.value})} />
@@ -1321,7 +1329,7 @@ export default function GlobalPlayerProfilePage() {
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Lesiones</label>
                       <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.lesiones || ''} onChange={e => setEditData({...editData, lesiones: e.target.value})} />
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-700 mb-1">Operaciones</label>
                       <input className="w-full border border-gray-300 rounded p-2 text-sm text-slate-900" value={editData.operaciones || ''} onChange={e => setEditData({...editData, operaciones: e.target.value})} />
                     </div>
@@ -1338,7 +1346,7 @@ export default function GlobalPlayerProfilePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 bg-white border border-gray-100 rounded-xl p-3.5 sm:p-4 shadow-sm">
                     <div>
                       <span className="block text-xs text-gray-500 mb-1">SIP</span>
                       <span className="font-medium text-gray-900">{player.sip || '-'}</span>
@@ -1359,7 +1367,7 @@ export default function GlobalPlayerProfilePage() {
                       <span className="block text-xs text-gray-500 mb-1">Medicación</span>
                       <span className="font-medium text-gray-900">{player.medicacion || 'Ninguna'}</span>
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <span className="block text-xs text-gray-500 mb-1">Lesiones / Operaciones</span>
                       <span className="font-medium text-gray-900">
                         {player.lesiones || player.operaciones ? `${player.lesiones || ''} ${player.operaciones ? `(${player.operaciones})` : ''}` : 'Ninguna'}
@@ -1367,11 +1375,11 @@ export default function GlobalPlayerProfilePage() {
                     </div>
                   </div>
                   {player.medical_notes ? (
-                    <div className="bg-yellow-50/50 border border-yellow-200 rounded-xl p-4">
-                      <p className="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed">{player.medical_notes}</p>
+                    <div className="bg-yellow-50/50 border border-yellow-200 rounded-xl p-3 sm:p-4">
+                      <p className="text-gray-800 whitespace-pre-wrap text-xs sm:text-sm leading-relaxed">{player.medical_notes}</p>
                     </div>
                   ) : (
-                    <p className="text-gray-400 italic text-sm">Sin notas médicas adicionales.</p>
+                    <p className="text-gray-400 italic text-xs sm:text-sm">Sin notas médicas adicionales.</p>
                   )}
                 </div>
               )}
@@ -1386,36 +1394,38 @@ export default function GlobalPlayerProfilePage() {
               </div>
 
               {/* TABLA HISTORIAL DE PROGRESIÓN (IMC / Peso) */}
-              <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mt-8 flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2 mt-8 flex items-center gap-2">
                 <TrendingUp size={18} className="text-blue-500" />
                 Historial de Progresión (Peso / IMC)
               </h3>
               <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                 {measurementsHistory.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400 text-sm">
+                  <div className="p-6 sm:p-8 text-center text-gray-400 text-xs sm:text-sm">
                     No hay mediciones históricas. Modifica el peso o la altura para crear el primer registro.
                   </div>
                 ) : (
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-xs">
-                      <tr>
-                        <th className="px-4 py-3">Fecha</th>
-                        <th className="px-4 py-3 text-center">Peso</th>
-                        <th className="px-4 py-3 text-center">Altura</th>
-                        <th className="px-4 py-3 text-center">IMC</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {measurementsHistory.map((m, idx) => (
-                        <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-gray-900">{new Date(m.date).toLocaleDateString('es-ES')}</td>
-                          <td className="px-4 py-3 text-center text-gray-700">{m.weight ? `${m.weight} kg` : '-'}</td>
-                          <td className="px-4 py-3 text-center text-gray-700">{m.height ? `${m.height} m` : '-'}</td>
-                          <td className="px-4 py-3 text-center font-bold text-blue-700">{m.bmi ? m.bmi : '-'}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm min-w-[320px]">
+                      <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold uppercase text-xs">
+                        <tr>
+                          <th className="px-4 py-3">Fecha</th>
+                          <th className="px-4 py-3 text-center">Peso</th>
+                          <th className="px-4 py-3 text-center">Altura</th>
+                          <th className="px-4 py-3 text-center">IMC</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {measurementsHistory.map((m, idx) => (
+                          <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-gray-900">{new Date(m.date).toLocaleDateString('es-ES')}</td>
+                            <td className="px-4 py-3 text-center text-gray-700">{m.weight ? `${m.weight} kg` : '-'}</td>
+                            <td className="px-4 py-3 text-center text-gray-700">{m.height ? `${m.height} m` : '-'}</td>
+                            <td className="px-4 py-3 text-center font-bold text-blue-700">{m.bmi ? m.bmi : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

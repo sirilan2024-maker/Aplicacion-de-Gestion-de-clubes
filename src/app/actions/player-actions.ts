@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { headers } from "next/headers"
+import { getAuthenticatedContext, ADMIN_ROLES, COACH_ROLES, canUserAccessPlayer } from "@/lib/auth-helpers"
+
 
 export async function createFamilyAndPlayerAction(playerData: any, familyAuthData: any) {
   try {
@@ -185,11 +187,20 @@ export async function acceptGdprAction({ linkCode, playerId }: { linkCode?: stri
 
 export async function exportRgpdAction(clubId: string) {
   try {
-    const adminClient = await createAdminClient()
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role) || context.profile.club_id !== clubId) {
+      return { success: false, error: "No tienes permisos para exportar datos RGPD de este club" };
+    }
+
+    const adminClient = createAdminClient();
     const { data: players, error } = await adminClient
       .from('players')
       .select('first_name, last_name, consent_rgpd_at, consent_ip, consent_user_agent')
-      .eq('club_id', clubId)
+      .eq('club_id', context.profile.club_id)
       .order('first_name')
       
     if (error) throw error
@@ -215,185 +226,249 @@ export async function exportRgpdAction(clubId: string) {
 
 export async function updatePlayerPositionAction(playerId: string, newPosition: string) {
   try {
-    const supabase = await createClient()
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: { message: authError || "No autenticado" } };
+    }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: { message: "No autenticado" } }
+    const adminClient = createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: { message: access.reason || "No tienes permisos para modificar este jugador" } };
+    }
 
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('players')
       .update({ posicion: newPosition })
       .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
 
     if (error) {
-      console.error("Error updating player position:", error)
-      return { success: false, error }
+      console.error("Error updating player position:", error);
+      return { success: false, error };
     }
 
-    revalidatePath('/dashboard/club/miembros')
-    revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page')
+    revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page');
     
-    return { success: true }
+    return { success: true };
   } catch (err: any) {
-    return { success: false, error: { message: err.message } }
+    return { success: false, error: { message: err.message } };
   }
 }
 
 export async function archivePlayerAction(playerId: string, isArchived: boolean = true) {
   try {
-    const supabase = await createClient()
-
-    // Comprobamos la autenticación
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { success: false, error: { message: "No autenticado" } }
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: { message: authError || "No autenticado" } };
     }
 
-    const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
-    const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: { message: "Solo los administradores pueden archivar o desarchivar jugadores" } };
+    }
 
-    const { error } = await supabase
+    const adminClient = createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: { message: access.reason || "No tienes permisos para archivar este jugador" } };
+    }
+
+    const { data: activeSeason } = await adminClient
+      .from('seasons')
+      .select('id')
+      .eq('club_id', context.profile.club_id)
+      .eq('is_active', true)
+      .single();
+
+    const { error } = await adminClient
       .from('players')
       .update({ status: isArchived ? 'inactive' : 'active' })
       .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
 
     if (activeSeason?.id) {
-      await supabase
+      await adminClient
         .from('player_season_history')
         .update({ status: isArchived ? 'inactive' : 'active' })
         .eq('player_id', playerId)
         .eq('season_id', activeSeason.id)
+        .eq('club_id', context.profile.club_id);
     }
 
     if (error) {
-      console.error("Error archiving player:", error)
-      return { success: false, error }
+      console.error("Error archiving player:", error);
+      return { success: false, error };
     }
 
-    revalidatePath('/dashboard/club/miembros')
-    revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page')
+    revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page');
     
-    return { success: true }
+    return { success: true };
   } catch (err: any) {
-    return { success: false, error: { message: err.message } }
+    return { success: false, error: { message: err.message } };
   }
 }
 
 export async function reactivatePlayerAction(playerId: string, teamId: string | null) {
   try {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { success: false, error: { message: "No autenticado" } }
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: { message: authError || "No autenticado" } };
     }
 
-    const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
-    const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: { message: "Solo los administradores pueden reactivar jugadores" } };
+    }
+
+    const adminClient = createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: { message: access.reason || "No tienes permisos sobre este jugador" } };
+    }
+
+    if (teamId) {
+      const { data: targetTeam } = await adminClient
+        .from('teams')
+        .select('id, club_id')
+        .eq('id', teamId)
+        .single();
+      if (!targetTeam || targetTeam.club_id !== context.profile.club_id) {
+        return { success: false, error: { message: "El equipo seleccionado no pertenece a tu club" } };
+      }
+    }
+
+    const { data: activeSeason } = await adminClient
+      .from('seasons')
+      .select('id')
+      .eq('club_id', context.profile.club_id)
+      .eq('is_active', true)
+      .single();
 
     // Reactivar al jugador
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminClient
       .from('players')
       .update({ status: 'active', team_id: teamId })
       .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
 
     if (updateError) {
-      return { success: false, error: updateError }
+      return { success: false, error: updateError };
     }
 
     // Si se le ha asignado un equipo y hay temporada activa, lo registramos en el historial
     if (teamId && activeSeason?.id) {
-      // Evitar duplicados (por si ya estuviera)
-      const { data: existing } = await supabase
+      const { data: existing } = await adminClient
         .from('player_season_history')
         .select('id')
         .eq('player_id', playerId)
         .eq('season_id', activeSeason.id)
         .eq('team_id', teamId)
-        .maybeSingle()
+        .maybeSingle();
         
       if (!existing) {
-        await supabase.from('player_season_history').insert({
+        await adminClient.from('player_season_history').insert({
           player_id: playerId,
           team_id: teamId,
           season_id: activeSeason.id,
-          club_id: profile?.club_id,
+          club_id: context.profile.club_id,
           status: 'active'
-        })
+        });
       }
     }
 
-    revalidatePath('/dashboard/club/miembros')
-    revalidatePath('/dashboard/club/miembros/archivo')
+    revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/dashboard/club/miembros/archivo');
     
-    return { success: true }
+    return { success: true };
   } catch (err: any) {
-    return { success: false, error: { message: err.message } }
+    return { success: false, error: { message: err.message } };
   }
 }
 
 export async function deletePlayerAction(playerId: string) {
   try {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { success: false, error: { message: "No autenticado" } }
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: { message: authError || "No autenticado" } };
     }
 
-    // Get current first name
-    const { data: player } = await supabase
-      .from('players')
-      .select('first_name')
-      .eq('id', playerId)
-      .single()
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: { message: "Solo los administradores pueden eliminar jugadores" } };
+    }
+
+    const adminClient = createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: { message: access.reason || "No autorizado para eliminar este jugador" } };
+    }
 
     // 1. Manually cascade delete from related tables to avoid FK constraint errors
-    await supabase.from('player_season_history').delete().eq('player_id', playerId)
-    await supabase.from('player_tutors').delete().eq('player_id', playerId)
-    // En caso de que exista ficha médica, dependencias etc.
-    await supabase.from('player_medical_records').delete().eq('player_id', playerId)
+    await adminClient.from('player_season_history').delete().eq('player_id', playerId).eq('club_id', context.profile.club_id);
+    await adminClient.from('player_tutors').delete().eq('player_id', playerId);
+    await adminClient.from('player_medical_records').delete().eq('player_id', playerId);
 
     // 2. Hard delete from players table
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('players')
       .delete()
       .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
 
     if (error) {
-      console.error("Error deleting player:", error)
-      return { success: false, error }
+      console.error("Error deleting player:", error);
+      return { success: false, error };
     }
 
-    revalidatePath('/dashboard/club/miembros')
+    revalidatePath('/dashboard/club/miembros');
     
-    return { success: true }
+    return { success: true };
   } catch (err: any) {
-    return { success: false, error: { message: err.message } }
+    return { success: false, error: { message: err.message } };
   }
 }
 
+
 export async function getPlayerTutorsAction(playerId: string) {
   try {
-    const supabase = createAdminClient()
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    const supabase = createAdminClient();
+    const access = await canUserAccessPlayer(supabase, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No autorizado" };
+    }
+
     const { data, error } = await supabase
       .from('player_tutors')
       .select('profiles(id, first_name, last_name, email, role)')
-      .eq('player_id', playerId)
+      .eq('player_id', playerId);
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: error.message };
     }
     
-    return { success: true, tutors: data }
+    return { success: true, tutors: data };
   } catch (err: any) {
-    return { success: false, error: err.message }
+    return { success: false, error: err.message };
   }
 }
 
 export async function getClubStaffAction(clubId: string) {
   try {
-    const adminClient = createAdminClient()
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (context.profile.club_id !== clubId) {
+      return { success: false, error: "No tienes permisos para ver el staff de este club" };
+    }
+
+    const adminClient = createAdminClient();
     const { data, error } = await adminClient
       .from('profiles')
       .select(`
@@ -411,9 +486,9 @@ export async function getClubStaffAction(clubId: string) {
         team_coaches(teams(id, name, color))
       `)
       .eq('club_id', clubId)
-      .or('role.in.(admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado),roles.ov.{admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado}')
+      .or('role.in.(admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado),roles.ov.{admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado}');
     
-    if (error) throw error
+    if (error) throw error;
 
     const mappedData = data.map(profile => {
       const tcArray = profile.team_coaches || [];
@@ -422,12 +497,12 @@ export async function getClubStaffAction(clubId: string) {
         ...profile,
         teams: teamsArray,
         team_coaches: undefined
-      }
-    })
+      };
+    });
 
-    return { success: true, data: mappedData }
+    return { success: true, data: mappedData };
   } catch (err: any) {
-    return { success: false, error: err.message }
+    return { success: false, error: err.message };
   }
 }
 
@@ -457,46 +532,71 @@ export async function revokeImageConsentAction(playerId: string) {
     
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message }
+    return { success: false, error: err.message };
   }
 }
 
 export async function assignPlayerToTeamAction(playerId: string, teamId: string) {
   try {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { success: false, error: { message: "No autenticado" } }
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: { message: authError || "No autenticado" } };
     }
 
-    const { error } = await supabase
+    if (!ADMIN_ROLES.includes(context.profile.role) && !COACH_ROLES.includes(context.profile.role)) {
+      return { success: false, error: { message: "No tienes permisos para asignar jugadores a equipos" } };
+    }
+
+    const adminClient = createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: { message: access.reason || "No autorizado sobre este jugador" } };
+    }
+
+    if (teamId) {
+      const { data: team } = await adminClient
+        .from('teams')
+        .select('id, club_id')
+        .eq('id', teamId)
+        .eq('club_id', context.profile.club_id)
+        .maybeSingle();
+
+      if (!team) {
+        return { success: false, error: { message: "El equipo seleccionado no pertenece a tu club" } };
+      }
+    }
+
+    const { error } = await adminClient
       .from('players')
       .update({ team_id: teamId || null })
       .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
 
     if (error) {
-      return { success: false, error }
+      return { success: false, error };
     }
 
-    revalidatePath('/dashboard/club/miembros')
-    
-    return { success: true }
+    revalidatePath('/dashboard/club/miembros');
+    return { success: true };
   } catch (err: any) {
-    return { success: false, error: { message: err.message } }
+    return { success: false, error: { message: err.message } };
   }
 }
 
 export async function uploadPlayerAvatarAction(playerId: string, formData: FormData) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "No autenticado" };
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) return { success: false, error: authError || "No autenticado" };
 
     const file = formData.get('file') as File;
     if (!file) return { success: false, error: "No se proporcionó archivo de imagen" };
 
     const adminClient = createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No autorizado para cambiar el avatar de este jugador" };
+    }
+
     const fileExt = file.name.split('.').pop() || 'jpg';
     const fileName = `${playerId}-${Date.now()}.${fileExt}`;
     const filePath = `jugadores/${fileName}`;
@@ -523,7 +623,8 @@ export async function uploadPlayerAvatarAction(playerId: string, formData: FormD
     const { error: updateError } = await adminClient
       .from('players')
       .update({ avatar_url: publicUrl })
-      .eq('id', playerId);
+      .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
 
     if (updateError) {
       console.error("Admin DB Update Error:", updateError);
@@ -537,5 +638,6 @@ export async function uploadPlayerAvatarAction(playerId: string, formData: FormD
     return { success: false, error: err.message };
   }
 }
+
 
 

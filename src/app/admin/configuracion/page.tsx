@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Settings, Plus, Save, Trash2, CheckCircle2 } from "lucide-react";
+import { Settings, Plus, Save, Trash2, CheckCircle2, Landmark, Loader2 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { getClubSepaAction, updateClubSepaAction } from "@/app/actions/club-actions";
 
 interface ClubMetric {
   id: string;
@@ -18,15 +19,32 @@ export default function ConfiguracionClubPage() {
   const [loading, setLoading] = useState(true);
   const [clubId, setClubId] = useState<string | null>(null);
 
+  // SEPA Club configuration state
+  const [sepaCreditorId, setSepaCreditorId] = useState("");
+  const [sepaIban, setSepaIban] = useState("");
+  const [savingSepa, setSavingSepa] = useState(false);
+  const [loadingSepa, setLoadingSepa] = useState(true);
+
   // New metric form
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
   const [newType, setNewType] = useState("number");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchMetrics();
-  }, []);
+  const fetchClubSepa = async () => {
+    setLoadingSepa(true);
+    try {
+      const res = await getClubSepaAction();
+      if (res.success && res.data) {
+        setSepaCreditorId(res.data.sepa_creditor_id || "");
+        setSepaIban(res.data.sepa_iban || "");
+      }
+    } catch {
+      // Ignorar error en carga inicial
+    } finally {
+      setLoadingSepa(false);
+    }
+  };
 
   const fetchMetrics = async () => {
     setLoading(true);
@@ -41,7 +59,7 @@ export default function ConfiguracionClubPage() {
     
     setClubId(profile.club_id);
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('club_metrics')
       .select('*')
       .eq('club_id', profile.club_id)
@@ -51,6 +69,33 @@ export default function ConfiguracionClubPage() {
       setMetrics(data);
     }
     setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMetrics();
+    fetchClubSepa();
+  }, []);
+
+  const handleSaveClubSepa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clubId) return;
+    setSavingSepa(true);
+    try {
+      const res = await updateClubSepaAction({
+        clubId,
+        sepaCreditorId,
+        sepaIban,
+      });
+      if (res.success) {
+        toast.success("Configuración bancaria SEPA guardada correctamente");
+      } else {
+        toast.error(res.error || "Error al guardar configuración SEPA");
+      }
+    } catch {
+      toast.error("Error al guardar la configuración SEPA");
+    } finally {
+      setSavingSepa(false);
+    }
   };
 
   const handleAddMetric = async (e: React.FormEvent) => {
@@ -121,6 +166,70 @@ export default function ConfiguracionClubPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Configuración del Club</h1>
           <p className="text-gray-500">Administra los parámetros y preferencias globales de tu club.</p>
+        </div>
+      </div>
+
+      {/* Configuración Bancaria y Mandato SEPA (Acreedor) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+              <Landmark size={22} className="text-blue-600" />
+              Configuración Bancaria SEPA (Acreedor)
+            </h2>
+            <p className="text-gray-500 text-sm">
+              Datos del club requeridos para la emisión y cobro de remesas bancarias SEPA.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 bg-gray-50/50">
+          <form onSubmit={handleSaveClubSepa} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Identificador acreedor SEPA
+                </label>
+                <input
+                  type="text"
+                  value={sepaCreditorId}
+                  onChange={e => setSepaCreditorId(e.target.value)}
+                  placeholder="ej: ES02000A12345678"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono text-sm bg-white"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Identificador asignado por el banco para adeudos SEPA (AT-02).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  IBAN del Club
+                </label>
+                <input
+                  type="text"
+                  value={sepaIban}
+                  onChange={e => setSepaIban(e.target.value)}
+                  placeholder="ES00 0000 0000 0000 0000 0000"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono text-sm bg-white"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Cuenta bancaria receptora de las cuotas del club.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={savingSepa || loadingSepa}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 shadow-sm"
+              >
+                {savingSepa ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                Guardar Configuración SEPA
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 

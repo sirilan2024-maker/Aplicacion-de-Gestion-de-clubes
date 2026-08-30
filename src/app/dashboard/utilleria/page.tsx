@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Loader2, Search, Shirt, CheckSquare, BarChart3, AlertCircle, ShoppingBag, ClipboardList, X } from "lucide-react"
 import toast from "react-hot-toast"
 import { createClient } from "@/lib/supabase/client"
-import { getApparelDashboardDataAction, getApparelSummaryReportAction, toggleApparelDeliveryAction, updatePlayerApparelSizesAction, updateApparelStockAction } from "@/app/actions/apparel-actions"
+import { getApparelDashboardDataAction, getApparelSummaryReportAction, toggleApparelDeliveryAction, updatePlayerApparelSizesAction, updateApparelStockAction, updatePlayerDorsalAction } from "@/app/actions/apparel-actions"
 
 const CLOTHING_SIZES = [
   'Talla 116',
@@ -872,7 +872,7 @@ export default function UtilleriaDashboardPage() {
                         {item.label}
                       </h3>
                       <span className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-lg">
-                        {Object.values(sizesReport).reduce((acc: any, stats: any) => acc + (stats.totalNeeded || 0), 0)} Solicitados
+                        {Object.values(sizesReport).reduce((acc: number, stats: any) => acc + (stats.totalNeeded || 0), 0)} Solicitados
                       </span>
                     </div>
                     {item.key.includes('Total') && (

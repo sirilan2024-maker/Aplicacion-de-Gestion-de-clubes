@@ -7,7 +7,7 @@
 import { MethodologyPriority } from "./methodologyPriorityEngine";
 import { GeneratorContext } from "./methodologySessionGenerator";
 
-export type MicrocycleDayCode = 'MD+1' | 'MD-5' | 'MD-4' | 'MD-3' | 'MD-2' | 'MD-1' | 'MD' | 'REST';
+export type MicrocycleDayCode = 'MD+2' | 'MD+1' | 'MD' | 'MD-1' | 'MD-2' | 'MD-3' | 'MD-4' | 'MD-5' | 'MD-6' | 'REST';
 
 export interface MicrocycleDayPlan {
   dayOfWeek: number; // 1 = Lunes, 2 = Martes, ..., 7 = Domingo
@@ -65,6 +65,7 @@ export interface MicrocyclePlannerContext {
   mesocycleId?: string;
   weekStartDate: string; // Lunes YYYY-MM-DD
   matchDayDate?: string; // YYYY-MM-DD (normalmente Sábado o Domingo)
+  matchDayDates?: string[]; // Para semanas con múltiples partidos
   matchOpponent?: string;
   trainingDays?: number[]; // ej. [2, 4, 5] para Martes, Jueves, Viernes
   priorities?: MethodologyPriority[];
@@ -76,26 +77,45 @@ export interface MicrocyclePlannerContext {
 const DAY_NAMES = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 /**
- * Calcula el código MD respecto a la fecha del partido
+ * Calcula de forma canónica y determinista el código MD-x respecto a la fecha del partido
  */
-export function calculateMdCode(dayDateStr: string, matchDateStr?: string): MicrocycleDayCode {
+export function calculateMdCode(dayDateStr: string, matchDateStr?: string | string[]): MicrocycleDayCode {
   if (!matchDateStr) return 'MD-3';
   
+  const matchDates = Array.isArray(matchDateStr) ? matchDateStr : [matchDateStr];
+  if (matchDates.length === 0) return 'MD-3';
+
+  // Si coincide exactamente con día de partido
+  if (matchDates.includes(dayDateStr)) return 'MD';
+
+  // Encontrar el partido de referencia más relevante
+  const sortedMatches = [...matchDates].sort();
+  let refMatchStr = sortedMatches[0];
+  for (const mStr of sortedMatches) {
+    if (dayDateStr <= mStr) {
+      refMatchStr = mStr;
+      break;
+    }
+    refMatchStr = mStr;
+  }
+
   const dayDate = new Date(dayDateStr);
-  const matchDate = new Date(matchDateStr);
+  const matchDate = new Date(refMatchStr);
   
   const diffTime = dayDate.getTime() - matchDate.getTime();
   const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
 
   if (diffDays === 0) return 'MD';
   if (diffDays === 1) return 'MD+1';
+  if (diffDays === 2) return 'MD+2';
   if (diffDays === -1) return 'MD-1';
   if (diffDays === -2) return 'MD-2';
   if (diffDays === -3) return 'MD-3';
   if (diffDays === -4) return 'MD-4';
   if (diffDays === -5) return 'MD-5';
+  if (diffDays === -6) return 'MD-6';
   
-  return diffDays < 0 ? 'MD-4' : 'REST';
+  return 'REST';
 }
 
 /**
@@ -109,6 +129,7 @@ export function generateMicrocycleProposal(context: MicrocyclePlannerContext): M
     mesocycleId,
     weekStartDate,
     matchDayDate,
+    matchDayDates,
     matchOpponent,
     priorities = [],
     curriculumPrinciples = [],
@@ -135,13 +156,15 @@ export function generateMicrocycleProposal(context: MicrocyclePlannerContext): M
     ? recentRpeScores.reduce((a, b) => a + b, 0) / recentRpeScores.length 
     : 6;
 
+  const allMatchDates = matchDayDates || (matchDayDate ? [matchDayDate] : []);
+
   // Generar cada uno de los 7 días (Lunes=1 a Domingo=7)
   for (let d = 1; d <= 7; d++) {
     const currentDayDate = new Date(baseDate);
     currentDayDate.setDate(baseDate.getDate() + (d - 1));
     const dateStr = currentDayDate.toISOString().split('T')[0];
-    const isMatch = matchDayDate ? dateStr === matchDayDate : (d === 7); // Domingo si no hay fecha
-    const mdCode = isMatch ? 'MD' : calculateMdCode(dateStr, matchDayDate);
+    const isMatch = allMatchDates.length > 0 ? allMatchDates.includes(dateStr) : (d === 7);
+    const mdCode = isMatch ? 'MD' : calculateMdCode(dateStr, allMatchDates.length > 0 ? allMatchDates : undefined);
     const isTraining = !isMatch && defaultTrainingDays.includes(d);
 
     let duration = 0;
@@ -160,8 +183,8 @@ export function generateMicrocycleProposal(context: MicrocyclePlannerContext): M
       objective = matchOpponent ? `Partido de Competición vs ${matchOpponent}` : "Partido de Competición";
       dayReasons.push("Día de Partido oficial (MD): Máxima exigencia competitiva y evaluación del modelo");
     } else if (isTraining) {
-      if (mdCode === 'MD-3' || mdCode === 'MD-4' || mdCode === 'MD-5') {
-        // Día de Tensión / Fuerza / Táctica principal
+      if (mdCode === 'MD-4') {
+        // Tensión / Fuerza / Duelos / Espacios Reducidos
         targetLoad = 'Alta';
         targetLoadPercentage = 85;
         duration = 90;
@@ -169,20 +192,39 @@ export function generateMicrocycleProposal(context: MicrocyclePlannerContext): M
         secondaryObjectives = ["Transición Ofensiva", "Duelos"];
         dayPriority = primaryPriorityTitle;
         principles = [objective, ...secondaryObjectives];
-        dayReasons.push(`${mdCode}: Día de máxima intensidad metodológica. Foco en ${objective}`);
+        dayReasons.push(`MD-4: Día de Tensión y Fuerza específica. Foco en ${objective}`);
         if (dayPriority) {
           dayReasons.push(`Alineado con prioridad activa: ${dayPriority}`);
         }
-      } else if (mdCode === 'MD-2') {
-        // Día de Espacios amplios / Velocidad / Juego de posición
+      } else if (mdCode === 'MD-3') {
+        // Extensión / Resistencia Táctica / Espacios Medios-Grandes
+        targetLoad = 'Alta';
+        targetLoadPercentage = 80;
+        duration = 90;
+        objective = highPriority?.suggestedPrinciple || "Organización y Circulación en Espacios Amplios";
+        secondaryObjectives = ["Salida de balón", "Circulación"];
+        dayPriority = primaryPriorityTitle;
+        principles = [objective, ...secondaryObjectives];
+        dayReasons.push(`MD-3: Día de Extensión y Resistencia táctica en espacios amplios.`);
+      } else if (mdCode === 'MD-5') {
+        // Tensión sub-máxima / Conservación
         targetLoad = 'Media-Alta';
         targetLoadPercentage = 70;
-        duration = 90;
-        objective = "Progresión y Juego de Posición en Amplitud";
-        secondaryObjectives = ["Salida de balón", "Circulación"];
+        duration = 80;
+        objective = "Conservación y Dinámica de Pases";
+        secondaryObjectives = ["Apoyos", "Cambios de orientación"];
+        principles = [objective, ...secondaryObjectives];
+        dayReasons.push("MD-5: Introducción de patrones y conservación en espacio intermedio");
+      } else if (mdCode === 'MD-2') {
+        // Velocidad / Reacción / SSG
+        targetLoad = 'Media-Alta';
+        targetLoadPercentage = 70;
+        duration = 80;
+        objective = "Velocidad de Juego y Finalización Rápida";
+        secondaryObjectives = ["Transición Ofensiva", "Tiro"];
         dayPriority = priorities[1]?.title || primaryPriorityTitle;
         principles = [objective, ...secondaryObjectives];
-        dayReasons.push("MD-2: Dinámica de espacios amplios y fijación posicional");
+        dayReasons.push("MD-2: Velocidad de reacción, toques reducidos y finalización");
       } else if (mdCode === 'MD-1') {
         // Víspera de partido: Activación + ABP
         targetLoad = 'Baja';
@@ -191,21 +233,45 @@ export function generateMicrocycleProposal(context: MicrocyclePlannerContext): M
         objective = "Acciones a Balón Parado y Activación Previa";
         secondaryObjectives = ["Estrategia defensiva", "Velocidad de reacción"];
         principles = [objective, ...secondaryObjectives];
-        dayReasons.push("MD-1: Reducción de fatiga neuro-muscular y ajuste de balón parado");
+        dayReasons.push("MD-1: Activación neuromuscular y ajuste de balón parado sin sobrecarga");
         if (avgRecentRpe >= 7.5) {
           dayReasons.push("Carga modulada a la baja por acumulación reciente de RPE");
         }
+      } else if (mdCode === 'MD-6') {
+        targetLoad = 'Media';
+        targetLoadPercentage = 55;
+        duration = 75;
+        objective = "Reactivación Técnica y Dinámica Posicional";
+        secondaryObjectives = ["Pase", "Control"];
+        principles = [objective, ...secondaryObjectives];
+        dayReasons.push("MD-6: Reactivación progresiva del modelo");
       } else if (mdCode === 'MD+1') {
-        // Día posterior a partido: Regeneración
         targetLoad = 'Baja';
         targetLoadPercentage = 35;
         duration = 60;
         objective = "Compensación y Recuperación Regenerativa";
         principles = ["Circulación suave", "Rueda de pases"];
         dayReasons.push("MD+1: Tareas de baja carga física para restablecimiento fisiológico");
+      } else if (mdCode === 'MD+2') {
+        targetLoad = 'Media';
+        targetLoadPercentage = 50;
+        duration = 60;
+        objective = "Compensación y Asimilación Táctica";
+        principles = ["Posesión suave"];
+        dayReasons.push("MD+2: Normalización de cargas post-partido");
       }
 
       principles.forEach(p => coveredPrinciplesSet.add(p));
+
+      // Protección metodológica: evitar 2 días consecutivos de carga 'Alta'
+      if (targetLoad === 'Alta' && days.length > 0) {
+        const prevDay = days[days.length - 1];
+        if (prevDay.isTrainingDay && prevDay.targetLoad === 'Alta') {
+          targetLoad = 'Media-Alta';
+          targetLoadPercentage = 75;
+          dayReasons.push(`Carga modulada preventivamente a Media-Alta (75%) para evitar sobrecarga en días consecutivos (${prevDay.dayName} y ${DAY_NAMES[d]})`);
+        }
+      }
     } else {
       dayReasons.push("Jornada sin entrenamiento programado (Descanso)");
     }

@@ -3,9 +3,37 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    const isCronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+    if (!isCronAuthorized) {
+      try {
+        const { createClient } = await import('@/lib/supabase/server');
+        const authSupabase = await createClient();
+        const { data: { user } } = await authSupabase.auth.getUser();
+        if (!user) {
+          return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+        }
+        const { data: profile } = await authSupabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (!profile || !['admin', 'superadmin', 'coordinador', 'directivo'].includes(profile.role)) {
+          return NextResponse.json({ error: 'Rol insuficiente para ejecutar recordatorios' }, { status: 403 });
+        }
+      } catch {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      }
+    }
+
+
+
     // Use admin client so we can fetch club_id and insert notifications without RLS issues
     const supabase = await createAdminClient()
     const nowISO = new Date().toISOString()
+
 
     // 1. Encontrar eventos de equipo programados para recordar AHORA o en el PASADO y que NO se hayan enviado
     const { data: events } = await supabase

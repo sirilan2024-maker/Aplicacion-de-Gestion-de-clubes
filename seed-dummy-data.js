@@ -1,3 +1,14 @@
+// ============================================================================
+// BLINDAJE DE SEGURIDAD CONTRA EJECUCIÓN ACCIDENTAL EN PRODUCCIÓN (P17-C9)
+// ============================================================================
+if (process.env.NODE_ENV === 'production' || process.env.ALLOW_SEED_EXECUTION !== 'true') {
+  console.error('\n[SEGURIDAD CRÍTICA] Ejecución abortada.');
+  console.error('Este script genera datos de prueba/seed y está terminantemente PROHIBIDO en producción.');
+  console.error('Para ejecutarlo en un entorno de desarrollo aislado, define explícitamente:');
+  console.error('  ALLOW_SEED_EXECUTION=true y asegúrate de no apuntar a producción.\n');
+  process.exit(1);
+}
+
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const crypto = require('crypto');

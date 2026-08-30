@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthenticatedContext, canUserAccessMatch } from "@/lib/auth-helpers";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createAdminClient();
+    // 1. Validar autenticación y contexto de usuario
+    const { context, error: authError, statusCode } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return NextResponse.json({ error: authError || "No autenticado" }, { status: statusCode || 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const partidoId = searchParams.get("partidoId");
 
@@ -11,21 +17,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Falta el parámetro partidoId" }, { status: 400 });
     }
 
-    // Consultar la ruta en la base de datos
-    const { data: match, error: dbError } = await supabase
-      .from("partidos")
-      .select("id, acta_oficial_url")
-      .eq("id", partidoId)
-      .single();
+    const supabase = createAdminClient();
 
-    let storagePath = match?.acta_oficial_url;
+    // 2. Validar que el partido pertenece al club del usuario
+    const matchCheck = await canUserAccessMatch(supabase, context, partidoId);
+    if (!matchCheck.allowed || !matchCheck.match) {
+      return NextResponse.json(
+        { error: matchCheck.reason || "Partido no encontrado o no autorizado" },
+        { status: 403 }
+      );
+    }
+
+    const match = matchCheck.match;
+    let storagePath = match.acta_oficial_url;
 
     if (!storagePath) {
-      // Probar si existe la ruta por defecto
       storagePath = `partidos/${partidoId}/acta_oficial.pdf`;
     }
 
-    // Generar Signed URL con TTL de 900 segundos (15 minutos)
+    // 3. Generar Signed URL con TTL de 900 segundos (15 minutos)
     const { data, error: urlError } = await supabase.storage
       .from("actas-partidos")
       .createSignedUrl(storagePath, 900);
@@ -52,3 +62,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Error interno" }, { status: 500 });
   }
 }
+

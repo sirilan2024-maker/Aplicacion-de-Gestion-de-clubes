@@ -3,18 +3,20 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Activity, 
-  Building2, 
-  Sliders, 
-  ChevronDown, 
-  Brain, 
-  LayoutDashboard, 
-  TrendingUp, 
-  ShieldCheck, 
-  CheckCircle, 
-  History, 
-  LineChart
+import {
+  Activity,
+  Calendar,
+  BookOpen,
+  Users,
+  Building2,
+  ChevronDown,
+  Brain,
+  Award,
+  Layers,
+  Sparkles,
+  Plus,
+  ArrowRight,
+  Target
 } from "lucide-react";
 
 interface MethodologyNavHeaderProps {
@@ -23,239 +25,253 @@ interface MethodologyNavHeaderProps {
 
 export function MethodologyNavHeader({ currentRole }: MethodologyNavHeaderProps) {
   const pathname = usePathname();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
+  // Estados para dropdowns
+  const [openMenu, setOpenMenu] = useState<"planificacion" | "curriculo" | "jugadores" | null>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar menús al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setOpenMenu(null);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Close dropdown on route change
+  // Cerrar al cambiar de ruta
   useEffect(() => {
-    setIsDropdownOpen(false);
+    setOpenMenu(null);
   }, [pathname]);
 
+  // Chequeo de rutas activas para cada pilar
   const isOperativaActive = pathname === "/admin/metodologia/operativa";
-  const isSimulacionActive = pathname === "/admin/metodologia/simulador" || pathname === "/admin/metodologia/simulacion";
   
-  const isDireccionActive = [
-    "/admin/metodologia/direccion",
-    "/admin/metodologia/ejecutiva",
-    "/admin/metodologia/centro-control",
-    "/admin/metodologia/evolucion",
-    "/admin/metodologia/gobierno",
-    "/admin/metodologia/gobernanza",
-    "/admin/metodologia/decision",
-    "/admin/metodologia/calidad",
-    "/admin/metodologia/auditoria",
-    "/admin/metodologia/optimizacion",
-  ].some(route => pathname.startsWith(route));
+  const isPlanificacionActive = 
+    pathname.startsWith("/admin/metodologia/planificacion") ||
+    pathname.startsWith("/admin/metodologia/sesiones");
+
+  const isCurriculoActive = 
+    pathname.startsWith("/admin/metodologia/curriculo") ||
+    pathname.startsWith("/admin/metodologia/biblioteca") ||
+    pathname.startsWith("/admin/metodologia/principios");
+
+  const isJugadoresActive = 
+    pathname.startsWith("/admin/metodologia/jugadores") ||
+    pathname.startsWith("/admin/metodologia/evaluacion");
+
+  const isDireccionActive = 
+    pathname === "/admin/metodologia/direccion" ||
+    [
+      "/admin/metodologia/ejecutiva",
+      "/admin/metodologia/centro-control",
+      "/admin/metodologia/evolucion",
+      "/admin/metodologia/gobierno",
+      "/admin/metodologia/gobernanza",
+      "/admin/metodologia/decision",
+      "/admin/metodologia/calidad",
+      "/admin/metodologia/auditoria",
+      "/admin/metodologia/optimizacion",
+    ].some(r => pathname.startsWith(r));
 
   return (
-    <div className="relative flex flex-wrap items-center gap-2 print:hidden z-30">
-      {/* 1. CENTRO OPERATIVO */}
+    <nav ref={navRef} className="relative flex flex-wrap items-center gap-1.5 print:hidden z-30" aria-label="Navegación Metodológica">
+      
+      {/* PILAR 1: CENTRO OPERATIVO */}
       <Link
         href="/admin/metodologia/operativa"
-        className={`flex items-center gap-2 py-2 px-3.5 sm:px-4 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs ${
+        className={`flex items-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all shadow-2xs ${
           isOperativaActive
-            ? "bg-purple-700 text-white ring-2 ring-purple-400/50"
-            : "bg-purple-600 hover:bg-purple-500 text-white"
+            ? "bg-purple-600 text-white shadow-xs"
+            : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
         }`}
       >
-        <Activity className="w-4 h-4 shrink-0" />
-        <span>Centro Operativo</span>
+        <Activity className={`w-3.5 h-3.5 shrink-0 ${isOperativaActive ? "text-white" : "text-purple-600"}`} />
+        <span>Operativa</span>
       </Link>
 
-      {/* 2. DIRECCIÓN DEPORTIVA (DROPDOWN ESTRATÉGICO) */}
-      <div className="relative" ref={dropdownRef}>
+      {/* PILAR 2: PLANIFICACIÓN */}
+      <div className="relative">
         <button
           type="button"
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className={`flex items-center gap-2 py-2 px-3.5 sm:px-4 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs ${
-            isDireccionActive
-              ? "bg-indigo-700 text-white ring-2 ring-indigo-400/50"
-              : "bg-indigo-600 hover:bg-indigo-500 text-white"
+          onClick={() => setOpenMenu(openMenu === "planificacion" ? null : "planificacion")}
+          className={`flex items-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all shadow-2xs ${
+            isPlanificacionActive
+              ? "bg-blue-600 text-white shadow-xs"
+              : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
           }`}
-          aria-expanded={isDropdownOpen}
+          aria-expanded={openMenu === "planificacion"}
         >
-          <Building2 className="w-4 h-4 shrink-0" />
-          <span>Dirección Deportiva</span>
-          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} />
+          <Calendar className={`w-3.5 h-3.5 shrink-0 ${isPlanificacionActive ? "text-white" : "text-blue-600"}`} />
+          <span>Planificación</span>
+          <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${openMenu === "planificacion" ? "rotate-180" : ""}`} />
         </button>
 
-        {isDropdownOpen && (
-          <div className="absolute right-0 sm:left-0 sm:right-auto mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 grid gap-3 animate-in fade-in zoom-in-95 duration-150 z-50">
-            
-            {/* Header del Menú Desplegable */}
-            <div className="px-2 py-1.5 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                Dirección Deportiva & Gobierno
-              </span>
-              <Link 
-                href="/admin/metodologia/direccion" 
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                Panel General →
-              </Link>
-            </div>
-
-            {/* SECCIÓN 1: INTELIGENCIA */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
-                Inteligencia
+        {openMenu === "planificacion" && (
+          <div className="absolute left-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100 z-50">
+            <Link
+              href="/admin/metodologia/planificacion"
+              className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
+                pathname.startsWith("/admin/metodologia/planificacion")
+                  ? "bg-blue-50 text-blue-900 font-bold"
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <Calendar className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold leading-tight">Macrociclos & Microciclos</div>
+                <div className="text-[10px] text-slate-400">Estructuración temporal por temporadas</div>
               </div>
-              <Link
-                href="/admin/metodologia/ejecutiva"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/ejecutiva")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <Brain className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Inteligencia Ejecutiva</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Visión institucional y KPIs estratégicos</div>
-                </div>
-              </Link>
-              <Link
-                href="/admin/metodologia/centro-control"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/centro-control")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <LayoutDashboard className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Centro de Control 360º</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Visión transversal de estado, calidad y ciclo</div>
-                </div>
-              </Link>
-            </div>
+            </Link>
 
-            {/* SECCIÓN 2: EVOLUCIÓN Y GOBIERNO */}
-            <div className="space-y-1 border-t border-slate-100 pt-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
-                Evolución y Gobierno
+            <Link
+              href="/admin/metodologia/sesiones"
+              className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
+                pathname.startsWith("/admin/metodologia/sesiones") && !pathname.includes("/nueva")
+                  ? "bg-blue-50 text-blue-900 font-bold"
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <Target className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold leading-tight">Sesiones de Entrenamiento</div>
+                <div className="text-[10px] text-slate-400">Listado, ejecución y evaluación</div>
               </div>
-              <Link
-                href="/admin/metodologia/evolucion"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/evolucion")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <TrendingUp className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Evolución Metodológica</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Diagnóstico adaptativo y tendencias de ciclo</div>
-                </div>
-              </Link>
-              <Link
-                href="/admin/metodologia/gobierno"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/gobierno")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <ShieldCheck className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Gobierno Metodológico</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Validación humana y registro de decisiones</div>
-                </div>
-              </Link>
-            </div>
+            </Link>
 
-            {/* SECCIÓN 3: CALIDAD Y AUDITORÍA */}
-            <div className="space-y-1 border-t border-slate-100 pt-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
-                Calidad y Auditoría
+            <Link
+              href="/admin/metodologia/sesiones/nueva"
+              className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-slate-50 text-slate-700 border-t border-slate-100"
+            >
+              <Plus className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-indigo-600 leading-tight">+ Diseñar Nueva Sesión</div>
+                <div className="text-[10px] text-slate-400">Constructor en 5 fases de sesión</div>
               </div>
-              <Link
-                href="/admin/metodologia/calidad"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/calidad")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <CheckCircle className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Calidad y Garantía</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Validación de rigor y completitud de datos</div>
-                </div>
-              </Link>
-              <Link
-                href="/admin/metodologia/auditoria"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/auditoria")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <History className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Auditoría Histórica</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Eventos inmutables y reconstrucción temporal</div>
-                </div>
-              </Link>
-            </div>
-
-            {/* SECCIÓN 4: OPTIMIZACIÓN */}
-            <div className="space-y-1 border-t border-slate-100 pt-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2">
-                Optimización
-              </div>
-              <Link
-                href="/admin/metodologia/optimizacion"
-                className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
-                  pathname.startsWith("/admin/metodologia/optimizacion")
-                    ? "bg-indigo-50 text-indigo-900 font-bold"
-                    : "hover:bg-slate-50 text-slate-700"
-                }`}
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <LineChart className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold leading-tight">Optimización y Benchmarking</div>
-                  <div className="text-[10px] text-slate-500 leading-snug">Comparativa comparable y detección de buenas prácticas</div>
-                </div>
-              </Link>
-            </div>
-
+            </Link>
           </div>
         )}
       </div>
 
-      {/* 3. SIMULADOR */}
+      {/* PILAR 3: CURRÍCULO & BIBLIOTECA */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpenMenu(openMenu === "curriculo" ? null : "curriculo")}
+          className={`flex items-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all shadow-2xs ${
+            isCurriculoActive
+              ? "bg-indigo-600 text-white shadow-xs"
+              : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
+          }`}
+          aria-expanded={openMenu === "curriculo"}
+        >
+          <Brain className={`w-3.5 h-3.5 shrink-0 ${isCurriculoActive ? "text-white" : "text-indigo-600"}`} />
+          <span>Currículo & Biblioteca</span>
+          <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${openMenu === "curriculo" ? "rotate-180" : ""}`} />
+        </button>
+
+        {openMenu === "curriculo" && (
+          <div className="absolute left-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100 z-50">
+            <Link
+              href="/admin/metodologia/curriculo"
+              className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
+                pathname.startsWith("/admin/metodologia/curriculo") || pathname.startsWith("/admin/metodologia/principios")
+                  ? "bg-indigo-50 text-indigo-900 font-bold"
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <Brain className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold leading-tight">Currículo & Modelo de Juego</div>
+                <div className="text-[10px] text-slate-400">Etapas formativas (U6-Senior) y fases</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/admin/metodologia/biblioteca"
+              className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
+                pathname.startsWith("/admin/metodologia/biblioteca")
+                  ? "bg-indigo-50 text-indigo-900 font-bold"
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold leading-tight">Biblioteca de Tareas</div>
+                <div className="text-[10px] text-slate-400">199 ejercicios oficiales, PDF y QR</div>
+              </div>
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* PILAR 4: JUGADORES & EVALUACIÓN */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpenMenu(openMenu === "jugadores" ? null : "jugadores")}
+          className={`flex items-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all shadow-2xs ${
+            isJugadoresActive
+              ? "bg-emerald-600 text-white shadow-xs"
+              : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
+          }`}
+          aria-expanded={openMenu === "jugadores"}
+        >
+          <Users className={`w-3.5 h-3.5 shrink-0 ${isJugadoresActive ? "text-white" : "text-emerald-600"}`} />
+          <span>Jugadores & Evaluación</span>
+          <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${openMenu === "jugadores" ? "rotate-180" : ""}`} />
+        </button>
+
+        {openMenu === "jugadores" && (
+          <div className="absolute left-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-100 z-50">
+            <Link
+              href="/admin/metodologia/evaluacion"
+              className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
+                pathname.startsWith("/admin/metodologia/evaluacion")
+                  ? "bg-emerald-50 text-emerald-900 font-bold"
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <Award className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold leading-tight">Evaluación Formativa</div>
+                <div className="text-[10px] text-slate-400">Rúbricas de 5 niveles y deltas M3</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/admin/metodologia/jugadores"
+              className={`flex items-start gap-2.5 p-2 rounded-xl transition-colors ${
+                pathname.startsWith("/admin/metodologia/jugadores")
+                  ? "bg-emerald-50 text-emerald-900 font-bold"
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <Users className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold leading-tight">Directorio de Plantilla</div>
+                <div className="text-[10px] text-slate-400">Censo, asistencia y objetivos de jugador</div>
+              </div>
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* PILAR 5: DIRECCIÓN */}
       <Link
-        href="/admin/metodologia/simulador"
-        className={`flex items-center gap-2 py-2 px-3.5 sm:px-4 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs ${
-          isSimulacionActive
-            ? "bg-slate-950 text-white ring-2 ring-slate-400/50"
-            : "bg-slate-900 hover:bg-slate-800 text-white"
+        href="/admin/metodologia/direccion"
+        className={`flex items-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all shadow-2xs ${
+          isDireccionActive
+            ? "bg-slate-900 text-white shadow-xs"
+            : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200"
         }`}
       >
-        <Sliders className="w-4 h-4 shrink-0" />
-        <span>Simulación</span>
+        <Building2 className={`w-3.5 h-3.5 shrink-0 ${isDireccionActive ? "text-white" : "text-slate-700"}`} />
+        <span>Dirección</span>
       </Link>
-    </div>
+
+    </nav>
   );
 }

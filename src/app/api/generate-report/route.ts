@@ -10,14 +10,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Comprobar rol de admin
+    // Comprobar rol y club
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, club_id')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'admin' && profile?.role !== 'metodologo') {
+    if (profile?.role !== 'admin' && profile?.role !== 'metodologo' && profile?.role !== 'coordinador') {
       return NextResponse.json({ error: 'Acceso denegado. Rol insuficiente.' }, { status: 403 })
     }
 
@@ -33,13 +33,20 @@ export async function POST(req: Request) {
 
     if (entityType === 'player' && entityId) {
       const { data: player } = await supabase.from('players').select('*').eq('id', entityId).single()
+      if (!player || (profile.club_id && player.club_id !== profile.club_id)) {
+        return NextResponse.json({ error: 'Jugador no encontrado o ajeno al club' }, { status: 403 })
+      }
       const { data: attendance } = await supabase.from('attendance').select('*').eq('player_id', entityId)
       contextData = { player, attendance }
     } else if (entityType === 'team' && entityId) {
       const { data: team } = await supabase.from('teams').select('*').eq('id', entityId).single()
+      if (!team || (profile.club_id && team.club_id !== profile.club_id)) {
+        return NextResponse.json({ error: 'Equipo no encontrado o ajeno al club' }, { status: 403 })
+      }
       const { data: players } = await supabase.from('players').select('*').eq('team_id', entityId)
       contextData = { team, players }
     }
+
 
     // 2. Preparar el prompt para el LLM (e.g., OpenAI o Anthropic)
     // Aquí conectarías con la SDK de tu proveedor de IA. Por ejemplo:

@@ -12,18 +12,34 @@ function formatTime(totalSeconds: number) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-export function LiveMatchPanel({ match: initialMatch, clubLogoUrl }: { match: any, clubLogoUrl?: string }) {
-  const [match, setMatch] = useState<any>(initialMatch);
-  const [matchEvents, setMatchEvents] = useState<any[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+export function LiveMatchPanel({
+  match: initialMatch,
+  clubLogoUrl,
+  partidoId,
+  convocados,
+  initialEvents,
+  teamColor
+}: {
+  match?: any;
+  clubLogoUrl?: string;
+  partidoId?: string;
+  convocados?: any[];
+  initialEvents?: any[];
+  teamColor?: any;
+}) {
+  const [match, setMatch] = useState<any>(initialMatch || (partidoId ? { id: partidoId } : null));
+  const [matchEvents, setMatchEvents] = useState<any[]>(initialEvents || []);
+  const [loadingEvents, setLoadingEvents] = useState(!initialEvents);
 
   const supabase = createClient();
-  const matchId = match?.id;
+  const matchId = match?.id || partidoId;
 
   // Sync state if initialMatch changes (user clicked another match in carousel)
   useEffect(() => {
-    setMatch(initialMatch);
-    setLoadingEvents(true);
+    if (initialMatch) {
+      setMatch(initialMatch);
+      setLoadingEvents(true);
+    }
   }, [initialMatch]);
 
   // Fetch initial events and subscribe

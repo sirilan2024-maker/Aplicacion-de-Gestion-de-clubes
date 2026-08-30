@@ -16,7 +16,8 @@ export default async function DashboardPage() {
     .single();
 
   const role = profile?.role;
-  if (role === 'admin' || role === 'coordinador') redirect('/dashboard/equipos');
+  if (role === 'admin') redirect('/admin/inicio');
+  else if (role === 'coordinador') redirect('/dashboard/equipos');
   else if (role === 'coach' || role === 'entrenador') redirect('/dashboard/mis-equipos');
   else if (role === 'tutor' || role === 'familia' || role === 'family') redirect('/dashboard/family');
   else if (role === 'jugador') {

@@ -67,7 +67,7 @@ export function generatePostSessionFeedback(params: {
         type: 'adjust_microcycle_day',
         title: 'Ajustar carga de siguiente jornada',
         rationale: `RPE elevado (${comparison.executed.sessionRpe}/10) en la sesión anterior.`,
-        evidence: [{ metric: 'RPE', value: comparison.executed.sessionRpe, reference: session.objective }],
+        evidence: [{ metric: 'RPE', value: comparison.executed.sessionRpe ?? 0, reference: session.objective }],
         target: { microcycleDay: 'MD-2' },
         proposedChanges: { modificationsSummary: ['Reducir intensidad a Media/Baja', 'Limitar duración a 60 min'] }
       }));

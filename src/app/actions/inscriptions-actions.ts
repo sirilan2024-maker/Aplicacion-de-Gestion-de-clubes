@@ -2,17 +2,20 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessPlayer, canUserManageRegistration, canUserUpdateRegistrationEmail } from "@/lib/auth-helpers";
 
 export async function getInscriptionsAction() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, data: [] };
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) return { success: false, data: [] };
+
+  if (!ADMIN_ROLES.includes(context.profile.role) && context.profile.role !== 'secretario') {
+    return { success: false, data: [] };
+  }
+
+  const clubId = context.profile.club_id;
+  if (!clubId) return { success: false, data: [] };
 
   const adminSupabase = await createAdminClient();
-  const { data: profile } = await adminSupabase.from('profiles').select('club_id').eq('id', user.id).single();
-  
-  const clubId = profile?.club_id;
-  if (!clubId) return { success: false, data: [] };
 
   const { data, error } = await adminSupabase
     .from('players')
@@ -54,13 +57,29 @@ export async function getInscriptionsAction() {
 }
 
 export async function approveInscriptionAction(id: string) {
+
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || 'No autenticado' };
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role)) {
+    return { success: false, error: 'No tienes permisos para aprobar inscripciones' };
+  }
+
   const supabase = await createAdminClient();
+
+  const access = await canUserAccessPlayer(supabase, context, id);
+  if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+    return { success: false, error: access.reason || 'No autorizado para aprobar esta inscripción' };
+  }
   
-  // Update the player status to active and registration_status to pending_payment
+  // Update the player status to active and registration_status to formalized
   const { data: player, error: updateError } = await supabase
     .from('players')
     .update({ status: 'active', registration_status: 'formalized' })
     .eq('id', id)
+    .eq('club_id', context.profile.club_id)
     .select('club_id, team_id')
     .single();
 
@@ -102,7 +121,21 @@ export async function approveInscriptionAction(id: string) {
 }
 
 export async function requestCorrectionAction(id: string, reason: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || 'No autenticado' };
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role)) {
+    return { success: false, error: 'No tienes permisos para solicitar correcciones' };
+  }
+
   const supabase = await createAdminClient();
+
+  const access = await canUserManageRegistration(supabase, context, id);
+  if (!access.allowed) {
+    return { success: false, error: access.reason || 'No autorizado para modificar esta inscripción' };
+  }
   
   const { error } = await supabase
     .from('registrations')
@@ -110,37 +143,52 @@ export async function requestCorrectionAction(id: string, reason: string) {
       status: 'NEEDS_CORRECTION',
       correction_reason: reason
     })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('club_id', context.profile.club_id);
 
   if (error) return { success: false, error: error.message };
 
-  // Aquí iría el envío de email automático
   revalidatePath('/dashboard/inscripciones');
   return { success: true };
 }
 
 export async function rejectInscriptionAction(id: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || 'No autenticado' };
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role)) {
+    return { success: false, error: 'No tienes permisos para rechazar inscripciones' };
+  }
+
   const supabase = await createAdminClient();
+
+  const access = await canUserAccessPlayer(supabase, context, id);
+  if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+    return { success: false, error: access.reason || 'No autorizado para eliminar este jugador' };
+  }
   
   // 1. Fetch player name to delete associated fees
-  const { data: player } = await supabase.from('players').select('first_name, last_name, user_auth_id').eq('id', id).single();
+  const { data: player } = await supabase.from('players').select('first_name, last_name, user_auth_id').eq('id', id).eq('club_id', context.profile.club_id).single();
   
   if (player) {
     const conceptLike = `Inscripción Temporada - ${player.first_name} ${player.last_name}`;
-    await supabase.from('fees').delete().ilike('concept', conceptLike);
+    await supabase.from('fees').delete().ilike('concept', conceptLike).eq('club_id', context.profile.club_id);
   }
 
   // 2. Manually delete from related tables just to be safe
-  await supabase.from('player_season_history').delete().eq('player_id', id);
+  await supabase.from('player_season_history').delete().eq('player_id', id).eq('club_id', context.profile.club_id);
   await supabase.from('player_tutors').delete().eq('player_id', id);
   await supabase.from('player_documents').delete().eq('player_id', id);
   await supabase.from('player_apparel').delete().eq('player_id', id);
   
-  // 2. Borrado del jugador (hard delete)
+  // 3. Borrado del jugador (hard delete)
   const { error } = await supabase
     .from('players')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('club_id', context.profile.club_id);
 
   if (error) return { success: false, error: error.message };
 
@@ -148,17 +196,39 @@ export async function rejectInscriptionAction(id: string) {
   return { success: true };
 }
 
+
 export async function updateRegistrationEmailAction(registrationId: string, newEmail: string, userId?: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
   const supabase = await createAdminClient();
+
+  const access = await canUserUpdateRegistrationEmail(supabase, context, registrationId, userId);
+  if (!access.allowed) {
+    return { success: false, error: access.reason || "No autorizado para modificar el email de esta inscripción" };
+  }
   
   // 1. Update form_data in registrations
-  const { data: reg, error: fetchErr } = await supabase.from('registrations').select('form_data').eq('id', registrationId).single();
-  if (fetchErr) return { success: false, error: fetchErr.message };
+  const { data: reg, error: fetchErr } = await supabase
+    .from('registrations')
+    .select('form_data, club_id')
+    .eq('id', registrationId)
+    .eq('club_id', context.profile.club_id)
+    .single();
+
+  if (fetchErr || !reg) return { success: false, error: fetchErr?.message || "Inscripción no encontrada" };
 
   const formData = reg.form_data || {};
   formData.tutor1Email = newEmail;
 
-  const { error: updateRegErr } = await supabase.from('registrations').update({ form_data: formData }).eq('id', registrationId);
+  const { error: updateRegErr } = await supabase
+    .from('registrations')
+    .update({ form_data: formData })
+    .eq('id', registrationId)
+    .eq('club_id', context.profile.club_id);
+
   if (updateRegErr) return { success: false, error: updateRegErr.message };
 
   // 2. Update auth.users and profiles if user_id is provided
@@ -166,13 +236,19 @@ export async function updateRegistrationEmailAction(registrationId: string, newE
     const { error: authErr } = await supabase.auth.admin.updateUserById(userId, { email: newEmail });
     if (authErr) return { success: false, error: authErr.message };
 
-    const { error: profErr } = await supabase.from('profiles').update({ email: newEmail }).eq('id', userId);
+    const { error: profErr } = await supabase
+      .from('profiles')
+      .update({ email: newEmail })
+      .eq('id', userId)
+      .eq('club_id', context.profile.club_id);
+
     if (profErr) return { success: false, error: profErr.message };
   }
 
   revalidatePath('/dashboard/inscripciones');
   return { success: true };
 }
+
 
 export async function resetPasswordAction(email: string) {
   const supabase = await createAdminClient();

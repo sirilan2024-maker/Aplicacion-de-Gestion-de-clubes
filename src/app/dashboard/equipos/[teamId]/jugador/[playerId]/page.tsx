@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, BrainCircuit, ChevronRight
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, BrainCircuit, ChevronRight, ShieldCheck
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
@@ -18,6 +18,7 @@ import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
+import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
 
 interface PlayerData {
   id: string;
@@ -108,7 +109,7 @@ export default function GlobalPlayerProfilePage() {
 
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'formativo' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
 
   const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -131,6 +132,7 @@ export default function GlobalPlayerProfilePage() {
   const [showAllTrainings, setShowAllTrainings] = useState(false);
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
+  const [hasActiveInjury, setHasActiveInjury] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -213,6 +215,14 @@ export default function GlobalPlayerProfilePage() {
         .eq('player_id', playerId);
       
       if (docs) setPlayerDocs(docs);
+
+      // Comprobar disponibilidad deportiva desde player_injuries
+      const { count: activeInjuriesCount } = await supabase
+        .from('player_injuries')
+        .select('id', { count: 'exact', head: true })
+        .eq('player_id', playerId)
+        .eq('status', 'activa');
+      setHasActiveInjury((activeInjuriesCount || 0) > 0);
     } catch (err: any) {
       toast.error("Error al cargar jugador: " + err.message);
     } finally {
@@ -749,12 +759,24 @@ export default function GlobalPlayerProfilePage() {
                   )}
                   <span>•</span>
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                    player.status === 'Lesionado' ? 'bg-red-100 text-red-700' :
+                    player.status === 'inactive' ? 'bg-gray-100 text-gray-700' :
                     player.status === 'Sancionado' ? 'bg-orange-100 text-orange-700' :
                     'bg-green-100 text-green-700'
                   }`}>
-                    {player.status || 'Activo'}
+                    {player.status === 'active' || player.status === 'Activo' ? 'Activo' : player.status || 'Activo'}
                   </span>
+                  <span>•</span>
+                  {hasActiveInjury ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-white" />
+                      🔴 BAJA POR LESIÓN
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      🟢 SIN LESIONES ACTIVAS
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1353,6 +1375,15 @@ export default function GlobalPlayerProfilePage() {
                   )}
                 </div>
               )}
+
+              {/* SECCIÓN M1: HISTORIAL BÁSICO DE LESIONES */}
+              <div className="mt-8 pt-2">
+                <PlayerInjuriesSection 
+                  playerId={player.id} 
+                  playerName={`${player.first_name} ${player.last_name}`}
+                  onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
+                />
+              </div>
 
               {/* TABLA HISTORIAL DE PROGRESIÓN (IMC / Peso) */}
               <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mt-8 flex items-center gap-2">

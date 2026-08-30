@@ -15,6 +15,9 @@ interface MatchdayViewProps {
   ads?: any[];
   isAdmin?: boolean;
   clubLogoUrl?: string | null;
+  players?: any[];
+  convocatorias?: any[];
+  teamId?: any;
 }
 
 export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl }: MatchdayViewProps) {
@@ -319,7 +322,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
           </div>
           
           <div className="w-full">
-            <LiveMatchPanel match={selectedMatch} clubLogoUrl={clubLogoUrl} />
+            <LiveMatchPanel match={selectedMatch} clubLogoUrl={clubLogoUrl || undefined} />
           </div>
         </section>
       )}

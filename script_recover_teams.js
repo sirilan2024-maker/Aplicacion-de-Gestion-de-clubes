@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://qjjfgncvtpshddqlxbdx.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqamZnbmN2dHBzaGRkcWx4YmR4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODM0MTE3MCwiZXhwIjoyMDkzOTE3MTcwfQ.CoaAMaMp4NIr7K0HAjyB7K9EAIrW_NNMh-VxcCuEa_Q';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qjjfgncvtpshddqlxbdx.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const OLD_SEASON_ID = '1f95102d-1d00-43fa-9e4c-408681a03e7f';

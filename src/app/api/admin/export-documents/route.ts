@@ -156,7 +156,7 @@ export async function GET(req: NextRequest) {
     const scope = teamId && teamId !== 'all' ? 'equipo' : 'club'
     const fileName = `Expedientes_${scope}_${dateStr}.zip`
 
-    return new NextResponse(zipUint8, {
+    return new NextResponse(zipUint8.buffer as ArrayBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',

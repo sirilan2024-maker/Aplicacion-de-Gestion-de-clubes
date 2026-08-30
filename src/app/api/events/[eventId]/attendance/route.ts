@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthenticatedContext, canUserAccessPlayer } from '@/lib/auth-helpers'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) {
+      return NextResponse.json({ error: authError || 'No autenticado' }, { status: 401 })
+    }
+
     const { eventId } = await params
     const { playerId, status } = await request.json()
 
@@ -13,14 +20,18 @@ export async function POST(
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const adminClient = createAdminClient()
+    const access = await canUserAccessPlayer(adminClient, context, playerId)
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return NextResponse.json({ error: access.reason || 'No tienes permisos sobre este jugador' }, { status: 403 })
+    }
 
     // Ensure team_event exists (in case it's a match/partido)
-    const { data: ev } = await supabase.from('team_events').select('id').eq('id', eventId).maybeSingle()
+    const { data: ev } = await adminClient.from('team_events').select('id').eq('id', eventId).maybeSingle()
     if (!ev) {
-      const { data: pEv } = await supabase.from('partidos').select('*').eq('id', eventId).maybeSingle()
+      const { data: pEv } = await adminClient.from('partidos').select('*').eq('id', eventId).maybeSingle()
       if (pEv) {
-        await supabase.from('team_events').insert({
+        await adminClient.from('team_events').insert({
           id: pEv.id,
           team_id: pEv.equipo_id,
           event_type: 'Partido',
@@ -31,16 +42,12 @@ export async function POST(
       }
     }
 
-    // Assuming we insert a row with a dummy session_id or just insert by event_id 
-    // depending on the schema. We will use upsert.
-    // If session_id is NOT NULL constraint, we generate a UUID for it. Let's use crypto.randomUUID() for safety if it complains.
-    const { error } = await supabase
+    const { error } = await adminClient
       .from('attendance')
       .upsert({ 
         player_id: playerId, 
         event_id: eventId,
         status: status,
-        // session_id is normally for training sessions, we might just put the eventId there as a workaround
         session_id: eventId 
       }, { onConflict: 'session_id,player_id' })
 
@@ -55,3 +62,4 @@ export async function POST(
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+

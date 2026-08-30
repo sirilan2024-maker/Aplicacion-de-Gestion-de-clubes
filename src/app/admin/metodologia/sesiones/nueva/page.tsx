@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { 
   Plus, Save, Clock, Target, ArrowLeft, Search, Loader2, GripVertical, 
   X, Trash2, ArrowUp, ArrowDown, Sparkles, Activity, Brain, Shield,
-  Maximize, AlertCircle, CheckCircle2, Copy, RefreshCw, ChevronRight, Layers, Users
+  Maximize, AlertCircle, CheckCircle2, Copy, RefreshCw, ChevronRight, Layers, Users, Globe, ExternalLink
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   recommendExercises, 
   calculateSessionMetrics, 
@@ -30,6 +30,12 @@ import {
   validateMethodologySessionProposal,
   SessionProposal
 } from "@/lib/methodology/methodologySessionGenerator";
+import {
+  searchExternalExercisesAction,
+  reviewFootballSessionAction,
+  replaceFootballDrillAction
+} from "@/app/actions/methodology-actions";
+import { NormalizedExternalExercise } from "@/lib/methodology/externalSearch/types";
 
 // Block structure definitions
 const BLOCKS = [
@@ -40,8 +46,9 @@ const BLOCKS = [
   { id: "vuelta_calma", name: "🔄 Vuelta a la Calma", suggestedMin: 10, tag: "Regeneración" },
 ];
 
-export default function SessionBuilderPage() {
+function SessionBuilderContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   
   // 1. Session Configuration
@@ -52,6 +59,7 @@ export default function SessionBuilderPage() {
   const [ageCategory, setAgeCategory] = useState("cadete");
   const [microcycleDay, setMicrocycleDay] = useState("MD-3");
   const [intensity, setIntensity] = useState("3");
+  const [preloadedFromCurriculum, setPreloadedFromCurriculum] = useState<string | null>(null);
   const [objective, setObjective] = useState("Presión tras pérdida");
   const [objectivesSecondary, setObjectivesSecondary] = useState<string[]>(["Transición defensiva"]);
   const [numPlayers, setNumPlayers] = useState("16");
@@ -80,7 +88,20 @@ export default function SessionBuilderPage() {
   // Search & Recommendations panel state
   const [searchTerm, setSearchTerm] = useState("");
   const [searchBlockId, setSearchBlockId] = useState<string | null>(null);
+  const [drawerTab, setDrawerTab] = useState<"internal" | "external">("internal");
+  const [externalSearchTerm, setExternalSearchTerm] = useState("");
+  const [externalResults, setExternalResults] = useState<NormalizedExternalExercise[]>([]);
+  const [isSearchingExternal, setIsSearchingExternal] = useState(false);
   const [selectedExDetail, setSelectedExDetail] = useState<any | null>(null);
+
+  // Football Intelligence Agent Review & Replace States
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewResult, setReviewResult] = useState<any | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  const [replaceTarget, setReplaceTarget] = useState<{ blockId: string; index: number; currentTitle: string } | null>(null);
+  const [replacePrompt, setReplacePrompt] = useState("");
+  const [isReplacing, setIsReplacing] = useState(false);
 
   // Session content state
   const [sessionBlocks, setSessionBlocks] = useState<Record<string, any[]>>({
@@ -138,10 +159,63 @@ export default function SessionBuilderPage() {
         supabase.from("methodology_principles").select("id, name, game_phase").order("sort_order", { ascending: true }).order("id", { ascending: true })
       ]);
 
-      if (teamsRes.data) setTeams(teamsRes.data);
-      if (exercisesRes.data) setExercises(exercisesRes.data);
+      if (teamsRes.data && teamsRes.data.length > 0) {
+        setTeams(teamsRes.data);
+        const categoryParam = searchParams.get("category");
+        if (categoryParam) {
+          const matchingTeam = teamsRes.data.find(t => t.category?.toLowerCase() === categoryParam.toLowerCase());
+          if (matchingTeam) {
+            setTeamId(matchingTeam.id);
+          } else {
+            setTeamId(teamsRes.data[0].id);
+          }
+        } else {
+          setTeamId(teamsRes.data[0].id);
+        }
+      }
       if (microcyclesRes.data) setMicrocycles(microcyclesRes.data);
       if (principlesRes.data) setCurriculumPrinciplesList(principlesRes.data);
+
+      if (exercisesRes.data) {
+        setExercises(exercisesRes.data);
+
+        // Preload exercise from URL query params (e.g. from Currículo)
+        const exerciseIdParam = searchParams.get("exerciseId");
+        const categoryParam = searchParams.get("category");
+        const objectiveParam = searchParams.get("objective");
+
+        if (categoryParam) {
+          setAgeCategory(categoryParam.toLowerCase());
+        }
+        if (objectiveParam) {
+          setObjective(decodeURIComponent(objectiveParam));
+        }
+
+        if (exerciseIdParam) {
+          const preloadedEx = exercisesRes.data.find(e => e.id === exerciseIdParam);
+          if (preloadedEx) {
+            const targetBlock =
+              (preloadedEx.bloque_sesion === "calentamiento" || preloadedEx.tipo === "calentamiento" || preloadedEx.tipo === "individual_technical") ? "activacion" :
+              (preloadedEx.bloque_sesion === "global" || preloadedEx.tipo === "juego_global" || preloadedEx.tipo === "conditioned_game") ? "global" :
+              (preloadedEx.bloque_sesion === "vuelta_calma") ? "vuelta_calma" :
+              "principal_1";
+
+            setSessionBlocks(prev => ({
+              ...prev,
+              [targetBlock]: [
+                {
+                  ...preloadedEx,
+                  unique_id: `${targetBlock}-${preloadedEx.id}-0`,
+                  duration_min: preloadedEx.duracion_recomendada || 15,
+                  drill_id: preloadedEx.id
+                }
+              ]
+            }));
+
+            setPreloadedFromCurriculum(preloadedEx.nombre);
+          }
+        }
+      }
 
       if (curriculumRes.data) {
         const allObjs = new Set<string>();
@@ -377,6 +451,159 @@ export default function SessionBuilderPage() {
     });
   };
 
+  const handleSearchExternal = async (overrideTerm?: string) => {
+    const q = overrideTerm !== undefined ? overrideTerm : (externalSearchTerm || objective || searchTerm);
+    if (!q) return;
+    setIsSearchingExternal(true);
+    try {
+      const res = await searchExternalExercisesAction(q, {
+        ageCategory: ageCategory !== "all" ? ageCategory : undefined
+      });
+      if (res.success && res.results) {
+        setExternalResults(res.results);
+      }
+    } catch (err) {
+      console.error("Error buscando en web:", err);
+    } finally {
+      setIsSearchingExternal(false);
+    }
+  };
+
+  const handleReviewSession = async () => {
+    setIsReviewing(true);
+    try {
+      // Formatear sesión actual como plan estructurado
+      const drills: any[] = [];
+      let order = 1;
+      Object.entries(sessionBlocks).forEach(([bId, bList]) => {
+        bList.forEach((ex) => {
+          drills.push({
+            id: ex.id || `drill-${order}`,
+            phase: bId,
+            phaseLabel: BLOCKS.find(b => b.id === bId)?.name || bId,
+            orderIndex: order++,
+            allocatedDurationMin: ex.duration_min || 15,
+            exercise: ex,
+            source: ex.is_external || ex.external ? "externo" : "oficial",
+            selectionRationale: "Planificado por el entrenador",
+            matchScore: 90
+          });
+        });
+      });
+
+      const sessionPlanToReview = {
+        id: `draft-${Date.now()}`,
+        title: objective || "Sesión Metodológica",
+        intent: {
+          rawPrompt: objective,
+          ageCategory,
+          players: parseInt(numPlayers, 10) || 16,
+          durationMinutes: parseInt(duration, 10) || 90,
+          primaryObjective: objective,
+          secondaryObjectives: objectivesSecondary
+        },
+        totalDurationMinutes: parseInt(duration, 10) || 90,
+        calculatedDurationMinutes: sessionMetrics.totalDurationMin,
+        isDurationExact: sessionMetrics.totalDurationMin === (parseInt(duration, 10) || 90),
+        drills,
+        methodologicalSummary: `Sesión de ${duration} min para categoría ${ageCategory}`,
+        createdAt: new Date().toISOString()
+      };
+
+      const res = await reviewFootballSessionAction(sessionPlanToReview, {
+        teamId: teamId || undefined,
+        category: ageCategory
+      });
+
+      if (res.success && res.review) {
+        setReviewResult(res.review);
+        setShowReviewModal(true);
+      }
+    } catch (err: any) {
+      alert(`Error al revisar sesión con IA: ${err.message || err}`);
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
+  const handleOpenReplace = (blockId: string, index: number, currentTitle: string) => {
+    setReplaceTarget({ blockId, index, currentTitle });
+    setReplacePrompt("");
+  };
+
+  const handleExecuteReplace = async () => {
+    if (!replaceTarget || !replacePrompt.trim()) return;
+    setIsReplacing(true);
+    try {
+      const currentDrill = sessionBlocks[replaceTarget.blockId][replaceTarget.index];
+      const targetDuration = currentDrill.duration_min || 15;
+
+      const drills: any[] = [];
+      let order = 1;
+      Object.entries(sessionBlocks).forEach(([bId, bList]) => {
+        bList.forEach((ex, idx) => {
+          drills.push({
+            id: ex.id || `drill-${order}`,
+            phase: bId,
+            phaseLabel: BLOCKS.find(b => b.id === bId)?.name || bId,
+            orderIndex: order++,
+            allocatedDurationMin: ex.duration_min || 15,
+            exercise: ex,
+            source: ex.is_external || ex.external ? "externo" : "oficial"
+          });
+        });
+      });
+
+      const sessionPlan = {
+        id: `draft-${Date.now()}`,
+        title: objective || "Sesión",
+        intent: {
+          rawPrompt: objective,
+          ageCategory,
+          players: parseInt(numPlayers, 10) || 16,
+          durationMinutes: parseInt(duration, 10) || 90,
+          primaryObjective: objective,
+          secondaryObjectives: objectivesSecondary
+        },
+        totalDurationMinutes: parseInt(duration, 10) || 90,
+        calculatedDurationMinutes: sessionMetrics.totalDurationMin,
+        isDurationExact: true,
+        drills,
+        methodologicalSummary: "",
+        createdAt: new Date().toISOString()
+      };
+
+      const res = await replaceFootballDrillAction(
+        sessionPlan,
+        replaceTarget.blockId,
+        replacePrompt
+      );
+
+      if (res.success && res.result?.replacedDrill) {
+        const newEx = res.result.replacedDrill.exercise;
+        const isExt = res.result.replacedDrill.source === "externo" || newEx.external === true;
+
+        setSessionBlocks(prev => {
+          const list = [...prev[replaceTarget.blockId]];
+          list[replaceTarget.index] = {
+            ...newEx,
+            is_external: isExt,
+            unique_id: `${replaceTarget.blockId}-${newEx.id || Date.now()}-${replaceTarget.index}`,
+            duration_min: targetDuration, // Mantiene duración exacta
+            drill_id: newEx.id
+          };
+          return { ...prev, [replaceTarget.blockId]: list };
+        });
+
+        setReplaceTarget(null);
+      }
+    } catch (err: any) {
+      alert(`Error al sustituir ejercicio con IA: ${err.message || err}`);
+    } finally {
+      setIsReplacing(false);
+    }
+  };
+
   const handleSave = async (isDraft: boolean) => {
     if (sessionMetrics.durationAlert === 'warning_long' && !isDraft) {
       if (!confirm(`La sesión supera la duración planificada (${sessionMetrics.totalDurationMin} min vs ${sessionMetrics.plannedDurationMin} min planificados). ¿Deseas guardar de todos modos?`)) {
@@ -392,7 +619,7 @@ export default function SessionBuilderPage() {
       }
 
       await saveMethodologySession({
-        teamId,
+        teamId: teamId || (teams.length > 0 ? teams[0].id : ""),
         microcycleId: microcycleId || undefined,
         dateTime: date_time || new Date().toISOString(),
         durationMinutes: sessionMetrics.totalDurationMin || parseInt(duration, 10),
@@ -413,9 +640,9 @@ export default function SessionBuilderPage() {
       });
 
       router.push("/admin/metodologia/sesiones");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving session:", error);
-      alert("Error al guardar la sesión en el sistema");
+      alert(`Error al guardar la sesión: ${error?.message || error?.details || "Error en el guardado de la sesión"}`);
     } finally {
       setIsSaving(false);
     }
@@ -458,20 +685,30 @@ export default function SessionBuilderPage() {
             <span>Carga Metodológica: {sessionMetrics.estimatedMethodologicalLoad}%</span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap items-center">
             <button
               type="button"
               onClick={handleGenerateProposal}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
               title="Generar propuesta estructurada de 5 bloques"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              Generar Propuesta Asistida
+              <Sparkles className="w-4 h-4" />
+              <span>Propuesta 5 Bloques</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleReviewSession}
+              disabled={isReviewing}
+              className="px-3.5 py-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              title="Solicitar análisis metodológico al Asistente IA"
+            >
+              {isReviewing ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <Brain className="w-4 h-4 text-indigo-600" />}
+              <span>{isReviewing ? "Analizando..." : "Auditoría IA"}</span>
             </button>
             <button 
               onClick={() => handleSave(true)}
               disabled={isSaving}
-              className="px-4 py-2 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors"
+              className="px-3 py-2 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50 transition-colors"
             >
               Guardar Borrador
             </button>
@@ -493,6 +730,25 @@ export default function SessionBuilderPage() {
           </div>
         </div>
       </div>
+
+      {/* BANNER: EJERCICIO PRECARGADO DESDE CURRÍCULO */}
+      {preloadedFromCurriculum && (
+        <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs text-indigo-900 animate-in fade-in">
+          <div className="flex items-center gap-2 font-medium">
+            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span>
+              <strong>Ejercicio precargado desde Currículo:</strong> &quot;{preloadedFromCurriculum}&quot; ha sido añadido automáticamente al bloque de trabajo correspondiente.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreloadedFromCurriculum(null)}
+            className="p-1 text-indigo-400 hover:text-indigo-700 rounded-lg cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* LIVE VALIDATION ALERTS (IF ANY) */}
       {(!sessionValidation.valid || sessionValidation.warnings.length > 0) && (
@@ -892,128 +1148,301 @@ export default function SessionBuilderPage() {
                 {/* Exercises in Block */}
                 {blockExercises.length === 0 ? (
                   <div className="p-4 border-2 border-dashed border-slate-100 rounded-xl text-center text-xs font-medium text-slate-400">
-                    Bloque vacío. Pulsa en &quot;+ Añadir / Recomendar&quot; o usa &quot;Generar Propuesta Asistida&quot;.
+                    Bloque vacío. Pulsa en &quot;+ Añadir / Recomendar&quot; o usa &quot;Generar Asistida&quot;.
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {blockExercises.map((ex, index) => (
-                      <div 
-                        key={ex.unique_id || index}
-                        className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl transition-all gap-3"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex flex-col gap-0.5 text-slate-400">
-                            <button 
-                              onClick={() => moveExercise(block.id, index, 'up')}
-                              disabled={index === 0}
-                              className="hover:text-slate-700 disabled:opacity-30"
-                            >
-                              <ArrowUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => moveExercise(block.id, index, 'down')}
-                              disabled={index === blockExercises.length - 1}
-                              className="hover:text-slate-700 disabled:opacity-30"
-                            >
-                              <ArrowDown className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                    {blockExercises.map((ex, index) => {
+                      const isExternal = ex.is_external || ex.external || ex.source === "externo";
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs text-slate-900 truncate">{ex.nombre}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white border border-slate-200 text-slate-600 shrink-0">
-                                {ex.tipo}
-                              </span>
+                      return (
+                        <div 
+                          key={ex.unique_id || index}
+                          className={`flex items-center justify-between p-3 border rounded-xl transition-all gap-3 ${
+                            isExternal 
+                              ? "bg-indigo-50/40 border-indigo-200 hover:border-indigo-400" 
+                              : "bg-slate-50 hover:bg-slate-100/80 border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex flex-col gap-0.5 text-slate-400">
+                              <button 
+                                onClick={() => moveExercise(block.id, index, 'up')}
+                                disabled={index === 0}
+                                className="hover:text-slate-700 disabled:opacity-30"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => moveExercise(block.id, index, 'down')}
+                                disabled={index === blockExercises.length - 1}
+                                className="hover:text-slate-700 disabled:opacity-30"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                            <p className="text-[11px] text-slate-500 truncate max-w-md">
-                              {ex.objetivo_tactico?.join(", ") || ex.descripcion || "Sin descripción"}
-                            </p>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-xs text-slate-900 truncate">
+                                  {ex.nombre || ex.title}
+                                </span>
+                                {isExternal ? (
+                                  ex.verificationStatus === "VERIFIED" ? (
+                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 flex items-center gap-1">
+                                      <Globe className="w-2.5 h-2.5" />
+                                      🌐 VERIFICADO
+                                    </span>
+                                  ) : ex.verificationStatus === "UNVERIFIED" ? (
+                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-600 text-white shrink-0 flex items-center gap-1">
+                                      <Globe className="w-2.5 h-2.5" />
+                                      ⚠️ NO VERIFICADO
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-600 text-white shrink-0 flex items-center gap-1">
+                                      <Globe className="w-2.5 h-2.5" />
+                                      🌐 EXTERNO
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white border border-slate-200 text-slate-600 shrink-0">
+                                    {ex.tipo || "Oficial"}
+                                  </span>
+                                )}
+
+                                {ex.source && isExternal && (
+                                  <span className="text-[9px] font-bold text-slate-400">
+                                    • {ex.source}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate max-w-md">
+                                {ex.objetivo_tactico?.join(", ") || ex.tacticalObjective || ex.descripcion || ex.description || "Sin descripción"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Controls */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1">
+                              <input 
+                                type="number"
+                                value={ex.duration_min || 15}
+                                onChange={(e) => updateExerciseDuration(block.id, index, parseInt(e.target.value, 10) || 0)}
+                                className="w-10 text-xs font-bold text-center outline-none bg-transparent"
+                              />
+                              <span className="text-[10px] font-medium text-slate-400">min</span>
+                            </div>
+
+                            <button 
+                              onClick={() => handleOpenReplace(block.id, index, ex.nombre || ex.title || "Tarea")}
+                              title="Sustituir con IA manteniendo duración"
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold"
+                            >
+                              <Brain className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Sustituir IA</span>
+                            </button>
+
+                            <button 
+                              onClick={() => handleDuplicateExercise(block.id, index)}
+                              title="Duplicar tarea"
+                              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button 
+                              onClick={() => handleRemoveExercise(block.id, index)}
+                              title="Eliminar de la sesión"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
-
-                        {/* Controls */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1">
-                            <input 
-                              type="number"
-                              value={ex.duration_min || 15}
-                              onChange={(e) => updateExerciseDuration(block.id, index, parseInt(e.target.value, 10) || 0)}
-                              className="w-10 text-xs font-bold text-center outline-none bg-transparent"
-                            />
-                            <span className="text-[10px] font-medium text-slate-400">min</span>
-                          </div>
-
-                          <button 
-                            onClick={() => handleDuplicateExercise(block.id, index)}
-                            title="Duplicar tarea"
-                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button 
-                            onClick={() => handleRemoveExercise(block.id, index)}
-                            title="Eliminar de la sesión"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
-                {/* Recommendations slide-down drawer */}
+                {/* Recommendations & Web Search Drawer */}
                 {searchBlockId === block.id && (
-                  <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center justify-between">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+                    
+                    {/* Drawer Tabs */}
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        <h4 className="text-xs font-black uppercase tracking-wider text-blue-900">
-                          Tareas Sugeridas por el Motor Metodológico
-                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerTab("internal")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            drawerTab === "internal"
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                          }`}
+                        >
+                          🏛️ Biblioteca Oficial ({recommendedExercises.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDrawerTab("external");
+                            if (externalResults.length === 0 && !isSearchingExternal) {
+                              handleSearchExternal();
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            drawerTab === "external"
+                              ? "bg-indigo-600 text-white shadow-sm"
+                              : "bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200"
+                          }`}
+                        >
+                          🌐 Repositorios Web / Externos ({externalResults.length})
+                        </button>
                       </div>
-                      <span className="text-[10px] font-bold text-blue-600 bg-white border border-blue-200 px-2 py-0.5 rounded-lg">
-                        Scoring Ponderado
+
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">
+                        {drawerTab === "internal" ? "Catálogo Homologado" : "Fuentes Allowlisted"}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
-                      {recommendedExercises.slice(0, 6).map((rec) => (
-                        <div 
-                          key={rec.exercise.id} 
-                          className="p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-400 transition-all flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex justify-between items-start">
-                              <span className="text-[10px] font-black uppercase text-blue-600">
-                                Compatibilidad: {rec.score} pts
-                              </span>
+                    {/* VISTA 1: BIBLIOTECA OFICIAL */}
+                    {drawerTab === "internal" && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                        {recommendedExercises.slice(0, 6).map((rec) => (
+                          <div 
+                            key={rec.exercise.id} 
+                            className="p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-400 transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex justify-between items-start">
+                                <span className="text-[10px] font-black uppercase text-blue-600">
+                                  Compatibilidad: {rec.score} pts
+                                </span>
+                              </div>
+                              <h4 className="font-black text-xs text-slate-900 mt-1 truncate">
+                                {rec.exercise.nombre}
+                              </h4>
+                              <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                                {rec.exercise.descripcion}
+                              </p>
                             </div>
-                            <h4 className="font-black text-xs text-slate-900 mt-1 truncate">
-                              {rec.exercise.nombre}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
-                              {rec.exercise.descripcion}
-                            </p>
+                            <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100">
+                              <span className="text-[10px] font-bold text-slate-400">
+                                {rec.exercise.duracion_recomendada || 15}&apos; • {rec.exercise.tipo}
+                              </span>
+                              <button
+                                onClick={() => handleAddExercise(rec.exercise, block.id)}
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3" />
+                                Añadir
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100">
-                            <span className="text-[10px] font-bold text-slate-400">
-                              {rec.exercise.duracion_recomendada || 15}&apos; • {rec.exercise.tipo}
-                            </span>
-                            <button
-                              onClick={() => handleAddExercise(rec.exercise, block.id)}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Añadir
-                            </button>
-                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* VISTA 2: BÚSQUEDA WEB ALLOWLISTED */}
+                    {drawerTab === "external" && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Buscar en RFEF, UEFA, The FA (ej: presión tras pérdida, posesión 12 jug...)"
+                            value={externalSearchTerm}
+                            onChange={(e) => setExternalSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSearchExternal(externalSearchTerm);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSearchExternal(externalSearchTerm)}
+                            disabled={isSearchingExternal}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            {isSearchingExternal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                            Buscar Web
+                          </button>
                         </div>
-                      ))}
-                    </div>
+
+                        {/* Suggestion Chips */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                          {["presión tras pérdida", "posesión infantil 12 jugadores", "transición defensiva espacio reducido"].map((sug, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                setExternalSearchTerm(sug);
+                                handleSearchExternal(sug);
+                              }}
+                              className="px-2 py-0.5 bg-white border border-indigo-100 hover:border-indigo-300 text-indigo-700 text-[10px] font-bold rounded-lg whitespace-nowrap cursor-pointer transition-colors"
+                            >
+                              🔍 {sug}
+                            </button>
+                          ))}
+                        </div>
+
+                        {isSearchingExternal ? (
+                          <div className="p-8 text-center bg-white rounded-xl border border-indigo-100">
+                            <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mx-auto" />
+                            <p className="text-xs font-bold text-slate-500 mt-2">Consultando repositorios federados allowlisted...</p>
+                          </div>
+                        ) : externalResults.length === 0 ? (
+                          <div className="p-6 text-center bg-white rounded-xl border border-slate-200">
+                            <p className="text-xs text-slate-400 font-medium">Escribe una consulta táctica y pulsa Buscar Web.</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                            {externalResults.map((ext) => (
+                              <div 
+                                key={ext.id} 
+                                className="p-3 bg-white border border-indigo-200 rounded-xl hover:border-indigo-400 transition-all flex flex-col justify-between"
+                              >
+                                <div>
+                                  <div className="flex justify-between items-start gap-1">
+                                    <span className="text-[9px] font-black uppercase bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                                      🌐 {ext.source}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400">
+                                      {ext.players} jug.
+                                    </span>
+                                  </div>
+                                  <h4 className="font-black text-xs text-slate-900 mt-1 line-clamp-1">
+                                    {ext.title}
+                                  </h4>
+                                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                                    {ext.description}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100">
+                                  <span className="text-[10px] font-bold text-slate-400">
+                                    {ext.duration} min • {ext.ageCategory}
+                                  </span>
+                                  <button
+                                    onClick={() => handleAddExercise({
+                                      ...ext,
+                                      nombre: ext.title,
+                                      descripcion: ext.description,
+                                      duracion_recomendada: ext.duration,
+                                      is_external: true
+                                    }, block.id)}
+                                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Añadir
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                   </div>
                 )}
 
@@ -1046,7 +1475,7 @@ export default function SessionBuilderPage() {
               </div>
               <button 
                 onClick={() => setShowProposalModal(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1105,21 +1534,195 @@ export default function SessionBuilderPage() {
             </div>
 
             {/* MODAL ACTIONS */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowProposalModal(false)}
+                  className="flex-1 sm:flex-initial px-3.5 py-2.5 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 cursor-pointer"
+                >
+                  ✏️ Modificar Parámetros
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateProposal}
+                  className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  Regenerar Propuesta
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleApplyProposal}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Confirmar y Aplicar Propuesta al Constructor
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* FOOTBALL INTELLIGENCE REVIEW MODAL */}
+      {showReviewModal && reviewResult && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                    <Brain className="w-3.5 h-3.5" />
+                    Football Intelligence Agent
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    • Calidad Metodológica: {reviewResult.score}/100
+                  </span>
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mt-1">
+                  Auditoría Metodológica de la Sesión
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowReviewModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* STRENGTHS */}
+            {reviewResult.strengths?.length > 0 && (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Fortalezas Pedagógicas
+                </span>
+                <ul className="text-xs text-emerald-800 font-medium space-y-1 list-disc list-inside">
+                  {reviewResult.strengths.map((s: string, i: number) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* ISSUES / ALERTS */}
+            {reviewResult.issues?.length > 0 && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  Aspectos a Mejorar / Advertencias
+                </span>
+                <ul className="text-xs text-amber-800 font-medium space-y-1 list-disc list-inside">
+                  {reviewResult.issues.map((iss: string, i: number) => (
+                    <li key={i}>{iss}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* RECOMMENDATIONS */}
+            {reviewResult.recommendations?.length > 0 && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
+                <span className="text-xs font-black uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  Recomendaciones del Copiloto
+                </span>
+                <ul className="text-xs text-blue-800 font-medium space-y-1 list-disc list-inside">
+                  {reviewResult.recommendations.map((r: string, i: number) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
-                onClick={() => setShowProposalModal(false)}
-                className="px-4 py-2.5 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50"
+                onClick={() => setShowReviewModal(false)}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer"
               >
-                Descartar y Ajustar Manualmente
+                Entendido
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* REPLACE DRILL MODAL */}
+      {replaceTarget && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Brain className="w-3 h-3" />
+                  Sustitución Inteligente de Tarea
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">
+                  Sustituir: {replaceTarget.currentTitle}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setReplaceTarget(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 font-medium">
+              Indica qué tipo de ejercicio buscas para este bloque. El agente buscará en catálogo oficial y fuentes externas manteniendo la duración programada.
+            </p>
+
+            <input
+              type="text"
+              placeholder="Ej: Tarea con mayor intensidad, Rondo 4v2, Posesión con porterías..."
+              value={replacePrompt}
+              onChange={(e) => setReplacePrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleExecuteReplace();
+              }}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {["Más intensidad", "Rondo con presión", "Espacio reducido", "Transición rápida"].map((sug, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setReplacePrompt(sug)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 text-[10px] font-bold rounded-lg cursor-pointer transition-colors"
+                >
+                  {sug}
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReplaceTarget(null)}
+                className="px-3.5 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 cursor-pointer"
+              >
+                Cancelar
               </button>
               <button
                 type="button"
-                onClick={handleApplyProposal}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2"
+                onClick={handleExecuteReplace}
+                disabled={isReplacing || !replacePrompt.trim()}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Confirmar y Aplicar Propuesta al Constructor
+                {isReplacing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {isReplacing ? "Buscando reemplazo..." : "Sustituir Tarea"}
               </button>
             </div>
 
@@ -1130,3 +1733,17 @@ export default function SessionBuilderPage() {
     </div>
   );
 }
+
+export default function SessionBuilderPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+        <p className="text-xs font-bold text-slate-500">Cargando Constructor de Sesión Metodológica...</p>
+      </div>
+    }>
+      <SessionBuilderContent />
+    </Suspense>
+  );
+}
+

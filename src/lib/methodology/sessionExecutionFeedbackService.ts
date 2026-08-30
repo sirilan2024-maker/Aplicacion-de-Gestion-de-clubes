@@ -21,6 +21,7 @@ export interface PlannedVsExecutedFeedbackResult {
     incidentsNotes: string;
     behavioursCount: number;
   };
+  evaluation?: any;
   deviations: {
     durationDiffMin: number;
     durationAlert: 'optimal' | 'moderate' | 'severe';

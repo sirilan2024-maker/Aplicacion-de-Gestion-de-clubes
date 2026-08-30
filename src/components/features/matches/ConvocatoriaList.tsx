@@ -81,7 +81,8 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
       const result = await updateConvocatoriaBatch(matchId, updates);
       
       if (result && !result.success) {
-        alert("Error al guardar la convocatoria: " + (result.error?.message || "Error desconocido"));
+        const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || "Error desconocido";
+        alert("Error al guardar la convocatoria: " + errorMsg);
       } else if (onCloseModal) {
         onCloseModal();
       }

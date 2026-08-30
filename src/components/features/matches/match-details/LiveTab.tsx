@@ -14,6 +14,7 @@ interface LiveEvent {
   tipo_evento: string;
   notas: string;
   player_id?: string;
+  created_at?: string;
 }
 
 export const MOCK_LIVE_PLAYERS = [

@@ -115,6 +115,10 @@ export interface SessionLoadEvolutionRecord {
   rpeEquivalentLoad: number; // 1-100 (actualRpe * 10)
   loadDiff: number;
   isHighFatigueWarning: boolean;
+  plannedDuration?: number;
+  actualDuration?: number;
+  durationDeviation?: number;
+  objectiveAchievement?: any;
 }
 
 export interface TeamMethodologySummary {
@@ -171,51 +175,129 @@ export async function getRecentTeamExerciseIds(teamId: string, limitSessions: nu
 export async function saveMethodologySession(payload: SessionSavePayload) {
   const supabase = createClient();
 
+  // 1. Resolver club_id y team_id de forma robusta
+  let resolvedClubId: string | null = null;
+  let resolvedTeamId: string | null = payload.teamId || null;
+
+  if (resolvedTeamId) {
+    const { data: teamData } = await supabase
+      .from("teams")
+      .select("id, club_id")
+      .eq("id", resolvedTeamId)
+      .single();
+    if (teamData?.club_id) {
+      resolvedClubId = teamData.club_id;
+    }
+  }
+
+  if (!resolvedClubId || !resolvedTeamId) {
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData?.user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("club_id")
+        .eq("id", userData.user.id)
+        .single();
+      if (profile?.club_id) resolvedClubId = profile.club_id;
+    }
+  }
+
+  if (!resolvedClubId) {
+    const { data: anyClub } = await supabase.from("clubs").select("id").limit(1).single();
+    resolvedClubId = anyClub?.id || null;
+  }
+
+  if (!resolvedTeamId) {
+    const { data: anyTeam } = await supabase.from("teams").select("id").limit(1).single();
+    resolvedTeamId = anyTeam?.id || null;
+  }
+
+  // 2. Extraer date y start_time
+  let dateStr = new Date().toISOString().split("T")[0];
+  let startTimeStr = "18:00";
+
+  if (payload.dateTime) {
+    if (payload.dateTime.includes("T")) {
+      const parts = payload.dateTime.split("T");
+      dateStr = parts[0];
+      startTimeStr = parts[1]?.substring(0, 5) || "18:00";
+    } else {
+      dateStr = payload.dateTime;
+    }
+  }
+
+  const sessionTitle = payload.objective 
+    ? `Sesión: ${payload.objective}` 
+    : "Sesión de Entrenamiento Metodológica";
+
   const { data: sessionData, error: sessionError } = await supabase
     .from("training_sessions")
     .insert({
-      team_id: payload.teamId || null,
+      club_id: resolvedClubId,
+      team_id: resolvedTeamId,
       season_id: payload.seasonId || null,
       microcycle_id: payload.microcycleId || null,
-      date_time: payload.dateTime || null,
-      duration_minutes: payload.durationMinutes,
-      location: payload.location || null,
-      age_category: payload.ageCategory,
-      microcycle_day: payload.microcycleDay,
-      intensity_load: payload.intensityLoad,
-      objective: payload.objective,
+      title: sessionTitle,
+      date: dateStr,
+      start_time: startTimeStr,
+      status: "scheduled",
+      age_category: payload.ageCategory || "alevin",
+      microcycle_day: payload.microcycleDay || "MD-3",
+      intensity_load: payload.intensityLoad || 3,
+      objective: payload.objective || "Entrenamiento Táctico",
       objectives_secondary: payload.objectivesSecondary || [],
-      num_players: payload.numPlayers,
+      num_players: payload.numPlayers || 16,
       num_goalkeepers: payload.numGoalkeepers || 0,
       available_space: payload.availableSpace || null,
       available_material: payload.availableMaterial || [],
       estimated_load: payload.estimatedLoad || 50,
       is_completed: payload.isCompleted || false,
-      coach_notes: payload.coachNotes || payload.objective,
+      coach_notes: payload.coachNotes || payload.objective || null,
     })
     .select()
     .single();
 
-  if (sessionError) throw sessionError;
+  if (sessionError) {
+    console.error("Error inserting training_sessions:", sessionError);
+    throw sessionError;
+  }
 
   const drillsToInsert: any[] = [];
   let globalOrder = 0;
 
-  Object.keys(payload.blocks).forEach(blockId => {
-    payload.blocks[blockId].forEach((ex) => {
-      drillsToInsert.push({
-        session_id: sessionData.id,
-        drill_id: ex.id || ex.drill_id,
-        phase: blockId,
-        order_index: globalOrder++,
-        duration_min: ex.duration_min || 15,
+  const blockToDbPhase: Record<string, string> = {
+    activacion: "warmup",
+    calentamiento: "warmup",
+    warmup: "warmup",
+    principal_1: "main_1",
+    main_1: "main_1",
+    principal_2: "main_2",
+    main_2: "main_2",
+    global: "main_2",
+    vuelta_calma: "cooldown",
+    cooldown: "cooldown"
+  };
+
+  if (payload.blocks) {
+    Object.keys(payload.blocks).forEach(blockId => {
+      payload.blocks[blockId].forEach((ex) => {
+        drillsToInsert.push({
+          session_id: sessionData.id,
+          drill_id: ex.id || ex.drill_id,
+          phase: blockToDbPhase[blockId] || "main_1",
+          order_index: globalOrder++,
+          duration_min: ex.duration_min || 15,
+        });
       });
     });
-  });
+  }
 
   if (drillsToInsert.length > 0) {
     const { error: drillsError } = await supabase.from("session_drills").insert(drillsToInsert);
-    if (drillsError) throw drillsError;
+    if (drillsError) {
+      console.error("Error inserting session_drills:", drillsError);
+      throw drillsError;
+    }
   }
 
   return sessionData;
@@ -227,15 +309,32 @@ export async function saveMethodologySession(payload: SessionSavePayload) {
 export async function updateMethodologySession(sessionId: string, payload: SessionSavePayload) {
   const supabase = createClient();
 
+  let dateStr = new Date().toISOString().split("T")[0];
+  let startTimeStr = "18:00";
+
+  if (payload.dateTime) {
+    if (payload.dateTime.includes("T")) {
+      const parts = payload.dateTime.split("T");
+      dateStr = parts[0];
+      startTimeStr = parts[1]?.substring(0, 5) || "18:00";
+    } else {
+      dateStr = payload.dateTime;
+    }
+  }
+
+  const sessionTitle = payload.objective 
+    ? `Sesión: ${payload.objective}` 
+    : "Sesión de Entrenamiento Metodológica";
+
   const { data: sessionData, error: sessionError } = await supabase
     .from("training_sessions")
     .update({
       team_id: payload.teamId || null,
       season_id: payload.seasonId || null,
       microcycle_id: payload.microcycleId || null,
-      date_time: payload.dateTime || null,
-      duration_minutes: payload.durationMinutes,
-      location: payload.location || null,
+      title: sessionTitle,
+      date: dateStr,
+      start_time: startTimeStr,
       age_category: payload.ageCategory,
       microcycle_day: payload.microcycleDay,
       intensity_load: payload.intensityLoad,
@@ -260,17 +359,32 @@ export async function updateMethodologySession(sessionId: string, payload: Sessi
   const drillsToInsert: any[] = [];
   let globalOrder = 0;
 
-  Object.keys(payload.blocks).forEach(blockId => {
-    payload.blocks[blockId].forEach((ex) => {
-      drillsToInsert.push({
-        session_id: sessionId,
-        drill_id: ex.id || ex.drill_id,
-        phase: blockId,
-        order_index: globalOrder++,
-        duration_min: ex.duration_min || 15,
+  const blockToDbPhase: Record<string, string> = {
+    activacion: "warmup",
+    calentamiento: "warmup",
+    warmup: "warmup",
+    principal_1: "main_1",
+    main_1: "main_1",
+    principal_2: "main_2",
+    main_2: "main_2",
+    global: "main_2",
+    vuelta_calma: "cooldown",
+    cooldown: "cooldown"
+  };
+
+  if (payload.blocks) {
+    Object.keys(payload.blocks).forEach(blockId => {
+      payload.blocks[blockId].forEach((ex) => {
+        drillsToInsert.push({
+          session_id: sessionId,
+          drill_id: ex.id || ex.drill_id,
+          phase: blockToDbPhase[blockId] || "main_1",
+          order_index: globalOrder++,
+          duration_min: ex.duration_min || 15,
+        });
       });
     });
-  });
+  }
 
   if (drillsToInsert.length > 0) {
     const { error: drillsError } = await supabase.from("session_drills").insert(drillsToInsert);

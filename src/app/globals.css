@@ -39,14 +39,18 @@ body {
   }
 }
 
-@layer utilities {
-  .scrollbar-hide, .no-scrollbar, .hide-scrollbar {
-    -ms-overflow-style: none !important; /* IE and Edge */
-    scrollbar-width: none !important; /* Firefox */
-  }
-  .scrollbar-hide::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar, .hide-scrollbar::-webkit-scrollbar {
-    display: none !important; /* Chrome, Safari and Opera */
-    width: 0 !important;
-    height: 0 !important;
-  }
+/* Hide scrollbars globally while preserving functional scroll on all browsers */
+html, body, .no-scrollbar, .scrollbar-hide, .hide-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
 }

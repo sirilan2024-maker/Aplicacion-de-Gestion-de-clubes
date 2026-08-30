@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Groq from 'groq-sdk';
+import { getAuthenticatedContext, ADMIN_ROLES, COACH_ROLES } from '@/lib/auth-helpers';
 
 export async function POST(req: Request) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+    const hasAccess = ADMIN_ROLES.includes(context.profile.role) || COACH_ROLES.includes(context.profile.role) || ['coordinador', 'metodologo'].includes(context.profile.role);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes permisos para usar el asistente IA' }, { status: 403 });
+    }
+
     const body = await req.json();
     const prompt = body.prompt || body.query;
 
@@ -38,6 +49,7 @@ export async function POST(req: Request) {
       WHERE table_schema = 'public'
       ORDER BY table_name, ordinal_position
     `;
+
     const { data: schemaData, error: schemaError } = await supabase.rpc('execute_sql_query', { query_text: schemaQuery });
     
     if (schemaError) {
@@ -79,7 +91,8 @@ INSTRUCCIONES:
 8. IMPORTANTE: Los goles de nuestro equipo y las TARJETAS (amarilla/roja) están EXCLUSIVAMENTE en la tabla 'match_events' bajo 'tipo_evento'. NO inventes columnas como 'tarjetas_amarillas' en convocatorias.
 9. Si la pregunta pide datos que CLARAMENTE no existen en el esquema (ej. posesión de balón), devuelve un JSON con el campo "error" explicando cortésmente por qué no se puede responder.
 10. IMPORTANTE: Revisa minuciosamente los nombres de las columnas. Usa la tabla correcta para cada columna según el esquema.
-11. DEBES devolver ÚNICAMENTE un objeto JSON válido con UNA de estas dos estructuras:
+11. SEGURIDAD Y MULTI-TENANT: Estás generando una consulta para el club '${context.profile.club_id}'. Si las tablas tienen club_id, añade la condición club_id = '${context.profile.club_id}'.
+12. DEBES devolver ÚNICAMENTE un objeto JSON válido con UNA de estas dos estructuras:
 Si puedes generar SQL:
 {
   "sql": "SELECT ... FROM ...;"
@@ -134,12 +147,23 @@ No incluyas markdown, ni backticks, solo el JSON puro.`;
       generatedSql = generatedSql.slice(0, -1);
     }
 
-    console.log("SQL GENERADO:", generatedSql);
+    // ==========================================
+    // VALIDACIÓN DE SEGURIDAD DEL SQL
+    // ==========================================
+    const upperSql = generatedSql.toUpperCase();
+    if (!upperSql.startsWith('SELECT') && !upperSql.startsWith('WITH')) {
+      return NextResponse.json({ type: "text", text: "Consulta no permitida por razones de seguridad." });
+    }
+    const dangerousKeywords = ['INSERT ', 'UPDATE ', 'DELETE ', 'DROP ', 'ALTER ', 'TRUNCATE ', 'GRANT ', 'REVOKE ', 'EXECUTE ', 'CREATE '];
+    if (dangerousKeywords.some(kw => upperSql.includes(kw))) {
+      return NextResponse.json({ type: "text", text: "Consulta rechazada por razones de seguridad." });
+    }
 
     // ==========================================
     // FASE 2: Ejecutar SQL
     // ==========================================
     const { data: queryResult, error: queryError } = await supabase.rpc('execute_sql_query', { query_text: generatedSql });
+
     
     if (queryError) {
       console.error("Error ejecutando SQL generado:", queryError);

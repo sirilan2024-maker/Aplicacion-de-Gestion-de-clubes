@@ -97,11 +97,13 @@ export function calculateLongitudinalMemory(params: {
   const recentSessions = sortedSessions;
 
   const earlyPriorities = calculateMethodologyPriorities({
+    teamId: team.id,
     curriculumPrinciples,
     recentSessions: earlySessions
   });
 
   const currentPriorities = calculateMethodologyPriorities({
+    teamId: team.id,
     curriculumPrinciples,
     recentSessions: recentSessions
   });

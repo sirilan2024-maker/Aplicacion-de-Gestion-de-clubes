@@ -32,7 +32,7 @@ export async function login(formData: FormData) {
 
   const role = (profile?.role as string) ?? 'coach';
   let destination = '/dashboard';
-  if (role === 'admin') destination = '/dashboard/equipos';
+  if (role === 'admin') destination = '/admin/inicio';
   else if (role === 'coach' || role === 'entrenador') destination = '/dashboard/mis-equipos';
   else if (role === 'tutor' || role === 'familia' || role === 'family') {
     // Check if they have linked children to redirect them straight into the context

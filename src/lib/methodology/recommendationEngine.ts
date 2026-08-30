@@ -4,14 +4,16 @@
  * Implementa las reglas exactas de scoring ponderado y métricas de carga
  */
 
+import { evaluatePureTacticalAffinity } from "./tacticalEngine/tacticalAffinityEngine";
+
 export interface SessionContext {
-  category: string; // querubin, prebenjamin, benjamin, alevin, infantil, cadete, juvenil, senior
+  category?: string; // querubin, prebenjamin, benjamin, alevin, infantil, cadete, juvenil, senior
   objective: string; // Objetivo principal
   secondaryObjectives?: string[];
-  numPlayers: number;
+  numPlayers?: number;
   durationMinutes: number;
-  microcycleDay: string; // MD, MD-5, MD-4, MD-3, MD-2, MD-1, MD+1, REST
-  intensityLoad: number; // 1-5
+  microcycleDay?: string; // MD, MD-5, MD-4, MD-3, MD-2, MD-1, MD+1, REST
+  intensityLoad?: number; // 1-5
   availableSpace?: string;
   availableMaterial?: string[];
   recentExerciseIds?: string[]; // IDs de ejercicios usados en las últimas 3-5 sesiones
@@ -22,6 +24,9 @@ export interface SessionContext {
 export interface ExerciseScoreResult {
   exercise: any;
   score: number;
+  isSelectable?: boolean;
+  tacticalAffinity?: any;
+  rejectionReason?: string | null;
   breakdown: {
     categoryMatch: number;
     objectiveMatch: number;
@@ -91,6 +96,7 @@ export function scoreExercise(exercise: any, context: SessionContext): ExerciseS
     loadMatch: 0,
     blockSuitability: 0,
     microcycleSuitability: 0,
+    priorityMatch: 0,
     recencyPenalty: 0,
   };
 
@@ -118,19 +124,50 @@ export function scoreExercise(exercise: any, context: SessionContext): ExerciseS
     }
   }
 
-  // 2. Coincidencia con Objetivo Principal (+25)
-  const exTacticalObjs = (exercise.objetivo_tactico || []).map((o: string) => o.toLowerCase());
-  const exTechnicalObjs = (exercise.objetivo_tecnico || []).map((o: string) => o.toLowerCase());
-  const exFamilia = (exercise.familia || "").toLowerCase();
-  const allExTargets = [...exTacticalObjs, ...exTechnicalObjs, exFamilia].filter(Boolean);
-
+  // 2. Coincidencia con Objetivo Principal mediante Motor Táctico Puro
   if (context.objective) {
-    const mainTarget = context.objective.toLowerCase().trim();
-    const hasExact = mainTarget && allExTargets.some(t => t.length > 2 && (t.includes(mainTarget) || mainTarget.includes(t)));
-    
-    if (hasExact) {
-      breakdown.objectiveMatch += RECOMMENDATION_WEIGHTS.OBJECTIVE_PRIMARY;
-      reasons.push("Alineado directamente con el objetivo principal (+25)");
+    const pureTacticalEval = evaluatePureTacticalAffinity(exercise, { 
+      name: context.objective, 
+      game_phase: context.objective 
+    });
+
+    if (context.targetBlock === "principal_1" || context.targetBlock === "principal_2" || context.targetBlock === "global") {
+      if (!pureTacticalEval || !pureTacticalEval.hasMeaningfulAffinity) {
+        let matchedSec = false;
+        if (context.secondaryObjectives && context.secondaryObjectives.length > 0) {
+          for (const sec of context.secondaryObjectives) {
+            const secEval = evaluatePureTacticalAffinity(exercise, { name: sec, game_phase: sec });
+            if (secEval && secEval.hasMeaningfulAffinity) {
+              matchedSec = true;
+              breakdown.objectiveMatch += (secEval.affinityType === "DIRECT" ? 35 : 20) + secEval.tacticalScore;
+              reasons.push(`Alineado con objetivo secundario: "${sec}"`);
+              break;
+            }
+          }
+        }
+
+        if (!matchedSec) {
+          return {
+            exercise,
+            score: -500,
+            breakdown,
+            reasons: [`⚠️ Excluido: Sin afinidad táctica real con "${context.objective}"`]
+          };
+        }
+      } else {
+        if (pureTacticalEval.affinityType === "DIRECT") {
+          breakdown.objectiveMatch += 50 + pureTacticalEval.tacticalScore;
+          reasons.push(`Alineado directamente con "${context.objective}" (+${pureTacticalEval.tacticalScore} táctico)`);
+        } else {
+          breakdown.objectiveMatch += 25 + pureTacticalEval.tacticalScore;
+          reasons.push(`Afinidad táctica secundaria con "${context.objective}"`);
+        }
+      }
+    } else {
+      if (pureTacticalEval && pureTacticalEval.hasMeaningfulAffinity) {
+        breakdown.objectiveMatch += (pureTacticalEval.affinityType === "DIRECT" ? 40 : 20) + pureTacticalEval.tacticalScore;
+        reasons.push(`Alineado con objetivo táctico: "${context.objective}"`);
+      }
     }
   }
 
@@ -188,8 +225,15 @@ export function scoreExercise(exercise: any, context: SessionContext): ExerciseS
     const blockSesion = (exercise.bloque_sesion || "").toLowerCase();
     const exType = (exercise.tipo || "").toLowerCase();
 
+    const isPositional = exType.includes("juego_medio") || exType.includes("positional") || exType.includes("posicional") || exType.includes("posicion") || exType.includes("possession") || exType.includes("posesion");
+    const isGlobal = exType.includes("ssg") || exType.includes("global") || exType.includes("partido") || exType.includes("conditioned") || exType.includes("defensive");
+    const isRondo = exType.includes("rondo");
+    const isAnalytic = exType.includes("analitico") || exType.includes("analítico") || exType.includes("individual") || exType.includes("tecnico");
+    const isWarmup = exType.includes("calentamiento") || exType.includes("circuito") || exType.includes("circuit") || exType.includes("ludico") || structure.includes("calentamiento") || structure.includes("circuito") || blockSesion === 'calentamiento';
+    const isCooldown = blockSesion === 'vuelta_calma' || exType.includes("calma") || ((exercise.carga_fisica ?? 2) <= 1 && (exercise.oposicion ?? 2) <= 1);
+
     if (context.targetBlock === 'activacion') {
-      if (blockSesion === 'calentamiento' || structure.includes('calentamiento') || structure.includes('circuito') || exType === 'rondo') {
+      if (isWarmup || isRondo || (isAnalytic && (exercise.carga_fisica ?? 2) <= 2)) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_PERFECT_MATCH;
         reasons.push("Estructura óptima para activación (+40)");
       } else {
@@ -197,36 +241,34 @@ export function scoreExercise(exercise: any, context: SessionContext): ExerciseS
         reasons.push("Tarea no apta para activación (-40)");
       }
     } else if (context.targetBlock === 'principal_1') {
-      if (exType === 'juego_medio' || exType === 'rondo' || exType === 'analitico' || (blockSesion === 'principal' && exType !== 'ssg' && exType !== 'juego_global')) {
+      if (isPositional || isRondo || isAnalytic || (blockSesion === 'principal' && !isGlobal)) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_PERFECT_MATCH;
         reasons.push("Ideal para fijación táctica (Principal 1) (+40)");
-      } else if (exType === 'ssg') {
+      } else if (isGlobal) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_GOOD_MATCH;
       } else {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_INCOMPATIBLE;
       }
     } else if (context.targetBlock === 'principal_2') {
-      if (exType === 'ssg' || exType === 'transiciones') {
+      if (isGlobal || isPositional || exType.includes("transicion")) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_PERFECT_MATCH;
         reasons.push("Óptimo para aumento de oposición contextual (Principal 2) (+40)");
-      } else if (exType === 'juego_medio') {
+      } else if (isRondo || isAnalytic) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_GOOD_MATCH;
-      } else if (exType === 'juego_global') {
-        breakdown.blockSuitability = 10;
       } else {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_INCOMPATIBLE;
       }
     } else if (context.targetBlock === 'global') {
-      if (exType === 'juego_global' || blockSesion === 'global') {
+      if (isGlobal || blockSesion === 'global') {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_PERFECT_MATCH;
         reasons.push("Alta representatividad para bloque global (+40)");
-      } else if (exType === 'ssg') {
+      } else if (isPositional && (exercise.representatividad ?? 2) >= 3) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_GOOD_MATCH;
       } else {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_INCOMPATIBLE;
       }
     } else if (context.targetBlock === 'vuelta_calma') {
-      if (blockSesion === 'vuelta_calma' || exType === 'analitico' || (exercise.carga_fisica && exercise.carga_fisica <= 1)) {
+      if (isCooldown) {
         breakdown.blockSuitability = RECOMMENDATION_WEIGHTS.BLOCK_PERFECT_MATCH;
         reasons.push("Regenerativo para vuelta a la calma (+40)");
       } else {
@@ -302,6 +344,24 @@ export function scoreExercise(exercise: any, context: SessionContext): ExerciseS
   };
 }
 
+/**
+ * Barrera de seleccionabilidad metodológica obligatoria.
+ * Un ejercicio NO puede ser seleccionado para un bloque si:
+ * 1. Su puntuación global es <= 30 (o fue descartado tácticamente con -500).
+ * 2. Su estructura es incompatible con el bloque (blockSuitability === -40).
+ * 3. Es severamente incompatible con la franja de edad (categoryMatch === -30).
+ */
+export function isExerciseSelectableForBlock(
+  scoreResult: ExerciseScoreResult, 
+  context?: SessionContext
+): boolean {
+  if (!scoreResult || !scoreResult.exercise) return false;
+  if (scoreResult.score <= 30) return false;
+  if (scoreResult.breakdown.blockSuitability <= RECOMMENDATION_WEIGHTS.BLOCK_INCOMPATIBLE) return false;
+  if (scoreResult.breakdown.categoryMatch <= RECOMMENDATION_WEIGHTS.CATEGORY_INCOMPATIBLE) return false;
+  return true;
+}
+
 export function recommendExercises(
   allExercises: any[], 
   context: SessionContext, 
@@ -310,7 +370,7 @@ export function recommendExercises(
   const scored = allExercises.map(ex => scoreExercise(ex, context));
   
   return scored
-    .filter(res => res.score > 0)
+    .filter(res => isExerciseSelectableForBlock(res, context))
     .sort((a, b) => {
       // 1. Mayor score
       if (b.score !== a.score) {

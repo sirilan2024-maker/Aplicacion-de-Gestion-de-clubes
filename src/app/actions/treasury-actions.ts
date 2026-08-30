@@ -2,13 +2,33 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import {
+  getAuthenticatedContext,
+  canUserAccessFamily,
+  canUserAccessPlayer,
+  canUserAccessFee,
+  TREASURY_ADMIN_ROLES,
+} from "@/lib/auth-helpers";
+
 
 export async function getFamilyFeesAction(familyId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  const access = await canUserAccessFamily(adminSupabase, context, familyId);
+  if (!access.allowed) {
+    throw new Error(access.reason || "No autorizado para consultar las cuotas de esta familia");
+  }
+
   const { data, error } = await adminSupabase
     .from("fees")
     .select("id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, receipt_path, fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
     .eq("profile_id", familyId)
+    .eq("club_id", context.profile.club_id)
     .order("creado_en", { ascending: false });
 
   if (error) {
@@ -32,11 +52,23 @@ export async function getFamilyFeesAction(familyId: string) {
 }
 
 export async function getPlayerFeesAction(playerId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  const access = await canUserAccessPlayer(adminSupabase, context, playerId);
+  if (!access.allowed) {
+    throw new Error(access.reason || "No autorizado para consultar las cuotas de este jugador");
+  }
+
   const { data, error } = await adminSupabase
     .from("fees")
     .select("id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, receipt_path, fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
     .eq("player_id", playerId)
+    .eq("club_id", context.profile.club_id)
     .order("creado_en", { ascending: false });
 
   if (error) {
@@ -58,6 +90,7 @@ export async function getPlayerFeesAction(playerId: string) {
     payments: f.fee_payments || []
   }));
 }
+
 
 export async function getClubFeesAction() {
   const supabase = await createClient();
@@ -662,14 +695,37 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
 }
 
 export async function updateFeeStatusAction(id: string, newStatus: string, paymentMethod?: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+    throw new Error("No tienes permisos de tesorería para modificar el estado de cuotas");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  // Validar existencia y pertenencia al club de la cuota
+  const { data: fee, error: feeErr } = await adminSupabase
+    .from("fees")
+    .select("id, club_id, amount_cents")
+    .eq("id", id)
+    .single();
+
+  if (feeErr || !fee) {
+    throw new Error("Cuota no encontrada");
+  }
+
+  if (fee.club_id !== context.profile.club_id) {
+    throw new Error("La cuota no pertenece a tu club");
+  }
   
   const updateData: any = { estado: newStatus };
   if (paymentMethod) updateData.payment_method = paymentMethod;
   if (newStatus === 'pagado') {
     updateData.fecha_pago = new Date().toISOString();
-    const { data: fee } = await adminSupabase.from("fees").select("amount_cents").eq("id", id).single();
-    if (fee) updateData.amount_paid_cents = fee.amount_cents;
+    updateData.amount_paid_cents = fee.amount_cents;
   } else if (newStatus === 'pendiente') {
     updateData.amount_paid_cents = 0;
   }
@@ -677,7 +733,8 @@ export async function updateFeeStatusAction(id: string, newStatus: string, payme
   const { error } = await adminSupabase
     .from("fees")
     .update(updateData)
-    .eq("id", id);
+    .eq("id", id)
+    .eq("club_id", context.profile.club_id);
 
   if (error) {
     console.error("Error updating fee status:", error);
@@ -690,6 +747,7 @@ export async function updateFeeStatusAction(id: string, newStatus: string, payme
 
   return { success: true };
 }
+
 
 export async function getRegistrationPaymentsAction() {
   const supabase = await createClient();
@@ -1120,18 +1178,80 @@ export async function rejectReservationFeeAction(feeId: string) {
 
 
 export async function updateFeeDetailsAction(id: string, updates: { concept?: string; amount_cents?: number; due_date?: string }) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+    throw new Error("No tienes permisos de tesorería para modificar cuotas");
+  }
+
   const adminSupabase = await createAdminClient();
-  const { error } = await adminSupabase.from("fees").update(updates).eq("id", id);
+
+  const { data: fee, error: feeErr } = await adminSupabase
+    .from("fees")
+    .select("id, club_id")
+    .eq("id", id)
+    .single();
+
+  if (feeErr || !fee) {
+    throw new Error("Cuota no encontrada");
+  }
+
+  if (fee.club_id !== context.profile.club_id) {
+    throw new Error("La cuota no pertenece a tu club");
+  }
+
+  const { error } = await adminSupabase
+    .from("fees")
+    .update(updates)
+    .eq("id", id)
+    .eq("club_id", context.profile.club_id);
+
   if (error) throw new Error(error.message);
   return { success: true };
 }
 
 export async function deleteFeeAction(id: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+    throw new Error("No tienes permisos de tesorería para eliminar cuotas");
+  }
+
   const adminSupabase = await createAdminClient();
-  const { error } = await adminSupabase.from("fees").delete().eq("id", id);
+
+  const { data: fee, error: feeErr } = await adminSupabase
+    .from("fees")
+    .select("id, club_id")
+    .eq("id", id)
+    .single();
+
+  if (feeErr || !fee) {
+    throw new Error("Cuota no encontrada");
+  }
+
+  if (fee.club_id !== context.profile.club_id) {
+    throw new Error("La cuota no pertenece a tu club");
+  }
+
+  // Eliminar pagos asociados primero para mantener consistencia referencial
+  await adminSupabase.from("fee_payments").delete().eq("fee_id", id);
+
+  const { error } = await adminSupabase
+    .from("fees")
+    .delete()
+    .eq("id", id)
+    .eq("club_id", context.profile.club_id);
+
   if (error) throw new Error(error.message);
   return { success: true };
 }
+
 
 export async function getInscriptionFeesAction() {
   const supabase = await createClient();
@@ -1178,7 +1298,18 @@ export async function getInscriptionFeesAction() {
 }
 
 export async function getFeePaymentsAction(feeId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  const access = await canUserAccessFee(adminSupabase, context, feeId);
+  if (!access.allowed) {
+    throw new Error(access.reason || "No autorizado para ver los pagos de esta cuota");
+  }
+
   const { data, error } = await adminSupabase
     .from("fee_payments")
     .select("*")
@@ -1190,16 +1321,28 @@ export async function getFeePaymentsAction(feeId: string) {
 }
 
 export async function addPartialPaymentAction(feeId: string, amountCents: number, method: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  // Validar permisos sobre la cuota (aislamiento de club y relación con la cuota)
+  const access = await canUserAccessFee(adminSupabase, context, feeId);
+  if (!access.allowed || !access.fee) {
+    throw new Error(access.reason || "No autorizado para registrar pagos en esta cuota");
+  }
 
   // 1. Get current fee to validate
   const { data: fee, error: feeError } = await adminSupabase
     .from("fees")
-    .select("amount_cents, amount_paid_cents")
+    .select("id, club_id, amount_cents, amount_paid_cents")
     .eq("id", feeId)
     .single();
 
   if (feeError || !fee) throw new Error("Cuota no encontrada");
+  if (fee.club_id !== context.profile.club_id) throw new Error("La cuota no pertenece a tu club");
 
   const pending = fee.amount_cents - (fee.amount_paid_cents || 0);
   if (amountCents > pending) {
@@ -1225,7 +1368,8 @@ export async function addPartialPaymentAction(feeId: string, amountCents: number
 
   await adminSupabase.from("fees")
     .update({ amount_paid_cents: newPaid, estado: newStatus, payment_method: method })
-    .eq("id", feeId);
+    .eq("id", feeId)
+    .eq("club_id", context.profile.club_id);
 
   // 4. Generate receipt
   try {
@@ -1240,8 +1384,30 @@ export async function addPartialPaymentAction(feeId: string, amountCents: number
   return { success: true };
 }
 
+
 export async function downloadPaymentReceiptAction(paymentId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  const { data: payment, error: paymentError } = await adminSupabase
+    .from("fee_payments")
+    .select("id, fee_id, receipt_path")
+    .eq("id", paymentId)
+    .single();
+
+  if (paymentError || !payment) {
+    throw new Error("Pago no encontrado");
+  }
+
+  const access = await canUserAccessFee(adminSupabase, context, payment.fee_id);
+  if (!access.allowed) {
+    throw new Error(access.reason || "No autorizado para descargar este recibo de pago");
+  }
+
   const res = await generateAndUploadPaymentReceiptAction(paymentId);
 
   const { data, error } = await adminSupabase.storage
@@ -1256,7 +1422,18 @@ export async function downloadPaymentReceiptAction(paymentId: string) {
 }
 
 export async function downloadFeeReceiptAction(feeId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
   const adminSupabase = await createAdminClient();
+
+  const access = await canUserAccessFee(adminSupabase, context, feeId);
+  if (!access.allowed) {
+    throw new Error(access.reason || "No autorizado para descargar este recibo de cuota");
+  }
+
   const res = await generateAndUploadReceiptAction(feeId);
 
   const { data: fee } = await adminSupabase
@@ -1280,6 +1457,7 @@ export async function downloadFeeReceiptAction(feeId: string) {
 
   return { success: true, url: data.signedUrl, fileName };
 }
+
 
 export async function getMemberBalancesAction() {
   const supabase = await createClient();
@@ -1464,15 +1642,17 @@ export async function getMemberStatementAction(playerId: string) {
 }
 
 export async function getOfficialReceiptsAction() {
-  const supabase = await createClient();
-  const adminSupabase = await createAdminClient();
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) throw new Error(authError || "No autenticado");
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+  if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+    throw new Error("No tienes permisos de tesorería para consultar los recibos");
+  }
 
-  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  const clubId = profile?.club_id;
+  const clubId = context.profile.club_id;
   if (!clubId) throw new Error("Club no encontrado");
+
+  const adminSupabase = await createAdminClient();
 
   // 1. Intentar sincronizar recibos de todas las cuotas pagadas o con entregas a cuenta
   try {
@@ -1602,38 +1782,62 @@ export async function exportOfficialReceiptsCsvAction() {
 }
 
 export async function downloadOfficialReceiptPdfAction(receiptId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) throw new Error(authError || "No autenticado");
+
   const adminSupabase = await createAdminClient();
 
   const { data: receipt } = await adminSupabase
     .from("official_receipts")
-    .select("*, players(first_name, last_name)")
+    .select("*, players(id, first_name, last_name, club_id, tutor_id)")
     .eq("id", receiptId)
     .single();
+
+  let targetFeeId = receipt?.fee_id;
+  let receiptClubId = receipt?.club_id;
+  let receiptPlayerTutorId = (receipt?.players as any)?.tutor_id;
+
+  let feeData: any = null;
+  if (!receipt) {
+    const { data: fee } = await adminSupabase
+      .from("fees")
+      .select("*, players(id, first_name, last_name, club_id, tutor_id)")
+      .eq("id", receiptId)
+      .single();
+    feeData = fee;
+    if (fee) {
+      targetFeeId = fee.id;
+      receiptClubId = fee.club_id;
+      receiptPlayerTutorId = (fee.players as any)?.tutor_id;
+    }
+  }
+
+  if (!receipt && !feeData) {
+    throw new Error("Recibo no encontrado");
+  }
+
+  // Comprobar autorización: Tesorería del mismo club o familia propietaria
+  const isTreasury = TREASURY_ADMIN_ROLES.includes(context.profile.role) && context.profile.club_id === receiptClubId;
+  const isOwner = (context.profile.role === 'familia' || context.profile.role === 'family') && (receiptPlayerTutorId === context.user.id || (feeData && feeData.profile_id === context.user.id));
+
+  if (!isTreasury && !isOwner) {
+    throw new Error("No autorizado para descargar este recibo");
+  }
 
   let path = receipt?.pdf_path;
   let receiptNum = receipt?.receipt_number;
 
   // Si no se encuentra en official_receipts por ID, buscar en fees
-  if (!receipt) {
-    const { data: fee } = await adminSupabase
-      .from("fees")
-      .select("*, players(first_name, last_name)")
-      .eq("id", receiptId)
-      .single();
-
-    if (fee) {
-      if (fee.tipo_cargo === "manual_receipt" && fee.receipt_path) {
-        path = fee.receipt_path;
-        receiptNum = fee.concept.split("-")[0] || "REC";
-      } else {
-        const res = await generateAndUploadReceiptAction(fee.id);
-        path = res.path;
-        receiptNum = res.receiptNumber;
-      }
+  if (!receipt && feeData) {
+    if (feeData.tipo_cargo === "manual_receipt" && feeData.receipt_path) {
+      path = feeData.receipt_path;
+      receiptNum = feeData.concept?.split("-")[0] || "REC";
     } else {
-      throw new Error("Recibo no encontrado");
+      const res = await generateAndUploadReceiptAction(feeData.id);
+      path = res.path;
+      receiptNum = res.receiptNumber;
     }
-  } else if (receipt.fee_id && !path) {
+  } else if (receipt?.fee_id && !path) {
     const res = await generateAndUploadReceiptAction(receipt.fee_id);
     path = res.path;
   }
@@ -1641,7 +1845,7 @@ export async function downloadOfficialReceiptPdfAction(receiptId: string) {
   if (path) {
     let playerName = "Pagador";
     if (receipt?.players) {
-      playerName = `${receipt.players.first_name}_${receipt.players.last_name}`;
+      playerName = `${(receipt.players as any).first_name}_${(receipt.players as any).last_name}`;
     } else if (receipt?.concept && receipt.concept.includes("Pagador:")) {
       playerName = receipt.concept.split("Pagador:")[1].trim().split(" ")[0];
     }
@@ -1661,7 +1865,17 @@ export async function downloadOfficialReceiptPdfAction(receiptId: string) {
   throw new Error("No se pudo obtener el PDF del recibo");
 }
 
+
 export async function updateFeeAmountAction(feeId: string, newAmountCents: number, reason?: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+    throw new Error("No tienes permisos de tesorería para modificar el importe de cuotas");
+  }
+
   const adminSupabase = await createAdminClient();
 
   if (newAmountCents < 0) {
@@ -1670,11 +1884,15 @@ export async function updateFeeAmountAction(feeId: string, newAmountCents: numbe
 
   const { data: fee, error: feeErr } = await adminSupabase
     .from("fees")
-    .select("amount_paid_cents, concept")
+    .select("id, club_id, amount_paid_cents, concept")
     .eq("id", feeId)
     .single();
 
   if (feeErr || !fee) throw new Error("Cuota no encontrada");
+
+  if (fee.club_id !== context.profile.club_id) {
+    throw new Error("La cuota no pertenece a tu club");
+  }
 
   const paidCents = fee.amount_paid_cents || 0;
   const newStatus = paidCents >= newAmountCents ? "pagado" : "pendiente";
@@ -1687,12 +1905,14 @@ export async function updateFeeAmountAction(feeId: string, newAmountCents: numbe
       estado: newStatus,
       concept: updatedConcept,
     })
-    .eq("id", feeId);
+    .eq("id", feeId)
+    .eq("club_id", context.profile.club_id);
 
   if (updateErr) throw new Error("Error al actualizar importe de cuota: " + updateErr.message);
 
   return { success: true };
 }
+
 
 export async function createManualReceiptAction(params: {
   payerName: string;
@@ -1822,5 +2042,427 @@ export async function createManualReceiptAction(params: {
     fileName,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P11-F: Generador de Remesa SEPA XML para Tesorería
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PendingSepaFeeItem {
+  id: string;
+  concept: string;
+  amountCents: number;
+  amountFormatted: string;
+  status: string;
+  paymentMethod: string;
+  playerId: string;
+  playerName: string;
+  isSenior: boolean;
+  debtorName: string;
+  debtorIban: string | null;
+  mandateId: string | null;
+  mandateDate: string | null;
+  isValid: boolean;
+  validationErrors: string[];
+}
+
+export interface ClubSepaStatus {
+  clubId: string;
+  clubName: string;
+  creditorId: string | null;
+  creditorIban: string | null;
+  isValid: boolean;
+  errors: string[];
+}
+
+interface FeeWithPlayerRow {
+  id: string;
+  concept: string | null;
+  amount_cents: number;
+  estado: string;
+  payment_method: string | null;
+  club_id: string;
+  player_id: string;
+  players: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    dni: string | null;
+    is_senior: boolean | null;
+    parent1_name: string | null;
+    parent1_last_name: string | null;
+    parent1_dni: string | null;
+    iban: string | null;
+    sepa_mandate_id: string | null;
+    sepa_mandate_date: string | null;
+  } | null;
+}
+
+/**
+ * Consulta las cuotas domiciliadas pendientes de remesar para el club activo,
+ * evaluando su aptitud y datos SEPA según las reglas de pagador (senior vs tutor parent1_*).
+ */
+export async function getPendingDirectDebitFeesAction(): Promise<{
+  success: boolean;
+  clubSepa?: ClubSepaStatus;
+  fees?: PendingSepaFeeItem[];
+  totalAmountCents?: number;
+  error?: string;
+}> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || 'No autenticado' };
+    }
+
+    if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: 'No tienes permisos de Tesorería para acceder a las remesas SEPA' };
+    }
+
+    const adminSupabase = await createAdminClient();
+
+    // 1. Obtener datos SEPA del Club
+    const { data: club, error: clubError } = await adminSupabase
+      .from('clubs')
+      .select('id, name, sepa_creditor_id, sepa_iban')
+      .eq('id', context.profile.club_id)
+      .single();
+
+    if (clubError || !club) {
+      return { success: false, error: 'No se pudo cargar la información del club' };
+    }
+
+    const { validateIban } = await import('@/lib/sepa/sepaGenerator');
+
+    const clubErrors: string[] = [];
+    if (!club.sepa_creditor_id?.trim()) {
+      clubErrors.push('Falta el Identificador de acreedor SEPA del club');
+    }
+    if (!club.sepa_iban?.trim()) {
+      clubErrors.push('Falta el IBAN del club');
+    } else {
+      const ibanCheck = validateIban(club.sepa_iban);
+      if (!ibanCheck.valid) {
+        clubErrors.push(`IBAN del club inválido (${ibanCheck.reason})`);
+      }
+    }
+
+    const clubSepa: ClubSepaStatus = {
+      clubId: club.id,
+      clubName: club.name || 'Club Deportivo',
+      creditorId: club.sepa_creditor_id || null,
+      creditorIban: club.sepa_iban || null,
+      isValid: clubErrors.length === 0,
+      errors: clubErrors,
+    };
+
+    // 2. Obtener cuotas pendientes domiciliadas
+    const { data: fees, error: feesError } = await adminSupabase
+      .from('fees')
+      .select(`
+        id, concept, amount_cents, estado, payment_method, player_id,
+        players (
+          id, first_name, last_name, dni, is_senior,
+          parent1_name, parent1_last_name, parent1_dni,
+          iban, sepa_mandate_id, sepa_mandate_date
+        )
+      `)
+      .eq('club_id', context.profile.club_id)
+      .in('estado', ['pending', 'pendiente', 'pdte_verif', 'pendiente_verificacion'])
+      .ilike('payment_method', '%domicilia%')
+      .order('creado_en', { ascending: true });
+
+    if (feesError) {
+      console.error('[getPendingDirectDebitFeesAction] Error consultando cuotas');
+      return { success: false, error: 'Error al consultar cuotas domiciliadas' };
+    }
+
+    const pendingItems: PendingSepaFeeItem[] = [];
+    let totalCents = 0;
+
+    const typedFees = (fees as unknown as FeeWithPlayerRow[]) || [];
+    for (const f of typedFees) {
+      const player = f.players;
+      const isSenior = Boolean(player?.is_senior);
+
+      // Regla de Pagador P11-F:
+      // Si players.is_senior = true: deudor = jugador (first_name, last_name)
+      // Si players.is_senior = false: deudor = parent1_* (parent1_name, parent1_last_name)
+      let debtorName = '';
+      if (isSenior) {
+        debtorName = `${player?.first_name || ''} ${player?.last_name || ''}`.trim();
+      } else {
+        debtorName = `${player?.parent1_name || ''} ${player?.parent1_last_name || ''}`.trim() || player?.parent1_name || '';
+      }
+
+      const debtorIban = player?.iban || null;
+      const mandateId = player?.sepa_mandate_id || null;
+      const mandateDate = player?.sepa_mandate_date || null;
+
+      const itemErrors: string[] = [];
+
+      if (!debtorName) {
+        itemErrors.push('Falta el nombre del deudor');
+      }
+      if (!debtorIban) {
+        itemErrors.push('Falta el IBAN del deudor');
+      } else {
+        const ibanCheck = validateIban(debtorIban);
+        if (!ibanCheck.valid) {
+          itemErrors.push(`IBAN no válido (${ibanCheck.reason})`);
+        }
+      }
+      if (!mandateId) {
+        itemErrors.push('Falta la referencia de mandato SEPA');
+      }
+      if (!mandateDate) {
+        itemErrors.push('Falta la fecha de mandato SEPA');
+      }
+      if (!f.amount_cents || f.amount_cents <= 0) {
+        itemErrors.push('Importe de la cuota debe ser mayor que cero');
+      }
+
+      const isValid = itemErrors.length === 0;
+
+      pendingItems.push({
+        id: f.id,
+        concept: f.concept || 'Cuota club',
+        amountCents: f.amount_cents,
+        amountFormatted: (f.amount_cents / 100).toFixed(2),
+        status: f.estado,
+        paymentMethod: f.payment_method || 'domiciliacion',
+        playerId: f.player_id,
+        playerName: `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || 'Jugador sin nombre',
+        isSenior,
+        debtorName: debtorName || 'Sin pagador asignado',
+        debtorIban,
+        mandateId,
+        mandateDate,
+        isValid,
+        validationErrors: itemErrors,
+      });
+
+      totalCents += f.amount_cents;
+    }
+
+    return {
+      success: true,
+      clubSepa,
+      fees: pendingItems,
+      totalAmountCents: totalCents,
+    };
+  } catch {
+    return { success: false, error: 'Error al recuperar cuotas domiciliadas pendientes' };
+  }
+}
+
+/**
+ * Genera el archivo SEPA XML (ISO 20022 / pain.008.001.02) a partir de cuotas existentes.
+ * Realiza todas las validaciones obligatorias sin efectos destructivos sobre las cuotas.
+ */
+export async function generateSepaRemittanceAction(params?: {
+  feeIds?: string[];
+  collectionDate?: string;
+}): Promise<{
+  success: boolean;
+  xml?: string;
+  filename?: string;
+  totalAmount?: number;
+  txCount?: number;
+  error?: string;
+}> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || 'No autenticado' };
+    }
+
+    if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: 'No tienes permisos de Tesorería para generar remesas SEPA' };
+    }
+
+    const adminSupabase = await createAdminClient();
+
+    // 1. Validar datos del Club (Acreedor)
+    const { data: club, error: clubError } = await adminSupabase
+      .from('clubs')
+      .select('id, name, sepa_creditor_id, sepa_iban')
+      .eq('id', context.profile.club_id)
+      .single();
+
+    if (clubError || !club) {
+      return { success: false, error: 'Club no encontrado' };
+    }
+
+    if (!club.sepa_creditor_id?.trim()) {
+      return {
+        success: false,
+        error: 'No se puede generar la remesa: Falta el Identificador de acreedor SEPA del club. Configúralo en Configuración del Club.',
+      };
+    }
+
+    if (!club.sepa_iban?.trim()) {
+      return {
+        success: false,
+        error: 'No se puede generar la remesa: Falta el IBAN del club. Configúralo en Configuración del Club.',
+      };
+    }
+
+    const { validateIban, generateSepaXml } = await import('@/lib/sepa/sepaGenerator');
+
+    const clubIbanCheck = validateIban(club.sepa_iban);
+    if (!clubIbanCheck.valid) {
+      return {
+        success: false,
+        error: `No se puede generar la remesa: El IBAN del club no es válido (${clubIbanCheck.reason}).`,
+      };
+    }
+
+    // 2. Consultar cuotas a incluir
+    let query = adminSupabase
+      .from('fees')
+      .select(`
+        id, concept, amount_cents, estado, payment_method, club_id, player_id,
+        players (
+          id, first_name, last_name, dni, is_senior,
+          parent1_name, parent1_last_name, parent1_dni,
+          iban, sepa_mandate_id, sepa_mandate_date
+        )
+      `)
+      .eq('club_id', context.profile.club_id)
+      .in('estado', ['pending', 'pendiente', 'pdte_verif', 'pendiente_verificacion'])
+      .ilike('payment_method', '%domicilia%');
+
+    if (params?.feeIds && params.feeIds.length > 0) {
+      query = query.in('id', params.feeIds);
+    }
+
+    const { data: fees, error: feesError } = await query;
+
+    if (feesError || !fees || fees.length === 0) {
+      return {
+        success: false,
+        error: 'No se encontraron cuotas domiciliadas pendientes válidas para generar la remesa.',
+      };
+    }
+
+    // 3. Validaciones Obligatorias de cada cuota
+    const transactions = [];
+
+    const typedFees = (fees as unknown as FeeWithPlayerRow[]) || [];
+    for (const f of typedFees) {
+      // Verificación de aislamiento multi-tenant
+      if (f.club_id !== context.profile.club_id) {
+        return {
+          success: false,
+          error: 'Violación de seguridad: Una o más cuotas no pertenecen a tu club.',
+        };
+      }
+
+      const player = f.players;
+      const isSenior = Boolean(player?.is_senior);
+      const playerName = `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || 'Jugador';
+
+      // Validación de importe
+      if (!f.amount_cents || f.amount_cents <= 0) {
+        return {
+          success: false,
+          error: `No se puede generar la remesa: La cuota de "${playerName}" tiene un importe igual o inferior a cero.`,
+        };
+      }
+
+      // Regla de Pagador P11-F
+      let debtorName = '';
+      if (isSenior) {
+        debtorName = `${player?.first_name || ''} ${player?.last_name || ''}`.trim();
+      } else {
+        debtorName = `${player?.parent1_name || ''} ${player?.parent1_last_name || ''}`.trim() || player?.parent1_name || '';
+      }
+
+      if (!debtorName) {
+        return {
+          success: false,
+          error: `No se puede generar la remesa: Falta el nombre del deudor para la cuota de "${playerName}".`,
+        };
+      }
+
+      // Validación de IBAN deudor
+      const debtorIban = player?.iban?.trim();
+      if (!debtorIban) {
+        return {
+          success: false,
+          error: `No se puede generar la remesa: Falta el IBAN para la cuota de "${playerName}".`,
+        };
+      }
+
+      const debtorIbanCheck = validateIban(debtorIban);
+      if (!debtorIbanCheck.valid) {
+        return {
+          success: false,
+          error: `No se puede generar la remesa: El IBAN de "${playerName}" no es válido (${debtorIbanCheck.reason}).`,
+        };
+      }
+
+      // Validación de mandato SEPA
+      const mandateId = player?.sepa_mandate_id?.trim();
+      if (!mandateId) {
+        return {
+          success: false,
+          error: `No se puede generar la remesa: Falta la referencia de mandato SEPA para "${playerName}".`,
+        };
+      }
+
+      const mandateDate = player?.sepa_mandate_date ? String(player.sepa_mandate_date).trim() : '';
+      if (!mandateDate) {
+        return {
+          success: false,
+          error: `No se puede generar la remesa: Falta la fecha de mandato SEPA para "${playerName}".`,
+        };
+      }
+
+      transactions.push({
+        feeId: f.id,
+        amountCents: f.amount_cents,
+        concept: f.concept || 'Cuota deportiva',
+        debtorIban,
+        debtorName,
+        mandateId,
+        mandateDate,
+        endToEndId: `FEE-${f.id.replace(/-/g, '').slice(0, 20)}`,
+      });
+    }
+
+    // 4. Generar XML SEPA
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const messageId = `MSG-${club.id.replace(/-/g, '').slice(0, 8)}-${dateStr}-${Date.now().toString().slice(-6)}`;
+
+    const xml = generateSepaXml({
+      header: {
+        messageId,
+        creditorName: club.name || 'Club Deportivo',
+        creditorIban: club.sepa_iban,
+        creditorId: club.sepa_creditor_id,
+        collectionDate: params?.collectionDate,
+      },
+      transactions,
+    });
+
+    const totalAmount = transactions.reduce((acc, t) => acc + t.amountCents, 0) / 100;
+    const filename = `remesa_sepa_${dateStr}_${transactions.length}recibos.xml`;
+
+    return {
+      success: true,
+      xml,
+      filename,
+      totalAmount,
+      txCount: transactions.length,
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Error al generar el archivo XML de la remesa SEPA',
+    };
+  }
+}
+
 
 

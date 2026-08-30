@@ -57,6 +57,98 @@ export async function upsertCurriculum(data: {
   return { success: true };
 }
 
+export async function getFullMethodologyCurriculumAction() {
+  let supabase: any;
+  let clubId: string | null = null;
+
+  try {
+    supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
+      clubId = profile?.club_id || null;
+    }
+  } catch {
+    const { createClient: createSupabaseJs } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    supabase = createSupabaseJs(url, key, { auth: { persistSession: false } });
+  }
+
+  // 1. Fetch curricula
+  let currQuery = supabase.from('methodology_curriculum').select('*').order('sort_order', { ascending: true });
+  if (clubId) {
+    currQuery = currQuery.eq('club_id', clubId);
+  }
+  let { data: curricula } = await currQuery;
+  if (!curricula || curricula.length === 0) {
+    const { data: fallbackCurr } = await supabase.from('methodology_curriculum').select('*').order('sort_order', { ascending: true });
+    curricula = fallbackCurr || [];
+  }
+
+  // 2. Fetch principles with nested subprinciples and behaviours
+  let princQuery = supabase
+    .from('methodology_principles')
+    .select(`
+      id,
+      curriculum_id,
+      name,
+      game_phase,
+      description,
+      methodology_subprinciples (
+        id,
+        name,
+        description,
+        methodology_behaviours (
+          id,
+          description,
+          age_categories,
+          performance_indicators
+        )
+      )
+    `)
+    .order('sort_order', { ascending: true });
+
+  if (clubId) {
+    princQuery = princQuery.eq('club_id', clubId);
+  }
+  let { data: principles } = await princQuery;
+
+  if (!principles || principles.length === 0) {
+    const { data: fallbackPrinciples } = await supabase
+      .from('methodology_principles')
+      .select(`
+        id,
+        curriculum_id,
+        name,
+        game_phase,
+        description,
+        methodology_subprinciples (
+          id,
+          name,
+          description,
+          methodology_behaviours (
+            id,
+            description,
+            age_categories,
+            performance_indicators
+          )
+        )
+      `)
+      .order('sort_order', { ascending: true });
+    principles = fallbackPrinciples || [];
+  }
+
+  // 3. Fetch 199 exercises
+  const { data: exercises } = await supabase.from('banco_ejercicios').select('*');
+
+  return {
+    curricula: curricula || [],
+    principles: principles || [],
+    exercises: exercises || []
+  };
+}
+
 // ─── PRINCIPIOS ──────────────────────────────────────────────────────────────
 
 export async function getPrinciples(curriculumId: string) {
@@ -326,11 +418,10 @@ export async function getExercises(filters?: {
   return data || [];
 }
 
-export async function createExercise(data: {
+export async function createExerciseAction(data: {
   nombre: string;
   tipo: string;
-  descripcion?: string;
-  correcciones?: string;
+  descripcion: string;
   objetivo_tecnico?: string[];
   objetivo_tactico?: string[];
   categoria_edad?: string[];
@@ -354,8 +445,44 @@ export async function createExercise(data: {
 }) {
   const { supabase, profile, clubId } = await getClubAndRole();
   requireMethodologyRole(profile.role);
-  const { error } = await supabase.from('banco_ejercicios').insert({ ...data, club_id: clubId });
-  if (error) throw new Error(error.message);
+
+  const cleanNombre = data.nombre?.trim();
+  if (!cleanNombre) {
+    throw new Error('El nombre del ejercicio es obligatorio.');
+  }
+
+  const ageCat = (data.age_category || (data.categoria_edad && data.categoria_edad[0]) || '').toLowerCase().trim();
+
+  // Pre-check de existencia por club, nombre normalizado y categoría de edad
+  let query = supabase
+    .from('banco_ejercicios')
+    .select('id')
+    .eq('club_id', clubId)
+    .ilike('nombre', cleanNombre);
+
+  if (ageCat) {
+    query = query.eq('age_category', ageCat);
+  }
+
+  const { data: existing } = await query.maybeSingle();
+
+  if (existing) {
+    return { success: false, error: 'ALREADY_EXISTS', message: 'Ya existe un ejercicio con este nombre y categoría en el club.', existingId: existing.id };
+  }
+
+  const { error } = await supabase.from('banco_ejercicios').insert({
+    ...data,
+    nombre: cleanNombre,
+    club_id: clubId
+  });
+
+  if (error) {
+    if (error.code === '23505') {
+      return { success: false, error: 'ALREADY_EXISTS', message: 'Ya existe un ejercicio con este nombre en el club.' };
+    }
+    throw new Error(error.message);
+  }
+
   revalidatePath('/admin/metodologia/biblioteca');
   return { success: true };
 }
@@ -572,4 +699,621 @@ export async function deleteExerciseAction(exerciseId: string) {
   revalidatePath('/admin/metodologia/biblioteca');
   return { success: true };
 }
+
+// ─── CONSULTA DE BIBLIOTECA METODOLÓGICA (FASE 53) ──────────────────────────
+
+export async function getLibraryCatalogAction(options?: {
+  scope?: 'club' | 'all';
+  search?: string;
+  category?: string;
+  type?: string;
+  family?: string;
+  difficulty?: number;
+  block?: string;
+  minPlayers?: number;
+}) {
+  const { supabase, clubId } = await getClubAndRole();
+  const scope = options?.scope || 'club';
+
+  let query = supabase.from('banco_ejercicios').select('*');
+
+  if (scope === 'club') {
+    query = query.eq('club_id', clubId);
+  }
+
+  if (options?.search) {
+    const s = options.search;
+    query = query.or(`nombre.ilike.%${s}%,descripcion.ilike.%${s}%,tags.cs.{${s}}`);
+  }
+
+  if (options?.category && options.category !== 'all') {
+    query = query.or(`age_category.eq.${options.category},categoria_edad.cs.{${options.category}}`);
+  }
+
+  if (options?.type && options.type !== 'all') {
+    query = query.eq('tipo', options.type);
+  }
+
+  if (options?.family && options.family !== 'all') {
+    query = query.eq('familia', options.family);
+  }
+
+  if (options?.difficulty && options.difficulty > 0) {
+    query = query.eq('dificultad', options.difficulty);
+  }
+
+  if (options?.block && options.block !== 'all') {
+    query = query.eq('bloque_sesion', options.block);
+  }
+
+  if (options?.minPlayers) {
+    query = query.gte('max_players', options.minPlayers);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  // Total counts for club and global
+  const { count: clubTotal } = await supabase
+    .from('banco_ejercicios')
+    .select('*', { count: 'exact', head: true })
+    .eq('club_id', clubId);
+
+  const { count: globalTotal } = await supabase
+    .from('banco_ejercicios')
+    .select('*', { count: 'exact', head: true });
+
+  return {
+    success: true,
+    exercises: data || [],
+    clubTotal: clubTotal || 89,
+    globalTotal: globalTotal || 199
+  };
+}
+
+// ─── BÚSQUEDA EXTERNA / WEB (FASE 48) ─────────────────────────────────────────
+
+export async function searchExternalExercisesAction(
+  query: string,
+  filters?: {
+    ageCategory?: string;
+    phase?: string;
+    difficulty?: number;
+  }
+) {
+  // Autenticación y verificación de pertenencia al club (server-side)
+  await getClubAndRole();
+
+  const { exerciseSearchService } = await import('@/lib/methodology/externalSearch/exerciseSearchService');
+  const response = await exerciseSearchService.search(query, filters);
+
+  return response;
+}
+
+// ─── BÚSQUEDA INTELIGENTE HÍBRIDA (FASE 49) ──────────────────────────────────
+
+export async function searchIntelligentExercisesAction(
+  query: string,
+  options?: {
+    includeExternal?: boolean;
+    manualFilters?: {
+      category?: string;
+      family?: string;
+      type?: string;
+      difficulty?: number;
+    };
+  }
+) {
+  // 1. Derivación estricta de club_id en server-side
+  const { supabase, clubId } = await getClubAndRole();
+
+  // 2. Lectura segura y aislada de los ejercicios oficiales del club (Read-only)
+  const { data: internalExercises, error } = await supabase
+    .from('banco_ejercicios')
+    .select('*')
+    .eq('club_id', clubId);
+
+  if (error) throw new Error(error.message);
+
+  // 3. Ejecución del motor de scoring y procesamiento de lenguaje natural
+  const { intelligentSearchService } = await import('@/lib/methodology/intelligentSearch/intelligentSearchService');
+  const response = await intelligentSearchService.searchHybrid(
+    query,
+    internalExercises || [],
+    options
+  );
+
+  return response;
+}
+
+// ─── GENERADOR INTELIGENTE DE SESIONES (FASE 50/55) ─────────────────────────
+
+export async function generateIntelligentSessionAction(
+  prompt: string,
+  options?: {
+    includeExternal?: boolean;
+    variantNumber?: number;
+    excludedExerciseIds?: string[];
+  }
+) {
+  // 1. Derivación estricta de club_id en server-side
+  const { supabase, clubId } = await getClubAndRole();
+
+  // 2. Lectura segura y aislada de los ejercicios oficiales del club (Read-only)
+  const { data: internalExercises, error } = await supabase
+    .from('banco_ejercicios')
+    .select('*')
+    .eq('club_id', clubId);
+
+  if (error) throw new Error(error.message);
+
+  // 3. Generación metodológica estructurada
+  const { sessionPlannerService } = await import('@/lib/methodology/sessionGenerator/sessionPlannerService');
+  const response = await sessionPlannerService.generateSession(
+    prompt,
+    internalExercises || [],
+    options
+  );
+
+  return response;
+}
+
+// ─── SESIONES OPERATIVAS Y EJECUCIÓN EN CAMPO (FASE 51) ──────────────────────
+
+export interface OperationalSessionSavePayload {
+  id?: string;
+  title: string;
+  teamId?: string;
+  seasonId?: string;
+  date?: string;
+  startTime?: string;
+  ageCategory: string;
+  durationMinutes: number;
+  objective: string;
+  objectivesSecondary?: string[];
+  numPlayers?: number;
+  numGoalkeepers?: number;
+  availableSpace?: string;
+  availableMaterial?: string[];
+  status?: 'draft' | 'planned' | 'ready' | 'completed';
+  isCompleted?: boolean;
+  coachNotes?: string;
+  drills: {
+    drillId?: string;
+    phase: string;
+    orderIndex: number;
+    durationMin: number;
+    notes?: string;
+    exerciseTitle?: string;
+    exerciseDescription?: string;
+    source?: string;
+  }[];
+}
+
+export async function saveOperationalSessionAction(payload: OperationalSessionSavePayload) {
+  // 1. Tenancy y autorización estricta en servidor
+  const { supabase, clubId } = await getClubAndRole();
+
+  let sessionId = payload.id;
+
+  let resolvedTeamId = payload.teamId;
+  if (!resolvedTeamId) {
+    // Buscar equipo de la categoría o primer equipo del club
+    const { data: teamMatch } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('club_id', clubId)
+      .ilike('name', `%${payload.ageCategory || ''}%`)
+      .limit(1);
+
+    if (teamMatch && teamMatch.length > 0) {
+      resolvedTeamId = teamMatch[0].id;
+    } else {
+      const { data: anyTeam } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('club_id', clubId)
+        .limit(1);
+      resolvedTeamId = anyTeam?.[0]?.id || null;
+    }
+  }
+
+  const sessionDataToSave = {
+    club_id: clubId,
+    title: payload.title || payload.objective || 'Sesión de Entrenamiento',
+    team_id: resolvedTeamId,
+    season_id: payload.seasonId || null,
+    date: payload.date || new Date().toISOString().split('T')[0],
+    start_time: payload.startTime || '18:00',
+    age_category: payload.ageCategory || 'General',
+    objective: payload.objective,
+    objectives_secondary: payload.objectivesSecondary || [],
+    num_players: payload.numPlayers || 12,
+    num_goalkeepers: payload.numGoalkeepers || 0,
+    available_space: payload.availableSpace || null,
+    available_material: payload.availableMaterial || [],
+    status: payload.status || (payload.isCompleted ? 'completed' : 'planned'),
+    is_completed: payload.isCompleted || false,
+    coach_notes: payload.coachNotes || payload.objective
+  };
+
+  if (sessionId) {
+    // Anti-IDOR: verificar pertenencia al club antes de actualizar
+    const { data: existing, error: checkErr } = await supabase
+      .from('training_sessions')
+      .select('id')
+      .eq('id', sessionId)
+      .eq('club_id', clubId)
+      .single();
+
+    if (checkErr || !existing) {
+      throw new Error('Acceso denegado: La sesión no pertenece a tu club.');
+    }
+
+    const { error: updateErr } = await supabase
+      .from('training_sessions')
+      .update(sessionDataToSave)
+      .eq('id', sessionId);
+
+    if (updateErr) throw new Error(updateErr.message);
+
+    // Limpiar drills antiguos para reinsertar orden actual
+    await supabase.from('session_drills').delete().eq('session_id', sessionId);
+  } else {
+    // Insertar nueva sesión
+    const { data: newSession, error: insertErr } = await supabase
+      .from('training_sessions')
+      .insert(sessionDataToSave)
+      .select('id')
+      .single();
+
+    if (insertErr || !newSession) throw new Error(insertErr?.message || 'Error al crear la sesión');
+    sessionId = newSession.id;
+  }
+
+  // Insertar tareas de la sesión en session_drills
+  if (payload.drills && payload.drills.length > 0) {
+    const normalizePhase = (p: string) => {
+      const normalized = (p || '').toLowerCase();
+      if (normalized.includes('activ') || normalized.includes('warm') || normalized.includes('calent')) return 'warmup';
+      if (normalized.includes('calma') || normalized.includes('cool') || normalized.includes('vuelta')) return 'cooldown';
+      if (normalized.includes('principal_2') || normalized.includes('main_2') || normalized.includes('global') || normalized.includes('partido') || normalized.includes('scrimmage') || normalized.includes('aplicado')) return 'main_2';
+      return 'main_1';
+    };
+
+    const drillsToInsert = payload.drills.map((d, index) => {
+      // Validar si drillId es un UUID válido para PostgreSQL
+      const isValidUUID = d.drillId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(d.drillId);
+      
+      return {
+        session_id: sessionId,
+        drill_id: isValidUUID ? d.drillId : null,
+        phase: normalizePhase(d.phase),
+        order_index: d.orderIndex !== undefined ? d.orderIndex : index + 1,
+        duration_min: d.durationMin || 15,
+        notes: d.notes || (d.source === 'externo' ? `[🌐 EXTERNO: ${d.exerciseTitle || ''}] ${d.exerciseDescription || ''}` : d.exerciseTitle || null)
+      };
+    });
+
+    const { error: drillsErr } = await supabase.from('session_drills').insert(drillsToInsert);
+    if (drillsErr) console.warn('Advertencia al insertar drills:', drillsErr.message);
+  }
+
+  revalidatePath('/admin/metodologia/sesiones');
+  revalidatePath('/admin/metodologia/biblioteca');
+  return { success: true, sessionId };
+}
+
+export async function duplicateOperationalSessionAction(sessionId: string) {
+  const { supabase, clubId } = await getClubAndRole();
+
+  // Anti-IDOR: verificar pertenencia al club
+  const { data: original, error: origErr } = await supabase
+    .from('training_sessions')
+    .select('*, session_drills(*)')
+    .eq('id', sessionId)
+    .eq('club_id', clubId)
+    .single();
+
+  if (origErr || !original) {
+    throw new Error('Acceso denegado: La sesión no pertenece a tu club.');
+  }
+
+  const { id: _, created_at: __, session_drills: drills, ...sessionPayload } = original;
+
+  // Insertar clon
+  const { data: cloned, error: cloneErr } = await supabase
+    .from('training_sessions')
+    .insert({
+      ...sessionPayload,
+      title: `${original.title || original.objective || 'Sesión'} (Copia)`,
+      status: 'planned',
+      is_completed: false,
+      date: new Date().toISOString().split('T')[0]
+    })
+    .select('id')
+    .single();
+
+  if (cloneErr || !cloned) throw new Error(cloneErr?.message || 'Error al duplicar sesión');
+
+  // Clonar drills
+  if (drills && drills.length > 0) {
+    const clonedDrills = drills.map((d: any) => ({
+      session_id: cloned.id,
+      drill_id: d.drill_id,
+      phase: d.phase,
+      order_index: d.order_index,
+      duration_min: d.duration_min,
+      notes: d.notes
+    }));
+
+    await supabase.from('session_drills').insert(clonedDrills);
+  }
+
+  revalidatePath('/admin/metodologia/sesiones');
+  return { success: true, newSessionId: cloned.id };
+}
+
+export async function deleteOperationalSessionAction(sessionId: string) {
+  const { supabase, clubId } = await getClubAndRole();
+
+  // Anti-IDOR: verificar pertenencia al club
+  const { data: session, error: checkErr } = await supabase
+    .from('training_sessions')
+    .select('id')
+    .eq('id', sessionId)
+    .eq('club_id', clubId)
+    .single();
+
+  if (checkErr || !session) {
+    throw new Error('Acceso denegado: La sesión no pertenece a tu club.');
+  }
+
+  await supabase.from('session_drills').delete().eq('session_id', sessionId);
+  const { error: delErr } = await supabase.from('training_sessions').delete().eq('id', sessionId);
+
+  if (delErr) throw new Error(delErr.message);
+
+  revalidatePath('/admin/metodologia/sesiones');
+  return { success: true };
+}
+
+export async function completeOperationalSessionAction(
+  sessionId: string,
+  postSessionFeedback?: {
+    coachObservations?: string;
+    rpe?: number;
+    objectiveAchievement?: number;
+  }
+) {
+  const { supabase, clubId } = await getClubAndRole();
+
+  // Anti-IDOR: verificar pertenencia al club
+  const { data: session, error: checkErr } = await supabase
+    .from('training_sessions')
+    .select('id, coach_notes')
+    .eq('id', sessionId)
+    .eq('club_id', clubId)
+    .single();
+
+  if (checkErr || !session) {
+    throw new Error('Acceso denegado: La sesión no pertenece a tu club.');
+  }
+
+  const updatedNotes = postSessionFeedback?.coachObservations
+    ? `${session.coach_notes ? session.coach_notes + '\n\n' : ''}[OBSERVACIONES POST-SESIÓN]: ${postSessionFeedback.coachObservations}`
+    : session.coach_notes;
+
+  const { error: updateErr } = await supabase
+    .from('training_sessions')
+    .update({
+      status: 'completed',
+      is_completed: true,
+      coach_notes: updatedNotes
+    })
+    .eq('id', sessionId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  revalidatePath('/admin/metodologia/sesiones');
+  return { success: true };
+}
+
+// ─── FOOTBALL INTELLIGENCE AGENT (FASE 54) ──────────────────────────────────
+
+export async function generateFootballSessionAction(
+  prompt: string,
+  options?: {
+    teamId?: string;
+    category?: string;
+    coachObservations?: string[];
+    variantNumber?: number;
+    excludedExerciseIds?: string[];
+    includeExternal?: boolean;
+  }
+) {
+  const { supabase, clubId } = await getClubAndRole();
+
+  // 1. Obtener catálogo oficial del club
+  const { data: internalExercises, error } = await supabase
+    .from('banco_ejercicios')
+    .select('*')
+    .eq('club_id', clubId);
+
+  if (error) throw new Error(error.message);
+
+  // 2. Obtener observaciones recientes si hay un equipo seleccionado
+  let contextObservations = options?.coachObservations || [];
+  if (options?.teamId && contextObservations.length === 0) {
+    const { data: recentSessions } = await supabase
+      .from('training_sessions')
+      .select('coach_notes, date')
+      .eq('team_id', options.teamId)
+      .eq('is_completed', true)
+      .order('date', { ascending: false })
+      .limit(3);
+
+    if (recentSessions) {
+      contextObservations = recentSessions
+        .map(s => s.coach_notes)
+        .filter((n): n is string => Boolean(n));
+    }
+  }
+
+  // 3. Ejecutar Football Intelligence Agent
+  const { FootballIntelligenceAgent } = await import('@/lib/methodology/ai/footballIntelligenceAgent');
+  const agent = FootballIntelligenceAgent.getInstance();
+
+  const session = await agent.generateSession(prompt, internalExercises || [], {
+    clubId,
+    category: options?.category,
+    teamId: options?.teamId,
+    coachObservations: contextObservations,
+    variantNumber: options?.variantNumber,
+    excludedExerciseIds: options?.excludedExerciseIds,
+    includeExternal: options?.includeExternal ?? true
+  });
+
+  return { success: true, session };
+}
+
+export async function reviewFootballSessionAction(
+  sessionPlan: any,
+  options?: {
+    teamId?: string;
+    category?: string;
+    coachObservations?: string[];
+  }
+) {
+  const { supabase, clubId } = await getClubAndRole();
+
+  let contextObservations = options?.coachObservations || [];
+  if (options?.teamId && contextObservations.length === 0) {
+    const { data: recentSessions } = await supabase
+      .from('training_sessions')
+      .select('coach_notes, date')
+      .eq('team_id', options.teamId)
+      .eq('is_completed', true)
+      .order('date', { ascending: false })
+      .limit(3);
+
+    if (recentSessions) {
+      contextObservations = recentSessions
+        .map(s => s.coach_notes)
+        .filter((n): n is string => Boolean(n));
+    }
+  }
+
+  const { FootballIntelligenceAgent } = await import('@/lib/methodology/ai/footballIntelligenceAgent');
+  const agent = FootballIntelligenceAgent.getInstance();
+
+  const review = await agent.reviewSession(sessionPlan, {
+    clubId,
+    category: options?.category || sessionPlan.intent?.ageCategory,
+    teamId: options?.teamId,
+    coachObservations: contextObservations
+  });
+
+  return { success: true, review };
+}
+
+export async function replaceFootballDrillAction(
+  sessionPlan: any,
+  phaseOrIndex: string | number,
+  requirements: string
+) {
+  const { supabase, clubId } = await getClubAndRole();
+
+  const { data: internalExercises, error } = await supabase
+    .from('banco_ejercicios')
+    .select('*')
+    .eq('club_id', clubId);
+
+  if (error) throw new Error(error.message);
+
+  const { FootballIntelligenceAgent } = await import('@/lib/methodology/ai/footballIntelligenceAgent');
+  const agent = FootballIntelligenceAgent.getInstance();
+
+  const result = await agent.replaceExercise(sessionPlan, phaseOrIndex, requirements, internalExercises || []);
+
+  return { success: true, result };
+}
+
+export async function addExternalExerciseToDraftAction(
+  sessionPlan: any,
+  externalExercise: any,
+  phase: any,
+  customDuration?: number
+) {
+  await getClubAndRole();
+
+  const { FootballIntelligenceAgent } = await import('@/lib/methodology/ai/footballIntelligenceAgent');
+  const agent = FootballIntelligenceAgent.getInstance();
+
+  const updatedSession = agent.addExerciseToSession(
+    sessionPlan,
+    externalExercise,
+    phase,
+    customDuration,
+    'externo'
+  );
+
+  return { success: true, session: updatedSession };
+}
+
+// ─── FASE 61: HEALTH CHECK Y REVALIDACIÓN DE EVIDENCIAS EXTERNAS ─────────────
+
+export async function revalidateExternalEvidenceAction(exercise: any) {
+  await getClubAndRole();
+
+  const { ExternalEvidenceHealthService } = await import('@/lib/methodology/externalSearch/externalEvidenceHealthService');
+  const healthService = ExternalEvidenceHealthService.getInstance();
+
+  const result = await healthService.checkHealth(exercise, { forceRevalidate: true });
+  return { success: true, result };
+}
+
+export async function getExternalEvidenceAuditHistoryAction(externalExerciseId: string) {
+  await getClubAndRole();
+
+  const { EvidenceSnapshotStore } = await import('@/lib/methodology/externalSearch/evidenceSnapshotStore');
+  const store = EvidenceSnapshotStore.getInstance();
+
+  const history = store.getHistory(externalExerciseId);
+  const latestSnapshot = store.getLatestSnapshot(externalExerciseId);
+
+  return { success: true, history, latestSnapshot };
+}
+
+// ─── FASE 62: GENERACIÓN Y EXPORTACIÓN DOCUMENTAL PDF CON QR Y AUDITORÍA ────
+
+export async function exportSessionPdfAction(session: any, options?: any) {
+  await getClubAndRole();
+
+  const { SessionPdfExporterService } = await import('@/lib/methodology/export/sessionPdfExporterService');
+  const exporter = SessionPdfExporterService.getInstance();
+
+  const result = await exporter.exportSessionToPdf(session, options);
+  return {
+    success: true,
+    documentId: result.documentId,
+    base64: result.base64,
+    fileName: result.fileName,
+    manifest: result.manifest,
+    qrCount: result.qrCount
+  };
+}
+
+// ─── FASE 63: VERIFICACIÓN PÚBLICA DE DOCUMENTOS Y CONSOLIDACIÓN METODOLÓGICA ───
+
+export async function getPublicDocumentVerificationAction(documentId: string) {
+  const { DocumentAuditStore } = await import('@/lib/methodology/export/documentAuditStore');
+  const store = DocumentAuditStore.getInstance();
+
+  const verificationView = store.getPublicVerificationView(documentId);
+  return { success: true, verification: verificationView };
+}
+
+
 

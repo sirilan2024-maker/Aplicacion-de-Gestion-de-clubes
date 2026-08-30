@@ -49,12 +49,24 @@ export async function createTeam(formData: FormData) {
   return { success: true }
 }
 
+import { getAuthenticatedContext, canUserDeleteTeam } from '@/lib/auth-helpers'
+
 export async function deleteTeam(id: string) {
+  const { context, error: authError } = await getAuthenticatedContext()
+  if (!context || authError) {
+    return { error: authError || 'No autenticado' }
+  }
+
   const { createAdminClient } = await import('@/lib/supabase/admin')
   const adminClient = createAdminClient()
+
+  const access = await canUserDeleteTeam(adminClient, context, id)
+  if (!access.allowed) {
+    return { error: access.reason || 'No tienes permisos para eliminar este equipo' }
+  }
   
   // 0. Eliminar dependencias problemáticas de los jugadores
-  const { data: players } = await adminClient.from('players').select('id').eq('team_id', id)
+  const { data: players } = await adminClient.from('players').select('id').eq('team_id', id).eq('club_id', context.profile.club_id)
   if (players && players.length > 0) {
     const playerIds = players.map(p => p.id)
     await adminClient.from('player_season_history').delete().in('player_id', playerIds)
@@ -65,6 +77,7 @@ export async function deleteTeam(id: string) {
     .from('players')
     .delete()
     .eq('team_id', id)
+    .eq('club_id', context.profile.club_id)
 
   if (playersError) {
     console.error('[TeamsAction] Error deleting players:', playersError.message)
@@ -82,6 +95,7 @@ export async function deleteTeam(id: string) {
     .from('teams')
     .delete()
     .eq('id', id)
+    .eq('club_id', context.profile.club_id)
 
   if (error) {
     console.error('[TeamsAction] Error deleting team:', error.message)
@@ -94,6 +108,7 @@ export async function deleteTeam(id: string) {
   revalidatePath('/dashboard/club/miembros')
   return { success: true }
 }
+
 
 export async function updateTeam(id: string, formData: FormData) {
   const supabase = await createClient()

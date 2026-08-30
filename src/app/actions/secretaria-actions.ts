@@ -4,6 +4,8 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { headers } from "next/headers"
 
+import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessPlayer } from "@/lib/auth-helpers"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Alta Asistida (invitación de miembro desde el panel de Secretaría)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,6 +19,15 @@ export async function altaAsistidaAction({
   clubId: string;
 }) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role) || context.profile.club_id !== clubId) {
+      return { success: false, error: "No tienes permisos para registrar miembros en este club" };
+    }
+
     const supabase = await createClient()
     const adminSupabase = await createAdminClient()
 
@@ -60,7 +71,7 @@ export async function altaAsistidaAction({
       .insert({
         first_name: playerName,
         last_name: "",
-        club_id: clubId,
+        club_id: context.profile.club_id,
         tutor_id: userId,
         user_auth_id: userId,
         gdpr_consent: false,
@@ -90,6 +101,7 @@ export async function altaAsistidaAction({
   }
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // FASE 5: Obtener documentos de un jugador desde las tablas definitivas
 // Lee de player_documents, families (DNI tutor) y players (SIP)
@@ -97,7 +109,17 @@ export async function altaAsistidaAction({
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getPlayerExpedienteAction(playerId: string) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado", documents: [] };
+    }
+
     const supabaseAdmin = await createAdminClient();
+
+    const access = await canUserAccessPlayer(supabaseAdmin, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No autorizado", documents: [] };
+    }
 
     // 1. Obtener documentos de la tabla player_documents
     const { data: docs, error: docsError } = await supabaseAdmin
@@ -108,10 +130,10 @@ export async function getPlayerExpedienteAction(playerId: string) {
 
     if (docsError) throw docsError;
 
-    // 2. Obtener el DNI del tutor desde families (vinculado por family_id en players)
+    // 2. Obtener datos del jugador, SEPA y del tutor desde families
     const { data: playerRow } = await supabaseAdmin
       .from('players')
-      .select('family_id, sip, dni, families(id, tutor_1_dni_url, tutor_2_dni_url)')
+      .select('family_id, sip, dni, first_name, last_name, is_senior, parent1_name, parent1_last_name, parent1_dni, iban, sepa_mandate_id, sepa_mandate_date, families(id, tutor_1_dni_url, tutor_2_dni_url)')
       .eq('id', playerId)
       .single();
 
@@ -147,6 +169,19 @@ export async function getPlayerExpedienteAction(playerId: string) {
       tutorDni2SignedUrl = data?.signedUrl || null;
     }
 
+    const isSenior = Boolean(playerRow?.is_senior);
+    const payer = isSenior
+      ? {
+          type: 'senior',
+          name: `${playerRow?.first_name || ''} ${playerRow?.last_name || ''}`.trim(),
+          dni: playerRow?.dni || null,
+        }
+      : {
+          type: 'tutor',
+          name: `${playerRow?.parent1_name || ''} ${playerRow?.parent1_last_name || ''}`.trim() || playerRow?.parent1_name || null,
+          dni: playerRow?.parent1_dni || null,
+        };
+
     return {
       success: true,
       documents: documentsWithUrls,
@@ -155,6 +190,13 @@ export async function getPlayerExpedienteAction(playerId: string) {
       familyId: family?.id || null,
       sipNumber: playerRow?.sip || null,
       playerDni: playerRow?.dni || null,
+      sepa: {
+        iban: playerRow?.iban || null,
+        sepa_mandate_id: playerRow?.sepa_mandate_id || null,
+        sepa_mandate_date: playerRow?.sepa_mandate_date || null,
+      },
+      payer,
+      isSenior,
     };
   } catch (error: any) {
     console.error('[getPlayerExpedienteAction]', error);
@@ -171,7 +213,28 @@ export async function updateDocumentStatusAction(
   rejectionReason?: string
 ) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role) && context.profile.role !== 'secretario') {
+      return { success: false, error: "No tienes permisos para cambiar el estado del documento" };
+    }
+
     const supabaseAdmin = await createAdminClient();
+
+    // Validar que el documento pertenezca al club del usuario
+    const { data: doc } = await supabaseAdmin
+      .from('player_documents')
+      .select('id, player_id, players(club_id)')
+      .eq('id', docId)
+      .single();
+
+    const docClubId = (doc?.players as any)?.club_id;
+    if (!doc || docClubId !== context.profile.club_id) {
+      return { success: false, error: "Documento no encontrado o ajeno a tu club" };
+    }
 
     const { error } = await supabaseAdmin
       .from('player_documents')
@@ -198,7 +261,17 @@ export async function updateDocumentStatusAction(
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getPlayerApparelAction(playerId: string) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado", apparel: [] };
+    }
+
     const supabaseAdmin = await createAdminClient();
+
+    const access = await canUserAccessPlayer(supabaseAdmin, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No autorizado", apparel: [] };
+    }
 
     const { data, error } = await supabaseAdmin
       .from('player_apparel')
@@ -219,7 +292,28 @@ export async function getPlayerApparelAction(playerId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function markApparelDeliveredAction(apparelId: string, delivered: boolean) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role) && context.profile.role !== 'utillero') {
+      return { success: false, error: "No tienes permisos de utillería" };
+    }
+
     const supabaseAdmin = await createAdminClient();
+
+    const { data: appRow } = await supabaseAdmin
+      .from('player_apparel')
+      .select('id, player_id, players(club_id)')
+      .eq('id', apparelId)
+      .single();
+
+    const appClubId = (appRow?.players as any)?.club_id;
+    if (!appRow || appClubId !== context.profile.club_id) {
+      return { success: false, error: "Prenda no encontrada o ajena a tu club" };
+    }
+
     const { error } = await supabaseAdmin
       .from('player_apparel')
       .update({
@@ -241,7 +335,17 @@ export async function markApparelDeliveredAction(apparelId: string, delivered: b
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getPlayerFichaAction(playerId: string) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
     const supabaseAdmin = await createAdminClient();
+
+    const access = await canUserAccessPlayer(supabaseAdmin, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No autorizado para consultar esta ficha" };
+    }
 
     const { data, error } = await supabaseAdmin
       .from('players')
@@ -266,6 +370,17 @@ export async function getPlayerFichaAction(playerId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getSignedDniUrlAction(filePath: string) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    const isAdmin = ADMIN_ROLES.includes(context.profile.role) || context.profile.role === 'secretario';
+    const isOwner = filePath.startsWith(`${context.user.id}/`);
+    if (!isAdmin && !isOwner) {
+      return { success: false, error: "No autorizado para acceder a este documento" };
+    }
+
     const supabaseAdmin = await createAdminClient();
     const { data, error } = await supabaseAdmin
       .storage
@@ -278,6 +393,7 @@ export async function getSignedDniUrlAction(filePath: string) {
     return { success: false, error: error.message };
   }
 }
+
 
 export async function listPlayerDocumentsAction(playerId: string) {
   // Redirige a la nueva implementación que usa la tabla player_documents
@@ -329,27 +445,174 @@ export async function submitMegaWizardAction(payload: any, clubId: string) {
 }
 
 export async function validatePlayerRegistrationAction(playerId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role)) {
+    return { success: false, error: "No tienes permisos de secretaría para validar jugadores" };
+  }
+
   const adminSupabase = await createAdminClient();
-  const { data: player, error: fetchError } = await adminSupabase.from('players').select('*').eq('id', playerId).single();
-  
-  if (fetchError || !player) {
-    return { success: false, error: 'Jugador no encontrado' };
+  const access = await canUserAccessPlayer(adminSupabase, context, playerId);
+  if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+    return { success: false, error: access.reason || "Jugador no encontrado o no autorizado" };
   }
   
   // 1. Update player status
   const { error: updateError } = await adminSupabase
     .from('players')
     .update({ registration_status: 'formalized' })
-    .eq('id', playerId);
+    .eq('id', playerId)
+    .eq('club_id', context.profile.club_id);
     
   if (updateError) return { success: false, error: updateError.message };
   
   // 2. Generate fees only if they don't exist yet
   const { createAdminFeeForPlayerAction } = await import('@/app/actions/treasury-actions');
-  await createAdminFeeForPlayerAction(playerId, player.was_in_club || false);
+  await createAdminFeeForPlayerAction(playerId, access.player.was_in_club || false);
   
   revalidatePath('/dashboard/club/jugador/[id]', 'page');
   revalidatePath('/dashboard/club/miembros');
   return { success: true };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P11-E: Gestión de Datos SEPA de Jugador (Captura Secretaría)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Obtener datos SEPA y datos de pagador según reglas de negocio:
+ * Si is_senior = true -> pagador es el jugador (nombre, dni, contacto)
+ * Si is_senior = false -> pagador es el tutor en parent1_*
+ */
+export async function getPlayerSepaAction(playerId: string) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: "No tienes permisos para consultar datos SEPA" };
+    }
+
+    const adminClient = await createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No autorizado para consultar este jugador" };
+    }
+
+    const { data: player, error } = await adminClient
+      .from('players')
+      .select(`
+        id, club_id, first_name, last_name, dni, phone, email, is_senior,
+        parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
+        iban, sepa_mandate_id, sepa_mandate_date
+      `)
+      .eq('id', playerId)
+      .single();
+
+    if (error || !player) {
+      return { success: false, error: "Jugador no encontrado" };
+    }
+
+    // Regla de Pagador P11-E:
+    // Si is_senior = true: el pagador es el propio jugador.
+    // Si is_senior = false: el pagador es el tutor registrado en parent1_*.
+    const isSenior = Boolean(player.is_senior);
+    const payer = isSenior
+      ? {
+          type: 'senior',
+          name: `${player.first_name || ''} ${player.last_name || ''}`.trim(),
+          dni: player.dni || null,
+          phone: player.phone || null,
+          email: player.email || null,
+        }
+      : {
+          type: 'tutor',
+          name: `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim() || player.parent1_name || null,
+          dni: player.parent1_dni || null,
+          phone: player.parent1_phone || null,
+          email: player.parent1_email || null,
+        };
+
+    return {
+      success: true,
+      sepa: {
+        iban: player.iban || null,
+        sepa_mandate_id: player.sepa_mandate_id || null,
+        sepa_mandate_date: player.sepa_mandate_date || null,
+      },
+      payer,
+      isSenior,
+    };
+  } catch {
+    return { success: false, error: "Error al recuperar datos SEPA del jugador" };
+  }
+}
+
+/**
+ * Actualizar datos SEPA de un jugador (IBAN, Mandato, Fecha Mandato)
+ */
+export async function updatePlayerSepaAction(playerId: string, {
+  iban,
+  sepaMandateId,
+  sepaMandateDate,
+}: {
+  iban: string | null;
+  sepaMandateId: string | null;
+  sepaMandateDate: string | null;
+}) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: "No tienes permisos de Secretaría para modificar datos SEPA" };
+    }
+
+    const adminClient = await createAdminClient();
+    const access = await canUserAccessPlayer(adminClient, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No tienes permisos para modificar este jugador" };
+    }
+
+    // Limpieza y validación segura
+    const cleanIban = iban ? iban.replace(/\s+/g, '').toUpperCase() : null;
+    const cleanMandateId = sepaMandateId ? sepaMandateId.trim() : null;
+    const cleanMandateDate = sepaMandateDate ? sepaMandateDate.trim() : null;
+
+    if (cleanIban && !/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(cleanIban)) {
+      return { success: false, error: "El formato de IBAN no es válido" };
+    }
+
+    const { error: updateError } = await adminClient
+      .from('players')
+      .update({
+        iban: cleanIban,
+        sepa_mandate_id: cleanMandateId,
+        sepa_mandate_date: cleanMandateDate || null,
+      })
+      .eq('id', playerId)
+      .eq('club_id', context.profile.club_id);
+
+    if (updateError) {
+      // Seguridad: nunca mostrar IBAN ni detalles sensibles en logs
+      console.error('[updatePlayerSepaAction] Error al guardar datos SEPA');
+      return { success: false, error: "Error al guardar los datos SEPA del jugador" };
+    }
+
+    revalidatePath(`/dashboard/club/jugador/${playerId}`);
+    revalidatePath('/admin/secretaria');
+    return { success: true };
+  } catch {
+    return { success: false, error: "Error inesperado al guardar datos SEPA" };
+  }
+}
+
+
 

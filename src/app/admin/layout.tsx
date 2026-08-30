@@ -29,15 +29,15 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row bg-slate-50 md:bg-gray-50 overflow-hidden font-sans">
-      <div className="hidden md:flex">
+    <div className="flex min-h-screen md:h-screen flex-col md:flex-row bg-slate-50 md:bg-gray-50 md:overflow-hidden font-sans">
+      <div className="hidden md:flex md:h-full md:shrink-0">
         <Sidebar signOutAction={signOut} />
       </div>
 
       {/* Mobile Navigation (App-like) */}
       <MobileNavigation signOutAction={signOut} />
 
-      <main className="flex-1 overflow-y-auto relative pb-16 md:pb-0 w-full">
+      <main className="flex-1 md:overflow-y-auto relative pb-16 md:pb-0 w-full md:h-full no-scrollbar">
         {/* We can add a top navbar here if needed later */}
         {children}
       </main>

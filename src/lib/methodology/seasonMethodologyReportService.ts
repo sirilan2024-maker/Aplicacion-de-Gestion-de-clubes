@@ -16,6 +16,8 @@ import {
 } from "./methodologyService";
 import { METHODOLOGY_RULES } from "./methodologyPriorityEngine";
 
+export type { BehaviourEvolutionRecord };
+
 export interface SeasonMethodologySummary {
   plannedSessions: number;
   completedSessions: number;
@@ -306,15 +308,24 @@ export function buildSeasonMethodologyReportFromData(params: {
     const actualRpe = evalData?.session_rpe !== undefined ? Number(evalData.session_rpe) : 6;
     const plannedLoad = Number(s.estimated_load) || 50;
 
+    const rpeEquivalentLoad = actualRpe * 10;
+    const diffDur = actualDur - plannedDur;
+
     return {
       sessionId: s.id,
       date: s.date_time || '',
       microcycleDay: s.microcycle_day || 'MD-3',
+      plannedDurationMin: plannedDur,
+      actualDurationMin: actualDur,
+      durationDiffMin: diffDur,
       plannedDuration: plannedDur,
       actualDuration: actualDur,
-      durationDeviation: actualDur - plannedDur,
+      durationDeviation: diffDur,
       plannedLoad,
       actualRpe,
+      rpeEquivalentLoad,
+      loadDiff: rpeEquivalentLoad - plannedLoad,
+      isHighFatigueWarning: actualRpe >= 8,
       objectiveAchievement: evalData?.objective_achievement
     };
   });
@@ -447,7 +458,7 @@ export function buildSeasonMethodologyReportFromData(params: {
   }
 
   // Detección de desviación de carga
-  const highDeviationSessions = loadEvolution.filter(l => Math.abs(l.durationDeviation) >= 15);
+  const highDeviationSessions = loadEvolution.filter(l => Math.abs(l.durationDeviation || l.durationDiffMin || 0) >= 15);
   if (highDeviationSessions.length >= 3) {
     conclusions.push({
       type: 'risk',

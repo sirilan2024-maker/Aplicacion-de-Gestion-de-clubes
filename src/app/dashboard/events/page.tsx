@@ -1037,7 +1037,7 @@ export default function EventsPage() {
           onSave={() => {
             setShowMatchModal(false)
             setEditingMatch(null)
-            fetchEvents() // refresh events list
+            fetchData() // refresh events list
           }}
         />
       )}

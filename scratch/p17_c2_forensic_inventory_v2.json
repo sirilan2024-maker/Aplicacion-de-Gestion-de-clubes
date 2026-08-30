@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-08-30T17:42:31.556Z",
+  "auditType": "READ_ONLY_FORENSIC_AUDIT_V2",
+  "targetClubId": "7ff5dbeb-2942-4576-8e74-b45a17646fb7",
+  "clubName": "CLUB SPORTING SALADAR",
+  "foreignKeySchema": [
+    {
+      "childTable": "attendance",
+      "childColumn": "player_id",
+      "parentTable": "players"
+    },
+    {
+      "childTable": "attendance",
+      "childColumn": "event_id",
+      "parentTable": "team_events"
+    },
+    {
+      "childTable": "convocatorias",
+      "childColumn": "player_id",
+      "parentTable": "players"
+    },
+    {
+      "childTable": "player_season_history",
+      "childColumn": "player_id",
+      "parentTable": "players"
+    },
+    {
+      "childTable": "player_documents",
+      "childColumn": "player_id",
+      "parentTable": "players"
+    },
+    {
+      "childTable": "player_evaluations",
+      "childColumn": "player_id",
+      "parentTable": "players"
+    },
+    {
+      "childTable": "player_evaluations",
+      "childColumn": "event_id",
+      "parentTable": "team_events"
+    },
+    {
+      "childTable": "match_events",
+      "childColumn": "player_id",
+      "parentTable": "players"
+    }
+  ],
+  "suspiciousPlayerIdsAudited": [
+    "4d0aba28-1ee0-43e2-8e62-14284daba4e8",
+    "deb66d95-37c8-4282-9ca6-c24495782af0",
+    "912621a5-d55a-4872-8e07-4b3803b86c17",
+    "e7c34f4f-7b1e-4c8c-8666-8257934c75d8",
+    "120e793f-17ca-4f87-9c8f-49e14d04233b",
+    "c0779d46-1f1b-4aee-9c74-8eadf7d7b05d",
+    "81c9dbc0-61d8-4f88-b4b5-29f5612cb74a",
+    "6d8cf3e8-cbd4-4e1b-b777-62be02764d0d",
+    "e71d8a97-89a9-4303-a785-41c002a9b722",
+    "75e47e7a-3845-4621-9bbd-85f1a629ca65",
+    "3c221be8-5f32-47eb-bcd1-3d67b596d135",
+    "a4a6179c-506a-4a6c-9d0c-2f177920fbd3",
+    "bed7b5bf-0115-4cdc-9b18-092831f0a697",
+    "c71171e1-9061-49ff-a481-a49ec058ec5f",
+    "c1785f56-ab3e-4c6e-a0be-99e839b470d8",
+    "8eb43fe8-21cd-4c5a-97ed-94eb4d7df9c6",
+    "0645e4c4-df91-40a1-bd59-330186b2d1e7",
+    "ad057bb1-b5ae-462a-ab56-45d0900d696f",
+    "08ee600a-c115-43f8-a205-5e5b2b922de0",
+    "dce71b50-af8c-406d-9868-533b56b8ff95",
+    "f1e4d35a-f89b-4fc7-b732-53d69e3fc99e",
+    "03dcfbdb-aa18-4138-9096-3781ea2eceec",
+    "e878e8a6-918e-4c8d-9b8a-7e50380e2519"
+  ],
+  "suspiciousPlayersCurrentlyInDB": [],
+  "suspiciousEventsAudited": [
+    "66d9f8e4-a9cf-4d2a-b0b8-6e79ca98d6f6",
+    "102e23cf-150e-487c-8f47-1ae8fabb4e53",
+    "f8374849-c307-4481-abfb-f2b227a3a103",
+    "08ed872a-3f6b-4ae2-8702-ae93ab836a6f",
+    "83e70227-29aa-4cd8-907b-975314929acc",
+    "126d2f1b-8b76-4efb-9ff8-0632cd10c211"
+  ],
+  "suspiciousEventsCurrentlyInDB": [],
+  "suspiciousAttendanceCurrentlyInDB": {
+    "byPlayerId": [],
+    "byEventId": []
+  },
+  "suspiciousConvocatoriasCurrentlyInDB": [],
+  "historicalRealDataSummary": {
+    "Enero 2026": {
+      "events": 48,
+      "attendance": 352
+    },
+    "Febrero 2026": {
+      "events": 69,
+      "attendance": 374
+    },
+    "Marzo 2026": {
+      "events": 57,
+      "attendance": 352
+    },
+    "Abril 2026": {
+      "events": 62,
+      "attendance": 374
+    },
+    "Mayo 2026": {
+      "events": 78,
+      "attendance": 330
+    }
+  }
+}

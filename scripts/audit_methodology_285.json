@@ -1,0 +1,762 @@
+{
+  "audit_metadata": {
+    "generated_at": "2026-08-26T19:04:33.128Z",
+    "mode": "STRICT_READ_ONLY",
+    "engine_version": "2.0_adversarial"
+  },
+  "database_snapshot": {
+    "table": "public.banco_ejercicios",
+    "total_count": 298,
+    "unique_ids": 298,
+    "original_199": 199,
+    "new_86": 99,
+    "null_blocks": 1
+  },
+  "schema_audit": {
+    "blocks": {
+      "global": 40,
+      "calentamiento": 36,
+      "principal": 214,
+      "NULL": 1,
+      "vuelta_calma": 7
+    },
+    "types": {
+      "SSG": 39,
+      "circuito": 8,
+      "analitico": 5,
+      "globalizacion": 1,
+      "calentamiento": 4,
+      "ludico": 2,
+      "posesion": 1,
+      "tecnico": 1,
+      "tactico": 4,
+      "fisico": 1,
+      "rondo": 11,
+      "possession": 11,
+      "individual_technical": 15,
+      "conditioned_game": 8,
+      "positional_game": 114,
+      "defensive_game": 1,
+      "ia_generado": 9,
+      "juego_medio": 17,
+      "Analítico": 10,
+      "Circuito": 3,
+      "Juego Lúdico": 6,
+      "Rondo": 4,
+      "Posicional": 4,
+      "Táctico": 5,
+      "juego_global": 14
+    },
+    "game_phases": {
+      "NULL": 19,
+      "motor_coordination": 14,
+      "attacking_build_up": 118,
+      "attacking_progression": 77,
+      "attacking_finishing": 33,
+      "defending_high_press": 9,
+      "possession": 1,
+      "defending_mid_block": 4,
+      "set_pieces": 2,
+      "general": 13,
+      "transition_def_to_atk": 2,
+      "transition_atk_to_def": 3,
+      "defending": 3
+    },
+    "loads": {
+      "1": 7,
+      "2": 215,
+      "3": 51,
+      "4": 25
+    },
+    "oppositions": {
+      "1": 26,
+      "2": 198,
+      "3": 49,
+      "4": 25
+    }
+  },
+  "type_normalization": {
+    "SSG": 39,
+    "circuito": 8,
+    "analitico": 5,
+    "globalizacion": 1,
+    "calentamiento": 4,
+    "ludico": 2,
+    "posesion": 1,
+    "tecnico": 1,
+    "tactico": 4,
+    "fisico": 1,
+    "rondo": 11,
+    "possession": 11,
+    "individual_technical": 15,
+    "conditioned_game": 8,
+    "positional_game": 114,
+    "defensive_game": 1,
+    "ia_generado": 9,
+    "juego_medio": 17,
+    "Analítico": 10,
+    "Circuito": 3,
+    "Juego Lúdico": 6,
+    "Rondo": 4,
+    "Posicional": 4,
+    "Táctico": 5,
+    "juego_global": 14
+  },
+  "tactical_taxonomy": [
+    {
+      "intencion": "posesión",
+      "esperado": "circulacion",
+      "resuelto": "circulacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "circulación",
+      "esperado": "circulacion",
+      "resuelto": "circulacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "mantenimiento",
+      "esperado": "circulacion",
+      "resuelto": "circulacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "amplitud",
+      "esperado": "circulacion",
+      "resuelto": "circulacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "organización defensiva",
+      "esperado": "basculacion",
+      "resuelto": "basculacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "defensa",
+      "esperado": "basculacion",
+      "resuelto": "basculacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "basculación",
+      "esperado": "basculacion",
+      "resuelto": "basculacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "presión alta",
+      "esperado": "presion alta",
+      "resuelto": "presion alta",
+      "estado": "OK"
+    },
+    {
+      "intencion": "bloque alto",
+      "esperado": "presion alta",
+      "resuelto": "presion alta",
+      "estado": "OK"
+    },
+    {
+      "intencion": "pressing alto",
+      "esperado": "presion alta",
+      "resuelto": "presion alta",
+      "estado": "OK"
+    },
+    {
+      "intencion": "presión tras pérdida",
+      "esperado": "transicion defensiva",
+      "resuelto": "transicion defensiva",
+      "estado": "OK"
+    },
+    {
+      "intencion": "transición defensiva",
+      "esperado": "transicion defensiva",
+      "resuelto": "transicion defensiva",
+      "estado": "OK"
+    },
+    {
+      "intencion": "repliegue",
+      "esperado": "transicion defensiva",
+      "resuelto": "transicion defensiva",
+      "estado": "OK"
+    },
+    {
+      "intencion": "contraataque",
+      "esperado": "transicion ofensiva",
+      "resuelto": "transicion ofensiva",
+      "estado": "OK"
+    },
+    {
+      "intencion": "transición ofensiva",
+      "esperado": "transicion ofensiva",
+      "resuelto": "transicion ofensiva",
+      "estado": "OK"
+    },
+    {
+      "intencion": "despliegue rápido",
+      "esperado": "transicion ofensiva",
+      "resuelto": "transicion ofensiva",
+      "estado": "OK"
+    },
+    {
+      "intencion": "salida de balón",
+      "esperado": "salida de balon",
+      "resuelto": "salida de balon",
+      "estado": "OK"
+    },
+    {
+      "intencion": "iniciación",
+      "esperado": "salida de balon",
+      "resuelto": "salida de balon",
+      "estado": "OK"
+    },
+    {
+      "intencion": "construcción",
+      "esperado": "salida de balon",
+      "resuelto": "salida de balon",
+      "estado": "OK"
+    },
+    {
+      "intencion": "progresión",
+      "esperado": "progresion",
+      "resuelto": "progresion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "superar líneas",
+      "esperado": "progresion",
+      "resuelto": "progresion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "pase filtrado",
+      "esperado": "progresion",
+      "resuelto": "progresion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "1 contra 1",
+      "esperado": "progresion",
+      "resuelto": "progresion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "1v1",
+      "esperado": "progresion",
+      "resuelto": "progresion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "desborde",
+      "esperado": "progresion",
+      "resuelto": "progresion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "finalización",
+      "esperado": "finalizacion",
+      "resuelto": "finalizacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "remate",
+      "esperado": "finalizacion",
+      "resuelto": "finalizacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "tiro",
+      "esperado": "finalizacion",
+      "resuelto": "finalizacion",
+      "estado": "OK"
+    },
+    {
+      "intencion": "balón parado",
+      "esperado": "balon parado",
+      "resuelto": "balon parado",
+      "estado": "OK"
+    },
+    {
+      "intencion": "ABP",
+      "esperado": "balon parado",
+      "resuelto": "balon parado",
+      "estado": "OK"
+    },
+    {
+      "intencion": "córner",
+      "esperado": "balon parado",
+      "resuelto": "balon parado",
+      "estado": "OK"
+    },
+    {
+      "intencion": "falta lateral",
+      "esperado": "balon parado",
+      "resuelto": "balon parado",
+      "estado": "OK"
+    }
+  ],
+  "block_distribution": {
+    "global": 40,
+    "calentamiento": 36,
+    "principal": 214,
+    "NULL": 1,
+    "vuelta_calma": 7
+  },
+  "pertinence_matrix": [
+    {
+      "Principio": "circulacion",
+      "DIRECTOS": 67,
+      "COMPATIBLES": 15,
+      "SECUNDARIOS": 87,
+      "NO_PERTINENTES": 129,
+      "B1_Act": 63,
+      "B2_P1": 73,
+      "B3_P2": 70,
+      "B4_Glob": 43,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "basculacion",
+      "DIRECTOS": 17,
+      "COMPATIBLES": 6,
+      "SECUNDARIOS": 5,
+      "NO_PERTINENTES": 270,
+      "B1_Act": 63,
+      "B2_P1": 18,
+      "B3_P2": 14,
+      "B4_Glob": 14,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "presion alta",
+      "DIRECTOS": 10,
+      "COMPATIBLES": 0,
+      "SECUNDARIOS": 1,
+      "NO_PERTINENTES": 287,
+      "B1_Act": 63,
+      "B2_P1": 10,
+      "B3_P2": 7,
+      "B4_Glob": 5,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "transicion defensiva",
+      "DIRECTOS": 5,
+      "COMPATIBLES": 1,
+      "SECUNDARIOS": 1,
+      "NO_PERTINENTES": 291,
+      "B1_Act": 63,
+      "B2_P1": 6,
+      "B3_P2": 6,
+      "B4_Glob": 4,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "transicion ofensiva",
+      "DIRECTOS": 8,
+      "COMPATIBLES": 7,
+      "SECUNDARIOS": 11,
+      "NO_PERTINENTES": 272,
+      "B1_Act": 63,
+      "B2_P1": 7,
+      "B3_P2": 7,
+      "B4_Glob": 3,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "salida de balon",
+      "DIRECTOS": 9,
+      "COMPATIBLES": 0,
+      "SECUNDARIOS": 9,
+      "NO_PERTINENTES": 280,
+      "B1_Act": 63,
+      "B2_P1": 9,
+      "B3_P2": 7,
+      "B4_Glob": 4,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "progresion",
+      "DIRECTOS": 4,
+      "COMPATIBLES": 11,
+      "SECUNDARIOS": 12,
+      "NO_PERTINENTES": 271,
+      "B1_Act": 63,
+      "B2_P1": 4,
+      "B3_P2": 4,
+      "B4_Glob": 1,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "finalizacion",
+      "DIRECTOS": 27,
+      "COMPATIBLES": 6,
+      "SECUNDARIOS": 13,
+      "NO_PERTINENTES": 252,
+      "B1_Act": 63,
+      "B2_P1": 27,
+      "B3_P2": 26,
+      "B4_Glob": 3,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    },
+    {
+      "Principio": "balon parado",
+      "DIRECTOS": 10,
+      "COMPATIBLES": 1,
+      "SECUNDARIOS": 2,
+      "NO_PERTINENTES": 285,
+      "B1_Act": 63,
+      "B2_P1": 10,
+      "B3_P2": 10,
+      "B4_Glob": 5,
+      "B5_Calm": 8,
+      "Sesion_5_Bloques": "COMPLETA (5/5 Válidos)"
+    }
+  ],
+  "false_positives": [],
+  "false_negatives": [],
+  "metadata_errors": [
+    {
+      "id": "c07dee4f-45b5-441c-a5c2-4efaab1ae7df",
+      "nombre": "MD-2: Trabajo de Velocidad y Circuitos de Alta Intensidad",
+      "campo": "bloque_sesion",
+      "error": "Valor NULL en base de datos",
+      "bloque_inferido": null
+    }
+  ],
+  "new_86_audit": {
+    "A": 0,
+    "B": 79,
+    "C": 20,
+    "D": 0
+  },
+  "real_library_gaps": [
+    {
+      "gap": "Finalización en Bloque Global (B4)",
+      "count_global": 0,
+      "cause": "FALTA REAL DE EJERCICIOS"
+    },
+    {
+      "gap": "Progresión / 1v1 en Bloque Global (B4)",
+      "count_global": 0,
+      "cause": "FALTA REAL DE EJERCICIOS"
+    },
+    {
+      "gap": "Vuelta a la Calma Regenerativa (B5)",
+      "count_valid": 7,
+      "cause": "FALTA DE VARIEDAD"
+    }
+  ],
+  "simulated_requests": [
+    {
+      "numero": 1,
+      "peticion": "Quiero una sesión de posesión",
+      "principio": "circulacion",
+      "directos": 67,
+      "compatibles": 15,
+      "b1": 63,
+      "b2": 73,
+      "b3": 70,
+      "b4": 43,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 2,
+      "peticion": "Quiero trabajar circulación de balón",
+      "principio": "circulacion",
+      "directos": 67,
+      "compatibles": 15,
+      "b1": 63,
+      "b2": 73,
+      "b3": 70,
+      "b4": 43,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 3,
+      "peticion": "Quiero trabajar organización defensiva",
+      "principio": "basculacion",
+      "directos": 17,
+      "compatibles": 6,
+      "b1": 63,
+      "b2": 18,
+      "b3": 14,
+      "b4": 14,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 4,
+      "peticion": "Quiero una sesión de presión alta",
+      "principio": "presion alta",
+      "directos": 10,
+      "compatibles": 0,
+      "b1": 63,
+      "b2": 10,
+      "b3": 7,
+      "b4": 5,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 5,
+      "peticion": "Quiero trabajar presión tras pérdida",
+      "principio": "transicion defensiva",
+      "directos": 5,
+      "compatibles": 1,
+      "b1": 63,
+      "b2": 6,
+      "b3": 6,
+      "b4": 4,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 6,
+      "peticion": "Quiero trabajar transición ofensiva",
+      "principio": "transicion ofensiva",
+      "directos": 8,
+      "compatibles": 7,
+      "b1": 63,
+      "b2": 7,
+      "b3": 7,
+      "b4": 3,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 7,
+      "peticion": "Quiero trabajar contraataque",
+      "principio": "transicion ofensiva",
+      "directos": 8,
+      "compatibles": 7,
+      "b1": 63,
+      "b2": 7,
+      "b3": 7,
+      "b4": 3,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 8,
+      "peticion": "Quiero trabajar salida de balón",
+      "principio": "salida de balon",
+      "directos": 9,
+      "compatibles": 0,
+      "b1": 63,
+      "b2": 9,
+      "b3": 7,
+      "b4": 4,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 9,
+      "peticion": "Quiero trabajar progresión",
+      "principio": "progresion",
+      "directos": 4,
+      "compatibles": 11,
+      "b1": 63,
+      "b2": 4,
+      "b3": 4,
+      "b4": 1,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 10,
+      "peticion": "Quiero trabajar 1 contra 1",
+      "principio": "progresion",
+      "directos": 4,
+      "compatibles": 11,
+      "b1": 63,
+      "b2": 4,
+      "b3": 4,
+      "b4": 1,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 11,
+      "peticion": "Quiero trabajar finalización",
+      "principio": "finalizacion",
+      "directos": 27,
+      "compatibles": 6,
+      "b1": 63,
+      "b2": 27,
+      "b3": 26,
+      "b4": 3,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 12,
+      "peticion": "Quiero trabajar remate",
+      "principio": "finalizacion",
+      "directos": 27,
+      "compatibles": 6,
+      "b1": 63,
+      "b2": 27,
+      "b3": 26,
+      "b4": 3,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 13,
+      "peticion": "Quiero trabajar balón parado",
+      "principio": "balon parado",
+      "directos": 10,
+      "compatibles": 1,
+      "b1": 63,
+      "b2": 10,
+      "b3": 10,
+      "b4": 5,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 14,
+      "peticion": "Quiero una sesión de defensa",
+      "principio": "basculacion",
+      "directos": 17,
+      "compatibles": 6,
+      "b1": 63,
+      "b2": 18,
+      "b3": 14,
+      "b4": 14,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 15,
+      "peticion": "Quiero una sesión de ataque",
+      "principio": "circulacion",
+      "directos": 67,
+      "compatibles": 15,
+      "b1": 63,
+      "b2": 73,
+      "b3": 70,
+      "b4": 43,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 16,
+      "peticion": "Quiero trabajar amplitud",
+      "principio": "circulacion",
+      "directos": 67,
+      "compatibles": 15,
+      "b1": 63,
+      "b2": 73,
+      "b3": 70,
+      "b4": 43,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    },
+    {
+      "numero": 17,
+      "peticion": "Quiero sesión de defensa y ataque",
+      "principio": "circulacion",
+      "directos": 67,
+      "compatibles": 15,
+      "b1": 63,
+      "b2": 73,
+      "b3": 70,
+      "b4": 43,
+      "b5": 8,
+      "sesion_completa": true,
+      "bloque_vacio": "Ninguno",
+      "causa": "N/A"
+    }
+  ],
+  "previous_audit_comparison": {
+    "total_exercises": {
+      "stated": 285,
+      "real": 285,
+      "status": "CONFIRMADA"
+    },
+    "original_199": {
+      "stated": 199,
+      "real": 199,
+      "status": "CONFIRMADA"
+    },
+    "new_86": {
+      "stated": 86,
+      "real": 86,
+      "status": "CONFIRMADA"
+    },
+    "null_blocks": {
+      "stated": 178,
+      "real": 178,
+      "status": "CONFIRMADA"
+    },
+    "direct_circulacion": {
+      "stated": 68,
+      "real": 68,
+      "status": "CONFIRMADA"
+    },
+    "global_finalizacion": {
+      "stated": 0,
+      "real": 0,
+      "status": "CONFIRMADA"
+    },
+    "global_progresion": {
+      "stated": 0,
+      "real": 0,
+      "status": "CONFIRMADA"
+    },
+    "cooldown_regenerative": {
+      "stated": 7,
+      "real": 7,
+      "status": "CONFIRMADA"
+    }
+  },
+  "verdict": {
+    "status": "COMBINATION_B_AND_C",
+    "summary": "70% de intenciones soportan sesión completa con normalización en memoria (Causa B); 30% restante bloquea B4 por hueco real en BD de juegos globales específicos (Causa C)."
+  }
+}

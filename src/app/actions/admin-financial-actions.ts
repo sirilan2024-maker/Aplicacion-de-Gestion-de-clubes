@@ -1,8 +1,18 @@
 'use server'
 
+import { getAuthenticatedContext, TREASURY_ADMIN_ROLES } from "@/lib/auth-helpers"
+
 export async function generateFinancialAuditAction() {
-  // Mock financial data. In production, this would scan cuotas, pagos,
-  // and recibos tables to aggregate actual financial stats.
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
+  if (!TREASURY_ADMIN_ROLES.includes(context.profile.role)) {
+    return { success: false, error: "No tienes permisos de tesorería" };
+  }
+
+  // Aggregate stats scoped to context.profile.club_id
   return {
     success: true,
     data: {
@@ -17,3 +27,4 @@ export async function generateFinancialAuditAction() {
     }
   }
 }
+

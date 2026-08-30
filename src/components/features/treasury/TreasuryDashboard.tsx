@@ -5,7 +5,8 @@ import Payments from "@/components/features/treasury/Payments";
 import ExpensesList from "@/components/features/treasury/ExpensesList";
 import MemberBalances from "@/components/features/treasury/MemberBalances";
 import OfficialReceiptsList from "@/components/features/treasury/OfficialReceiptsList";
-import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, TrendingDown, Scale, FileDown, Users, FileCheck2 } from "lucide-react";
+import { SepaRemittanceModal } from "@/components/features/treasury/SepaRemittanceModal";
+import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, TrendingDown, Scale, FileDown, Users, FileCheck2, Landmark } from "lucide-react";
 import { getTreasuryBalanceAction, exportAccountingCsvAction } from "@/app/actions/treasury-actions";
 import toast from "react-hot-toast";
 
@@ -14,6 +15,7 @@ export default function TreasuryDashboard() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [balances, setBalances] = useState({ ingresos: 0, gastos: 0 });
   const [exporting, setExporting] = useState(false);
+  const [showSepaModal, setShowSepaModal] = useState(false);
 
   useEffect(() => {
     const fetchBalances = async () => {
@@ -44,8 +46,8 @@ export default function TreasuryDashboard() {
       a.remove();
       URL.revokeObjectURL(url);
       toast.success("Contabilidad exportada correctamente");
-    } catch (err: any) {
-      toast.error("Error al exportar: " + err.message);
+    } catch {
+      toast.error("Error al exportar contabilidad");
     } finally {
       setExporting(false);
     }
@@ -63,14 +65,23 @@ export default function TreasuryDashboard() {
           </h1>
           <p className="text-xs md:text-sm text-gray-500 mt-0.5">Gestión de ingresos, cuotas y gastos del club</p>
         </div>
-        <button
-          onClick={handleExportContabilidad}
-          disabled={exporting}
-          className="flex items-center justify-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm transition-colors disabled:opacity-50 w-full sm:w-auto"
-        >
-          <FileDown className="w-4 h-4" />
-          {exporting ? "Generando..." : "Exportar CSV"}
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setShowSepaModal(true)}
+            className="flex items-center justify-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm transition-colors w-full sm:w-auto"
+          >
+            <Landmark className="w-4 h-4" />
+            Generar remesa SEPA
+          </button>
+          <button
+            onClick={handleExportContabilidad}
+            disabled={exporting}
+            className="flex items-center justify-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-sm transition-colors disabled:opacity-50 w-full sm:w-auto"
+          >
+            <FileDown className="w-4 h-4" />
+            {exporting ? "Generando..." : "Exportar CSV"}
+          </button>
+        </div>
       </div>
 
       {/* Balance Cards */}
@@ -190,6 +201,11 @@ export default function TreasuryDashboard() {
           <OfficialReceiptsList />
         )}
       </div>
+
+      <SepaRemittanceModal
+        isOpen={showSepaModal}
+        onClose={() => setShowSepaModal(false)}
+      />
 
     </div>
   );

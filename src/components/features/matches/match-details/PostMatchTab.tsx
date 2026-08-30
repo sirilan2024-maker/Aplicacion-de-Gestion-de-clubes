@@ -54,7 +54,7 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
         }
         if (finalTranscript.trim()) {
           const text = finalTranscript.trim();
-          setSummary(prev => (prev ? `${prev.trim()} ${text}` : text));
+          setSummary((prev: string) => (prev ? `${prev.trim()} ${text}` : text));
         }
       };
 
@@ -255,7 +255,7 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
                     const res = await sendMatchSummaryToCoordinatorsAction(matchId, summary);
                     setIsSendingSummary(false);
                     if (res.success) {
-                      toast.success(res.message, { id: toastId });
+                      toast.success(res.message || "Valoración enviada correctamente", { id: toastId });
                     } else {
                       toast.error(res.error || "Error al enviar la valoración.", { id: toastId });
                     }

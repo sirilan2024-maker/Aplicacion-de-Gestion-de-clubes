@@ -3,7 +3,7 @@
  * Antigravity Methodology OS - Fase 5.4
  */
 
-import { calculateMethodologyPriorities, MethodologyPriority, PriorityEngineContext } from "./methodologyPriorityEngine";
+import { calculateMethodologyPriorities, MethodologyPriority, PriorityContext } from "./methodologyPriorityEngine";
 
 export interface PriorityEvolutionResult {
   previousPriorities: MethodologyPriority[];
@@ -23,8 +23,8 @@ export interface PriorityEvolutionResult {
 }
 
 export function computePrioritiesEvolution(
-  contextBefore: PriorityEngineContext, 
-  contextAfter: PriorityEngineContext
+  contextBefore: PriorityContext, 
+  contextAfter: PriorityContext
 ): PriorityEvolutionResult {
   const previousPriorities = calculateMethodologyPriorities(contextBefore);
   const currentPriorities = calculateMethodologyPriorities(contextAfter);

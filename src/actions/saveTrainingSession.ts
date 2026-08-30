@@ -263,13 +263,19 @@ export async function getAllClubSessionsAction(clubId: string, teamId?: string) 
 /**
  * Obtiene todos los ejercicios del banco del club
  */
-export async function getClubDrillsAction() {
+export async function getClubDrillsAction(clubId?: string) {
   try {
     const adminClient = createAdminClient();
-    const { data, error } = await adminClient
+    let query = adminClient
       .from('banco_ejercicios')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (clubId) {
+      query = query.eq('club_id', clubId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return { success: true, data: data || [] };

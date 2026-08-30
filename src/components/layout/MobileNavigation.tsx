@@ -181,7 +181,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     // Si no estamos en equipo, usamos las rutas generales
     if (userRole === 'admin') {
       bottomLinks = [
-        { name: "Equipos", href: getHref("Equipos", "/admin/equipos"), icon: Shield },
+        { name: "Equipos", href: "/dashboard/equipos", icon: Shield },
         { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
         { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
@@ -235,12 +235,12 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     if (userRole === 'admin') {
       // Hardcode admin secondary links since they are not in DB usually
       secondaryLinks = [
-        { name: "Inicio", href: getHref("Inicio", "/dashboard"), icon: LayoutDashboard },
+        { name: "CENTRO DE CONTROL", href: "/admin/inicio", icon: LayoutDashboard },
         { name: "En directo", href: "/live", icon: Radio },
         { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
         { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
-        { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
+        { name: "Estadísticas", href: "/dashboard/club/estadisticas", icon: BarChart3 },
         { name: "Disciplina", href: getHref("Disciplina", "/dashboard/matches?view=disciplina"), icon: AlertTriangle },
         { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
         { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },

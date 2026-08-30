@@ -18,20 +18,20 @@ export async function POST(req: Request) {
     const signature = req.headers.get('stripe-signature');
     let event: Stripe.Event;
 
-    // Validate the Stripe signature if the secret is present
-    if (webhookSecret && signature) {
-      try {
-        event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-      } catch (err: any) {
-        console.error(`⚠️  Webhook signature verification failed:`, err.message);
-        return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 });
-      }
-    } else {
-      const data = JSON.parse(body);
-      event = data as Stripe.Event;
+    // Validate the Stripe signature strictly
+    if (!webhookSecret || !signature) {
+      return NextResponse.json({ error: 'Firma de webhook ausente o no configurada' }, { status: 400 });
+    }
+
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    } catch (err: any) {
+      console.error(`⚠️  Webhook signature verification failed:`, err.message);
+      return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 });
     }
 
     const supabaseAdmin = await createAdminClient();
+
 
     // ────────────────────────────────────────────────────────────────────────
     // FLUJO A: Pagos de Registro (Payment Intent)

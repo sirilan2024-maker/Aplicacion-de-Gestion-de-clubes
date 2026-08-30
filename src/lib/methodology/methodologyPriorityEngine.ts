@@ -43,6 +43,7 @@ export interface MethodologyPriority {
   id: string;
   type: PriorityType;
   priority: PriorityLevel;
+  priorityLevel?: PriorityLevel;
   title: string;
   description: string;
   evidence: PriorityEvidence;
@@ -55,7 +56,7 @@ export interface MethodologyPriority {
 }
 
 export interface PriorityContext {
-  teamId: string;
+  teamId?: string;
   date?: string;
   microcycleDay?: string;
   currentObjective?: string;
@@ -63,6 +64,8 @@ export interface PriorityContext {
   history?: any[];
   summary?: any;
   curriculumPrinciples?: any[];
+  recentSessions?: any[];
+  teamObjectives?: any[];
 }
 
 /**

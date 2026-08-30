@@ -143,7 +143,11 @@ export function applyAIActionToLocalState(
   if (proposal.type === 'regenerate_session_block') {
     const blockId = proposal.target.blockId;
     if (!blockId || !currentObject.blocks) return { updatedObject: currentObject, applied: false };
-    const updatedProposal = regenerateSessionBlock(currentObject as SessionProposal, blockId, context as GeneratorContext);
+    const updatedProposal = regenerateSessionBlock(
+      currentObject as SessionProposal,
+      blockId as 'activacion' | 'principal_1' | 'principal_2' | 'global' | 'vuelta_calma',
+      context as GeneratorContext
+    );
     return { updatedObject: updatedProposal, applied: true };
   }
 

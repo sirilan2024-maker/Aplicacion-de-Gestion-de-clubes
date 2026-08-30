@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
+import { getAuthenticatedContext, ADMIN_ROLES } from '@/lib/auth-helpers'
+
 
 const SPORTING_SALADAR_DATA = [
   {
@@ -48,14 +50,21 @@ const SPORTING_SALADAR_DATA = [
 ]
 
 export async function importSportingSaladarData(clubId: string) {
-  const supabase = await createClient()
-  const adminSupabase = createAdminClient()
 
-  // 1. Get current admin profile ID to assign as team's coach_id for backwards compatibility
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("No autenticado")
+  const { context, error: authError } = await getAuthenticatedContext()
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado")
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role) || context.profile.club_id !== clubId) {
+    throw new Error("No tienes permisos para importar datos en este club")
+  }
+
+  const adminSupabase = createAdminClient()
+  const user = context.user
 
   let importedTeams = 0
+
 
   for (const teamData of SPORTING_SALADAR_DATA) {
     // A. Insert Team into 'equipos'

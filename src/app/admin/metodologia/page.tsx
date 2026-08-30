@@ -7,6 +7,7 @@ import {
   Shield,
   Target,
   BookOpen,
+  Calendar,
   CalendarDays,
   TrendingUp,
   AlertTriangle,
@@ -154,35 +155,35 @@ export default function MethodologyDashboard() {
         <MethodologyNavHeader />
       </div>
 
-      {/* Hub de Navegación Rápida Modular Completo */}
+      {/* Hub de Navegación Rápida a los Pilares Canónicos */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         <Link href="/admin/metodologia/operativa" className="p-3.5 bg-white border border-slate-200 hover:border-purple-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
           <Activity className="w-5 h-5 text-purple-600 mx-auto group-hover:scale-110 transition-transform" />
           <span className="text-xs font-bold text-slate-900 block">Operativa</span>
         </Link>
-        <Link href="/admin/metodologia/ejecutiva" className="p-3.5 bg-white border border-slate-200 hover:border-indigo-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+        <Link href="/admin/metodologia/planificacion" className="p-3.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <Calendar className="w-5 h-5 text-blue-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Planificación</span>
+        </Link>
+        <Link href="/admin/metodologia/curriculo" className="p-3.5 bg-white border border-slate-200 hover:border-indigo-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
           <Brain className="w-5 h-5 text-indigo-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Ejecutiva</span>
+          <span className="text-xs font-bold text-slate-900 block">Currículo</span>
         </Link>
-        <Link href="/admin/metodologia/centro-control" className="p-3.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
-          <LayoutDashboard className="w-5 h-5 text-blue-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Control 360º</span>
+        <Link href="/admin/metodologia/biblioteca" className="p-3.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <BookOpen className="w-5 h-5 text-blue-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Biblioteca</span>
         </Link>
-        <Link href="/admin/metodologia/evolucion" className="p-3.5 bg-white border border-slate-200 hover:border-emerald-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
-          <TrendingUp className="w-5 h-5 text-emerald-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Evolución</span>
+        <Link href="/admin/metodologia/evaluacion" className="p-3.5 bg-white border border-slate-200 hover:border-emerald-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <Target className="w-5 h-5 text-emerald-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Evaluación</span>
         </Link>
-        <Link href="/admin/metodologia/gobierno" className="p-3.5 bg-white border border-slate-200 hover:border-purple-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
-          <ShieldCheck className="w-5 h-5 text-purple-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Gobierno</span>
+        <Link href="/admin/metodologia/jugadores" className="p-3.5 bg-white border border-slate-200 hover:border-teal-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <Users className="w-5 h-5 text-teal-600 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Jugadores</span>
         </Link>
-        <Link href="/admin/metodologia/calidad" className="p-3.5 bg-white border border-slate-200 hover:border-teal-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
-          <CheckCircle className="w-5 h-5 text-teal-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Calidad</span>
-        </Link>
-        <Link href="/admin/metodologia/optimizacion" className="p-3.5 bg-white border border-slate-200 hover:border-indigo-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
-          <LineChart className="w-5 h-5 text-indigo-600 mx-auto group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-900 block">Optimización</span>
+        <Link href="/admin/metodologia/direccion" className="p-3.5 bg-white border border-slate-200 hover:border-slate-400 rounded-xl shadow-xs transition-all text-center space-y-1 group">
+          <Building2 className="w-5 h-5 text-slate-800 mx-auto group-hover:scale-110 transition-transform" />
+          <span className="text-xs font-bold text-slate-900 block">Dirección</span>
         </Link>
         <Link href="/admin/metodologia/simulador" className="p-3.5 bg-white border border-slate-200 hover:border-amber-300 rounded-xl shadow-xs transition-all text-center space-y-1 group">
           <Sliders className="w-5 h-5 text-amber-600 mx-auto group-hover:scale-110 transition-transform" />

@@ -1,7 +1,9 @@
-﻿export default function Page() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-slate-800 capitalize">inicio (Proximamente)</h1>
-    </div>
-  )
+import { getExecutiveDashboardAction } from "@/app/actions/club-actions";
+import { AdminInicioClient } from "@/components/features/admin/AdminInicioClient";
+
+export const dynamic = "force-dynamic";
+
+export default async function AdminInicioPage() {
+  const result = await getExecutiveDashboardAction();
+  return <AdminInicioClient initialResult={result} />;
 }

@@ -2,10 +2,23 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Calendar, Plus, ChevronRight, LayoutDashboard, Loader2, X } from "lucide-react";
+import {
+  Calendar,
+  Plus,
+  ChevronRight,
+  LayoutDashboard,
+  Loader2,
+  X,
+  Target,
+  Clock,
+  ArrowRight,
+  Layers,
+  Sparkles
+} from "lucide-react";
 import Link from "next/link";
 import { format, differenceInWeeks } from "date-fns";
 import { es } from "date-fns/locale";
+import { MethodologyNavHeader } from "@/components/methodology/MethodologyNavHeader";
 
 interface Macrocycle {
   id: string;
@@ -46,16 +59,13 @@ export default function MacrocyclesPage() {
       const { data: userData } = await supabase.auth.getUser();
       const clubId = userData.user?.user_metadata?.club_id;
 
-      if (!clubId) return;
-
       const [macroRes, seasonRes, teamRes] = await Promise.all([
         supabase
           .from("macrocycles")
           .select("*, seasons(name), teams(name)")
-          .eq("club_id", clubId)
           .order("start_date", { ascending: false }),
-        supabase.from("seasons").select("*").eq("club_id", clubId),
-        supabase.from("teams").select("*").eq("club_id", clubId),
+        supabase.from("seasons").select("*").order("start_date", { ascending: false }),
+        supabase.from("teams").select("*").order("name", { ascending: true }),
       ]);
 
       if (macroRes.data) setMacrocycles(macroRes.data);
@@ -66,7 +76,7 @@ export default function MacrocyclesPage() {
         setSeasonId(seasonRes.data[0].id);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching planning data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -135,115 +145,148 @@ export default function MacrocyclesPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+      
+      {/* Header con Navegación Metodológica y Acciones */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Calendar className="w-8 h-8 text-blue-600" />
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px] font-black uppercase px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-800 tracking-wider">
+              Planificación Metodológica
+            </span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+            <Calendar className="w-7 h-7 text-blue-600 shrink-0" />
             Planificación de Temporada
           </h1>
-          <p className="text-slate-500 mt-1">Gestiona los macrociclos de la temporada actual.</p>
+          <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-2xl">
+            ¿Qué vamos a entrenar? Estructura temporal en cascada: Macrociclos, Mesociclos, Microciclos y Sesiones de Entrenamiento.
+          </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl flex items-center gap-2 transition-colors w-full md:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Macrociclo
-        </button>
+
+        {/* Acciones Rápidas */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link
+            href="/admin/metodologia/sesiones"
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
+          >
+            <Target className="w-3.5 h-3.5 text-slate-600" />
+            <span>Ver Sesiones</span>
+          </Link>
+
+          <Link
+            href="/admin/metodologia/sesiones/nueva"
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ Diseñar Sesión</span>
+          </Link>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Nuevo Macrociclo</span>
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-2xl border border-slate-200 gap-3 shadow-xs">
           <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-xs font-bold text-slate-500">Cargando planificación de temporada...</p>
         </div>
       ) : macrocycles.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-          <div className="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <LayoutDashboard className="w-10 h-10 text-blue-600" />
+        <div className="bg-white rounded-2xl border border-slate-200 border-dashed p-12 text-center shadow-xs space-y-3">
+          <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto text-blue-600">
+            <LayoutDashboard className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">No hay macrociclos</h3>
-          <p className="text-slate-500 mb-6 max-w-md mx-auto">
-            Comienza a planificar tu temporada creando tu primer macrociclo. Podrás dividirlo luego en mesociclos y microciclos.
+          <h3 className="text-lg font-black text-slate-900">No hay macrociclos planificados</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Comienza a planificar tu temporada creando tu primer macrociclo. Podrás estructurarlo en mesociclos y microciclos semanales.
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl inline-flex items-center gap-2 transition-colors"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs inline-flex items-center gap-1.5"
           >
-            <Plus className="w-5 h-5" />
-            Crear primer macrociclo
+            <Plus className="w-4 h-4" />
+            <span>Crear primer macrociclo</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {macrocycles.map((macro) => {
             const start = new Date(macro.start_date);
             const end = new Date(macro.end_date);
-            const totalWeeks = differenceInWeeks(end, start);
+            const totalWeeks = differenceInWeeks(end, start) || 1;
             const now = new Date();
-            const totalMs = end.getTime() - start.getTime();
+            const totalMs = Math.max(1, end.getTime() - start.getTime());
             const elapsedMs = now.getTime() - start.getTime();
             const progress = Math.max(0, Math.min(100, (elapsedMs / totalMs) * 100));
 
             return (
-              <div key={macro.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 leading-tight">{macro.name}</h3>
-                    <p className="text-sm text-slate-500">{macro.seasons?.name}</p>
-                  </div>
-                  <span className={`text-xs font-bold px-2 py-1 rounded-lg ${getPhaseColor(macro.phase_type)}`}>
-                    {macro.phase_type}
-                  </span>
-                </div>
-
-                <div className="space-y-3 mb-4 flex-grow">
-                  <div className="flex items-center text-sm text-slate-600 gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      {format(start, "d MMM yyyy", { locale: es })} - {format(end, "d MMM yyyy", { locale: es })}
+              <div key={macro.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-blue-300 transition-all flex flex-col justify-between gap-4">
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 leading-tight">{macro.name}</h3>
+                      <p className="text-xs text-slate-400 font-semibold mt-0.5">{macro.seasons?.name || "Temporada General"}</p>
+                    </div>
+                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-md uppercase tracking-wider ${getPhaseColor(macro.phase_type)}`}>
+                      {macro.phase_type}
                     </span>
                   </div>
-                  
-                  <div className="text-sm font-medium text-slate-700">
-                    Duración: {totalWeeks} semanas
-                  </div>
 
-                  {macro.objectives && macro.objectives.length > 0 && (
-                    <div className="text-sm text-slate-600">
-                      <p className="font-semibold text-slate-700 mb-1">Objetivos:</p>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {macro.objectives.slice(0, 3).map((obj, i) => (
-                          <li key={i} className="truncate">{obj}</li>
-                        ))}
-                        {macro.objectives.length > 3 && (
-                          <li className="text-slate-400 italic">+{macro.objectives.length - 3} más...</li>
-                        )}
-                      </ul>
+                  <div className="space-y-2.5 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>
+                        {format(start, "d MMM yyyy", { locale: es })} — {format(end, "d MMM yyyy", { locale: es })}
+                      </span>
                     </div>
-                  )}
+                    
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-slate-500">Duración estimada:</span>
+                      <span className="font-black text-slate-800">{totalWeeks} semanas</span>
+                    </div>
+
+                    {macro.objectives && macro.objectives.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/60">
+                        <span className="text-[10px] font-black uppercase text-slate-400 block mb-1">Objetivos Clave:</span>
+                        <ul className="space-y-1 text-[11px]">
+                          {macro.objectives.slice(0, 2).map((obj, i) => (
+                            <li key={i} className="flex items-start gap-1.5 text-slate-700">
+                              <span className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                              <span className="line-clamp-1">{obj}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="mt-auto">
-                  <div className="mb-4">
-                    <div className="flex justify-between text-xs font-medium text-slate-500 mb-1">
-                      <span>Progreso</span>
-                      <span>{Math.round(progress)}%</span>
+                <div>
+                  <div className="mb-3">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
+                      <span>Progreso temporal</span>
+                      <span className="text-slate-700 font-black">{Math.round(progress)}%</span>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div className="w-full bg-slate-100 rounded-full h-1.5">
                       <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
                         style={{ width: `${progress}%` }}
-                      ></div>
+                      />
                     </div>
                   </div>
 
                   <Link
                     href={`/admin/metodologia/planificacion/${macro.id}`}
-                    className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-blue-600 font-semibold rounded-xl border border-slate-200 flex items-center justify-center gap-1 transition-colors"
+                    className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    Ver Mesociclos
-                    <ChevronRight className="w-4 h-4" />
+                    <span>Ver Mesociclos & Semanas</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               </div>
@@ -252,36 +295,37 @@ export default function MacrocyclesPage() {
         </div>
       )}
 
+      {/* Modal de Creación */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white">
-              <h2 className="text-xl font-bold text-slate-900">Nuevo Macrociclo</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-6 h-6" />
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h2 className="text-lg font-black text-slate-900">Nuevo Macrociclo</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <form onSubmit={handleCreate} className="p-6 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+            <form onSubmit={handleCreate} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nombre del Macrociclo</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Periodo Preparatorio 2026/27"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Nombre</label>
-                  <input
-                    required
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Ej. Macrociclo 1 - Preparación"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Fase</label>
+                  <label className="font-bold text-slate-700 block mb-1">Tipo de Fase</label>
                   <select
-                    required
                     value={phaseType}
                     onChange={(e) => setPhaseType(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-bold"
                   >
                     <option value="Pretemporada">Pretemporada</option>
                     <option value="Inicio">Inicio</option>
@@ -290,91 +334,76 @@ export default function MacrocyclesPage() {
                     <option value="Mantenimiento">Mantenimiento</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Fecha de Inicio</label>
-                  <input
-                    required
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Fecha de Fin</label>
-                  <input
-                    required
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Temporada</label>
+                  <label className="font-bold text-slate-700 block mb-1">Temporada</label>
                   <select
-                    required
                     value={seasonId}
                     onChange={(e) => setSeasonId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-bold"
                   >
-                    {seasons.map(s => (
+                    {seasons.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Equipo (Opcional)</label>
-                  <select
-                    value={teamId}
-                    onChange={(e) => setTeamId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="">Aplicable a todo el club</option>
-                    {teams.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
+                  <label className="font-bold text-slate-700 block mb-1">Fecha de Inicio</label>
+                  <input
+                    type="date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Fecha de Fin</label>
+                  <input
+                    type="date"
+                    required
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-xs"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Objetivos Principales (uno por línea)</label>
+                <label className="font-bold text-slate-700 block mb-1">Objetivos del Macrociclo (un objetivo por línea)</label>
                 <textarea
-                  rows={4}
+                  rows={3}
+                  placeholder="Asimilar el modelo de juego en salida de balón&#10;Consolidar la estructura física básica"
                   value={objectivesStr}
                   onChange={(e) => setObjectivesStr(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                  placeholder="- Mejorar la condición aeróbica&#10;- Integrar los principios del modelo de juego&#10;- Cohesión grupal"
-                ></textarea>
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs"
+                />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-4 py-2 text-slate-600 font-bold text-xs hover:bg-slate-100 rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-xs disabled:opacity-50"
                 >
-                  {isSubmitting ? "Guardando..." : "Crear Macrociclo"}
+                  {isSubmitting ? "Creando..." : "Guardar Macrociclo"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }

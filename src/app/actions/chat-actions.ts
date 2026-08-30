@@ -176,7 +176,7 @@ export async function sendMessageAction(channelId: string, content: string) {
     if (!user) return { success: false, error: "No autorizado" }
 
     const adminClient = await createAdminClient()
-    const { data: channel } = await adminClient.from('chat_channels').select('type').eq('id', channelId).single()
+    const { data: channel } = await adminClient.from('chat_channels').select('type, name, team_id').eq('id', channelId).single()
     
     if (channel?.type === 'global') {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()

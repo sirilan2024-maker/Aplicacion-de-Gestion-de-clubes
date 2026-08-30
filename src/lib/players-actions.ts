@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessPlayer } from '@/lib/auth-helpers'
+
 
 export async function createPlayer(formData: FormData) {
   const supabase = await createClient()
@@ -96,18 +98,35 @@ export async function createPlayer(formData: FormData) {
 }
 
 export async function deletePlayer(id: string) {
-  const supabase = await createClient()
-  
+
+  const { context, error: authError } = await getAuthenticatedContext()
+  if (!context || authError) {
+    return { error: authError || 'No autenticado' }
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role)) {
+    return { error: 'No tienes permisos de administración para eliminar jugadores' }
+  }
+
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminClient = createAdminClient()
+
+  const access = await canUserAccessPlayer(adminClient, context, id)
+  if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+    return { error: access.reason || 'No autorizado para eliminar este jugador' }
+  }
+
   // 1. Manually cascade delete from related tables to avoid FK constraint errors
-  await supabase.from('player_season_history').delete().eq('player_id', id)
-  await supabase.from('player_tutors').delete().eq('player_id', id)
-  await supabase.from('player_medical_records').delete().eq('player_id', id)
+  await adminClient.from('player_season_history').delete().eq('player_id', id).eq('club_id', context.profile.club_id)
+  await adminClient.from('player_tutors').delete().eq('player_id', id)
+  await adminClient.from('player_medical_records').delete().eq('player_id', id)
   
   // 2. Hard delete from players table
-  const { error } = await supabase
+  const { error } = await adminClient
     .from('players')
     .delete()
     .eq('id', id)
+    .eq('club_id', context.profile.club_id)
 
   if (error) {
     console.error('[PlayersAction] Error deleting player:', error.message)
@@ -117,3 +136,4 @@ export async function deletePlayer(id: string) {
   revalidatePath('/dashboard/players')
   return { success: true }
 }
+

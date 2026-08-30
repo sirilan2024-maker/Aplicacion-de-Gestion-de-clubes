@@ -1,0 +1,2252 @@
+{
+  "updated_at": "2026-08-26T18:47:23.874Z",
+  "total_exercises": 285,
+  "applied_changes_count": 179,
+  "skipped_changes_count": 0,
+  "applied_changes": [
+    {
+      "id": "ff21ecaf-c117-4048-88f1-fbfa2224c11e",
+      "nombreAnterior": "ESTRELLA DEL ENGAÑO",
+      "nombreNuevo": "ESTRELLA DEL ENGAÑO",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "5e7b4f47-b130-413c-b155-1753fbc9d2fc",
+      "nombreAnterior": "Torneo 1 vs 1",
+      "nombreNuevo": "Torneo 1 vs 1",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "02fb9682-c84c-4d84-acc5-4da664cfdb2d",
+      "nombreAnterior": "Ejercicio de la brújula en el espejo",
+      "nombreNuevo": "Ejercicio de la brújula en el espejo",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "da5fa880-a4a9-47fe-9428-ee3b65517063",
+      "nombreAnterior": "Coordinación con tiro al blanco",
+      "nombreNuevo": "Coordinación con tiro al blanco",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "8aca1d1a-cf9e-4d0e-a38c-edbfc87e157b",
+      "nombreAnterior": "Carrera en Zigzag",
+      "nombreNuevo": "Carrera en Zigzag",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "3aee6147-c52d-4e1b-877e-d4d141aee686",
+      "nombreAnterior": "Juego de Pilla-Pilla con Pases",
+      "nombreNuevo": "Juego de Pilla-Pilla con Pases",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "6fa41305-78b0-468b-9b17-017a8a9156a3",
+      "nombreAnterior": "Calentamiento Brasileño",
+      "nombreNuevo": "Calentamiento Brasileño",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "85a2fdc4-bee0-4f0c-9376-9dbc4eee0de3",
+      "nombreAnterior": "Carrera de presión",
+      "nombreNuevo": "Carrera de presión",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "97add124-a525-4086-b749-0f420c5767b7",
+      "nombreAnterior": "Curso de coordinación del regate",
+      "nombreNuevo": "Curso de coordinación del regate",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "60fe590d-d000-497e-bc09-7fc1c45b7429",
+      "nombreAnterior": "Pase en Triángulo",
+      "nombreNuevo": "Pase en Triángulo",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "677e5bf6-2643-4dcc-a739-369aeb343ad1",
+      "nombreAnterior": "Circuito de Psicomotricidad \"El Zoo\"",
+      "nombreNuevo": "Circuito de Psicomotricidad \"El Zoo\"",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "2d951968-070c-4dea-ae05-9f14f4dbdb68",
+      "nombreAnterior": "El Rey de la Selva (Persecución)",
+      "nombreNuevo": "El Rey de la Selva (Persecución)",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "d2e74e74-f2ca-45b4-8d17-6fd9f86ebf24",
+      "nombreAnterior": "Rondo 3v1 en Cuadrado",
+      "nombreNuevo": "Rondo 3v1 en Cuadrado",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "81758270-05a8-4e32-a6ae-50280a828007",
+      "nombreAnterior": "Duelos 1v1 hacia Portería",
+      "nombreNuevo": "Duelos 1v1 hacia Portería",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "59fc4c86-aa0e-4381-913f-eeac1ade3c1a",
+      "nombreAnterior": "Juego de Posición 4v2 con Comodines",
+      "nombreNuevo": "Juego de Posición 4v2 con Comodines",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "527ad0aa-5e6a-4b80-a907-57f513115e55",
+      "nombreAnterior": "Salida de Balón ante Presión Alta 3-2-1",
+      "nombreNuevo": "Salida de Balón ante Presión Alta 3-2-1",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "d41e58cb-313e-46c8-855a-f1e7ec4dddb8",
+      "nombreAnterior": "Juego de Posición 4v4+3 con Porterías",
+      "nombreNuevo": "Juego de Posición 4v4+3 con Porterías",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "7a8a1d15-f95f-459d-8ea1-b0cda4504a60",
+      "nombreAnterior": "Rondo 3vs1 con Cones",
+      "nombreNuevo": "Rondo 3vs1 con Cones",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "e631ed29-2d36-43b5-a104-8a6f2f68aed5",
+      "nombreAnterior": "Rondo con presión",
+      "nombreNuevo": "Rondo con presión",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ec8e1c8f-c229-4e94-8d10-872770e104ba",
+      "nombreAnterior": "Rondo 4vs2 con Cones",
+      "nombreNuevo": "Rondo 4vs2 con Cones",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "46a6834b-57f3-477f-91ca-48f364b1fbf7",
+      "nombreAnterior": "Técnicos Pases entre tríos",
+      "nombreNuevo": "Técnicos Pases entre tríos",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "8212e70f-daa4-45fb-b67b-e03ca7aceba4",
+      "nombreAnterior": "Pases entre tríos",
+      "nombreNuevo": "Pases entre tríos",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "7c275aa9-0ad5-4541-b4bb-5beef4553467",
+      "nombreAnterior": "Pases entre parejas",
+      "nombreNuevo": "Pases entre parejas",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "05c12d05-24c0-4f78-b50b-f872d74156e8",
+      "nombreAnterior": "Mete y Corre",
+      "nombreNuevo": "Mete y Corre",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "7e35ef6e-562d-4df7-816f-df6f2daf7f0a",
+      "nombreAnterior": "Triangula",
+      "nombreNuevo": "Triangula",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "c27567ba-9da2-4130-927a-60f20ce5e1dd",
+      "nombreAnterior": "Triangula y muévete",
+      "nombreNuevo": "Triangula y muévete",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ea1f1389-df7f-4b2d-9e30-ebf4ec2646f4",
+      "nombreAnterior": "Pared, regate y tiro",
+      "nombreNuevo": "Pared, regate y tiro",
+      "cambios": {
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ed1129ff-6bad-412f-a4c6-e2e98c22d25a",
+      "nombreAnterior": "Dinámica de pases con pared",
+      "nombreNuevo": "Dinámica de pases con pared",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "fc0dcb3d-9ba3-47e3-a2e5-c1cf9d2fa405",
+      "nombreAnterior": "Tirar el pivote",
+      "nombreNuevo": "Tirar el pivote",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ab754222-6132-429d-b159-92b971e1c2f7",
+      "nombreAnterior": "Sucesión de pases",
+      "nombreNuevo": "Sucesión de pases",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "0dcced9b-3b65-4f77-a367-e5f0d3bcc86c",
+      "nombreAnterior": "Rondo",
+      "nombreNuevo": "Rondo",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "e017f7c6-235c-459f-b4ba-a8da38a94121",
+      "nombreAnterior": "Paredes y pase largo",
+      "nombreNuevo": "Paredes y pase largo",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "b8183b21-86c1-4fb8-9b4c-3c93a346e605",
+      "nombreAnterior": "Sorteando conos",
+      "nombreNuevo": "Sorteando conos",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "97a82c69-ab7a-4cdf-b069-b6daccb4dd14",
+      "nombreAnterior": "Número y tiro",
+      "nombreNuevo": "Número y tiro",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "43265e7f-928a-43e9-adfc-5567c71e16be",
+      "nombreAnterior": "Tirar todos los conos",
+      "nombreNuevo": "Tirar todos los conos",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "16b0e6a8-414a-4b16-9c0d-9f9a62c31a2b",
+      "nombreAnterior": "Corre que te paso",
+      "nombreNuevo": "Corre que te paso",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "3e88235b-4b16-4d4d-b877-6f7642bb4720",
+      "nombreAnterior": "Corre que te persiguen",
+      "nombreNuevo": "Corre que te persiguen",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "61384bb2-1bd8-4d12-ad4d-8c5f6950e8c2",
+      "nombreAnterior": "Combinación con llegada",
+      "nombreNuevo": "Combinación con llegada",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ed60d455-b555-4782-a778-662bb1c9c378",
+      "nombreAnterior": "Práctica de Penaltis",
+      "nombreNuevo": "Práctica de Penaltis",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "216f9e0f-89a3-45c5-9143-e0337ab18240",
+      "nombreAnterior": "Maniobra y pase",
+      "nombreNuevo": "Maniobra y pase",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "825cf53a-68ab-4cf3-8371-b7bf1ef08a4c",
+      "nombreAnterior": "Defensa en inferioridad con relevo",
+      "nombreNuevo": "Defensa en inferioridad con relevo",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "679e0dd3-11c7-438e-94e0-11e2e2bccc4c",
+      "nombreAnterior": "Saltos de vallas y finalización",
+      "nombreNuevo": "Saltos de vallas y finalización",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "01c47780-87db-44e7-b784-d29050ad979f",
+      "nombreAnterior": "Uno contra uno",
+      "nombreNuevo": "Uno contra uno",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "963619f9-d7fd-4252-86c7-77d9cf5db92b",
+      "nombreAnterior": "Velocidad reacción 2",
+      "nombreNuevo": "Velocidad reacción 2",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "4e14d721-f355-4ac6-92b3-625a04e6ded9",
+      "nombreAnterior": "Ejercicio de Lateralización",
+      "nombreNuevo": "Ejercicio de Lateralización",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "e0bf27a7-0bcb-4a9f-b658-0347f5b13419",
+      "nombreAnterior": "Lateralización 2",
+      "nombreNuevo": "Lateralización 2",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "043bf4f2-9b02-468f-aa60-639315c90d04",
+      "nombreAnterior": "Velocidad reacción",
+      "nombreNuevo": "Velocidad reacción",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ffdfc605-f997-41fd-a3c9-2807f1b1cb9f",
+      "nombreAnterior": "Circuito técnico para porteros",
+      "nombreNuevo": "Circuito técnico para porteros",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "e254eb54-2bc7-4705-8da4-07574fb7d8f1",
+      "nombreAnterior": "Velocidad reacción 3",
+      "nombreNuevo": "Velocidad reacción 3",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "fcc686b0-6538-4dac-87d5-4d3cfbb0702d",
+      "nombreAnterior": "Salto y parada",
+      "nombreNuevo": "Salto y parada",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "9f55efdc-12ee-470a-a0f7-797568e77eab",
+      "nombreAnterior": "Corner ofensivo 9",
+      "nombreNuevo": "Corner ofensivo 9",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "4908dede-6065-496e-a657-6918ed7e8b63",
+      "nombreAnterior": "Saque de banda 2",
+      "nombreNuevo": "Saque de banda 2",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "6995734f-aece-442f-885b-a56d74a6bb92",
+      "nombreAnterior": "Juego estrategia de córner",
+      "nombreNuevo": "Juego estrategia de córner",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "c3776e69-d601-486b-857f-4ff7104ec8a3",
+      "nombreAnterior": "Juego de faltas laterales",
+      "nombreNuevo": "Juego de faltas laterales",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "9d90f4a1-19f5-406a-8251-33d7ced49f85",
+      "nombreAnterior": "Saque de puerta",
+      "nombreNuevo": "Saque de puerta",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "7b36f048-4f54-480b-a986-55ed0849d2ac",
+      "nombreAnterior": "Partido 6 porterías",
+      "nombreNuevo": "Partido 6 porterías",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "94768cf9-fca3-4e9d-acfb-67501b919de7",
+      "nombreAnterior": "Circuito de Velocidad",
+      "nombreNuevo": "Circuito de Velocidad",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "c32155c4-1c48-40d4-94a2-910db8df5b8d",
+      "nombreAnterior": "Combinación en medio rombo",
+      "nombreNuevo": "Combinación en medio rombo",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "7c9785a3-8afd-4291-8fec-77e20c18e61f",
+      "nombreAnterior": "Combinación en medio rombo 2",
+      "nombreNuevo": "Combinación en medio rombo 2",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "f9b2fbdf-8790-4f7c-abb8-a6da83b71fcf",
+      "nombreAnterior": "Llegadas por ambas bandas",
+      "nombreNuevo": "Llegadas por ambas bandas",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "90375d7f-144f-4ef3-97a7-c415ed43e4bd",
+      "nombreAnterior": "Córner ofensivo 5",
+      "nombreNuevo": "Córner ofensivo 5",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "b7b1cdb4-57af-418b-baf6-9681f590be17",
+      "nombreAnterior": "Córner ofensivo 6",
+      "nombreNuevo": "Córner ofensivo 6",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "9a4742cd-e953-4fff-af3a-6074c453fa10",
+      "nombreAnterior": "Posesión porterías + 1",
+      "nombreNuevo": "Posesión porterías + 1",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "f8f93931-6acb-4068-ad94-b394c5e16721",
+      "nombreAnterior": "Posesión 3 equipos en mitad de campo",
+      "nombreNuevo": "Posesión 3 equipos en mitad de campo",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "1775b968-33f8-4747-a85a-b1e8bf79e63a",
+      "nombreAnterior": "Partido con comodines",
+      "nombreNuevo": "Partido con comodines",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "31105a0b-bd98-4ef0-8272-8195baff77f9",
+      "nombreAnterior": "Conduce y marca",
+      "nombreNuevo": "Conduce y marca",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "aff8f777-2c33-4f38-a12c-6be29e6fe9a6",
+      "nombreAnterior": "Gol que procede de la banda",
+      "nombreNuevo": "Gol que procede de la banda",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "9efdd68f-04fa-48b0-8264-46eabb539ec8",
+      "nombreAnterior": "Pase atrás y tiro",
+      "nombreNuevo": "Pase atrás y tiro",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "4adc55c7-ba29-47d6-bdc4-ae37b15803ff",
+      "nombreAnterior": "Realiza la pared y chuta",
+      "nombreNuevo": "Realiza la pared y chuta",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "aa571318-a2d4-4d55-b9e1-f45653ec8569",
+      "nombreAnterior": "Combinación de pases",
+      "nombreNuevo": "Combinación de pases",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "99ebf4a4-6f99-4e3c-9063-e68cc9e2a4eb",
+      "nombreAnterior": "Circuito técnico-táctico por grupos",
+      "nombreNuevo": "Circuito técnico-táctico por grupos",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ec9f5efc-d8a1-4a5e-b426-08dea8443eff",
+      "nombreAnterior": "Cambios de orientación",
+      "nombreNuevo": "Cambios de orientación",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "ba3730c1-c246-4013-8533-1b2120647775",
+      "nombreAnterior": "Calentamiento de tren superior (tronco)",
+      "nombreNuevo": "Calentamiento de tren superior (tronco)",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "569d6add-2b81-47d9-95ac-17231e5a41b1",
+      "nombreAnterior": "Calentamiento de brazos",
+      "nombreNuevo": "Calentamiento de brazos",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "b638e580-492f-4558-8043-9ce42d0624d8",
+      "nombreAnterior": "Circuito de Coordinación",
+      "nombreNuevo": "Circuito de Coordinación",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "d3663974-ef3f-44d5-96b8-a5e8700bdc25",
+      "nombreAnterior": "Dinámica de cambios de orientación",
+      "nombreNuevo": "Dinámica de cambios de orientación",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "58409bfe-29d5-48b3-a6bb-85977c2bb541",
+      "nombreAnterior": "Cambio de orientación diagonal",
+      "nombreNuevo": "Cambio de orientación diagonal",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "926e4ec2-3df9-428b-9cdf-1442ac9bf3f5",
+      "nombreAnterior": "Incorporación del centrocampista",
+      "nombreNuevo": "Incorporación del centrocampista",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "05451fc1-36e1-4b07-9963-5e526a19cf2b",
+      "nombreAnterior": "3 Zonas con ataque en superioridad",
+      "nombreNuevo": "3 Zonas con ataque en superioridad",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "9f3485df-127f-4bb9-9ff0-cba460576a30",
+      "nombreAnterior": "Finalización desde fuera del área",
+      "nombreNuevo": "Finalización desde fuera del área",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "8c693359-ccce-4536-8d35-fb16b674e17c",
+      "nombreAnterior": "Superioridad e incorporación",
+      "nombreNuevo": "Superioridad e incorporación",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "8f337440-7040-4fa3-8448-88d241ebc854",
+      "nombreAnterior": "Robo y cambio de orientación",
+      "nombreNuevo": "Robo y cambio de orientación",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "d26cab67-1bd2-49bc-8886-27ed3752a6ba",
+      "nombreAnterior": "Posesión y cambio de orientación",
+      "nombreNuevo": "Posesión y cambio de orientación",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "207a3d52-b377-4890-8bab-a26aa57d671d",
+      "nombreAnterior": "Superioridad 2x1 y finalización por banda",
+      "nombreNuevo": "Superioridad 2x1 y finalización por banda",
+      "cambios": {
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "70f8a0cf-8aa6-4a92-a07a-8d9d846f3bea",
+      "nombreAnterior": "Cortar y jugar el balón",
+      "nombreNuevo": "Cortar y jugar el balón",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "e905a836-bc3d-4fa9-8ced-25c16c3f75d9",
+      "nombreAnterior": "Defender en zona",
+      "nombreNuevo": "Defender en zona",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "64ee09f6-2875-411a-836f-fd501337644d",
+      "nombreAnterior": "Rondo con Foco en Circulación Rápida a 2 Toques",
+      "nombreNuevo": "Rondo con Foco en Circulación Rápida a 2 Toques",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "3c2d01bf-ac17-4250-b62e-775e803444a6",
+      "nombreAnterior": "Activación: Rondo 4v2 con Tercer Hombre",
+      "nombreNuevo": "Activación: Rondo 4v2 con Tercer Hombre",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "e44619de-2af9-49e4-8a58-73fc26225a11",
+      "nombreAnterior": "Fase Principal: Juego de Posición 6v6 + 2 Comodines",
+      "nombreNuevo": "Fase Principal: Juego de Posición 6v6 + 2 Comodines",
+      "cambios": {
+        "bloque_sesion": "principal"
+      }
+    },
+    {
+      "id": "c42563a2-dbb4-4449-8580-47d3b872b9fc",
+      "nombreAnterior": "Fase Aplicada: Partido Modificado con Zonas",
+      "nombreNuevo": "Fase Aplicada: Partido Modificado con Zonas",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "9a32c3b0-158c-428f-b49b-24d9dca16a7d",
+      "nombreAnterior": "Vuelta a la Calma: Estiramientos y Feedback",
+      "nombreNuevo": "Vuelta a la Calma: Estiramientos y Feedback",
+      "cambios": {
+        "bloque_sesion": "vuelta_calma"
+      }
+    },
+    {
+      "id": "a97c4bfa-9d7a-4cb9-a403-40a70d257516",
+      "nombreAnterior": "Circuito de Coordinación y Agilidad con Finalización Tras Duelo",
+      "nombreNuevo": "Circuito de Coordinación y Agilidad con Finalización Tras Duelo",
+      "cambios": {
+        "game_phase": "attacking_finishing",
+        "objetivo_tactico": [
+          "velocidad",
+          "aceleración",
+          "1v1 ofensivo",
+          "finalización",
+          "remate"
+        ]
+      }
+    },
+    {
+      "id": "2ba02f88-4c6b-467f-a0d8-9029471aef23",
+      "nombreAnterior": "Pressing Tras Pérdida en Cuadrantes Interconectados 4v4+2",
+      "nombreNuevo": "Pressing Tras Pérdida en Cuadrantes Interconectados 4v4+2",
+      "cambios": {
+        "game_phase": "transition_atk_to_def",
+        "objetivo_tactico": [
+          "tercer hombre",
+          "superioridad",
+          "amplitud",
+          "vigilancia",
+          "presión tras pérdida",
+          "transición defensiva"
+        ]
+      }
+    },
+    {
+      "id": "2be0a285-6e5a-4b18-8445-b1a0d0d40a6a",
+      "nombreAnterior": "Ejercicios de fútbol para tu entrenamiento: +70 gratis",
+      "nombreNuevo": "Ejercicios de fútbol para tu entrenamiento: +70 gratis",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "bc2216d9-51bb-4d10-b93c-2b41e3a34765",
+      "nombreAnterior": "Ejercicios de fútbol para tu entrenamiento: +70 gratis",
+      "nombreNuevo": "Ejercicios de fútbol para tu entrenamiento: +70 gratis",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "4886a78c-171e-4cb4-940b-8bf0557ba366",
+      "nombreAnterior": "2 contra 1 + 1 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "2 contra 1 + 1",
+      "cambios": {
+        "nombre": "2 contra 1 + 1",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "5bb714fb-0379-48f1-bd0f-140435f54844",
+      "nombreAnterior": "3 contra 1 apoyos constantes - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "3 contra 1 apoyos constantes",
+      "cambios": {
+        "nombre": "3 contra 1 apoyos constantes",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "66d416a6-6624-4405-a56b-170df180752c",
+      "nombreAnterior": "Acción combinada con finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Acción combinada con finalización",
+      "cambios": {
+        "nombre": "Acción combinada con finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "7bd08121-ec25-462b-b4b3-a7056f9c5661",
+      "nombreAnterior": "Acción combinada orientada a la finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Acción combinada orientada a la finalización",
+      "cambios": {
+        "nombre": "Acción combinada orientada a la finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "f5fb730f-9afd-4ade-b6a5-e328105d6ca8",
+      "nombreAnterior": "Acciones básicas con balón raso - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Acciones básicas con balón raso",
+      "cambios": {
+        "nombre": "Acciones básicas con balón raso",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ffc14027-db7a-4497-9335-2f9d4f259927",
+      "nombreAnterior": "Acciones de 1c1 rápidas - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Acciones de 1c1 rápidas",
+      "cambios": {
+        "nombre": "Acciones de 1c1 rápidas",
+        "objetivo_tactico": [
+          "1v1 ofensivo",
+          "desborde",
+          "duelos"
+        ],
+        "game_phase": "attacking_progression",
+        "principle_id": "669b8ba4-2376-4bbd-8fd7-5bd0cebe3eda",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "b35479f7-9849-4b12-9716-853838e955ea",
+      "nombreAnterior": "Acciones de triangulación y juego interior - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Acciones de triangulación y juego interior",
+      "cambios": {
+        "nombre": "Acciones de triangulación y juego interior",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "f4cd45bd-5fef-417f-87ad-59c43f8cbec7",
+      "nombreAnterior": "Ataque 2 c 2 con comodines - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ataque 2 c 2 con comodines",
+      "cambios": {
+        "nombre": "Ataque 2 c 2 con comodines",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "9b9d6ea1-24a6-4925-9b2c-fe0105588823",
+      "nombreAnterior": "Con cambios de ritmo y pared - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Con cambios de ritmo y pared",
+      "cambios": {
+        "nombre": "Con cambios de ritmo y pared",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "0c62535d-4278-44c1-b0ea-bfb8a2fdb43c",
+      "nombreAnterior": "Conducción, pase y devolución - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Conducción, pase y devolución",
+      "cambios": {
+        "nombre": "Conducción, pase y devolución",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "e942e663-0900-4a26-bed3-a4db233cdd1b",
+      "nombreAnterior": "Conservación 3 equipos con trabajo condicional - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Conservación 3 equipos con trabajo condicional",
+      "cambios": {
+        "nombre": "Conservación 3 equipos con trabajo condicional",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "da3cb7ec-d4b9-435c-a59c-58b04e5b44cf",
+      "nombreAnterior": "Creación, ocupación y aprovechamiento de espacios - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Creación, ocupación y aprovechamiento de espacios",
+      "cambios": {
+        "nombre": "Creación, ocupación y aprovechamiento de espacios",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "091f2903-5f0b-4838-841c-637c7700358c",
+      "nombreAnterior": "Cuadrado con superioridad 5 c 4 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Cuadrado con superioridad 5 c 4",
+      "cambios": {
+        "nombre": "Cuadrado con superioridad 5 c 4",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "5ffe771f-9ea7-4e37-88ff-d49bdae6aa3e",
+      "nombreAnterior": "Ejercicio competitivo de finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio competitivo de finalización",
+      "cambios": {
+        "nombre": "Ejercicio competitivo de finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ffc03e7e-4cfe-4001-83cd-39cca94fd24f",
+      "nombreAnterior": "Ejercicio con acciones técnicas de finta - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio con acciones técnicas de finta",
+      "cambios": {
+        "nombre": "Ejercicio con acciones técnicas de finta",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "42ea0e1e-4b25-4d43-b9c2-ce537e0d2f8e",
+      "nombreAnterior": "Ejercicio con disparo y finalización en 3 c 2 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio con disparo y finalización en 3 c 2",
+      "cambios": {
+        "nombre": "Ejercicio con disparo y finalización en 3 c 2",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "c70963d0-87bd-4c65-b271-2d3d49162cac",
+      "nombreAnterior": "Ejercicio con finalización en 2 c 1 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio con finalización en 2 c 1",
+      "cambios": {
+        "nombre": "Ejercicio con finalización en 2 c 1",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "bb4f7d57-52eb-436d-bb9c-d91871109b5c",
+      "nombreAnterior": "Ejercicio de 2 c 1 combinado con 3 c 2 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio de 2 c 1 combinado con 3 c 2",
+      "cambios": {
+        "nombre": "Ejercicio de 2 c 1 combinado con 3 c 2",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "99f892a3-2ad8-460f-bc12-95388c2a1aee",
+      "nombreAnterior": "Ejercicio de 2 c 1 y 3 c 2 de velocidad - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio de 2 c 1 y 3 c 2 de velocidad",
+      "cambios": {
+        "nombre": "Ejercicio de 2 c 1 y 3 c 2 de velocidad",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "239bf798-82a2-4412-94cb-0d25c6e85cd9",
+      "nombreAnterior": "Ejercicio de 2c1 y 4c2 con movimientos de ataque - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio de 2c1 y 4c2 con movimientos de ataque",
+      "cambios": {
+        "nombre": "Ejercicio de 2c1 y 4c2 con movimientos de ataque",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "28287cd3-9d14-4b6b-be58-cfbebca59cb8",
+      "nombreAnterior": "Ejercicio de 4 c 2 con finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio de 4 c 2 con finalización",
+      "cambios": {
+        "nombre": "Ejercicio de 4 c 2 con finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "b068c3a1-f5f6-4600-9fe2-1ae77d07f430",
+      "nombreAnterior": "Ejercicio de resistencia a la técnica orientado a la no finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio de resistencia a la técnica orientado a la no finalización",
+      "cambios": {
+        "nombre": "Ejercicio de resistencia a la técnica orientado a la no finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "1dff8304-50d2-4ba6-9908-71e794e92f71",
+      "nombreAnterior": "Ejercicio físico técnico de no finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio físico técnico de no finalización",
+      "cambios": {
+        "nombre": "Ejercicio físico técnico de no finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "93c2eecc-d433-4176-bc95-82ce1866c5e9",
+      "nombreAnterior": "Ejercicio físico técnico de no finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio físico técnico de no finalización",
+      "cambios": {
+        "nombre": "Ejercicio físico técnico de no finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "03ee91e1-a442-4736-a7d6-e9a8dbf808d1",
+      "nombreAnterior": "Ejercicio físico técnico de no finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Ejercicio físico técnico de no finalización",
+      "cambios": {
+        "nombre": "Ejercicio físico técnico de no finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "61cf4efe-d81e-4d18-ae43-eab4e75ce4ba",
+      "nombreAnterior": "Habilidad sobre balones rasos - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Habilidad sobre balones rasos",
+      "cambios": {
+        "nombre": "Habilidad sobre balones rasos",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "80b38add-dd27-45b1-9eab-02ae94f69d74",
+      "nombreAnterior": "Juego de posición 3 + 3 contra 3 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Juego de posición 3 + 3 contra 3",
+      "cambios": {
+        "nombre": "Juego de posición 3 + 3 contra 3",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ea5e13e6-8050-454e-9103-1c46933a1970",
+      "nombreAnterior": "Juego de posición para 1-4-2-3-1 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Juego de posición para 1-4-2-3-1",
+      "cambios": {
+        "nombre": "Juego de posición para 1-4-2-3-1",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "a0e57099-8dcf-4b89-b4b6-85aa01fa5b28",
+      "nombreAnterior": "Partido 3 equipos - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido 3 equipos",
+      "cambios": {
+        "nombre": "Partido 3 equipos",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "f639b1d6-be04-48c4-b8d6-7ed3b11b5961",
+      "nombreAnterior": "Partido alternando profundidad y amplitud - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido alternando profundidad y amplitud",
+      "cambios": {
+        "nombre": "Partido alternando profundidad y amplitud",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "8a1bc630-d454-45f7-9996-05a4780d094c",
+      "nombreAnterior": "Partido fútbol once (4-2-3-1) - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido fútbol once (4-2-3-1)",
+      "cambios": {
+        "nombre": "Partido fútbol once (4-2-3-1)",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "93b9b64b-b341-4ec5-8d53-0273fe5fb302",
+      "nombreAnterior": "Partido jugando con el marcador - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido jugando con el marcador",
+      "cambios": {
+        "nombre": "Partido jugando con el marcador",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "4d3db1ec-40b8-4279-a300-4c08d000379a",
+      "nombreAnterior": "Partido modulado en ½ campo para 4-3-3 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido modulado en ½ campo para 4-3-3",
+      "cambios": {
+        "nombre": "Partido modulado en ½ campo para 4-3-3",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "1723c051-a7b3-4e4f-9da8-3740f0c4336c",
+      "nombreAnterior": "Partido para superar 2 líneas de 4 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido para superar 2 líneas de 4",
+      "cambios": {
+        "nombre": "Partido para superar 2 líneas de 4",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "9dad7e6f-e04b-412c-8306-2f9862d2c1ee",
+      "nombreAnterior": "Partido reducido 7c7+2 superando la primera presión. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido reducido 7c7+2 superando la primera presión.",
+      "cambios": {
+        "nombre": "Partido reducido 7c7+2 superando la primera presión.",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ce4bb920-4b09-4f9b-8ded-da7c273da239",
+      "nombreAnterior": "Partido reducido con trabajo de perfiles para pivotes. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido reducido con trabajo de perfiles para pivotes.",
+      "cambios": {
+        "nombre": "Partido reducido con trabajo de perfiles para pivotes.",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "970170fb-0181-4e0d-ab67-d6b580aea5d3",
+      "nombreAnterior": "Partido tema trabajando el bloque bajo - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Partido tema trabajando el bloque bajo",
+      "cambios": {
+        "nombre": "Partido tema trabajando el bloque bajo",
+        "bloque_sesion": "global",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "cc52c0ab-b877-416b-8d7f-74044dee19a3",
+      "nombreAnterior": "Pillar y con balón salvador - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Pillar y con balón salvador",
+      "cambios": {
+        "nombre": "Pillar y con balón salvador",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "d60b9649-0edb-40a2-b634-442426cf1d28",
+      "nombreAnterior": "Posesión 3 equipos con cambio de orientación - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Posesión 3 equipos con cambio de orientación",
+      "cambios": {
+        "nombre": "Posesión 3 equipos con cambio de orientación",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "d859a425-e65c-40ba-89f5-3a3395da7a53",
+      "nombreAnterior": "Posesión 8c8+2 comodines con porterías interiores - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Posesión 8c8+2 comodines con porterías interiores",
+      "cambios": {
+        "nombre": "Posesión 8c8+2 comodines con porterías interiores",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "bd4c9829-5a14-4d20-8209-3eb993c12f20",
+      "nombreAnterior": "Posesión con comodines laterales - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Posesión con comodines laterales",
+      "cambios": {
+        "nombre": "Posesión con comodines laterales",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "fb4fcce2-c7a3-4980-a4f4-3a41c7900106",
+      "nombreAnterior": "Posesión con las manos con portería central - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Posesión con las manos con portería central",
+      "cambios": {
+        "nombre": "Posesión con las manos con portería central",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "e344d18f-8636-4514-b827-f40e277e5e13",
+      "nombreAnterior": "Posesión con objetivos - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Posesión con objetivos",
+      "cambios": {
+        "nombre": "Posesión con objetivos",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "0a299b96-ae28-47ff-a28e-0f6a976ea454",
+      "nombreAnterior": "Pressing en rombo - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Pressing en rombo",
+      "cambios": {
+        "nombre": "Pressing en rombo",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "65b87fcc-7bf9-4963-8d04-8b053ac1ce4b",
+      "nombreAnterior": "Rondo móvil - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Rondo móvil",
+      "cambios": {
+        "nombre": "Rondo móvil",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "2cd002dc-e919-478f-ba29-a9dba5bf7beb",
+      "nombreAnterior": "Rondos x siete - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Rondos x siete",
+      "cambios": {
+        "nombre": "Rondos x siete",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ae5a82c5-c224-449e-958e-2383fe325890",
+      "nombreAnterior": "Rueda de pase con 3r hombre en cuadrado. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Rueda de pase con 3r hombre en cuadrado.",
+      "cambios": {
+        "nombre": "Rueda de pase con 3r hombre en cuadrado.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "2d91f716-e1ff-49ac-abd3-5c17055c3e4a",
+      "nombreAnterior": "Rueda de pases en estructura 4-4-2 buscando triangulaciones. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Rueda de pases en estructura 4-4-2 buscando triangulaciones.",
+      "cambios": {
+        "nombre": "Rueda de pases en estructura 4-4-2 buscando triangulaciones.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "9d435e96-8b67-4918-91e8-677115afbf03",
+      "nombreAnterior": "Salida de balón en futbol 7 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Salida de balón en futbol 7",
+      "cambios": {
+        "nombre": "Salida de balón en futbol 7",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "12cee312-302e-49ff-ab40-07ee66784afd",
+      "nombreAnterior": "Salida de balón por dentro finalizando en banda - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Salida de balón por dentro finalizando en banda",
+      "cambios": {
+        "nombre": "Salida de balón por dentro finalizando en banda",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "e9ae228c-55c3-429b-8b00-37d7e5d1de9c",
+      "nombreAnterior": "Sin finalización en estructura triangular - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Sin finalización en estructura triangular",
+      "cambios": {
+        "nombre": "Sin finalización en estructura triangular",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "209206ed-382d-4564-9ef8-7ecc95073aa0",
+      "nombreAnterior": "Tarea 6 contra 6 ataque defensa - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea 6 contra 6 ataque defensa",
+      "cambios": {
+        "nombre": "Tarea 6 contra 6 ataque defensa",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "81623cd1-e7ff-48d7-ac59-a7b55f6018be",
+      "nombreAnterior": "Tarea competitiva de golpeos y igualdades 3c3 y 4c4 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea competitiva de golpeos y igualdades 3c3 y 4c4",
+      "cambios": {
+        "nombre": "Tarea competitiva de golpeos y igualdades 3c3 y 4c4",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "5dda9252-55d7-407c-ad9c-8025ca719a6c",
+      "nombreAnterior": "Tarea con disparo, 2c1y 3c2 con contra - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea con disparo, 2c1y 3c2 con contra",
+      "cambios": {
+        "nombre": "Tarea con disparo, 2c1y 3c2 con contra",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "e1ad5850-a197-4826-8a0e-90ccaf5dd377",
+      "nombreAnterior": "Tarea con movimientos de apoyo y ruptura - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea con movimientos de apoyo y ruptura",
+      "cambios": {
+        "nombre": "Tarea con movimientos de apoyo y ruptura",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "7c158393-376b-471e-8736-92fd5950415d",
+      "nombreAnterior": "Tarea de circulación y atacar zonas de remate - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de circulación y atacar zonas de remate",
+      "cambios": {
+        "nombre": "Tarea de circulación y atacar zonas de remate",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "1cbdef61-2b10-4d90-bfc2-462718bbe628",
+      "nombreAnterior": "Tarea de controles orientados - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de controles orientados",
+      "cambios": {
+        "nombre": "Tarea de controles orientados",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "0cd7e4d1-c951-4bd6-b0d8-c475f10f853c",
+      "nombreAnterior": "Tarea de defensa de la pared y centro al área. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de defensa de la pared y centro al área.",
+      "cambios": {
+        "nombre": "Tarea de defensa de la pared y centro al área.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "443f1f69-8054-49dc-bad9-cc02101a612c",
+      "nombreAnterior": "Tarea de disparo, 2c2, centro y ataque - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de disparo, 2c2, centro y ataque",
+      "cambios": {
+        "nombre": "Tarea de disparo, 2c2, centro y ataque",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "dd31d8ab-82a3-4d5a-a460-d79ae23d50a5",
+      "nombreAnterior": "Tarea de disparo, centro y remate mas 2c2 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de disparo, centro y remate mas 2c2",
+      "cambios": {
+        "nombre": "Tarea de disparo, centro y remate mas 2c2",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "aeb703f8-fc49-46ea-806a-bd4c736d1d92",
+      "nombreAnterior": "Tarea de finalización con 3r hombre y desmarque de ruptura. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de finalización con 3r hombre y desmarque de ruptura.",
+      "cambios": {
+        "nombre": "Tarea de finalización con 3r hombre y desmarque de ruptura.",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "3bd24970-bc4a-408a-85fb-b79654804c65",
+      "nombreAnterior": "Tarea de finalización y situaciones de transiciones - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de finalización y situaciones de transiciones",
+      "cambios": {
+        "nombre": "Tarea de finalización y situaciones de transiciones",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "4ce0dd6d-8513-4ad3-b464-d3d4bb74da44",
+      "nombreAnterior": "Tarea de finalizaciones diversas con 3 equipos en competición. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de finalizaciones diversas con 3 equipos en competición.",
+      "cambios": {
+        "nombre": "Tarea de finalizaciones diversas con 3 equipos en competición.",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "48183e8b-4cc8-4f43-8ed6-41de626006d4",
+      "nombreAnterior": "Tarea de finalizaciones diversas, con desmarques desde diferentes zonas. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de finalizaciones diversas, con desmarques desde diferentes zonas.",
+      "cambios": {
+        "nombre": "Tarea de finalizaciones diversas, con desmarques desde diferentes zonas.",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "09817403-bdf4-44f4-8f67-d2bad07b2056",
+      "nombreAnterior": "Tarea de finalizaciones rápidas con acción de 2c1 y con tiro rápido al 1r toque. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de finalizaciones rápidas con acción de 2c1 y con tiro rápido al 1r toque.",
+      "cambios": {
+        "nombre": "Tarea de finalizaciones rápidas con acción de 2c1 y con tiro rápido al 1r toque.",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "628f4896-beae-44c8-b9c6-b147ebd08b79",
+      "nombreAnterior": "Tarea de golpeo a portería y 2c1 por banda. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de golpeo a portería y 2c1 por banda.",
+      "cambios": {
+        "nombre": "Tarea de golpeo a portería y 2c1 por banda.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ba672df6-a667-4106-8d97-8482be915d4e",
+      "nombreAnterior": "Tarea de golpeo, centro y 5c5 - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de golpeo, centro y 5c5",
+      "cambios": {
+        "nombre": "Tarea de golpeo, centro y 5c5",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "c38a94aa-9882-4548-94b7-9cedfadfd4b8",
+      "nombreAnterior": "Tarea de posesión con robo y finalización - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de posesión con robo y finalización",
+      "cambios": {
+        "nombre": "Tarea de posesión con robo y finalización",
+        "objetivo_tactico": [
+          "finalización",
+          "remate",
+          "definición"
+        ],
+        "game_phase": "attacking_finishing",
+        "principle_id": "8c58686f-86b2-4d8c-9e31-8976fe205f33",
+        "bloque_sesion": "principal",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "4a8f7f06-3583-4a8e-8814-987c30f5da46",
+      "nombreAnterior": "Tarea de tercer hombre y 2c1. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de tercer hombre y 2c1.",
+      "cambios": {
+        "nombre": "Tarea de tercer hombre y 2c1.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "264cc642-9147-4340-9a42-3ce403b8a871",
+      "nombreAnterior": "Tarea de tercer hombre y llegar al área. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de tercer hombre y llegar al área.",
+      "cambios": {
+        "nombre": "Tarea de tercer hombre y llegar al área.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "65a045dd-e7bc-4221-9669-981e0ce19e2b",
+      "nombreAnterior": "Tarea de triangulación para finalizar y temporización en el desmarque. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea de triangulación para finalizar y temporización en el desmarque.",
+      "cambios": {
+        "nombre": "Tarea de triangulación para finalizar y temporización en el desmarque.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "1b8e9cf8-e432-4ef5-b66f-83e02de99729",
+      "nombreAnterior": "Tarea dirigida con movimientos y desmarques en zona 3. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea dirigida con movimientos y desmarques en zona 3.",
+      "cambios": {
+        "nombre": "Tarea dirigida con movimientos y desmarques en zona 3.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "49d871d5-f373-402b-b5a5-cbb9094d0ca5",
+      "nombreAnterior": "Tarea para fomentar el juego directo - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea para fomentar el juego directo",
+      "cambios": {
+        "nombre": "Tarea para fomentar el juego directo",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "ceffbe10-2062-400b-aa5f-6c9cc4c6cf27",
+      "nombreAnterior": "Tarea para trabajar las transiciones - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea para trabajar las transiciones",
+      "cambios": {
+        "nombre": "Tarea para trabajar las transiciones",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "f2b579df-d2a6-4397-94b3-4cef4026e523",
+      "nombreAnterior": "Tarea técnica de perfiles y 3r hombre. - Accede a 2600+ ejercicios como este en Fútbol Sesión",
+      "nombreNuevo": "Tarea técnica de perfiles y 3r hombre.",
+      "cambios": {
+        "nombre": "Tarea técnica de perfiles y 3r hombre.",
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "24673cb2-88a0-44bc-a68a-dc6cc7353afc",
+      "nombreAnterior": "Ejercicios de calentamiento de fútbol | Fútbol Sesión",
+      "nombreNuevo": "Ejercicios de calentamiento de fútbol | Fútbol Sesión",
+      "cambios": {
+        "bloque_sesion": "calentamiento",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "4b4be014-29ed-48f9-acc1-095ca1828440",
+      "nombreAnterior": "Ejercicios de presión y pressing Fútbol | Fútbol Sesión",
+      "nombreNuevo": "Ejercicios de presión y pressing Fútbol | Fútbol Sesión",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "5edbec9d-4327-44c1-b198-79a27c036ee3",
+      "nombreAnterior": "Ejercicios de salida de balón fútbol | Fútbol Sesión",
+      "nombreNuevo": "Ejercicios de salida de balón fútbol | Fútbol Sesión",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "aa7a8bf1-d845-4cd7-aeb7-6cb419bb1913",
+      "nombreAnterior": "Ejercicios de pase fútbol | Fútbol Sesión",
+      "nombreNuevo": "Ejercicios de pase fútbol | Fútbol Sesión",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "52ce3e33-3c2a-4420-b084-8b8eb6548212",
+      "nombreAnterior": "Ejercicios de conducción fútbol | Fútbol Sesión",
+      "nombreNuevo": "Ejercicios de conducción fútbol | Fútbol Sesión",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007",
+        "categoria_edad": [
+          "infantil",
+          "cadete",
+          "juvenil",
+          "senior"
+        ]
+      }
+    },
+    {
+      "id": "3399982f-3031-4c75-99ec-836962049091",
+      "nombreAnterior": "Activación: Rondo 4v2 con Tercer Hombre",
+      "nombreNuevo": "Activación: Rondo 4v2 con Tercer Hombre",
+      "cambios": {
+        "bloque_sesion": "calentamiento"
+      }
+    },
+    {
+      "id": "8688c858-b9cb-4b94-9237-5d6c6fedaed9",
+      "nombreAnterior": "Fase Principal: Juego de Posición 6v6 + 2 Comodines",
+      "nombreNuevo": "Fase Principal: Juego de Posición 6v6 + 2 Comodines",
+      "cambios": {
+        "bloque_sesion": "principal",
+        "principle_id": "4e7647c1-ae2b-458c-862f-4bc5c8c57007"
+      }
+    },
+    {
+      "id": "ef5a51c1-8cb1-4264-bd63-7450d9c69dac",
+      "nombreAnterior": "Fase Aplicada: Partido Modificado con Zonas",
+      "nombreNuevo": "Fase Aplicada: Partido Modificado con Zonas",
+      "cambios": {
+        "bloque_sesion": "global"
+      }
+    },
+    {
+      "id": "59a94792-43ea-43a3-aea2-43ea141b4a1b",
+      "nombreAnterior": "Vuelta a la Calma: Estiramientos y Feedback",
+      "nombreNuevo": "Vuelta a la Calma: Estiramientos y Feedback",
+      "cambios": {
+        "bloque_sesion": "vuelta_calma"
+      }
+    }
+  ],
+  "skipped_changes": []
+}

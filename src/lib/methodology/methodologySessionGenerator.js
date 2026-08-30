@@ -124,12 +124,7 @@ function generateMethodologySessionProposal(context) {
     const pool = availableCandidates.length > 0 ? availableCandidates : allExercises;
     const recommendations = recommendExercises(pool, blockContext, 5);
 
-    let chosen = recommendations.length > 0 ? recommendations[0] : null;
-
-    if (!chosen && allExercises.length > 0) {
-      const fallbackEx = allExercises[0];
-      chosen = scoreExercise(fallbackEx, blockContext);
-    }
+    const chosen = recommendations.length > 0 ? recommendations[0] : null;
 
     if (chosen) {
       selectedExerciseIds.add(chosen.exercise.id);
@@ -164,6 +159,26 @@ function generateMethodologySessionProposal(context) {
         ...ex,
         duration_min: blockDuration
       });
+    } else {
+      // Bloque sin candidato metodológicamente válido
+      proposalBlocks[block.id] = {
+        blockId: block.id,
+        blockName: block.name,
+        durationMin: blockDuration,
+        duration: blockDuration,
+        exercise: null,
+        objective: context.objective || "Sin asignar",
+        principle: "Sin asignar",
+        subprinciple: "Sin asignar",
+        behaviour: "Sin asignar",
+        organization: "Sin asignar",
+        space: "Sin asignar",
+        material: [],
+        estimatedLoad: 0,
+        score: 0,
+        reasons: [`⚠️ Sin ejercicio metodológicamente pertinente para ${block.name}`],
+        selectionReasons: [`⚠️ Sin ejercicio metodológicamente pertinente para ${block.name}`]
+      };
     }
   });
 

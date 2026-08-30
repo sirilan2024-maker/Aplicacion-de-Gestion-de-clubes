@@ -1,7 +1,10 @@
 'use server'
 
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
+import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessPlayer } from "@/lib/auth-helpers"
+
 
 const DEFAULT_ITEMS = [
   'Camiseta de Juego',
@@ -20,10 +23,17 @@ const DEFAULT_ITEMS = [
 
 // 1. Recuperar tallas y estado de entrega de un jugador
 export async function getApparelForPlayerAction(playerId: string) {
-  const supabase = await createClient()
-
   try {
-    const { data: apparelData, error } = await supabase
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: authError || 'No autenticado' }
+
+    const adminClient = createAdminClient()
+    const access = await canUserAccessPlayer(adminClient, context, playerId)
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || 'No tienes permisos sobre este jugador' }
+    }
+
+    const { data: apparelData, error } = await adminClient
       .from('player_apparel')
       .select('*')
       .eq('player_id', playerId)
@@ -50,7 +60,7 @@ export async function getApparelForPlayerAction(playerId: string) {
     })
 
     // Fetch player dorsal
-    const { data: playerData } = await supabase
+    const { data: playerData } = await adminClient
       .from('players')
       .select('dorsal')
       .eq('id', playerId)
@@ -63,34 +73,36 @@ export async function getApparelForPlayerAction(playerId: string) {
   }
 }
 
+
 // 2. Guardar o actualizar las tallas de un jugador (Tutor/Jugador)
 export async function updatePlayerApparelSizesAction(playerId: string, sizes: { [itemName: string]: string }, dorsal?: string) {
-  const supabase = await createClient()
 
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'No autenticado' }
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: authError || 'No autenticado' }
+
+    const adminClient = createAdminClient()
+    const access = await canUserAccessPlayer(adminClient, context, playerId)
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || 'No tienes permisos sobre este jugador' }
+    }
+
+    const supabase = await createClient()
 
     // Update player dorsal if provided
     if (dorsal !== undefined) {
-      const { error: dorsalError } = await supabase
+      const { error: dorsalError } = await adminClient
         .from('players')
         .update({ dorsal: dorsal })
         .eq('id', playerId)
+        .eq('club_id', context.profile.club_id)
       if (dorsalError) throw dorsalError
     }
 
-    // Fetch user profile role to bypass delivered check for staff
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const isStaff = profile?.role === 'admin' || profile?.role === 'coordinador' || profile?.role === 'utillero';
+    const isStaff = ADMIN_ROLES.includes(context.profile.role) || context.profile.role === 'utillero';
 
     // 1. Verificar si el artículo ya está entregado en la BD
-    const { data: existingApparel } = await supabase
+    const { data: existingApparel } = await adminClient
       .from('player_apparel')
       .select('item_name, delivered')
       .eq('player_id', playerId)
@@ -105,7 +117,7 @@ export async function updatePlayerApparelSizesAction(playerId: string, sizes: { 
       .map(([itemName]) => itemName)
 
     if (toDelete.length > 0) {
-      const { error: delError } = await supabase
+      const { error: delError } = await adminClient
         .from('player_apparel')
         .delete()
         .eq('player_id', playerId)
@@ -128,7 +140,7 @@ export async function updatePlayerApparelSizesAction(playerId: string, sizes: { 
       }))
 
     if (upserts.length > 0) {
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('player_apparel')
         .upsert(upserts, { onConflict: 'player_id,item_name' })
       if (error) throw error
@@ -147,26 +159,23 @@ export async function updatePlayerApparelSizesAction(playerId: string, sizes: { 
 
 // 3. Cambiar estado de entrega (marca/desmarca) - Reservado para staff
 export async function toggleApparelDeliveryAction(playerId: string, itemName: string, delivered: boolean) {
-  const supabase = await createClient()
-
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'No autenticado' }
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: authError || 'No autenticado' }
 
-    // Verificar rol de staff
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const hasPermission = profile?.role === 'admin' || profile?.role === 'coordinador' || profile?.role === 'utillero'
-    if (!hasPermission) {
+    const isStaff = ADMIN_ROLES.includes(context.profile.role) || context.profile.role === 'utillero';
+    if (!isStaff) {
       return { success: false, error: 'No tienes permisos de utillaje para esta acción.' }
     }
 
+    const adminClient = createAdminClient()
+    const access = await canUserAccessPlayer(adminClient, context, playerId)
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || 'No tienes permisos sobre este jugador' }
+    }
+
     // Buscar si el registro ya existe
-    const { data: existing } = await supabase
+    const { data: existing } = await adminClient
       .from('player_apparel')
       .select('id, size')
       .eq('player_id', playerId)
@@ -175,7 +184,7 @@ export async function toggleApparelDeliveryAction(playerId: string, itemName: st
 
     if (!existing) {
       if (['Medias', 'Mochila'].includes(itemName)) {
-        const { error: insertError } = await supabase
+        const { error: insertError } = await adminClient
           .from('player_apparel')
           .insert({
             player_id: playerId,
@@ -189,7 +198,7 @@ export async function toggleApparelDeliveryAction(playerId: string, itemName: st
         return { success: false, error: 'El jugador debe tener asignada una talla antes de marcarse como entregado.' }
       }
     } else {
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('player_apparel')
         .update({
           delivered: delivered,
@@ -212,28 +221,22 @@ export async function toggleApparelDeliveryAction(playerId: string, itemName: st
   }
 }
 
+
 // 4. Obtener todos los datos de ropa de los jugadores (para el panel del utillero)
 export async function getApparelDashboardDataAction(teamId?: string) {
-  const supabase = await createClient()
-
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'No autenticado' }
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: 'No autenticado' }
 
-    // RLS se encargará de limitar el acceso, pero hacemos verificación adicional
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const hasPermission = profile?.role === 'admin' || profile?.role === 'coordinador' || profile?.role === 'utillero'
+    const hasPermission = ADMIN_ROLES.includes(context.profile.role) || context.profile.role === 'utillero'
     if (!hasPermission) {
       return { success: false, error: 'Acceso denegado.' }
     }
 
-    // Consultar jugadores activos
-    let query = supabase
+    const adminClient = createAdminClient()
+
+    // Consultar jugadores activos del club
+    let query = adminClient
       .from('players')
       .select(`
         id,
@@ -254,6 +257,7 @@ export async function getApparelDashboardDataAction(teamId?: string) {
           delivered_at
         )
       `)
+      .eq('club_id', context.profile.club_id)
       .neq('status', 'inactive')
 
     if (teamId) {
@@ -262,6 +266,7 @@ export async function getApparelDashboardDataAction(teamId?: string) {
 
     const { data: playersData, error } = await query
     if (error) throw error
+
 
     // Formatear jugadores con su mapa de ropa
     const formattedPlayers = playersData?.map((p: any) => {
@@ -309,20 +314,25 @@ export async function getApparelDashboardDataAction(teamId?: string) {
 
 // 5. Obtener informe consolidado de pedidos (cantidades totales por artículo y talla)
 export async function getApparelSummaryReportAction(teamId?: string) {
-  const supabase = await createClient()
-
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'No autenticado' }
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: 'No autenticado' }
 
-    // Consultar todos los registros de ropa de jugadores activos
+    const hasPermission = ADMIN_ROLES.includes(context.profile.role) || context.profile.role === 'utillero'
+    if (!hasPermission) {
+      return { success: false, error: 'Acceso denegado.' }
+    }
+
+    const adminClient = createAdminClient()
+
+    // Consultar todos los registros de ropa de jugadores activos del club
     let allApparelRows: any[] = []
     let hasMore = true
     let page = 0
     const pageSize = 1000
 
     while (hasMore) {
-      let query = supabase
+      let query = adminClient
         .from('player_apparel')
         .select(`
           item_name,
@@ -330,9 +340,11 @@ export async function getApparelSummaryReportAction(teamId?: string) {
           delivered,
           players!inner (
             status,
-            team_id
+            team_id,
+            club_id
           )
         `)
+        .eq('players.club_id', context.profile.club_id)
         .range(page * pageSize, (page + 1) * pageSize - 1)
 
       if (teamId) {
@@ -368,12 +380,13 @@ export async function getApparelSummaryReportAction(teamId?: string) {
     const SOCKS_SIZES = ['28-32', '33-35', '36-38', '39-42', '43-46'];
 
     // Obtener cantidad de jugadores activos para prendas de talla única (Medias, Mochila)
-    let playersCountQuery = supabase.from('players').select('id', { count: 'exact', head: true }).neq('status', 'inactive')
+    let playersCountQuery = adminClient.from('players').select('id', { count: 'exact', head: true }).eq('club_id', context.profile.club_id).neq('status', 'inactive')
     if (teamId) {
       playersCountQuery = playersCountQuery.eq('team_id', teamId)
     }
     const { count: totalActivePlayers } = await playersCountQuery
     const totalPlayers = totalActivePlayers || 0;
+
 
     // Inicializar prendas oficiales con TODAS sus tallas
     DEFAULT_ITEMS.forEach(item => {
@@ -428,8 +441,8 @@ export async function getApparelSummaryReportAction(teamId?: string) {
     })
 
     // Fetch initial stock
-    const { data: stockData } = await supabase.from('apparel_stock').select('*')
-    stockData?.forEach(row => {
+    const { data: stockData } = await adminClient.from('apparel_stock').select('*')
+    stockData?.forEach((row: { item_name: string; size?: string | null; stock?: number; initial_stock?: number }) => {
       const item = row.item_name
       let size = row.size || 'Única'
       
@@ -458,9 +471,17 @@ export async function getApparelSummaryReportAction(teamId?: string) {
 }
 
 export async function updateApparelStockAction(itemName: string, size: string, stock: number) {
-  const supabase = await createClient()
   try {
-    const { error } = await supabase
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: authError || 'No autenticado' }
+
+    const isStaff = ADMIN_ROLES.includes(context.profile.role) || context.profile.role === 'utillero';
+    if (!isStaff) {
+      return { success: false, error: 'No tienes permisos para modificar el stock de utillería.' }
+    }
+
+    const adminClient = createAdminClient()
+    const { error } = await adminClient
       .from('apparel_stock')
       .upsert({ item_name: itemName, size: size, stock: stock, updated_at: new Date().toISOString() }, { onConflict: 'item_name,size' })
     if (error) throw error
@@ -471,3 +492,8 @@ export async function updateApparelStockAction(itemName: string, size: string, s
     return { success: false, error: error.message }
   }
 }
+
+export async function updatePlayerDorsalAction(playerId: string, dorsal: string) {
+  return updatePlayerApparelSizesAction(playerId, {}, dorsal);
+}
+

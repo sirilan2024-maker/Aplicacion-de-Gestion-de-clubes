@@ -1,9 +1,29 @@
 "use server"
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
+import { getAuthenticatedContext, ADMIN_ROLES, COACH_ROLES, canUserAccessMatch } from "@/lib/auth-helpers"
+
+async function checkLiveMatchAccess(matchId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) return { allowed: false, error: authError || "No autenticado" };
+
+  const isStaff = ADMIN_ROLES.includes(context.profile.role) || COACH_ROLES.includes(context.profile.role);
+  if (!isStaff) return { allowed: false, error: "No tienes permisos de gestión para este partido" };
+
+  const adminClient = await createAdminClient();
+  const access = await canUserAccessMatch(adminClient, context, matchId);
+  if (!access.allowed || !access.match) {
+    return { allowed: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+  return { allowed: true, client: adminClient };
+}
 
 export async function toggleMatchTimer(matchId: string, isRunning: boolean, elapsedSeconds: number) {
-  const supabase = await createAdminClient()
+  const check = await checkLiveMatchAccess(matchId);
+  if (!check.allowed || !check.client) {
+    return { success: false, error: check.error };
+  }
+  const supabase = check.client;
   
   const startedAt = isRunning ? new Date().toISOString() : null;
 
@@ -24,7 +44,11 @@ export async function toggleMatchTimer(matchId: string, isRunning: boolean, elap
 }
 
 export async function addLiveEvent(matchId: string, eventData: any) {
-  const supabase = await createAdminClient()
+  const check = await checkLiveMatchAccess(matchId);
+  if (!check.allowed || !check.client) {
+    return { success: false, error: check.error };
+  }
+  const supabase = check.client;
   
   // Usar el tipo de evento directamente sin transformar "Ocasión Peligrosa" en "Tiro al larguero"
   let dbTipo = eventData.tipo;
@@ -79,7 +103,11 @@ export async function addLiveEvent(matchId: string, eventData: any) {
 }
 
 export async function deleteLiveEvent(eventId: string, matchId: string) {
-  const supabase = await createAdminClient()
+  const check = await checkLiveMatchAccess(matchId);
+  if (!check.allowed || !check.client) {
+    return { success: false, error: check.error };
+  }
+  const supabase = check.client;
   
   const { error } = await supabase
     .from("match_events")
@@ -94,6 +122,7 @@ export async function deleteLiveEvent(eventId: string, matchId: string) {
 
   return { success: true }
 }
+
 
 async function recalculateScore(matchId: string, supabase: any) {
   const { data: events } = await supabase
@@ -127,7 +156,11 @@ async function recalculateScore(matchId: string, supabase: any) {
 }
 
 export async function updateMatchState(matchId: string, estado: string, updates: any = {}) {
-  const supabase = await createAdminClient()
+  const check = await checkLiveMatchAccess(matchId);
+  if (!check.allowed || !check.client) {
+    return { success: false, error: check.error };
+  }
+  const supabase = check.client;
   
   // Normalizar estado según la restricción 'partidos_estado_check' de la BD
   let dbEstado = estado;
@@ -140,6 +173,7 @@ export async function updateMatchState(matchId: string, estado: string, updates:
   } else if (estado === "Programado" || estado === "PROGRAMADO") {
     dbEstado = "Programado";
   }
+
 
   const finalUpdates = {
     estado: dbEstado,
@@ -276,10 +310,15 @@ async function syncMatchEventsToConvocatorias(matchId: string, supabase: any) {
 }
 
 export async function resetMatchAction(matchId: string) {
-  const supabase = await createAdminClient();
+  const check = await checkLiveMatchAccess(matchId);
+  if (!check.allowed || !check.client) {
+    return { success: false, error: check.error };
+  }
+  const supabase = check.client;
   
   // Borramos todos los eventos de este partido
   await supabase.from("match_events").delete().eq("partido_id", matchId);
+
   
   // Reseteamos el estado y cronómetro del partido
   await supabase.from("partidos").update({

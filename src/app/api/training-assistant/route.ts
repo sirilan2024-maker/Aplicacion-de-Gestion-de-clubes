@@ -76,12 +76,19 @@ Responde ÚNICAMENTE con este JSON:
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { messages, ageCategory = 'cadete', microcycleDay = 'MD_minus_3', teamId, numPlayers = 16 } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Mensajes requeridos' }, { status: 400 });
     }
+
 
     const lastMessage = messages[messages.length - 1]?.content || 'Diseña una sesión metodológica completa';
 

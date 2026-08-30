@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
+import { getAuthenticatedContext, canUserManageTeam } from '@/lib/auth-helpers';
+
 
 export async function createTeamEventAction(teamId: string, eventData: any, clientSeasonId?: string) {
   const supabase = await createClient();
@@ -40,13 +42,26 @@ export async function createTeamEventAction(teamId: string, eventData: any, clie
 }
 
 export async function updateTeamEventAction(eventId: string, teamId: string, eventData: any) {
+
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || 'No autorizado');
+  }
+
   const adminClient = await createAdminClient();
-  // Omitting strict season_id check for updates for brevity, assuming if it exists they can edit it if they are on the page (UI protection handles this).
+
+  const teamAccess = await canUserManageTeam(adminClient, context, teamId);
+  if (!teamAccess.allowed) {
+    throw new Error(teamAccess.reason || 'No tienes permisos para modificar eventos de este equipo');
+  }
+
   const { error } = await adminClient.from('team_events').update({
     ...eventData,
     rsvp_reminder_time: eventData.rsvp_reminder_time !== undefined ? eventData.rsvp_reminder_time : undefined
-  }).eq('id', eventId);
+  }).eq('id', eventId).eq('team_id', teamId);
+
   if (error) throw new Error(error.message);
   revalidatePath(`/dashboard/equipos/${teamId}/calendario`);
   return true;
 }
+

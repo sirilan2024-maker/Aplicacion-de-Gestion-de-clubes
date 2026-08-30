@@ -1,13 +1,44 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: Request) {
   try {
+    try {
+      const supabase = await createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+
     const { searchParams } = new URL(req.url);
     const url = searchParams.get('url');
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return NextResponse.json({ error: 'URL inválida' }, { status: 400 });
+    }
+
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Protocolo no permitido' }, { status: 400 });
+    }
+
+    const allowedDomains = ['ffcv.es', 'competiciones.ffcv.es', 'novanet.es'];
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isAllowed = allowedDomains.some(d => hostname === d || hostname.endsWith(`.${d}`));
+
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Dominio no permitido para scraping' }, { status: 403 });
     }
 
     const response = await fetch(url, {
@@ -16,6 +47,7 @@ export async function GET(req: Request) {
         'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
       }
     });
+
 
     if (!response.ok) {
       throw new Error(`Failed to fetch FFCV page: ${response.statusText}`);

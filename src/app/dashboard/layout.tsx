@@ -17,9 +17,9 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-screen flex-col md:flex-row bg-slate-50 md:bg-gray-50">
+    <div className="flex min-h-screen md:h-screen flex-col md:flex-row bg-slate-50 md:bg-gray-50 md:overflow-hidden">
       {/* Sidebar Desktop */}
-      <div className="hidden md:flex">
+      <div className="hidden md:flex md:h-full md:shrink-0">
         <Sidebar signOutAction={signOut} />
       </div>
 
@@ -27,12 +27,12 @@ export default function DashboardLayout({
       <MobileNavigation signOutAction={signOut} />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col md:overflow-hidden overflow-x-hidden relative pb-16 md:pb-0">
+      <main className="flex-1 flex flex-col md:h-full md:overflow-hidden overflow-x-hidden relative pb-16 md:pb-0">
         <EmailVerificationGuard />
         <GlobalAdminNotifications />
         <RgpdGuard />
         {/* Page Content */}
-        <div className="flex-1 p-2 sm:p-4 md:p-8 overflow-auto w-full">
+        <div className="flex-1 p-2 sm:p-4 md:p-8 md:overflow-y-auto w-full md:h-full no-scrollbar">
           <div className="max-w-7xl mx-auto w-full">
             {children}
           </div>

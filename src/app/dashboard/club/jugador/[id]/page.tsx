@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, ChevronRight, BrainCircuit
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, ChevronRight, BrainCircuit, ShieldCheck
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { differenceInDays, parseISO } from "date-fns";
@@ -18,6 +18,7 @@ import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
+import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
 
 interface PlayerData {
   id: string;
@@ -80,6 +81,12 @@ interface PlayerData {
   payment_plan: string | null;
   registration_status: string | null;
 
+  // SEPA
+  iban: string | null;
+  sepa_mandate_id: string | null;
+  sepa_mandate_date: string | null;
+  is_senior: boolean | null;
+
   // Consentimientos RGPD
   consent_rgpd_at: string | null;
   consent_tutela_at: string | null;
@@ -107,7 +114,7 @@ export default function GlobalPlayerProfilePage() {
 
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'formativo' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -128,6 +135,7 @@ export default function GlobalPlayerProfilePage() {
   const [showAllTrainings, setShowAllTrainings] = useState(false);
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
+  const [hasActiveInjury, setHasActiveInjury] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -207,6 +215,14 @@ export default function GlobalPlayerProfilePage() {
         .eq('player_id', playerId);
       
       if (docs) setPlayerDocs(docs);
+
+      // Comprobar disponibilidad deportiva desde player_injuries
+      const { count: activeInjuriesCount } = await supabase
+        .from('player_injuries')
+        .select('id', { count: 'exact', head: true })
+        .eq('player_id', playerId)
+        .eq('status', 'activa');
+      setHasActiveInjury((activeInjuriesCount || 0) > 0);
     } catch (err: any) {
       toast.error("Error al cargar jugador: " + err.message);
     } finally {
@@ -757,12 +773,24 @@ export default function GlobalPlayerProfilePage() {
                   )}
                   <span>•</span>
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                    player.status === 'Lesionado' ? 'bg-red-100 text-red-700' :
+                    player.status === 'inactive' ? 'bg-gray-100 text-gray-700' :
                     player.status === 'Sancionado' ? 'bg-orange-100 text-orange-700' :
                     'bg-green-100 text-green-700'
                   }`}>
-                    {player.status || 'Activo'}
+                    {player.status === 'active' || player.status === 'Activo' ? 'Activo' : player.status || 'Activo'}
                   </span>
+                  <span>•</span>
+                  {hasActiveInjury ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-white" />
+                      🔴 BAJA POR LESIÓN
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      🟢 SIN LESIONES ACTIVAS
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1130,17 +1158,81 @@ export default function GlobalPlayerProfilePage() {
               </details>
             </div>
 
-            {/* ── FASE 5: Bloque de Facturación ── */}
-            {!(player as any).is_senior && (
+            {/* ── FASE 5: Bloque de Facturación y Datos SEPA ── */}
             <div className="md:col-span-2 border-t pt-6 mt-4">
-              <details className="group">
+              <details className="group" open>
                 <summary className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
                   <div className="flex items-center gap-2">
                     <FileText size={18} className="text-blue-500" />
-                    Facturación y Pago
+                    Facturación y Datos Bancarios SEPA
                   </div>
                   <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                 </summary>
+
+                {/* Sub-bloque SEPA */}
+                <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Datos de Mandato Bancario SEPA
+                    </span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold w-fit">
+                      {(player as any).is_senior ? 'Pagador: Propio Jugador (Senior)' : `Pagador: Tutor (${(player as any).parent1_name || 'parent1_*'})`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                      <span className="block text-xs font-semibold text-slate-500 mb-1">IBAN</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editData.iban || ''}
+                          onChange={e => setEditData({ ...editData, iban: e.target.value })}
+                          placeholder="ES00 0000 0000 0000 0000 0000"
+                          className="w-full border rounded p-1.5 text-xs font-mono uppercase bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      ) : (
+                        <span className="text-xs font-bold font-mono text-slate-900">
+                          {player.iban ? `${player.iban.slice(0, 4)} **** **** **** **${player.iban.slice(-4)}` : '—'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                      <span className="block text-xs font-semibold text-slate-500 mb-1">Referencia Mandato SEPA</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editData.sepa_mandate_id || ''}
+                          onChange={e => setEditData({ ...editData, sepa_mandate_id: e.target.value })}
+                          placeholder="MANDATO-..."
+                          className="w-full border rounded p-1.5 text-xs font-mono bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      ) : (
+                        <span className="text-xs font-bold font-mono text-slate-900">
+                          {player.sepa_mandate_id || '—'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                      <span className="block text-xs font-semibold text-slate-500 mb-1">Fecha Mandato SEPA</span>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editData.sepa_mandate_date || ''}
+                          onChange={e => setEditData({ ...editData, sepa_mandate_date: e.target.value })}
+                          className="w-full border rounded p-1.5 text-xs bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900">
+                          {player.sepa_mandate_date ? new Date(player.sepa_mandate_date).toLocaleDateString('es-ES') : '—'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Método de Pago</span>
@@ -1208,7 +1300,6 @@ export default function GlobalPlayerProfilePage() {
               )}
               </details>
             </div>
-            )}
           </div>
         )}
 
@@ -1364,6 +1455,15 @@ export default function GlobalPlayerProfilePage() {
                   )}
                 </div>
               )}
+
+              {/* SECCIÓN M1: HISTORIAL BÁSICO DE LESIONES */}
+              <div className="mt-8 pt-2">
+                <PlayerInjuriesSection 
+                  playerId={player.id} 
+                  playerName={`${player.first_name} ${player.last_name}`}
+                  onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
+                />
+              </div>
 
               {/* TABLA HISTORIAL DE PROGRESIÓN (IMC / Peso) */}
               <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mt-8 flex items-center gap-2">
@@ -1982,73 +2082,6 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
-
-      {tempImageSrc && (
-        <PhotoAdjustModal
-          imageSrc={tempImageSrc}
-          onSave={handleSaveCroppedPhoto}
-          onCancel={() => setTempImageSrc(null)}
-        />
-      )}
-
-      {/* Modal Emergente de Gestión de Foto */}
-      {showPhotoModal && (
-        <div 
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in"
-          onClick={() => setShowPhotoModal(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 border border-slate-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner mb-1">
-              {player.avatar_url ? (
-                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
-              ) : (
-                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
-                  <UserIcon size={40} />
-                </div>
-              )}
-            </div>
-
-            <h3 className="font-bold text-slate-900 text-sm">Foto de Perfil</h3>
-
-            <div className="flex flex-col w-full gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPhotoModal(false);
-                  fileInputRef.current?.click();
-                }}
-                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
-              >
-                <Camera size={14} />
-                <span>Cambiar Foto</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPhotoModal(false);
-                  deletePhoto();
-                }}
-                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-rose-200"
-              >
-                <Trash2 size={14} />
-                <span>Eliminar Foto</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowPhotoModal(false)}
-                className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition-all mt-1"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

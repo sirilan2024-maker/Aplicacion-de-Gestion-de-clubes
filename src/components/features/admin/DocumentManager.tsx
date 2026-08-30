@@ -4,16 +4,24 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   Download, FileText, Loader2, AlertCircle, Image as ImageIcon,
   CheckCircle2, XCircle, Clock, Eye, RefreshCw, Shield, ShieldCheck, ShieldX,
-  PackageOpen
+  PackageOpen, CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   getPlayerExpedienteAction,
-  updateDocumentStatusAction
+  updateDocumentStatusAction,
+  updatePlayerSepaAction
 } from "@/app/actions/secretaria-actions";
 import toast from "react-hot-toast";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+
+function maskIban(iban: string | null): string {
+  if (!iban) return '—';
+  const clean = iban.replace(/\s+/g, '');
+  if (clean.length < 8) return clean;
+  return `${clean.slice(0, 4)} **** **** **** **${clean.slice(-4)}`;
+}
 
 interface DocumentManagerProps {
   playerId: string;
@@ -342,6 +350,13 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
   const [error, setError] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
 
+  // SEPA state
+  const [sepaData, setSepaData] = useState<{ iban: string | null; sepa_mandate_id: string | null; sepa_mandate_date: string | null } | null>(null);
+  const [payerInfo, setPayerInfo] = useState<{ type: string; name: string | null; dni: string | null } | null>(null);
+  const [isEditingSepa, setIsEditingSepa] = useState(false);
+  const [sepaForm, setSepaForm] = useState({ iban: '', sepaMandateId: '', sepaMandateDate: '' });
+  const [savingSepa, setSavingSepa] = useState(false);
+
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -352,6 +367,13 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
         setTutorDniUrl(res.tutorDniUrl || null);
         setSipNumber(res.sipNumber || null);
         setPlayerDni((res as any).playerDni || null);
+        setSepaData((res as any).sepa || null);
+        setPayerInfo((res as any).payer || null);
+        setSepaForm({
+          iban: (res as any).sepa?.iban || '',
+          sepaMandateId: (res as any).sepa?.sepa_mandate_id || '',
+          sepaMandateDate: (res as any).sepa?.sepa_mandate_date || '',
+        });
       } else {
         setError(res.error || "Error al cargar documentos");
       }
@@ -361,6 +383,28 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
       setLoading(false);
     }
   }, [playerId]);
+
+  const handleSaveSepa = async () => {
+    setSavingSepa(true);
+    try {
+      const res = await updatePlayerSepaAction(playerId, {
+        iban: sepaForm.iban,
+        sepaMandateId: sepaForm.sepaMandateId,
+        sepaMandateDate: sepaForm.sepaMandateDate,
+      });
+      if (res.success) {
+        toast.success("Datos SEPA actualizados correctamente");
+        setIsEditingSepa(false);
+        fetchDocuments();
+      } else {
+        toast.error(res.error || "Error al actualizar datos SEPA");
+      }
+    } catch {
+      toast.error("Error al guardar datos SEPA");
+    } finally {
+      setSavingSepa(false);
+    }
+  };
 
   useEffect(() => {
     fetchDocuments();
@@ -574,6 +618,103 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
           </span>
         </div>
       )}
+
+      {/* Datos Bancarios y Mandato SEPA */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-blue-600" />
+            <h4 className="text-sm font-bold text-slate-800">Datos Bancarios y Mandato SEPA</h4>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+              {payerInfo?.type === 'senior' ? 'Pagador: Propio Jugador (Senior)' : `Pagador: Tutor (${payerInfo?.name || 'parent1_*'})`}
+            </span>
+          </div>
+          {!isEditingSepa ? (
+            <button
+              onClick={() => setIsEditingSepa(true)}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              Editar SEPA
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveSepa}
+                disabled={savingSepa}
+                className="text-xs font-semibold bg-blue-600 text-white px-2.5 py-1 rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+              >
+                {savingSepa ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                Guardar
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditingSepa(false);
+                  setSepaForm({
+                    iban: sepaData?.iban || '',
+                    sepaMandateId: sepaData?.sepa_mandate_id || '',
+                    sepaMandateDate: sepaData?.sepa_mandate_date || ''
+                  });
+                }}
+                disabled={savingSepa}
+                className="text-xs text-slate-500 hover:text-slate-700"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!isEditingSepa ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+            <div>
+              <span className="text-slate-400 block font-medium">IBAN</span>
+              <span className="font-mono font-bold text-slate-800 text-sm tracking-wider">{maskIban(sepaData?.iban || null)}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-medium">Referencia Mandato SEPA</span>
+              <span className="font-mono font-bold text-slate-800 text-sm">{sepaData?.sepa_mandate_id || '—'}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-medium">Fecha Mandato SEPA</span>
+              <span className="font-bold text-slate-800 text-sm">
+                {sepaData?.sepa_mandate_date ? new Date(sepaData.sepa_mandate_date).toLocaleDateString('es-ES') : '—'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <label className="block text-slate-600 font-semibold mb-1">IBAN</label>
+              <input
+                type="text"
+                value={sepaForm.iban}
+                onChange={e => setSepaForm({ ...sepaForm, iban: e.target.value })}
+                placeholder="ES00 0000 0000 0000 0000 0000"
+                className="w-full border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs focus:ring-1 focus:ring-blue-500 outline-none uppercase"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-600 font-semibold mb-1">Referencia Mandato SEPA</label>
+              <input
+                type="text"
+                value={sepaForm.sepaMandateId}
+                onChange={e => setSepaForm({ ...sepaForm, sepaMandateId: e.target.value })}
+                placeholder="ej: MANDATO-2026-..."
+                className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-600 font-semibold mb-1">Fecha Mandato SEPA</label>
+              <input
+                type="date"
+                value={sepaForm.sepaMandateDate}
+                onChange={e => setSepaForm({ ...sepaForm, sepaMandateDate: e.target.value })}
+                className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Número SIP — oculto visualmente (solo interno) */}
 

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "76897baf-9199-4827-9997-19e202dd99b5",
+    "nombre": "Partido Condicionado de Oleadas Ofensivas con Finalización en Zona de Remate (7v7+Porteros)",
+    "tipo": "juego_global",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_finishing"
+  },
+  {
+    "id": "10f91063-cb01-4c6d-856a-8027559a63c2",
+    "nombre": "SSG 6v6+2 Comodines con Transición Rápida y Ocupación del Área de Remate",
+    "tipo": "SSG",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_finishing"
+  },
+  {
+    "id": "b56bb478-749d-47db-a378-fdd8c9a4761c",
+    "nombre": "Partido de Sector 8v8 con Porterías Reglamentarias: Llegada por Banda y Remate en Último Tercio",
+    "tipo": "conditioned_game",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_finishing"
+  },
+  {
+    "id": "3a596902-5973-4f02-832c-f1a4fb8e1a54",
+    "nombre": "Partido Condicionado 7v7 con Zonas de Desborde 1v1 y Superación de Líneas",
+    "tipo": "juego_global",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_progression"
+  },
+  {
+    "id": "f52c5502-616f-4a00-8d81-80b7708931b2",
+    "nombre": "SSG 6v6+1 Comodín: Conducción Fijadora y Duelos Interiores para Progresión",
+    "tipo": "SSG",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_progression"
+  },
+  {
+    "id": "e2c7f082-5d00-47c9-a6a6-9e67dd0f46c4",
+    "nombre": "Partido de Espacios Reducidos 8v8 con Premisa de Desborde Individual Previo a Disparo",
+    "tipo": "conditioned_game",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_progression"
+  },
+  {
+    "id": "c6622211-7a19-49fe-84ef-ffc4b6265713",
+    "nombre": "Juego de Puntería y Precisión Técnica Suave en Círculo Central",
+    "tipo": "Analítico",
+    "bloque_sesion": "vuelta_calma",
+    "game_phase": "attacking_build_up"
+  },
+  {
+    "id": "2c673ed2-3d88-4081-9e27-93975db5ee54",
+    "nombre": "Rueda de Pases Regenerativa y Movilidad Articular en Parejas",
+    "tipo": "Analítico",
+    "bloque_sesion": "vuelta_calma",
+    "game_phase": "attacking_build_up"
+  },
+  {
+    "id": "e9d83565-da3a-4f12-9070-f262cb591b44",
+    "nombre": "Fútbol Tenis Recreativo por Parejas de Baja Intensidad",
+    "tipo": "Juego Lúdico",
+    "bloque_sesion": "vuelta_calma",
+    "game_phase": "attacking_build_up"
+  },
+  {
+    "id": "7dff3e4e-51c3-4959-862a-51ec1173d668",
+    "nombre": "Circuito Regenerativo con Pases a Portería Pequeña sin Oposición y Feedback Colectivo",
+    "tipo": "Analítico",
+    "bloque_sesion": "vuelta_calma",
+    "game_phase": "attacking_build_up"
+  },
+  {
+    "id": "1debb7bf-d169-497f-934c-8d6038159b3a",
+    "nombre": "El Castillo del Dragón: Conducción y Esquiva Lúdica con Balón (U6 Querubín)",
+    "tipo": "Juego Lúdico",
+    "bloque_sesion": "calentamiento",
+    "game_phase": "attacking_build_up"
+  },
+  {
+    "id": "1acc4817-83bf-498f-99f1-660bb8a2dbe3",
+    "nombre": "Minipartido 3v3 con Porterías Múltiples de Conos (U8 Prebenjamín)",
+    "tipo": "SSG",
+    "bloque_sesion": "global",
+    "game_phase": "attacking_build_up"
+  }
+]

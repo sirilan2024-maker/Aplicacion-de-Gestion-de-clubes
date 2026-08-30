@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateDrillEmbedding } from '@/services/drillSearchService';
+import { validateExercise } from '@/lib/methodology/exerciseValidationEngine';
 import type { FootballCategory, MicrocycleDay } from '@/types/microcycle';
 import type { TacticalBoardData } from '@/types/exercises';
 
@@ -424,34 +425,79 @@ export async function importDrillFromUrlAction(
       ];
     }
 
-    // 6. Guardar TODOS los ejercicios en la base de datos Supabase
+    // 6. Validar y Guardar ejercicios válidos en la base de datos Supabase
     const savedDrills: any[] = [];
+    const validationErrors: string[] = [];
 
     for (const d of parsedDrills) {
       const category = preferredCategory || d.age_category || 'senior';
+      
+      const candidateToValidate = {
+        nombre: d.nombre || 'Ejercicio Web',
+        tipo: d.tipo || 'positional_game',
+        descripcion: d.descripcion || 'Ejercicio importado desde ' + url,
+        age_category: category,
+        categoria_edad: [category],
+        microcycle_day: d.microcycle_day || 'MD_minus_3',
+        game_phase: d.game_phase || 'attacking_progression',
+        drill_structure: d.tipo || 'positional_game',
+        min_players: d.min_players || 6,
+        max_players: d.max_players || 16,
+        intensity_level: d.intensity_level || 3,
+        duracion_recomendada: d.duracion_recomendada || 15,
+        tactical_board_data: d.tactical_board_data || null,
+        objetivo_tecnico: d.objetivo_tecnico || [],
+        objetivo_tactico: d.objetivo_tactico || [],
+        material: d.material || ['conos', 'balones'],
+        variantes: d.variantes || [],
+        tags: [category, 'web_import', new URL(url).hostname.replace('www.', '')],
+        dificultad: d.intensity_level || 3,
+        bloque_sesion: d.bloque_sesion || 'principal',
+        carga_fisica: d.carga_fisica ?? 2,
+        carga_cognitiva: d.carga_cognitiva ?? 2,
+        oposicion: d.oposicion ?? 2,
+        representatividad: d.representatividad ?? 3,
+      };
+
+      const valResult = validateExercise(candidateToValidate);
+      if (!valResult.valid || !valResult.sanitizedExercise) {
+        console.warn(`[importDrillFromUrlAction] Ejercicio rechazado por validación preventiva: ${d.nombre}`, valResult.errors);
+        validationErrors.push(`${d.nombre || 'Ejercicio'}: ${valResult.errors.join('; ')}`);
+        continue;
+      }
+
+      const clean = valResult.sanitizedExercise;
+
       const { data: insertedDrill, error: insertError } = await adminClient
         .from('banco_ejercicios')
         .insert({
           club_id: clubId,
-          nombre: d.nombre || 'Ejercicio Web',
-          tipo: d.tipo || 'positional_game',
-          descripcion: d.descripcion || 'Ejercicio importado desde ' + url,
-          age_category: category,
+          nombre: clean.nombre,
+          tipo: clean.tipo,
+          descripcion: clean.descripcion,
+          age_category: clean.age_category,
           microcycle_day: d.microcycle_day || 'MD_minus_3',
-          game_phase: d.game_phase || 'attacking_progression',
-          drill_structure: d.tipo || 'positional_game',
-          min_players: d.min_players || 6,
-          max_players: d.max_players || 16,
-          intensity_level: d.intensity_level || 3,
-          duracion_recomendada: d.duracion_recomendada || 15,
-          tactical_board_data: d.tactical_board_data || null,
-          objetivo_tecnico: d.objetivo_tecnico || [],
-          objetivo_tactico: d.objetivo_tactico || [],
-          material: d.material || ['conos', 'balones'],
-          variantes: d.variantes || [],
-          tags: [category, 'web_import', new URL(url).hostname.replace('www.', '')],
-          dificultad: d.intensity_level || 3,
-          categoria_edad: [category],
+          game_phase: clean.game_phase,
+          drill_structure: clean.drill_structure,
+          min_players: clean.min_players,
+          max_players: clean.max_players,
+          intensity_level: clean.intensity_level,
+          duracion_recomendada: clean.duracion_recomendada,
+          tactical_board_data: clean.tactical_board_data || null,
+          objetivo_tecnico: clean.objetivo_tecnico,
+          objetivo_tactico: clean.objetivo_tactico,
+          material: clean.material,
+          variantes: clean.variantes,
+          tags: clean.tags,
+          dificultad: clean.dificultad,
+          categoria_edad: clean.categoria_edad,
+          bloque_sesion: clean.bloque_sesion,
+          carga_fisica: clean.carga_fisica,
+          carga_cognitiva: clean.carga_cognitiva,
+          oposicion: clean.oposicion,
+          representatividad: clean.representatividad,
+          principle_id: clean.principle_id,
+          subprinciple_id: clean.subprinciple_id,
         })
         .select('*')
         .single();

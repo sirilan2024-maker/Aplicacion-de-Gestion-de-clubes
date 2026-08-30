@@ -40,6 +40,11 @@ export interface Player {
   posicion_principal?: string | null;
   created_at: string;
 
+  // SEPA
+  iban?: string | null;
+  sepa_mandate_id?: string | null;
+  sepa_mandate_date?: string | null;
+
   // Relaciones
   familias?: RelacionFamilia[];
   ficha_medica?: FichaMedica;

@@ -86,8 +86,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Archivo PDF, equipo destino y nombre en PDF son requeridos' }, { status: 400 });
     }
 
+    const teamBelongsToClub = allTeams?.some(t => t.id === equipoId);
+    if (!teamBelongsToClub) {
+      return NextResponse.json({ error: 'El equipo destino no pertenece a tu club' }, { status: 403 });
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
 
     // Extraer texto del PDF con pdf2json
     const rawPdfText = await new Promise<string>((resolve, reject) => {

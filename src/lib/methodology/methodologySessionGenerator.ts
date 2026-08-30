@@ -196,12 +196,7 @@ export function generateMethodologySessionProposal(context: GeneratorContext): S
     const pool = availableCandidates.length > 0 ? availableCandidates : allExercises;
     const recommendations = recommendExercises(pool, blockContext, 5);
 
-    let chosen = recommendations.length > 0 ? recommendations[0] : null;
-
-    if (!chosen && allExercises.length > 0) {
-      const fallbackEx = allExercises[0];
-      chosen = scoreExercise(fallbackEx, blockContext);
-    }
+    const chosen = recommendations.length > 0 ? recommendations[0] : null;
 
     if (chosen) {
       selectedExerciseIds.add(chosen.exercise.id);
@@ -236,6 +231,26 @@ export function generateMethodologySessionProposal(context: GeneratorContext): S
         ...ex,
         duration_min: blockDuration
       });
+    } else {
+      // Bloque sin candidato metodológicamente válido
+      proposalBlocks[block.id] = {
+        blockId: block.id,
+        blockName: block.name,
+        durationMin: blockDuration,
+        duration: blockDuration,
+        exercise: null,
+        objective: context.objective || "Sin asignar",
+        principle: "Sin asignar",
+        subprinciple: "Sin asignar",
+        behaviour: "Sin asignar",
+        organization: "Sin asignar",
+        space: "Sin asignar",
+        material: [],
+        estimatedLoad: 0,
+        score: 0,
+        reasons: [`⚠️ Sin ejercicio metodológicamente pertinente para ${block.name}`],
+        selectionReasons: [`⚠️ Sin ejercicio metodológicamente pertinente para ${block.name}`]
+      };
     }
   });
 
@@ -259,14 +274,14 @@ export function generateMethodologySessionProposal(context: GeneratorContext): S
 
   return {
     teamId: context.teamId,
-    category: context.category,
+    category: context.category || 'General',
     objective: context.objective,
     secondaryObjectives: context.secondaryObjectives || [],
-    microcycleDay: context.microcycleDay,
+    microcycleDay: context.microcycleDay || 'MD-3',
     plannedDurationMin: context.durationMinutes,
     totalDurationMin: totalDuration,
-    numPlayers: context.numPlayers,
-    intensityLoad: context.intensityLoad,
+    numPlayers: context.numPlayers || 16,
+    intensityLoad: context.intensityLoad || 3,
     priorityContext: context.priorityContext,
     blocks: proposalBlocks,
     sessionReasons,
@@ -363,6 +378,7 @@ export function regenerateMethodologyBlock(
 
 // Alias de conveniencia
 export const regenerateSessionBlock = regenerateMethodologyBlock;
+export const validateSessionProposal = validateMethodologySessionProposal;
 
 /**
  * Valida globalmente una propuesta o sesión construida antes de guardar

@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthenticatedContext, canUserAccessMatch, STAFF_ROLES } from "@/lib/auth-helpers";
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Validar autenticación y contexto de usuario
+    const { context, error: authError, statusCode } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return NextResponse.json({ error: authError || "No autenticado" }, { status: statusCode || 401 });
+    }
+
+    // 2. Validar rol autorizado
+    if (!STAFF_ROLES.includes(context.profile.role)) {
+      return NextResponse.json(
+        { error: "No tienes permisos de cuerpo técnico o administración para asignar actas." },
+        { status: 403 }
+      );
+    }
+
     const supabase = createAdminClient();
     const contentType = req.headers.get("content-type") || "";
 
@@ -14,6 +29,20 @@ export async function POST(req: NextRequest) {
 
       if (!file || !partidoId) {
         return NextResponse.json({ error: "Faltan parámetros requeridos (file, partidoId)" }, { status: 400 });
+      }
+
+      // 3. Validar que el partido pertenece al club del usuario
+      const matchCheck = await canUserAccessMatch(supabase, context, partidoId);
+      if (!matchCheck.allowed) {
+        return NextResponse.json(
+          { error: matchCheck.reason || "El partido no pertenece a tu club" },
+          { status: 403 }
+        );
+      }
+
+      // Validar tipo PDF
+      if (file.type && file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        return NextResponse.json({ error: "Solo se admiten documentos en formato PDF" }, { status: 400 });
       }
 
       const assignedPath = `partidos/${partidoId}/acta_oficial.pdf`;
@@ -50,6 +79,15 @@ export async function POST(req: NextRequest) {
 
     if (!pendingPath || !partidoId) {
       return NextResponse.json({ error: "Faltan parámetros requeridos (pendingPath, partidoId)" }, { status: 400 });
+    }
+
+    // 3. Validar que el partido pertenece al club del usuario
+    const matchCheck = await canUserAccessMatch(supabase, context, partidoId);
+    if (!matchCheck.allowed) {
+      return NextResponse.json(
+        { error: matchCheck.reason || "El partido no pertenece a tu club" },
+        { status: 403 }
+      );
     }
 
     const assignedPath = `partidos/${partidoId}/acta_oficial.pdf`;
@@ -104,3 +142,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Error interno del servidor" }, { status: 500 });
   }
 }
+

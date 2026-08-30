@@ -96,6 +96,44 @@ function extractGoalsFromActa(text: string, isLocal: boolean): { resultadoPropio
   return { resultadoPropio: null, resultadoRival: null };
 }
 
+function normalizeName(str: string): string {
+  if (!str) return '';
+  return str.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchPlayerInList(nameRaw: string, playersList: any[]): any {
+  if (!nameRaw || !playersList || playersList.length === 0) return null;
+  const normTarget = normalizeName(nameRaw);
+  const targetTokens = normTarget.split(' ').filter(w => w.length > 2);
+
+  let bestPlayer: any = null;
+  let maxScore = 0;
+
+  for (const player of playersList) {
+    const fullName = normalizeName(`${player.last_name || ''} ${player.first_name || ''}`);
+    const revName = normalizeName(`${player.first_name || ''} ${player.last_name || ''}`);
+    const playerTokens = [...fullName.split(' '), ...revName.split(' ')].filter(w => w.length > 2);
+
+    let score = 0;
+    targetTokens.forEach(token => {
+      if (playerTokens.some(pt => pt.includes(token) || token.includes(pt))) {
+        score += 1;
+      }
+    });
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestPlayer = player;
+    }
+  }
+
+  return maxScore >= 1 ? bestPlayer : null;
+}
+
 function extractAllDatesFromText(text: string): Date[] {
   const dates: Date[] = [];
   const ffcvParsed = parseFFCVActaText(text);
@@ -203,8 +241,24 @@ function extractCategoryFromText(text: string, fileName?: string): string | null
   return null;
 }
 
+import { getAuthenticatedContext, STAFF_ROLES } from "@/lib/auth-helpers";
+
 export async function POST(req: NextRequest) {
   try {
+    // 1. Validar autenticación y contexto de usuario
+    const { context, error: authError, statusCode } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return NextResponse.json({ error: authError || "No autenticado" }, { status: statusCode || 401 });
+    }
+
+    // 2. Validar rol autorizado
+    if (!STAFF_ROLES.includes(context.profile.role)) {
+      return NextResponse.json(
+        { error: "No tienes permisos de cuerpo técnico o administración para clasificar actas." },
+        { status: 403 }
+      );
+    }
+
     const supabase = createAdminClient();
     const formData = await req.formData();
     const files = formData.getAll("files") as File[];
@@ -216,13 +270,23 @@ export async function POST(req: NextRequest) {
     const classified: any[] = [];
     const pending: any[] = [];
 
-    // Obtener todos los equipos de la BD
-    const { data: teams } = await supabase.from("teams").select("id, name, category");
+    // 3. Obtener únicamente los equipos del club del usuario
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("id, name, category")
+      .eq("club_id", context.profile.club_id);
 
-    // Obtener todos los partidos para la búsqueda comparativa
-    const { data: allMatches } = await supabase
-      .from("partidos")
-      .select("id, fecha_hora, rival_nombre, equipo_id, equipo:teams(name)");
+    const teamIds = (teams || []).map((t: any) => t.id);
+
+    // 4. Obtener únicamente los partidos de los equipos del club
+    let allMatches: any[] = [];
+    if (teamIds.length > 0) {
+      const { data: matchesData } = await supabase
+        .from("partidos")
+        .select("id, fecha_hora, rival_nombre, equipo_id, lugar, equipo:teams(name)")
+        .in("equipo_id", teamIds);
+      allMatches = matchesData || [];
+    }
 
     for (const file of files) {
       const fileName = file.name;
@@ -292,11 +356,11 @@ export async function POST(req: NextRequest) {
             if (!normRival || normRival === 'descansa') return false;
 
             // Extraer palabras clave del rival (ej. "COX", "PETRELENSE", "DOLORES")
-            const keywords = normRival.split(' ').filter(w => w.length > 2 && !['c.d.', 'c.f.', 'u.d.', 'a.d.'].includes(w));
+            const keywords = normRival.split(' ').filter((w: string) => w.length > 2 && !['c.d.', 'c.f.', 'u.d.', 'a.d.'].includes(w));
             if (keywords.length === 0) return false;
 
             // Comprobar si al menos la palabra principal del rival está en el texto del PDF (o cabecera)
-            return keywords.some(kw => normalizedPdfText.includes(kw));
+            return keywords.some((kw: string) => normalizedPdfText.includes(kw));
           });
 
           if (rivalCandidates.length === 1) {
@@ -544,6 +608,8 @@ export async function POST(req: NextRequest) {
             contentType: "application/pdf",
             upsert: true
           });
+
+          const candidateMatches = allMatches ? (matchingTeam ? allMatches.filter(m => m.equipo_id === matchingTeam.id) : allMatches) : [];
 
           pending.push({
             fileName,

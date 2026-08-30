@@ -2,9 +2,25 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessMatch, canUserAccessPlayer } from "@/lib/auth-helpers"
 
 export async function updateConvocatoria(matchId: string, playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | null) {
-  const supabase = await createAdminClient()
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
+  const supabase = await createAdminClient();
+
+  const matchAccess = await canUserAccessMatch(supabase, context, matchId);
+  if (!matchAccess.allowed) {
+    return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+  }
+
+  const playerAccess = await canUserAccessPlayer(supabase, context, playerId);
+  if (!playerAccess.allowed) {
+    return { success: false, error: playerAccess.reason || "No tienes acceso a este jugador" };
+  }
 
   if (status === null) {
     await supabase
@@ -38,7 +54,17 @@ export async function updateConvocatoria(matchId: string, playerId: string, stat
 }
 
 export async function updateConvocatoriaBatch(matchId: string, updates: { playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | "titular" | "suplente" | null }[]) {
-  const supabase = await createAdminClient()
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
+  const supabase = await createAdminClient();
+
+  const matchAccess = await canUserAccessMatch(supabase, context, matchId);
+  if (!matchAccess.allowed) {
+    return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+  }
 
   let hasError = false;
   let lastError = null;
@@ -81,6 +107,7 @@ export async function updateConvocatoriaBatch(matchId: string, updates: { player
   revalidatePath('/dashboard', 'layout')
   return { success: true }
 }
+
 
 export async function sendConvocatoriaAlerts(matchId: string, teamId: string, playerIds: string[]) {
   const supabase = await createClient()
@@ -131,18 +158,35 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
 }
 
 export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null }) {
-  const supabase = await createClient()
-  await supabase.from('partidos').update(updates).eq('id', matchId)
-  revalidatePath(`/dashboard/e/${teamId}/partidos`, 'page')
-  return { success: true }
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessMatch(adminSupabase, context, matchId);
+  if (!access.allowed || !access.match) {
+    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+  await adminSupabase.from('partidos').update(updates).eq('id', matchId);
+  revalidatePath(`/dashboard/e/${teamId}/partidos`, 'page');
+  return { success: true };
 }
 
 export async function saveMatchReport(matchId: string, report: { coach_rating: number, coach_summary: string, positive_aspects: string, improvement_aspects: string, attitude_notes: string }) {
-  const supabase = await createClient()
-  await supabase.from('partidos').update(report).eq('id', matchId)
-  revalidatePath(`/dashboard/e/[teamId]/partidos/${matchId}`, 'page')
-  return { success: true }
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessMatch(adminSupabase, context, matchId);
+  if (!access.allowed || !access.match) {
+    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+  await adminSupabase.from('partidos').update(report).eq('id', matchId);
+  revalidatePath(`/dashboard/e/[teamId]/partidos/${matchId}`, 'page');
+  return { success: true };
 }
+
 
 export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summaryText: string) {
   try {
@@ -169,7 +213,8 @@ export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summ
       .single()
 
     const coachName = coachProfile ? `${coachProfile.first_name || ''} ${coachProfile.last_name || ''}`.trim() : 'Entrenador'
-    const teamName = partido.equipo?.name || 'Equipo'
+    const teamRel = partido.equipo as unknown
+    const teamName = Array.isArray(teamRel) ? (teamRel[0] as { name?: string })?.name || 'Equipo' : (teamRel as { name?: string })?.name || 'Equipo'
     const matchScore = (partido.resultado_propio !== null && partido.resultado_rival !== null) 
       ? `(${partido.resultado_propio} - ${partido.resultado_rival})` 
       : ''
@@ -218,21 +263,36 @@ export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summ
 }
 
 export async function deleteMatchAction(matchId: string, teamId: string) {
-  const supabase = await createClient()
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  if (!ADMIN_ROLES.includes(context.profile.role)) {
+    throw new Error("Solo los administradores pueden eliminar partidos");
+  }
+
+  const adminClient = await createAdminClient();
+  const matchAccess = await canUserAccessMatch(adminClient, context, matchId);
+  if (!matchAccess.allowed) {
+    throw new Error(matchAccess.reason || "No tienes permisos sobre este partido");
+  }
   
-  const { error } = await supabase
+  const { error } = await adminClient
     .from("partidos")
     .delete()
     .eq("id", matchId)
+    .eq("club_id", context.profile.club_id);
 
   if (error) {
-    throw new Error(error.message)
+    throw new Error(error.message);
   }
 
-  revalidatePath(`/dashboard/matches`)
-  revalidatePath(`/dashboard/equipos/${teamId}/partidos`)
-  return { success: true }
+  revalidatePath(`/dashboard/matches`);
+  revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
+  return { success: true };
 }
+
 
 export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string, season_id?: string }) {
   const supabase = await createClient()
@@ -294,30 +354,41 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
 }
 
 export async function updatePlayerRatingsBatch(matchId: string, ratings: { playerId: string, rating: number }[]) {
-  const supabase = await createClient();
-  
-  // We have to update one by one or use upsert if we know the convocatorias ID.
-  // Since we only know player_id and partido_id, we can do sequential updates.
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessMatch(adminSupabase, context, matchId);
+  if (!access.allowed || !access.match) {
+    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+
   for (const { playerId, rating } of ratings) {
-    await supabase
+    await adminSupabase
       .from('convocatorias')
       .update({ coach_rating: rating })
       .eq('partido_id', matchId)
       .eq('player_id', playerId);
   }
   
-  // Also revalidate the path so the UI updates
-  // Need team_id to revalidate correctly, but we don't have it directly here.
-  // We can revalidate a general path or everything
   revalidatePath(`/dashboard`, 'layout');
   return { success: true };
 }
 
 export async function saveLineup(matchId: string, assignedPlayers: {playerId: string, x: number, y: number}[], tactic: string) {
-  const supabase = await createClient();
-  
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessMatch(adminSupabase, context, matchId);
+  if (!access.allowed || !access.match) {
+    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+
   // Reset all to not titular and clear coordinates
-  await supabase
+  await adminSupabase
     .from('convocatorias')
     .update({ titular: false, tactical_x: null, tactical_y: null })
     .eq('partido_id', matchId);
@@ -325,7 +396,7 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
   // Set selected players as titular with their coordinates
   if (assignedPlayers.length > 0) {
     for (const player of assignedPlayers) {
-      const { data: existing } = await supabase
+      const { data: existing } = await adminSupabase
         .from('convocatorias')
         .select('id')
         .eq('partido_id', matchId)
@@ -333,12 +404,12 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
         .single();
 
       if (existing) {
-        await supabase
+        await adminSupabase
           .from('convocatorias')
           .update({ titular: true, tactical_x: player.x, tactical_y: player.y })
           .eq('id', existing.id);
       } else {
-        await supabase
+        await adminSupabase
           .from('convocatorias')
           .insert({ 
             partido_id: matchId, 
@@ -355,6 +426,7 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
   revalidatePath(`/dashboard`, 'layout');
   return { success: true };
 }
+
 
 export async function updateMatchAttendanceBatch(
   matchId: string, 
@@ -516,8 +588,23 @@ export async function updateMatchFullReportBatch(
 }
 
 export async function updatePlayerCardsInMatch(matchId: string, playerId: string, yellows: number, reds: number) {
-  console.log(`[updatePlayerCardsInMatch] Start: match=${matchId}, player=${playerId}, yellows=${yellows}, reds=${reds}`);
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
   const supabase = await createAdminClient();
+
+  const matchAccess = await canUserAccessMatch(supabase, context, matchId);
+  if (!matchAccess.allowed) {
+    return { success: false, error: matchAccess.reason || "No tienes permisos sobre este partido" };
+  }
+
+  const playerAccess = await canUserAccessPlayer(supabase, context, playerId);
+  if (!playerAccess.allowed) {
+    return { success: false, error: playerAccess.reason || "No tienes permisos sobre este jugador" };
+  }
+
   const { data: existing, error: findError } = await supabase
     .from('convocatorias')
     .select('id')
@@ -530,12 +617,9 @@ export async function updatePlayerCardsInMatch(matchId: string, playerId: string
   }
 
   if (existing) {
-    console.log(`[updatePlayerCardsInMatch] Row exists (${existing.id}), updating...`);
     const { error } = await supabase.from('convocatorias').update({ yellow_cards: yellows, red_cards: reds }).eq('id', existing.id);
     if (error) console.error("[updatePlayerCardsInMatch] Error updating cards:", error);
-    else console.log(`[updatePlayerCardsInMatch] Update SUCCESS!`);
   } else {
-    console.log(`[updatePlayerCardsInMatch] Row does not exist, inserting...`);
     const { error } = await supabase.from('convocatorias').insert({
       partido_id: matchId,
       player_id: playerId,
@@ -545,12 +629,11 @@ export async function updatePlayerCardsInMatch(matchId: string, playerId: string
       status: 'convocado'
     });
     if (error) console.error("[updatePlayerCardsInMatch] Error inserting cards:", error);
-    else console.log(`[updatePlayerCardsInMatch] Insert SUCCESS!`);
   }
   revalidatePath(`/dashboard`, 'layout');
-  console.log(`[updatePlayerCardsInMatch] Done.`);
   return { success: true };
 }
+
 
 export async function getPublicMatchEvents(matchId: string) {
   const supabase = await createAdminClient()
@@ -591,7 +674,21 @@ export async function getPublicMatches() {
 
 export async function reconcileMatchStatsAction(matchId: string, stats: any[]) {
   try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
     const supabase = await createAdminClient();
+    const access = await canUserAccessMatch(supabase, context, matchId);
+    if (!access.allowed || !access.match) {
+      return { success: false, error: access.reason || "No tienes acceso a este partido" };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role) && context.profile.role !== 'entrenador' && context.profile.role !== 'coach' && context.profile.role !== 'coordinador') {
+      return { success: false, error: "No tienes permisos deportivos para reconciliar estadísticas" };
+    }
+
     const { data, error } = await supabase.rpc('reconcile_match_and_close', {
       p_partido_id: matchId,
       p_stats: stats,
@@ -610,4 +707,5 @@ export async function reconcileMatchStatsAction(matchId: string, stats: any[]) {
     return { success: false, error: err.message || "Error interno" };
   }
 }
+
 

@@ -86,7 +86,7 @@ export function detectLongitudinalPatterns(memoryResult: LongitudinalMemoryResul
         title: `Prioridad Persistente: ${p.title}`,
         description: `El déficit asociado a '${p.title}' se mantiene activo tras múltiples sesiones evaluadas.`,
         confidence: 0.95,
-        evidence: [p.evidence || 'Persistencia a lo largo del período']
+        evidence: [p.evidence?.details || 'Persistencia a lo largo del período']
       });
     });
   }

@@ -264,13 +264,13 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "GENERAL/CLUB",
         items: [
-          { name: "Inicio", href: getHref("Inicio", "/dashboard"), icon: LayoutDashboard },
+          { name: "CENTRO DE CONTROL", href: "/admin/inicio", icon: LayoutDashboard },
           { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
-          { name: "Equipos", href: getHref("Equipos", "/admin/equipos"), icon: Shield },
+          { name: "Equipos", href: "/dashboard/equipos", icon: Shield },
           { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
           { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
           { name: "Mensajes", href: "/dashboard/mensajes", icon: MessageSquare },
-          { name: "Estadísticas", href: getHref("Estadísticas", "/admin/estadisticas"), icon: BarChart3 },
+          { name: "Estadísticas", href: "/dashboard/club/estadisticas", icon: BarChart3 },
           { name: "Disciplina", href: getHref("Disciplina", "/dashboard/matches?view=disciplina"), icon: AlertTriangle },
           { name: "Banco de Tareas", href: getHref("Banco de Tareas", "/dashboard/exercises"), icon: Target },
           { name: "Utillería", href: "/dashboard/utilleria", icon: Shirt },
@@ -431,7 +431,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     <>
     <aside
       className={cn(
-        "sticky top-0 flex flex-col transition-all duration-300 ease-in-out shrink-0 h-screen",
+        "flex flex-col transition-all duration-300 ease-in-out shrink-0 h-full",
         isAdmin ? "bg-slate-900 border-r border-slate-800 text-slate-300" : "bg-white border-r border-gray-100 text-slate-700",
         collapsed ? "w-[68px]" : "w-64"
       )}
@@ -632,7 +632,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       )}
 
       {/* ── Nav ────────────────────────────────── */}
-      <nav className="flex-1 overflow-hidden hover:overflow-y-auto py-2 px-2 space-y-3 scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto no-scrollbar py-2 px-2 space-y-2">
         {navGroups.map((group) => {
           if (group.items.length === 0) return null
           

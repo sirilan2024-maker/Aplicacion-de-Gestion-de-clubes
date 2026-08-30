@@ -1,0 +1,3503 @@
+{
+  "tables": [
+    {
+      "tablename": "ai_analysis_reports",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "app_navigation",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "apparel_stock",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "attendance",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "auditoria_roles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "autorizaciones",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "banco_ejercicios",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "chat_channels",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "chat_messages",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "chat_read_receipts",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "club_metrics",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "clubs",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "concept_rubrics",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "convocatorias",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "evaluation_concepts",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "evaluation_items",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "evaluation_modules",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "events",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "exercise_behaviours",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "exercise_principles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "exercise_subprinciples",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "exercises",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "expenses",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "families",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "family_sponsors",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "fee_payments",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "fees",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "fichas_medicas",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "invitations",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "macrocycles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "match_callups",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "match_comments",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "match_events",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "matches",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "mesocycles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "messages",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "methodology_behaviours",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "methodology_curriculum",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "methodology_principles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "methodology_subprinciples",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "microcycles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "mvp_votes",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "notifications",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "official_receipts",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "partidos",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "payments",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_apparel",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_documents",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_evaluations",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_measurements",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_objectives",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_requests",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_season_history",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_season_teams",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_training_metrics",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "player_tutors",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "players",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "profiles",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "registrations",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "relacion_familias",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "role_navigation",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "seasons",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "sesiones_ejercicios",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "session_drills",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "staff_invitations",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "team_coaches",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "team_events",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "team_objectives",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "teams",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "training_attendance",
+      "rowsecurity": true
+    },
+    {
+      "tablename": "training_sessions",
+      "rowsecurity": true
+    }
+  ],
+  "tErr": null,
+  "policies": [
+    {
+      "tablename": "ai_analysis_reports",
+      "policyname": "Admin and Coaches can create AI reports",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = ai_analysis_reports.team_id) AND (teams.coach_id = auth.uid())))))"
+    },
+    {
+      "tablename": "ai_analysis_reports",
+      "policyname": "Admin can view all AI reports",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "ai_analysis_reports",
+      "policyname": "Coaches can view their team AI reports",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = ai_analysis_reports.team_id) AND (teams.coach_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "app_navigation",
+      "policyname": "App navigation is public",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "apparel_stock",
+      "policyname": "Admins and utilleros can manage stock",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text, 'utillero'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "apparel_stock",
+      "policyname": "Anyone can select apparel stock",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "attendance",
+      "policyname": "Attendance SELECT policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['admin'::text, 'entrenador'::text])) OR (EXISTS ( SELECT 1\n   FROM players pl\n  WHERE ((pl.id = attendance.player_id) AND (pl.team_id = ( SELECT profiles.team_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid())))))) OR (player_id IN ( SELECT players.id\n   FROM players\n  WHERE (players.tutor_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "attendance",
+      "policyname": "Users can manage attendance in their club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((team_id IN ( SELECT teams.id\n   FROM teams\n  WHERE (teams.club_id IN ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid()))))) OR (event_id IN ( SELECT team_events.id\n   FROM team_events\n  WHERE (team_events.team_id IN ( SELECT teams.id\n           FROM teams\n          WHERE (teams.club_id IN ( SELECT profiles.club_id\n                   FROM profiles\n                  WHERE (profiles.id = auth.uid()))))))) OR (session_id IN ( SELECT training_sessions.id\n   FROM training_sessions\n  WHERE (training_sessions.club_id IN ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid()))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "auditoria_roles",
+      "policyname": "Admins can view auditoria_roles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "autorizaciones",
+      "policyname": "Admins and coaches can manage autorizaciones",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coach'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "autorizaciones",
+      "policyname": "Families can view/update their kids autorizaciones",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM relacion_familias\n  WHERE ((relacion_familias.player_id = autorizaciones.player_id) AND (relacion_familias.usuario_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "banco_ejercicios",
+      "policyname": "Admins y metodologos pueden gestionar ejercicios",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "banco_ejercicios",
+      "policyname": "Ejercicios visibles para el mismo club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "chat_channels",
+      "policyname": "Usuarios pueden ver canales",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "chat_messages",
+      "policyname": "Usuarios pueden insertar mensajes",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.role() = 'authenticated'::text)"
+    },
+    {
+      "tablename": "chat_messages",
+      "policyname": "Usuarios pueden ver mensajes",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "chat_read_receipts",
+      "policyname": "Usuarios gestionan sus propios recibos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "club_metrics",
+      "policyname": "Admins can manage their club's metrics",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "club_metrics",
+      "policyname": "Users can view their club's metrics",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "clubs",
+      "policyname": "Admins can update their club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "clubs",
+      "policyname": "Club members can view their club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "clubs",
+      "policyname": "Clubs Access",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(id = get_my_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "clubs",
+      "policyname": "Users can insert club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() IS NOT NULL)"
+    },
+    {
+      "tablename": "clubs",
+      "policyname": "Ver propio club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "concept_rubrics",
+      "policyname": "Allow authenticated read concept_rubrics",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "convocatorias",
+      "policyname": "Actualizar convocatorias",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((p.equipo_id = t.id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((p.equipo_id = t.id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (t.coach_id = auth.uid())))))"
+    },
+    {
+      "tablename": "convocatorias",
+      "policyname": "Admins y coach del equipo pueden gestionar convocatorias",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND ((profiles.rol = ANY (ARRAY['admin'::text, 'metodologo'::text])) OR (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text])))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((t.id = p.equipo_id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (t.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM partidos p\n  WHERE ((p.id = convocatorias.partido_id) AND (p.equipo_id = ( SELECT profiles.team_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid())))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN team_coaches tc ON ((tc.team_id = p.equipo_id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (tc.profile_id = auth.uid())))))",
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND ((profiles.rol = ANY (ARRAY['admin'::text, 'metodologo'::text])) OR (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text])))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((t.id = p.equipo_id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (t.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM partidos p\n  WHERE ((p.id = convocatorias.partido_id) AND (p.equipo_id = ( SELECT profiles.team_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid())))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN team_coaches tc ON ((tc.team_id = p.equipo_id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (tc.profile_id = auth.uid())))))"
+    },
+    {
+      "tablename": "convocatorias",
+      "policyname": "Convocatorias SELECT policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['admin'::text, 'entrenador'::text])) OR (EXISTS ( SELECT 1\n   FROM players pl\n  WHERE ((pl.id = convocatorias.player_id) AND (pl.team_id = ( SELECT profiles.team_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid())))))) OR (player_id IN ( SELECT players.id\n   FROM players\n  WHERE (players.tutor_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "convocatorias",
+      "policyname": "Convocatorias WRITE policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['admin'::text, 'entrenador'::text])) OR (player_id = ( SELECT profiles.linked_player_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))))",
+      "with_check": "((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['admin'::text, 'entrenador'::text])) OR (player_id = ( SELECT profiles.linked_player_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))))"
+    },
+    {
+      "tablename": "convocatorias",
+      "policyname": "Eliminar convocatorias",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((p.equipo_id = t.id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "convocatorias",
+      "policyname": "Insertar convocatorias",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((p.equipo_id = t.id)))\n  WHERE ((p.id = convocatorias.partido_id) AND (t.coach_id = auth.uid())))))"
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "policyname": "Allow authenticated insert equipos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() IS NOT NULL)"
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "policyname": "Allow authenticated update equipos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "policyname": "Allow authenticated users to delete equipos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "(auth.uid() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "policyname": "Club members can insert teams",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))"
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "policyname": "Permitir leer equipo si hay código de invitación",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(invite_code IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "tablename": "equipos_old_archive",
+      "policyname": "allow_select_equipos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "evaluation_concepts",
+      "policyname": "Allow authenticated read evaluation_concepts",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "evaluation_items",
+      "policyname": "Allow authenticated all evaluation_items",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "evaluation_modules",
+      "policyname": "Allow authenticated read evaluation_modules",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "events",
+      "policyname": "Admins y coaches pueden gestionar eventos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coach'::text, 'metodologo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "events",
+      "policyname": "Eventos visibles para el club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercise_behaviours",
+      "policyname": "Admins and metodologos can manage exercise_behaviours",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercise_behaviours",
+      "policyname": "Club members can view exercise_behaviours",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercise_principles",
+      "policyname": "Admins and metodologos can manage exercise_principles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercise_principles",
+      "policyname": "Club members can view exercise_principles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercise_subprinciples",
+      "policyname": "Admins and metodologos can manage exercise_subprinciples",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercise_subprinciples",
+      "policyname": "Club members can view exercise_subprinciples",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "exercises",
+      "policyname": "exercises_select_auth",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "tablename": "expenses",
+      "policyname": "Expenses manageable by admins",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'presidente'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "expenses",
+      "policyname": "Expenses viewable by admins",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'presidente'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "families",
+      "policyname": "Admins can manage families",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "families",
+      "policyname": "Tutors can insert own family",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(tutor_1_profile_id = auth.uid())"
+    },
+    {
+      "tablename": "families",
+      "policyname": "Tutors can update own family",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(tutor_1_profile_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "families",
+      "policyname": "Tutors can view own family",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(tutor_1_profile_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "family_sponsors",
+      "policyname": "Admins can manage sponsors",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "family_sponsors",
+      "policyname": "Families can manage own sponsors",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM families\n  WHERE ((families.id = family_sponsors.family_id) AND (families.tutor_1_profile_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "family_sponsors",
+      "policyname": "Families can view own sponsors",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM families\n  WHERE ((families.id = family_sponsors.family_id) AND (families.tutor_1_profile_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "fee_payments",
+      "policyname": "Los admins pueden insertar pagos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND ((profiles.role = 'admin'::text) OR (profiles.role = 'entrenador'::text)))))"
+    },
+    {
+      "tablename": "fee_payments",
+      "policyname": "Los admins y tesoreros pueden ver todos los pagos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND ((profiles.role = 'admin'::text) OR (profiles.role = 'entrenador'::text)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "fee_payments",
+      "policyname": "Los usuarios pueden ver los pagos de sus cuotas",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM fees\n  WHERE ((fees.id = fee_payments.fee_id) AND (fees.profile_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_admin_all",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(auth.role() = 'admin'::text)",
+      "with_check": "(auth.role() = 'admin'::text)"
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_delete",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "DELETE",
+      "qual": "(club_id = current_user_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_family_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((family_id = auth.uid()) AND ((estado)::text = 'pendiente'::text))"
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_family_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(family_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(club_id = current_user_club_id())"
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = current_user_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "fees",
+      "policyname": "fees_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(club_id = current_user_club_id())",
+      "with_check": "(club_id = current_user_club_id())"
+    },
+    {
+      "tablename": "fees",
+      "policyname": "insert_fees_owner",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = profile_id)"
+    },
+    {
+      "tablename": "fees",
+      "policyname": "select_fees_admin_fixed",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'presidente'::text, 'secretaria'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "fees",
+      "policyname": "select_fees_owner",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = profile_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "fees",
+      "policyname": "update_fees_owner",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = profile_id)",
+      "with_check": "(auth.uid() = profile_id)"
+    },
+    {
+      "tablename": "fichas_medicas",
+      "policyname": "Admins and coaches can view/manage medical data en su club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coach'::text, 'metodologo'::text]))))) AND (EXISTS ( SELECT 1\n   FROM players p\n  WHERE ((p.id = fichas_medicas.player_id) AND (p.club_id = ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid())))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "fichas_medicas",
+      "policyname": "Families can view/manage their kids medical data",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM relacion_familias\n  WHERE ((relacion_familias.player_id = fichas_medicas.player_id) AND (relacion_familias.usuario_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "invitations",
+      "policyname": "Admin and Coaches can create invitations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = invitations.team_id) AND (teams.coach_id = auth.uid())))))"
+    },
+    {
+      "tablename": "invitations",
+      "policyname": "Admin can view all invitations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "invitations",
+      "policyname": "Coaches can view their team invitations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = invitations.team_id) AND (teams.coach_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "macrocycles",
+      "policyname": "Admins and metodologos can manage macrocycles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "macrocycles",
+      "policyname": "Club members can view macrocycles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "match_callups",
+      "policyname": "Callups Access",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id = get_my_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "match_comments",
+      "policyname": "Inserción de comentarios",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = user_id)"
+    },
+    {
+      "tablename": "match_comments",
+      "policyname": "Lectura de comentarios",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "match_events",
+      "policyname": "Admins y coach del equipo pueden gestionar eventos de partido",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "match_events",
+      "policyname": "Admins y coach gestionan eventos del partido",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))) OR (EXISTS ( SELECT 1\n   FROM (partidos p\n     JOIN teams t ON ((p.equipo_id = t.id)))\n  WHERE ((p.id = match_events.partido_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "match_events",
+      "policyname": "Allow public read access to match_events",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "match_events",
+      "policyname": "Eventos visibles para el mismo club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM partidos\n  WHERE ((partidos.id = match_events.partido_id) AND (partidos.club_id = ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid()))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "matches",
+      "policyname": "Matches Access",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id = get_my_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "matches",
+      "policyname": "matches_delete",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "DELETE",
+      "qual": "(club_id = current_user_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "matches",
+      "policyname": "matches_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(club_id = current_user_club_id())"
+    },
+    {
+      "tablename": "matches",
+      "policyname": "matches_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = current_user_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "matches",
+      "policyname": "matches_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(club_id = current_user_club_id())",
+      "with_check": "(club_id = current_user_club_id())"
+    },
+    {
+      "tablename": "mesocycles",
+      "policyname": "Admins and metodologos can manage mesocycles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "mesocycles",
+      "policyname": "Club members can view mesocycles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "messages",
+      "policyname": "Autores pueden gestionar sus mensajes",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(sender_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "messages",
+      "policyname": "Mensajes visibles para el equipo",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_behaviours",
+      "policyname": "Admins and metodologos can manage methodology_behaviours",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_behaviours",
+      "policyname": "Club members can view methodology_behaviours",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_curriculum",
+      "policyname": "Admins and metodologos can manage methodology_curriculum",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_curriculum",
+      "policyname": "Club members can view methodology_curriculum",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_principles",
+      "policyname": "Admins and metodologos can manage methodology_principles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_principles",
+      "policyname": "Club members can view methodology_principles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_subprinciples",
+      "policyname": "Admins and metodologos can manage methodology_subprinciples",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "methodology_subprinciples",
+      "policyname": "Club members can view methodology_subprinciples",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "microcycles",
+      "policyname": "Admins and metodologos can manage microcycles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "microcycles",
+      "policyname": "Club members can view microcycles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "mvp_votes",
+      "policyname": "insert_mvp_votes_all",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((auth.uid() = voter_profile_id) AND (auth.role() = 'authenticated'::text))"
+    },
+    {
+      "tablename": "mvp_votes",
+      "policyname": "select_mvp_votes_all",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "notifications",
+      "policyname": "Usuarios pueden marcar como leido",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(user_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "notifications",
+      "policyname": "Usuarios ven sus notificaciones o admins ven las globales",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((user_id = auth.uid()) OR ((user_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text])))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "notifications",
+      "policyname": "insert_notifications_owner",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = profile_id)"
+    },
+    {
+      "tablename": "notifications",
+      "policyname": "select_notifications_owner",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = profile_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "notifications",
+      "policyname": "update_notifications_owner",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = profile_id)",
+      "with_check": "(auth.uid() = profile_id)"
+    },
+    {
+      "tablename": "official_receipts",
+      "policyname": "Los admins pueden insertar y actualizar recibos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text, 'directivo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "official_receipts",
+      "policyname": "Los admins y directivos ven todos los recibos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text, 'directivo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "official_receipts",
+      "policyname": "Los usuarios ven los recibos de sus jugadores",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = official_receipts.player_id) AND (players.tutor_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "partidos",
+      "policyname": "Admins y coach del equipo pueden gestionar partidos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.club_id = partidos.club_id) AND ((profiles.rol = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])) OR (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])))))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = partidos.equipo_id) AND (teams.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM team_coaches tc\n  WHERE ((tc.team_id = partidos.equipo_id) AND (tc.profile_id = auth.uid())))) OR ((equipo_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND ((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])) OR (( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])))))",
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.club_id = partidos.club_id) AND ((profiles.rol = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])) OR (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])))))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = partidos.equipo_id) AND (teams.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM team_coaches tc\n  WHERE ((tc.team_id = partidos.equipo_id) AND (tc.profile_id = auth.uid())))) OR ((equipo_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND ((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])) OR (( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])))))"
+    },
+    {
+      "tablename": "partidos",
+      "policyname": "Allow public read access to partidos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "partidos",
+      "policyname": "Partidos SELECT policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND ((profiles.rol = ANY (ARRAY['admin'::text, 'entrenador'::text, 'coach'::text, 'metodologo'::text])) OR (profiles.role = ANY (ARRAY['admin'::text, 'entrenador'::text, 'coach'::text, 'metodologo'::text])))))) OR (equipo_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = partidos.equipo_id) AND (teams.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM team_coaches tc\n  WHERE ((tc.team_id = partidos.equipo_id) AND (tc.profile_id = auth.uid())))) OR (equipo_id IN ( SELECT p.team_id\n   FROM players p\n  WHERE (p.tutor_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "Actualización de cuotas",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))) OR (EXISTS ( SELECT 1\n   FROM (players p\n     JOIN teams t ON ((p.team_id = t.id)))\n  WHERE ((p.id = payments.player_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "Borrado de cuotas",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))) OR (EXISTS ( SELECT 1\n   FROM (players p\n     JOIN teams t ON ((p.team_id = t.id)))\n  WHERE ((p.id = payments.player_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "Inserción de cuotas",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))) OR (EXISTS ( SELECT 1\n   FROM (players p\n     JOIN teams t ON ((p.team_id = t.id)))\n  WHERE ((p.id = payments.player_id) AND (t.coach_id = auth.uid())))))"
+    },
+    {
+      "tablename": "payments",
+      "policyname": "Lectura global de cuotas",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "payments_delete_admin",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "DELETE",
+      "qual": "((auth.jwt() ->> 'role'::text) = 'admin'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "payments_delete_coach_own",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "DELETE",
+      "qual": "(((auth.jwt() ->> 'role'::text) = 'coach'::text) AND (EXISTS ( SELECT 1\n   FROM teams t\n  WHERE ((t.id = payments.team_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "payments_insert_admin_only",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((auth.jwt() ->> 'role'::text) = 'admin'::text)"
+    },
+    {
+      "tablename": "payments",
+      "policyname": "payments_select_authenticated",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "payments_update_admin",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((auth.jwt() ->> 'role'::text) = 'admin'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "payments",
+      "policyname": "payments_update_coach_own",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(((auth.jwt() ->> 'role'::text) = 'coach'::text) AND (EXISTS ( SELECT 1\n   FROM teams t\n  WHERE ((t.id = payments.team_id) AND (t.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_apparel",
+      "policyname": "Anyone can select player_apparel",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "player_apparel",
+      "policyname": "Players and tutors can manage their sizes",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((auth.uid() = ( SELECT players.user_auth_id\n   FROM players\n  WHERE (players.id = player_apparel.player_id))) OR (auth.uid() = ( SELECT players.tutor_id\n   FROM players\n  WHERE (players.id = player_apparel.player_id))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_apparel",
+      "policyname": "Staff can manage player_apparel",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text, 'utillero'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_documents",
+      "policyname": "Admins can manage player documents",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_documents",
+      "policyname": "Tutors can insert own player documents",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = player_documents.player_id) AND (players.tutor_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = player_documents.player_id) AND (players.user_auth_id = auth.uid())))))"
+    },
+    {
+      "tablename": "player_documents",
+      "policyname": "Tutors can update own player documents",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = player_documents.player_id) AND (players.tutor_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = player_documents.player_id) AND (players.user_auth_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_documents",
+      "policyname": "Tutors can view own player documents",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = player_documents.player_id) AND (players.tutor_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM players\n  WHERE ((players.id = player_documents.player_id) AND (players.user_auth_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_evaluations",
+      "policyname": "Allow authenticated all player_evaluations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "tablename": "player_measurements",
+      "policyname": "Enable delete access for all authenticated users",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "DELETE",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "player_measurements",
+      "policyname": "Enable insert access for all authenticated users",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.role() = 'authenticated'::text)"
+    },
+    {
+      "tablename": "player_measurements",
+      "policyname": "Enable read access for all authenticated users",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "player_measurements",
+      "policyname": "Enable update access for all authenticated users",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(auth.role() = 'authenticated'::text)",
+      "with_check": null
+    },
+    {
+      "tablename": "player_objectives",
+      "policyname": "Admins and metodologos can manage player_objectives",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_objectives",
+      "policyname": "Club members can view player_objectives",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_requests",
+      "policyname": "Admins can update all requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_requests",
+      "policyname": "Admins can view all requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_requests",
+      "policyname": "Tutors can create their own requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = tutor_id)"
+    },
+    {
+      "tablename": "player_requests",
+      "policyname": "Tutors can view their own requests",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = tutor_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "player_season_history",
+      "policyname": "Enable delete for club members",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_season_history",
+      "policyname": "Enable insert for club members",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))"
+    },
+    {
+      "tablename": "player_season_history",
+      "policyname": "Enable read for club members",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_season_history",
+      "policyname": "Enable update for club members",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))"
+    },
+    {
+      "tablename": "player_season_teams",
+      "policyname": "Admins can manage their club's player seasons",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_season_teams",
+      "policyname": "Users can view their club's player seasons",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_training_metrics",
+      "policyname": "Coaches and Admins can manage training metrics",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (((players p\n     JOIN player_season_history psh ON ((psh.player_id = p.id)))\n     JOIN teams e ON ((psh.team_id = e.id)))\n     JOIN profiles pr ON ((pr.club_id = e.club_id)))\n  WHERE ((p.id = player_training_metrics.player_id) AND (pr.id = auth.uid()) AND (pr.role = ANY (ARRAY['admin'::text, 'superadmin'::text, 'coach'::text, 'entrenador'::text, 'metodologo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_training_metrics",
+      "policyname": "Users can view their club's player training metrics",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (((players p\n     JOIN player_season_history psh ON ((psh.player_id = p.id)))\n     JOIN teams e ON ((psh.team_id = e.id)))\n     JOIN profiles pr ON ((pr.club_id = e.club_id)))\n  WHERE ((p.id = player_training_metrics.player_id) AND (pr.id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "player_tutors",
+      "policyname": "Admins pueden ver todas las vinculaciones de su club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "is_admin_of_player_club(player_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "player_tutors",
+      "policyname": "Tutores pueden ver sus vinculaciones",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = tutor_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Actualizar jugadores de mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Actualizar jugadores del club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND ((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = players.team_id) AND (teams.coach_id = auth.uid()))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Admin can view all players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Admins pueden actualizar jugadores",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Allow authenticated insert players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() IS NOT NULL)"
+    },
+    {
+      "tablename": "players",
+      "policyname": "Allow authenticated update players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Allow public read access to players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Borrar jugadores de mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Borrar jugadores del club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "((club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text]))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Coaches can view their team players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = players.team_id) AND (teams.coach_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Coaches pueden actualizar sus jugadores",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = players.team_id) AND (teams.coach_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Crear jugadores",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coach'::text, 'metodologo'::text])))))"
+    },
+    {
+      "tablename": "players",
+      "policyname": "Directivos acceso total a players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text, 'coordinador'::text, 'directivo'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Insertar jugadores en mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))"
+    },
+    {
+      "tablename": "players",
+      "policyname": "Padres solo actualizan sus propios hijos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((tutor_id = auth.uid()) OR (user_auth_id = auth.uid()))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Padres solo leen sus propios hijos",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((tutor_id = auth.uid()) OR (user_auth_id = auth.uid()))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Permitir insercion a personal del club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coach'::text, 'metodologo'::text])))))"
+    },
+    {
+      "tablename": "players",
+      "policyname": "Players SELECT policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['admin'::text, 'entrenador'::text])) OR (team_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Players can view themselves",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = user_auth_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Players/Family can view their own record",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(user_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Tutores vinculados pueden ver ficha de su hijo",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "is_tutor_of_player(id)",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Tutors can view their linked players",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = tutor_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Ver jugadores de mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "players",
+      "policyname": "Ver jugadores del club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "Admins can update profiles",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles profiles_1\n  WHERE ((profiles_1.id = auth.uid()) AND (profiles_1.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "Users can insert their own profile.",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = id)"
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "Users can update own profile.",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = id)",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "Ver mi propio perfil",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "registrations",
+      "policyname": "Admins can manage registrations for their club fixed",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'secretaria'::text, 'presidente'::text])) AND (profiles.club_id = registrations.club_id))))",
+      "with_check": null
+    },
+    {
+      "tablename": "registrations",
+      "policyname": "Admins can view registrations for their club fixed",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'secretaria'::text, 'presidente'::text])) AND (profiles.club_id = registrations.club_id))))",
+      "with_check": null
+    },
+    {
+      "tablename": "registrations",
+      "policyname": "Allow public inserts",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "relacion_familias",
+      "policyname": "Admins and coaches can manage familias en su club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coach'::text, 'metodologo'::text]))))) AND (EXISTS ( SELECT 1\n   FROM players p\n  WHERE ((p.id = relacion_familias.player_id) AND (p.club_id = ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid())))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "relacion_familias",
+      "policyname": "Families can view their own relations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(usuario_id = auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "role_navigation",
+      "policyname": "Admins can modify role_navigation",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "role_navigation",
+      "policyname": "Role navigation is public",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "seasons",
+      "policyname": "Admins can manage their club's seasons",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'superadmin'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "seasons",
+      "policyname": "Users can view their club's seasons",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "sesiones_ejercicios",
+      "policyname": "Admins, entrenadores y metodologos pueden gestionar sesiones_ej",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coach'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "sesiones_ejercicios",
+      "policyname": "Sesiones ejercicios visibles para autenticados",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "session_drills",
+      "policyname": "session_drills_club_access",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(session_id IN ( SELECT ts.id\n   FROM ((training_sessions ts\n     JOIN teams t ON ((t.id = ts.team_id)))\n     JOIN profiles p ON ((p.club_id = t.club_id)))\n  WHERE (p.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "staff_invitations",
+      "policyname": "Admins can create invitations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.club_id = staff_invitations.club_id) AND (profiles.role = 'admin'::text))))"
+    },
+    {
+      "tablename": "staff_invitations",
+      "policyname": "Admins can view their club invitations",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.club_id = staff_invitations.club_id) AND (profiles.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "team_coaches",
+      "policyname": "Admins and club members can view team_coaches",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM teams t\n  WHERE ((t.id = team_coaches.team_id) AND (t.club_id IN ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid()))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "team_coaches",
+      "policyname": "Admins can manage team_coaches",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (teams t\n     JOIN profiles p ON ((t.club_id = p.club_id)))\n  WHERE ((t.id = p.team_id) AND (p.id = auth.uid()) AND (p.role = 'admin'::text))))",
+      "with_check": null
+    },
+    {
+      "tablename": "team_events",
+      "policyname": "Team events SELECT policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND ((profiles.rol = ANY (ARRAY['admin'::text, 'entrenador'::text, 'coach'::text, 'metodologo'::text])) OR (profiles.role = ANY (ARRAY['admin'::text, 'entrenador'::text, 'coach'::text, 'metodologo'::text])))))) OR (team_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = team_events.team_id) AND (teams.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM team_coaches tc\n  WHERE ((tc.team_id = team_events.team_id) AND (tc.profile_id = auth.uid())))) OR (team_id IN ( SELECT p.team_id\n   FROM players p\n  WHERE (p.tutor_id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "team_events",
+      "policyname": "Users can manage team_events for their club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM (teams e\n     JOIN profiles p ON ((p.club_id = e.club_id)))\n  WHERE ((e.id = team_events.team_id) AND (p.id = auth.uid()) AND ((p.rol = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])) OR (p.role = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])))))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = team_events.team_id) AND (teams.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM team_coaches tc\n  WHERE ((tc.team_id = team_events.team_id) AND (tc.profile_id = auth.uid())))) OR ((team_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND ((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])) OR (( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])))))",
+      "with_check": "((EXISTS ( SELECT 1\n   FROM (teams e\n     JOIN profiles p ON ((p.club_id = e.club_id)))\n  WHERE ((e.id = team_events.team_id) AND (p.id = auth.uid()) AND ((p.rol = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])) OR (p.role = ANY (ARRAY['admin'::text, 'superadmin'::text, 'metodologo'::text, 'coordinador'::text, 'entrenador'::text, 'coach'::text, 'delegado'::text])))))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = team_events.team_id) AND (teams.coach_id = auth.uid())))) OR (EXISTS ( SELECT 1\n   FROM team_coaches tc\n  WHERE ((tc.team_id = team_events.team_id) AND (tc.profile_id = auth.uid())))) OR ((team_id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) AND ((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])) OR (( SELECT profiles.role\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['entrenador'::text, 'coach'::text])))))"
+    },
+    {
+      "tablename": "team_events",
+      "policyname": "Users can view team_events for their club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (teams e\n     JOIN profiles p ON ((p.club_id = e.club_id)))\n  WHERE ((e.id = team_events.team_id) AND (p.id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "team_objectives",
+      "policyname": "Admins and metodologos can manage team_objectives",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'metodologo'::text, 'coordinador'::text])))))",
+      "with_check": null
+    },
+    {
+      "tablename": "team_objectives",
+      "policyname": "Club members can view team_objectives",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id IN ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Allow public read access to teams",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Borrar equipos de mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Crear equipos en mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))"
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Editar equipos de mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Public invite code lookup",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Teams SELECT policy",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((( SELECT profiles.rol\n   FROM profiles\n  WHERE (profiles.id = auth.uid())) = ANY (ARRAY['admin'::text, 'entrenador'::text])) OR (id = ( SELECT profiles.team_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))))",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Teams are viewable by club members",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "teams",
+      "policyname": "Ver equipos de mi club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(club_id = ( SELECT profiles.club_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid())))",
+      "with_check": null
+    },
+    {
+      "tablename": "training_attendance",
+      "policyname": "Attendance Access",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id = get_my_club_id())",
+      "with_check": null
+    },
+    {
+      "tablename": "training_sessions",
+      "policyname": "Training sessions can be managed by admins or assigned coach.",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "ALL",
+      "qual": "((EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::text)))) OR (EXISTS ( SELECT 1\n   FROM teams\n  WHERE ((teams.id = training_sessions.team_id) AND (teams.coach_id = auth.uid())))))",
+      "with_check": null
+    },
+    {
+      "tablename": "training_sessions",
+      "policyname": "Training sessions viewable by club",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM teams t\n  WHERE ((t.id = training_sessions.team_id) AND (t.club_id = ( SELECT profiles.club_id\n           FROM profiles\n          WHERE (profiles.id = auth.uid()))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "training_sessions",
+      "policyname": "Trainings Access",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "cmd": "ALL",
+      "qual": "(club_id = get_my_club_id())",
+      "with_check": null
+    }
+  ],
+  "pErr": null,
+  "functions": [
+    {
+      "proname": "array_to_halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "array_to_vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "assign_invite_code",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "avg",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "avg",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "binary_quantize",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "binary_quantize",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "check_consecutive_absences",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "cosine_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "cosine_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "cosine_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "current_user_club_id",
+      "prosecdef": true,
+      "provolatile": "s"
+    },
+    {
+      "proname": "current_user_team_id",
+      "prosecdef": true,
+      "provolatile": "s"
+    },
+    {
+      "proname": "execute_sql_query",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "generate_invite_code",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "get_my_club_id",
+      "prosecdef": true,
+      "provolatile": "s"
+    },
+    {
+      "proname": "get_user_club_id",
+      "prosecdef": true,
+      "provolatile": "s"
+    },
+    {
+      "proname": "get_user_role",
+      "prosecdef": true,
+      "provolatile": "s"
+    },
+    {
+      "proname": "halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_accum",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_add",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_avg",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_cmp",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_combine",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_concat",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_eq",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_ge",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_gt",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_in",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_l2_squared_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_le",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_lt",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_mul",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_ne",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_negative_inner_product",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_out",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_recv",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_send",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_spherical_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_sub",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_to_float4",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_to_sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_to_vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "halfvec_typmod_in",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "hamming_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "handle_document_rejection",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "handle_new_user",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "hnsw_bit_support",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "hnsw_halfvec_support",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "hnsw_sparsevec_support",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "hnswhandler",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "inner_product",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "inner_product",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "inner_product",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "is_admin_of_player_club",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "is_tutor_of_player",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "ivfflat_bit_support",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "ivfflat_halfvec_support",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "ivfflathandler",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "jaccard_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l1_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l1_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l1_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_norm",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_norm",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_normalize",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_normalize",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "l2_normalize",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "reconcile_match_and_close",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "send_scheduled_rsvps",
+      "prosecdef": true,
+      "provolatile": "v"
+    },
+    {
+      "proname": "set_fees_timestamp",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_cmp",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_eq",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_ge",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_gt",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_in",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_l2_squared_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_le",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_lt",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_ne",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_negative_inner_product",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_out",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_recv",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_send",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_to_halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_to_vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sparsevec_typmod_in",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "subvector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "subvector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sum",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sum",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "sync_player_season_history",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "update_equipos_coaches_count",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "update_equipos_members_count",
+      "prosecdef": false,
+      "provolatile": "v"
+    },
+    {
+      "proname": "vector",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_accum",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_add",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_avg",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_cmp",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_combine",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_concat",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_dims",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_dims",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_eq",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_ge",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_gt",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_in",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_l2_squared_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_le",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_lt",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_mul",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_ne",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_negative_inner_product",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_norm",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_out",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_recv",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_send",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_spherical_distance",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_sub",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_to_float4",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_to_halfvec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_to_sparsevec",
+      "prosecdef": false,
+      "provolatile": "i"
+    },
+    {
+      "proname": "vector_typmod_in",
+      "prosecdef": false,
+      "provolatile": "i"
+    }
+  ],
+  "fErr": null,
+  "buckets": [
+    {
+      "id": "avatars",
+      "name": "avatars",
+      "public": true
+    },
+    {
+      "id": "documentos-dni",
+      "name": "documentos-dni",
+      "public": false
+    },
+    {
+      "id": "expedientes-doc",
+      "name": "expedientes-doc",
+      "public": false
+    },
+    {
+      "id": "recibos_pagos",
+      "name": "recibos_pagos",
+      "public": false
+    },
+    {
+      "id": "actas-partidos",
+      "name": "actas-partidos",
+      "public": false
+    }
+  ],
+  "bErr": null,
+  "storagePolicies": [
+    {
+      "tablename": "objects",
+      "policyname": "Admins can upload receipts",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(bucket_id = 'recibos_pagos'::text)"
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Admins can view expedientes",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((bucket_id = 'expedientes-doc'::text) AND (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'presidente'::text, 'coordinador'::text]))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Admins pueden subir actas",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((bucket_id = 'actas-partidos'::text) AND ((auth.jwt() ->> 'role'::text) = 'admin'::text))"
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Anyone can update their avatar.",
+      "roles": [
+        "public"
+      ],
+      "cmd": "UPDATE",
+      "qual": "((bucket_id = 'avatars'::text) AND (auth.role() = 'authenticated'::text))",
+      "with_check": null
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Anyone can upload an avatar.",
+      "roles": [
+        "public"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((bucket_id = 'avatars'::text) AND (auth.role() = 'authenticated'::text))"
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Directivos y Padres leen DNI",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((bucket_id = 'documentos-dni'::text) AND (((auth.uid())::text = (storage.foldername(name))[1]) OR (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'coordinador'::text, 'directivo'::text])))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Lectura restringida de actas",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((bucket_id = 'actas-partidos'::text) AND (((auth.jwt() ->> 'role'::text) = 'admin'::text) OR (EXISTS ( SELECT 1\n   FROM (team_coaches tc\n     JOIN partidos p ON ((p.equipo_id = tc.team_id)))\n  WHERE ((tc.profile_id = auth.uid()) AND ((storage.foldername(objects.name))[1] = (p.id)::text)))) OR (EXISTS ( SELECT 1\n   FROM (teams t\n     JOIN partidos p ON ((p.equipo_id = t.id)))\n  WHERE ((t.coach_id = auth.uid()) AND ((storage.foldername(t.name))[1] = (p.id)::text))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Padres suben DNI a su carpeta",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((bucket_id = 'documentos-dni'::text) AND ((auth.uid())::text = (storage.foldername(name))[1]))"
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Users can upload expedientes",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(bucket_id = 'expedientes-doc'::text)"
+    },
+    {
+      "tablename": "objects",
+      "policyname": "Users can view own receipts",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "(bucket_id = 'recibos_pagos'::text)",
+      "with_check": null
+    }
+  ],
+  "spErr": null
+}

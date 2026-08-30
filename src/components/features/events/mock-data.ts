@@ -13,6 +13,8 @@ export interface CalendarEvent {
   teamColor: string // tailwind bg class
   teamHex: string  // hex for inline styles
   location?: string
+  isOfficialMatch?: boolean
+  color?: string
 }
 
 export const MOCK_TEAMS = [

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import Image from "next/image"
 import dynamic from "next/dynamic"
 import {
   MapPin,
@@ -586,6 +587,25 @@ export function buildDisplayLabel(structure: string, laterality: LateralityType)
   return structure
 }
 
+export const QUICK_REGIONS = [
+  { id: "cabeza", label: "Cabeza", thumb: "/models/thumbnails/cabeza.png", region: "Cabeza", structure: "Cabeza", lat: "central" as LateralityType, view: "front" as const },
+  { id: "cuello", label: "Cuello", thumb: "/models/thumbnails/cuello.png", region: "Cuello", structure: "Cuello", lat: "central" as LateralityType, view: "front" as const },
+  { id: "hombro", label: "Hombro", thumb: "/models/thumbnails/hombro.png", region: "Hombro", structure: "Hombro", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "brazo", label: "Brazo", thumb: "/models/thumbnails/brazo.png", region: "Brazo", structure: "Bíceps", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "codo", label: "Codo", thumb: "/models/thumbnails/codo.png", region: "Codo", structure: "Codo", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "antebrazo", label: "Antebrazo", thumb: "/models/thumbnails/antebrazo.png", region: "Antebrazo", structure: "Musculatura flexora", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "muneca", label: "Muñeca", thumb: "/models/thumbnails/muneca.png", region: "Muñeca", structure: "Muñeca", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "mano", label: "Mano", thumb: "/models/thumbnails/mano.png", region: "Mano", structure: "Mano", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "cadera", label: "Cadera", thumb: "/models/thumbnails/cadera.png", region: "Cadera / Pelvis", structure: "Cadera", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "muslo_post", label: "Muslo post.", thumb: "/models/thumbnails/muslo_post.png", region: "Muslo posterior", structure: "Isquiotibiales", lat: "derecha" as LateralityType, view: "back" as const },
+  { id: "rodilla", label: "Rodilla", thumb: "/models/thumbnails/rodilla.png", region: "Rodilla", structure: "Rodilla", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "pierna", label: "Pierna", thumb: "/models/thumbnails/pierna.png", region: "Pierna", structure: "Gemelo", lat: "derecha" as LateralityType, view: "back" as const },
+  { id: "tobillo", label: "Tobillo", thumb: "/models/thumbnails/tobillo.png", region: "Tobillo", structure: "Tobillo externo", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "pie_tarso", label: "Pie (tarso)", thumb: "/models/thumbnails/pie_tarso.png", region: "Pie", structure: "Talón", lat: "derecha" as LateralityType, view: "back" as const },
+  { id: "pie_meta", label: "Pie (metatarso)", thumb: "/models/thumbnails/pie_meta.png", region: "Pie", structure: "Empeine", lat: "derecha" as LateralityType, view: "front" as const },
+  { id: "dedos", label: "Dedos", thumb: "/models/thumbnails/dedos.png", region: "Pie", structure: "Dedos", lat: "derecha" as LateralityType, view: "front" as const },
+]
+
 export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
   // Modo de visualización: 3D por defecto, con opción 2D
   const [viewMode, setViewMode] = useState<"3d" | "2d">("3d")
@@ -890,6 +910,54 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
               </div>
             </div>
           )}
+
+          {/* Carrusel de Selección Rápida por Región (Idéntico a la referencia médica) */}
+          <div className="w-full mt-3 p-2.5 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-[11px] font-black uppercase text-slate-300 tracking-wide">
+                Selección rápida por región <span className="text-slate-500 font-normal text-[10px] lowercase">(clic para ir)</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-slate-700">
+              {QUICK_REGIONS.map(qr => {
+                const isActive = value?.bodyRegion?.toLowerCase() === qr.region.toLowerCase()
+                return (
+                  <button
+                    key={qr.id}
+                    type="button"
+                    onClick={() => {
+                      const label = buildDisplayLabel(qr.structure, qr.lat)
+                      onChange({
+                        bodyRegion: qr.region,
+                        bodyStructure: qr.structure,
+                        laterality: qr.lat,
+                        bodyView: qr.view,
+                        displayLabel: label
+                      })
+                    }}
+                    className={`flex flex-col items-center gap-1 p-1 rounded-xl border transition-all shrink-0 cursor-pointer min-w-[50px] ${
+                      isActive
+                        ? "bg-red-950/80 border-red-500 shadow-md shadow-red-950/50 scale-105"
+                        : "bg-slate-950/60 border-slate-800 hover:border-slate-600 opacity-80 hover:opacity-100"
+                    }`}
+                  >
+                    <div className="w-9 h-11 relative rounded-lg overflow-hidden bg-black/40">
+                      <Image
+                        src={qr.thumb}
+                        alt={qr.label}
+                        width={36}
+                        height={44}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <span className={`text-[9px] font-bold truncate max-w-[52px] ${isActive ? "text-red-400 font-black" : "text-slate-400"}`}>
+                      {qr.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/* COLUMNA DETALLE: SELECCIÓN EN DOS NIVELES Y LATERALIDAD */}
@@ -912,18 +980,36 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
             </div>
 
             {value ? (
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
-                <span className="text-sm font-black text-slate-900">
-                  {value.displayLabel}
-                </span>
-                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                  {value.bodyRegion}
-                </span>
+              <div className="flex items-center justify-between gap-3 p-2 bg-slate-900 border border-slate-800 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-16 relative rounded-lg overflow-hidden border border-red-500/40 bg-black/60 shrink-0">
+                    <Image
+                      src="/models/mini_body_preview.png"
+                      alt="Miniatura anatómica"
+                      width={40}
+                      height={64}
+                      className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                      <span className="text-sm font-black text-white">
+                        {value.displayLabel}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                      Región: <strong className="text-slate-200">{value.bodyRegion}</strong>
+                    </div>
+                    <div className="text-[10px] text-red-400 font-bold">
+                      Estructura: {value.bodyStructure}
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-slate-400 italic">
-                Haz clic o toca sobre el maniquí 3D para seleccionar la zona afectada.
+                Haz clic o toca sobre el avatar deportivo 3D o en el carrusel inferior para seleccionar la zona afectada.
               </p>
             )}
           </div>

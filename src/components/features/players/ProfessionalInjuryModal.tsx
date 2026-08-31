@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import Image from "next/image"
 import {
   X,
@@ -18,9 +18,7 @@ import {
   Save,
   MousePointer,
   Eye,
-  Maximize2,
-  ZoomIn,
-  ZoomOut
+  Maximize2
 } from "lucide-react"
 import { createInjuryAction } from "@/app/actions/injury-actions"
 import {
@@ -70,7 +68,7 @@ const FOOTBALL_ANATOMY_CATEGORIES: CategoryGroup[] = [
     icon: "💀",
     muscles: [
       { id: "cabeza", name: "Cráneo / Cara", region: "Cabeza", laterality: "central", view: "front" },
-      { id: "cuello", name: "Musculatura cervical", region: "Cuello", laterality: "central", view: "both" as any }
+      { id: "cuello", name: "Musculatura cervical", region: "Cuello", laterality: "central", view: "front" }
     ]
   },
   {
@@ -90,14 +88,14 @@ const FOOTBALL_ANATOMY_CATEGORIES: CategoryGroup[] = [
     title: "Miembros superiores (y Portero)",
     icon: "🫱",
     muscles: [
-      { id: "supraespinoso_der", name: "Supraespinoso (Hombro der)", region: "Hombro", laterality: "derecha", view: "both" as any },
-      { id: "supraespinoso_izq", name: "Supraespinoso (Hombro izq)", region: "Hombro", laterality: "izquierda", view: "both" as any },
-      { id: "subescapular_der", name: "Subescapular / Redondo mayor (der)", region: "Hombro", laterality: "derecha", view: "both" as any },
+      { id: "supraespinoso_der", name: "Supraespinoso (Hombro der)", region: "Hombro", laterality: "derecha", view: "front" },
+      { id: "supraespinoso_izq", name: "Supraespinoso (Hombro izq)", region: "Hombro", laterality: "izquierda", view: "front" },
+      { id: "subescapular_der", name: "Subescapular / Redondo mayor (der)", region: "Hombro", laterality: "derecha", view: "back" },
       { id: "biceps_der", name: "Bíceps braquial derecho", region: "Brazo", laterality: "derecha", view: "front" },
       { id: "triceps_der", name: "Tríceps braquial derecho", region: "Brazo", laterality: "derecha", view: "back" },
-      { id: "codo_der", name: "Codo / Epicóndilo derecho", region: "Codo", laterality: "derecha", view: "both" as any },
-      { id: "antebrazo_der", name: "Musculatura flexora / extensora", region: "Antebrazo", laterality: "derecha", view: "both" as any },
-      { id: "muneca_der", name: "Muñeca / Escafoides derecho", region: "Muñeca", laterality: "derecha", view: "both" as any }
+      { id: "codo_der", name: "Codo / Epicóndilo derecho", region: "Codo", laterality: "derecha", view: "front" },
+      { id: "antebrazo_der", name: "Musculatura flexora / extensora", region: "Antebrazo", laterality: "derecha", view: "front" },
+      { id: "muneca_der", name: "Muñeca / Escafoides derecho", region: "Muñeca", laterality: "derecha", view: "front" }
     ]
   },
   {
@@ -135,10 +133,71 @@ const FOOTBALL_ANATOMY_CATEGORIES: CategoryGroup[] = [
       { id: "soleo_der", name: "Sóleo derecho", region: "Pierna", laterality: "derecha", view: "back" },
       { id: "tibial_anterior_der", name: "Tibial anterior derecho", region: "Pierna", laterality: "derecha", view: "front" },
       { id: "peroneos_der", name: "Peroneo lateral largo / corto der", region: "Pierna", laterality: "derecha", view: "front" },
-      { id: "tobillo_der", name: "Ligamentos tobillo / Aquiles der", region: "Tobillo", laterality: "derecha", view: "both" as any }
+      { id: "tobillo_der", name: "Ligamentos tobillo / Aquiles der", region: "Tobillo", laterality: "derecha", view: "front" }
     ]
   }
 ]
+
+// Mapeo espacial exacto de cada músculo sobre el avatar (porcentaje x, y, ancho y alto)
+interface MuscleCoordinate {
+  view: "front" | "back"
+  x: number // porcentaje X
+  y: number // porcentaje Y
+  w: number // ancho del aura
+  h: number // alto del aura
+  pointerSide: "left" | "right"
+}
+
+const MUSCLE_COORDINATES: Record<string, MuscleCoordinate> = {
+  // Cabeza y Cuello
+  "Cráneo / Cara": { view: "front", x: 50, y: 9, w: 50, h: 55, pointerSide: "right" },
+  "Musculatura cervical": { view: "front", x: 50, y: 15, w: 42, h: 28, pointerSide: "right" },
+
+  // Core y Tronco
+  "Pectoral mayor": { view: "front", x: 50, y: 24, w: 90, h: 48, pointerSide: "right" },
+  "Recto abdominal": { view: "front", x: 50, y: 35, w: 60, h: 70, pointerSide: "right" },
+  "Oblicuo interno / externo": { view: "front", x: 62, y: 36, w: 45, h: 60, pointerSide: "right" },
+  "Dorsal ancho": { view: "back", x: 50, y: 27, w: 95, h: 65, pointerSide: "right" },
+  "Erectores de la columna": { view: "back", x: 50, y: 38, w: 65, h: 60, pointerSide: "right" },
+
+  // Miembros Superiores
+  "Supraespinoso (Hombro der)": { view: "front", x: 32, y: 22, w: 45, h: 45, pointerSide: "left" },
+  "Supraespinoso (Hombro izq)": { view: "front", x: 68, y: 22, w: 45, h: 45, pointerSide: "right" },
+  "Subescapular / Redondo mayor (der)": { view: "back", x: 33, y: 25, w: 45, h: 45, pointerSide: "left" },
+  "Bíceps braquial derecho": { view: "front", x: 27, y: 31, w: 35, h: 50, pointerSide: "left" },
+  "Tríceps braquial derecho": { view: "back", x: 27, y: 31, w: 35, h: 50, pointerSide: "left" },
+  "Codo / Epicóndilo derecho": { view: "front", x: 24, y: 39, w: 30, h: 30, pointerSide: "left" },
+  "Musculatura flexora / extensora": { view: "front", x: 21, y: 46, w: 30, h: 50, pointerSide: "left" },
+  "Muñeca / Escafoides derecho": { view: "front", x: 18, y: 54, w: 25, h: 25, pointerSide: "left" },
+
+  // Ingle y Cadera
+  "Aductor largo (medio) der": { view: "front", x: 45, y: 48, w: 38, h: 55, pointerSide: "left" },
+  "Aductor largo (medio) izq": { view: "front", x: 55, y: 48, w: 38, h: 55, pointerSide: "right" },
+  "Aductor mayor derecho": { view: "front", x: 44, y: 51, w: 38, h: 50, pointerSide: "left" },
+  "Pectíneo derecho": { view: "front", x: 44, y: 46, w: 35, h: 35, pointerSide: "left" },
+  "Grácil (Recto interno) der": { view: "front", x: 46, y: 53, w: 25, h: 60, pointerSide: "left" },
+  "Psoas ilíaco derecho": { view: "front", x: 42, y: 44, w: 35, h: 45, pointerSide: "left" },
+  "Tensor de la fascia lata der": { view: "front", x: 35, y: 46, w: 30, h: 45, pointerSide: "left" },
+  "Glúteo mayor / medio derecho": { view: "back", x: 43, y: 47, w: 50, h: 50, pointerSide: "left" },
+  "Glúteo mayor / medio izquierdo": { view: "back", x: 57, y: 47, w: 50, h: 50, pointerSide: "right" },
+
+  // Miembros Inferiores
+  "Recto anterior (cuádriceps) der": { view: "front", x: 41, y: 55, w: 45, h: 80, pointerSide: "left" },
+  "Vasto lateral (cuádriceps) der": { view: "front", x: 35, y: 56, w: 35, h: 70, pointerSide: "left" },
+  "Vasto medial (cuádriceps) der": { view: "front", x: 45, y: 62, w: 35, h: 50, pointerSide: "left" },
+  "Sartorio derecho": { view: "front", x: 39, y: 53, w: 25, h: 75, pointerSide: "left" },
+  "Bíceps femoral (Cabeza larga) der": { view: "back", x: 42, y: 56, w: 45, h: 80, pointerSide: "left" },
+  "Bíceps femoral (Cabeza corta) der": { view: "back", x: 40, y: 60, w: 35, h: 55, pointerSide: "left" },
+  "Semitendinoso derecho": { view: "back", x: 44, y: 56, w: 35, h: 75, pointerSide: "left" },
+  "Semimembranoso derecho": { view: "back", x: 45, y: 58, w: 35, h: 75, pointerSide: "left" },
+  "Rótula / Tendón rotuliano der": { view: "front", x: 42, y: 70, w: 35, h: 35, pointerSide: "left" },
+  "Gemelo interno (Gastrocnemio) der": { view: "back", x: 45, y: 77, w: 35, h: 55, pointerSide: "left" },
+  "Gemelo externo (Gastrocnemio) der": { view: "back", x: 38, y: 77, w: 35, h: 55, pointerSide: "left" },
+  "Sóleo derecho": { view: "back", x: 43, y: 83, w: 35, h: 50, pointerSide: "left" },
+  "Tibial anterior derecho": { view: "front", x: 42, y: 80, w: 35, h: 65, pointerSide: "left" },
+  "Peroneo lateral largo / corto der": { view: "front", x: 37, y: 81, w: 30, h: 60, pointerSide: "left" },
+  "Ligamentos tobillo / Aquiles der": { view: "front", x: 43, y: 91, w: 30, h: 30, pointerSide: "left" }
+}
 
 const INJURY_TYPES = [
   { value: "Rotura muscular", desc: "Desgarro total de las fibras musculares.", defaultImpact: "Grave" },
@@ -167,10 +226,11 @@ export function ProfessionalInjuryModal({
   // Acordeón izquierdo abierto
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["miembros_inferiores"])
 
-  // Selección Anatómica
-  const [selectedRegion, setSelectedRegion] = useState<string>("Muslo posterior")
-  const [selectedStructure, setSelectedStructure] = useState<string>("Bíceps femoral (Cabeza larga)")
+  // Selección Anatómica: EMPIEZA LIMPIO SIN LESIÓN MARCADA POR DEFECTO
+  const [selectedRegion, setSelectedRegion] = useState<string>("")
+  const [selectedStructure, setSelectedStructure] = useState<string>("")
   const [selectedLaterality, setSelectedLaterality] = useState<LateralityType>("derecha")
+  const [isTooltipDismissed, setIsTooltipDismissed] = useState<boolean>(false)
 
   // Datos de la Lesión
   const [injuryType, setInjuryType] = useState<string>("Rotura muscular")
@@ -181,6 +241,19 @@ export function ProfessionalInjuryModal({
   const [notes, setNotes] = useState<string>("")
   const [saving, setSaving] = useState<boolean>(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  // Coordenadas anatómicas del músculo seleccionado actualmente
+  const activeCoord = useMemo(() => {
+    if (!selectedStructure) return null
+    return MUSCLE_COORDINATES[selectedStructure] || {
+      view: "back" as const,
+      x: 42,
+      y: 56,
+      w: 45,
+      h: 80,
+      pointerSide: "left" as const
+    }
+  }, [selectedStructure])
 
   // Cálculo en tiempo real del pronóstico de baja con el motor científico
   const currentEstimation: RecoveryEstimationResult = estimateRecovery({
@@ -211,7 +284,10 @@ export function ProfessionalInjuryModal({
     setSelectedStructure(item.name)
     setSelectedRegion(item.region)
     setSelectedLaterality(item.laterality)
-    if (item.view && (item.view as string) !== "both" && activeAvatarView !== "dual") {
+    setIsTooltipDismissed(false)
+
+    // En móviles o si no está en modo dual, cambiar a la vista adecuada
+    if (item.view && activeAvatarView !== "dual") {
       setActiveAvatarView(item.view)
     }
   }
@@ -219,6 +295,12 @@ export function ProfessionalInjuryModal({
   // Guardar lesión definitiva
   const handleSaveInjury = async () => {
     setErrorMsg(null)
+    if (!selectedStructure || !selectedRegion) {
+      setErrorMsg("Debes seleccionar una zona anatómica en el Paso 1")
+      setCurrentStep(1)
+      return
+    }
+
     setSaving(true)
     try {
       const finalType = injuryType === "Otra" ? customType.trim() : injuryType
@@ -326,8 +408,8 @@ export function ProfessionalInjuryModal({
             </button>
           </div>
 
-          {/* Botones de Perspectiva (Frontal, Posterior, Lateral, Restablecer) */}
-          <div className="hidden md:flex items-center gap-1 text-xs">
+          {/* Botones de Perspectiva (Frontal, Posterior, Dual, Restablecer) */}
+          <div className="flex items-center gap-1 text-xs">
             <button
               type="button"
               onClick={() => setActiveAvatarView("front")}
@@ -349,7 +431,7 @@ export function ProfessionalInjuryModal({
             <button
               type="button"
               onClick={() => setActiveAvatarView("dual")}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`hidden sm:inline px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 activeAvatarView === "dual" ? "bg-red-600 text-white shadow-xs" : "bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
               }`}
             >
@@ -473,9 +555,10 @@ export function ProfessionalInjuryModal({
                 <div
                   onClick={() => {
                     handleSelectMuscle({
-                      name: "Recto anterior (cuádriceps)",
+                      name: "Recto anterior (cuádriceps) der",
                       region: "Muslo anterior",
-                      laterality: "derecha"
+                      laterality: "derecha",
+                      view: "front"
                     })
                   }}
                   className="relative w-48 sm:w-56 h-[380px] sm:h-[430px] flex items-center justify-center cursor-pointer group"
@@ -491,6 +574,55 @@ export function ProfessionalInjuryModal({
                   <div className="absolute top-2 inset-x-0 text-center text-[10px] font-black uppercase text-slate-500 tracking-wider pointer-events-none">
                     Vista Anterior
                   </div>
+
+                  {/* RESALTADO DINÁMICO EN LA POSICIÓN EXACTA SI EL MÚSCULO ES FRONTAL */}
+                  {selectedStructure && activeCoord && activeCoord.view === "front" && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${activeCoord.x}%`,
+                        top: `${activeCoord.y}%`,
+                        width: `${activeCoord.w}px`,
+                        height: `${activeCoord.h}px`,
+                        transform: "translate(-50%, -50%)"
+                      }}
+                      className="pointer-events-none z-10 animate-pulse rounded-full bg-red-600/50 filter blur-xs shadow-[0_0_25px_rgba(239,68,68,0.95)]"
+                    />
+                  )}
+
+                  {/* TARJETA CON PUNTERO DINÁMICAMENTE POSICIONADA EN EL MÚSCULO FRONTAL */}
+                  {selectedStructure && activeCoord && activeCoord.view === "front" && !isTooltipDismissed && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: activeCoord.pointerSide === "right" ? `${activeCoord.x + 14}%` : `${activeCoord.x - 42}%`,
+                        top: `${Math.max(10, Math.min(85, activeCoord.y - 4))}%`
+                      }}
+                      className="bg-slate-900/95 border border-red-500/80 rounded-xl p-2.5 shadow-2xl z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-bold text-white text-[11px] whitespace-nowrap">
+                          {selectedStructure.split("(")[0]}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIsTooltipDismissed(true)
+                          }}
+                          className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
+                          title="Cerrar indicador"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-bold text-red-400 flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                        <span>{selectedLaterality.toUpperCase()}</span>
+                      </div>
+                      <div className="text-[9px] text-slate-400 mt-1">Zona seleccionada</div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -499,9 +631,10 @@ export function ProfessionalInjuryModal({
                 <div
                   onClick={() => {
                     handleSelectMuscle({
-                      name: "Bíceps femoral (Cabeza larga)",
+                      name: "Bíceps femoral (Cabeza larga) der",
                       region: "Muslo posterior",
-                      laterality: "derecha"
+                      laterality: "derecha",
+                      view: "back"
                     })
                   }}
                   className="relative w-48 sm:w-56 h-[380px] sm:h-[430px] flex items-center justify-center cursor-pointer group"
@@ -518,30 +651,54 @@ export function ProfessionalInjuryModal({
                     Vista Posterior
                   </div>
 
-                  {/* Resaltado de fibra muscular en isquiotibiales cuando está activo */}
-                  {selectedRegion.toLowerCase().includes("posterior") && (
-                    <div className="absolute top-[41%] left-[26%] w-[24%] h-[26%] pointer-events-none z-10 animate-pulse">
-                      <Image
-                        src="/models/hamstring_right_glow.png"
-                        alt="Isquiotibiales iluminados"
-                        width={120}
-                        height={220}
-                        className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(239,68,68,1)] drop-shadow-[0_0_35px_rgba(220,38,38,0.9)]"
-                      />
-                    </div>
+                  {/* RESALTADO DINÁMICO EN LA POSICIÓN EXACTA SI EL MÚSCULO ES DORSAL */}
+                  {selectedStructure && activeCoord && activeCoord.view === "back" && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${activeCoord.x}%`,
+                        top: `${activeCoord.y}%`,
+                        width: `${activeCoord.w}px`,
+                        height: `${activeCoord.h}px`,
+                        transform: "translate(-50%, -50%)"
+                      }}
+                      className="pointer-events-none z-10 animate-pulse rounded-full bg-red-600/50 filter blur-xs shadow-[0_0_25px_rgba(239,68,68,0.95)]"
+                    />
                   )}
 
-                  {/* Tarjeta flotante con puntero idéntica a la imagen de referencia */}
-                  <div className="absolute top-[46%] left-[78%] bg-slate-900/95 border border-red-500/80 rounded-xl p-2.5 shadow-2xl z-30 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-                    <div className="font-bold text-white text-[11px] whitespace-nowrap">
-                      {selectedStructure.split("(")[0]}
+                  {/* TARJETA CON PUNTERO DINÁMICAMENTE POSICIONADA EN EL MÚSCULO DORSAL */}
+                  {selectedStructure && activeCoord && activeCoord.view === "back" && !isTooltipDismissed && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: activeCoord.pointerSide === "right" ? `${activeCoord.x + 14}%` : `${activeCoord.x - 42}%`,
+                        top: `${Math.max(10, Math.min(85, activeCoord.y - 4))}%`
+                      }}
+                      className="bg-slate-900/95 border border-red-500/80 rounded-xl p-2.5 shadow-2xl z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-bold text-white text-[11px] whitespace-nowrap">
+                          {selectedStructure.split("(")[0]}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIsTooltipDismissed(true)
+                          }}
+                          className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
+                          title="Cerrar indicador"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-bold text-red-400 flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                        <span>{selectedLaterality.toUpperCase()}</span>
+                      </div>
+                      <div className="text-[9px] text-slate-400 mt-1">Zona seleccionada</div>
                     </div>
-                    <div className="text-[10px] font-bold text-red-400 flex items-center gap-1 mt-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                      <span>{selectedLaterality.toUpperCase()}</span>
-                    </div>
-                    <div className="text-[9px] text-slate-400 mt-1">Haz clic para seleccionar</div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -552,7 +709,7 @@ export function ProfessionalInjuryModal({
             <div className="flex items-center gap-5">
               <span className="flex items-center gap-1.5">
                 <MousePointer className="w-3.5 h-3.5 text-slate-300" />
-                <span>Haz clic para seleccionar</span>
+                <span>Haz clic en un músculo para seleccionarlo</span>
               </span>
               <span className="hidden sm:flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5 text-slate-300" />
@@ -580,6 +737,10 @@ export function ProfessionalInjuryModal({
                       setSelectedRegion(qr.region)
                       setSelectedStructure(qr.structure)
                       setSelectedLaterality(qr.lat)
+                      setIsTooltipDismissed(false)
+                      if (qr.view && (qr.view as string) !== "both" && activeAvatarView !== "dual") {
+                        setActiveAvatarView(qr.view)
+                      }
                     }}
                     className={`flex flex-col items-center gap-1 p-1 rounded-xl border transition-all shrink-0 cursor-pointer min-w-[50px] ${
                       isActive
@@ -631,7 +792,7 @@ export function ProfessionalInjuryModal({
                 { step: 3, label: "Gravedad" },
                 { step: 4, label: "Detalles" }
               ].map(s => {
-                const isPassed = currentStep > s.step
+                const isPassed = currentStep > s.step || (s.step === 1 && Boolean(selectedStructure))
                 const isCurrent = currentStep === s.step
                 return (
                   <button
@@ -642,14 +803,14 @@ export function ProfessionalInjuryModal({
                   >
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
-                        isPassed
+                        isPassed && !isCurrent
                           ? "bg-emerald-500 text-white"
                           : isCurrent
                           ? "bg-red-600 text-white ring-2 ring-red-500/50"
                           : "bg-slate-800 text-slate-400"
                       }`}
                     >
-                      {isPassed ? <Check className="w-3.5 h-3.5" /> : s.step}
+                      {isPassed && !isCurrent ? <Check className="w-3.5 h-3.5" /> : s.step}
                     </div>
                     <span className={`text-[9px] font-bold ${isCurrent ? "text-white" : "text-slate-500"}`}>
                       {s.label}
@@ -666,10 +827,10 @@ export function ProfessionalInjuryModal({
                   Zona seleccionada
                 </span>
                 <span className="font-black text-sm text-white block mt-0.5">
-                  {selectedStructure}
+                  {selectedStructure || "Sin selección"}
                 </span>
                 <span className="text-[11px] font-bold text-red-400">
-                  {selectedLaterality.toUpperCase()}
+                  {selectedStructure ? selectedLaterality.toUpperCase() : "Selecciona en el avatar"}
                 </span>
               </div>
               <div className="w-10 h-16 relative rounded-lg overflow-hidden border border-red-500/40 bg-black/60 shrink-0">
@@ -687,25 +848,35 @@ export function ProfessionalInjuryModal({
             {/* PASO 1: CONFIRMAR ZONA Y LATERALIDAD */}
             {currentStep === 1 && (
               <div className="space-y-3">
-                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wide block">
-                  Lateralidad de la lesión
-                </span>
-                <div className="grid grid-cols-3 gap-1.5 text-xs">
-                  {(["izquierda", "derecha", "central", "bilateral"] as const).map(lat => (
-                    <button
-                      key={lat}
-                      type="button"
-                      onClick={() => setSelectedLaterality(lat)}
-                      className={`py-2 rounded-xl font-bold border transition-all cursor-pointer capitalize ${
-                        selectedLaterality === lat
-                          ? "bg-red-600 text-white border-red-500 shadow-xs"
-                          : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      {lat}
-                    </button>
-                  ))}
-                </div>
+                {!selectedStructure ? (
+                  <div className="p-3.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-400 text-center space-y-1">
+                    <MousePointer className="w-5 h-5 text-red-500 mx-auto" />
+                    <p className="font-bold text-slate-200">Haz clic en un músculo</p>
+                    <p className="text-[10px]">Toca cualquier parte en el maniquí o en el menú de la izquierda para marcar la lesión.</p>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wide block">
+                      Lateralidad de la lesión
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5 text-xs">
+                      {(["izquierda", "derecha", "central", "bilateral"] as const).map(lat => (
+                        <button
+                          key={lat}
+                          type="button"
+                          onClick={() => setSelectedLaterality(lat)}
+                          className={`py-2 rounded-xl font-bold border transition-all cursor-pointer capitalize ${
+                            selectedLaterality === lat
+                              ? "bg-red-600 text-white border-red-500 shadow-xs"
+                              : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          {lat}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -896,8 +1067,9 @@ export function ProfessionalInjuryModal({
               {currentStep < 4 ? (
                 <button
                   type="button"
+                  disabled={currentStep === 1 && !selectedStructure}
                   onClick={() => setCurrentStep(prev => (prev + 1) as any)}
-                  className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-red-600/30"
+                  className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-red-600/30"
                 >
                   <span>Siguiente</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -905,7 +1077,7 @@ export function ProfessionalInjuryModal({
               ) : (
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={saving || !selectedStructure}
                   onClick={handleSaveInjury}
                   className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-red-600/30"
                 >

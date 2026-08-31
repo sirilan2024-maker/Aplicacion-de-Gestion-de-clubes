@@ -776,15 +776,25 @@ export default function GlobalPlayerProfilePage() {
                     {player.status === 'active' || player.status === 'Activo' ? 'Activo' : player.status || 'Activo'}
                   </span>
                   {hasActiveInjury ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase bg-red-600 text-white shadow-xs animate-pulse">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('medico')}
+                      title="Ver lesiones del jugador"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase bg-red-600 hover:bg-red-700 text-white shadow-xs animate-pulse cursor-pointer transition-all"
+                    >
                       <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                      🔴 BAJA POR LESIÓN
-                    </span>
+                      🔴 BAJA POR LESIÓN (Ver)
+                    </button>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('medico')}
+                      title="Ver historial de lesiones del jugador"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-200 cursor-pointer transition-all"
+                    >
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      🟢 SIN LESIONES ACTIVAS
-                    </span>
+                      🟢 LESIONES / ALTA (Ver)
+                    </button>
                   )}
                 </div>
               </div>
@@ -833,7 +843,7 @@ export default function GlobalPlayerProfilePage() {
               onChange={(e) => setActiveTab(e.target.value as any)}
             >
               <option value="info" className="bg-white text-slate-900">📋 Info Personal</option>
-              <option value="medico" className="bg-white text-slate-900">🩺 Físico & Médico</option>
+              <option value="medico" className="bg-white text-slate-900">🩺 Físico & Lesiones</option>
               {isFormativeEligible() && (
                 <option value="formativo" className="bg-white text-slate-900">🧠 Formativo & Aprendizaje</option>
               )}
@@ -864,7 +874,7 @@ export default function GlobalPlayerProfilePage() {
               activeTab === 'medico' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <HeartPulse size={18} /> Físico & Médico
+            <HeartPulse size={18} /> Físico & Lesiones
           </button>
 
           {/* Pestaña Formativo (solo visible en categorías hasta infantil 2º año) */}

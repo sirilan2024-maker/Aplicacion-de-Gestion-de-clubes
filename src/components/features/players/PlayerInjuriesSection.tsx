@@ -430,10 +430,22 @@ export function PlayerInjuriesSection({
           {/* 2. PANEL DE LESIÓN ACTIVA */}
           {activeInjuries.length > 0 && (
             <div className="space-y-4">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-red-700 flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
-                Lesión Activa en Seguimiento ({activeInjuries.length})
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-red-700 flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+                  Lesión Activa en Seguimiento ({activeInjuries.length})
+                </span>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsNewModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Registrar Otra Lesión</span>
+                  </button>
+                )}
+              </div>
 
               {activeInjuries.map(act => (
                 <div
@@ -576,12 +588,24 @@ export function PlayerInjuriesSection({
 
           {/* 3. HISTORIAL COMPLETO DE LESIONES */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                <History className="w-4 h-4 text-gray-400" />
-                Historial Cronológico de Lesiones
-              </span>
-              <span className="text-xs text-gray-400">{injuries.length} registros</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                  <History className="w-4 h-4 text-gray-400" />
+                  Historial Cronológico de Lesiones
+                </span>
+                <span className="text-xs text-gray-400 font-semibold">({injuries.length} registros)</span>
+              </div>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsNewModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Añadir Otra Lesión al Historial</span>
+                </button>
+              )}
             </div>
 
             {injuries.length === 0 ? (

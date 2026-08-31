@@ -268,11 +268,10 @@ export function ProfessionalInjuryModal({
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-slate-700 bg-slate-800 shrink-0 relative">
             {player.avatarUrl ? (
-              <Image
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
                 src={player.avatarUrl}
                 alt={player.name}
-                width={44}
-                height={44}
                 className="w-full h-full object-cover"
               />
             ) : (

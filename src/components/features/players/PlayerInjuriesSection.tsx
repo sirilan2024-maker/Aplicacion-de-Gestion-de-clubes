@@ -875,6 +875,16 @@ export function PlayerInjuriesSection({
                         Ventana orientativa: <strong>{formatDate(currentEstimation.estimatedReturnFrom)}</strong> a <strong>{formatDate(currentEstimation.estimatedReturnTo)}</strong>
                       </div>
                     )}
+                    {currentEstimation.mechanism && (
+                      <div className="text-[11px] text-blue-900 bg-blue-100/60 px-2.5 py-1 rounded-lg">
+                        <strong>Mecanismo común:</strong> {currentEstimation.mechanism}
+                        {currentEstimation.incidence && (
+                          <span className="ml-2 font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded text-[10px]">
+                            Incidencia: {currentEstimation.incidence}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="text-[10px] text-blue-900/70 flex items-center gap-1 pt-1">
                       <BookOpen className="w-3 h-3" />
                       <span>Fuente: {currentEstimation.source} ({currentEstimation.reference})</span>

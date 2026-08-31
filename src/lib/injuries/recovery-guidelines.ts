@@ -17,6 +17,8 @@ export interface RecoveryGuideline {
   reference: string
   updatedDate: string
   notes: string
+  mechanism?: string
+  incidence?: string
 }
 
 export interface RecoveryEstimationResult {
@@ -32,13 +34,430 @@ export interface RecoveryEstimationResult {
   reference?: string
   updatedDate?: string
   notes?: string
+  mechanism?: string
+  incidence?: string
   disclaimer: string
 }
 
 // Catálogo de fuentes médicas deportivas acreditadas
 export const RECOVERY_GUIDELINES: RecoveryGuideline[] = [
+  // =========================================================================
+  // MAPEO ANATÓMICO DE LESIONES MUSCULARES EN EL FÚTBOL (LITERATURA ESPECIALIZADA)
+  // =========================================================================
+  // 1. Muslo (Anterior)
+  {
+    id: "cuad_recto_anterior_grave",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["recto anterior", "recto anterior (cuádriceps)", "recto femoral"],
+    severity: "Grave",
+    minDays: 42,
+    maxDays: 70,
+    minWeeks: 6,
+    maxWeeks: 10,
+    source: "BJSM / UEFA Elite Club Injury Study",
+    reference: "Mendiguchia J, et al. Rectus femoris muscle injuries in football. Br J Sports Med 2013; 47:351-358.",
+    updatedDate: "2026-08-01",
+    notes: "Afectación de la unión miotendinosa proximal o tendón central. Precaución antes de chutar a máxima potencia.",
+    mechanism: "Golpeo de balón, frenazos bruscos",
+    incidence: "Grave"
+  },
+  {
+    id: "cuad_vasto_lateral_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["vasto lateral", "vasto lateral (cuádriceps)", "vasto externo"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 35,
+    minWeeks: 3,
+    maxWeeks: 5,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine Manual: Vastus lateralis deceleration trauma in footballers.",
+    updatedDate: "2026-08-01",
+    notes: "Compromiso de la masa extensora lateral en frenadas excéntricas.",
+    mechanism: "Extensión de rodilla, desaceleración",
+    incidence: "Moderada"
+  },
+  {
+    id: "cuad_vasto_medial_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["vasto medial", "vasto medial (cuádriceps)", "vasto interno"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 28,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "FIFA Medical Network",
+    reference: "FIFA Football Emergency & Medicine: Patellar stabilizing muscle injuries.",
+    updatedDate: "2026-08-01",
+    notes: "Papel estabilizador crítico en la trayectoria femororrotuliana.",
+    mechanism: "Estabilización de la rótula",
+    incidence: "Moderada"
+  },
+  {
+    id: "muslo_sartorio_leve",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["sartorio"],
+    severity: "Leve",
+    minDays: 7,
+    maxDays: 18,
+    minWeeks: 1,
+    maxWeeks: 2.5,
+    source: "BJSM / Aspetar Sports Medicine",
+    reference: "Aspetar Sports Medicine Journal: Superficial thigh musculature strains in soccer.",
+    updatedDate: "2026-08-01",
+    notes: "Músculo biarticular más largo del cuerpo. Baja tasa de recidiva.",
+    mechanism: "Flexión combinada de cadera y rodilla",
+    incidence: "Leve"
+  },
+
+  // 2. Muslo (Posterior / Isquiotibiales)
+  {
+    id: "isquios_biceps_femoral_larga",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["bíceps femoral (cabeza larga)", "cabeza larga", "isquiotibiales", "bíceps femoral"],
+    severity: "Grave",
+    minDays: 28,
+    maxDays: 56,
+    minWeeks: 4,
+    maxWeeks: 8,
+    source: "BJSM / UEFA Elite Club Injury Study",
+    reference: "Ekstrand J, et al. Hamstring muscle injuries in professional football. Br J Sports Med.",
+    updatedDate: "2026-08-01",
+    notes: "Lesión muscular más frecuente en el fútbol profesional durante la fase final de oscilación del sprint.",
+    mechanism: "Sprints a máxima velocidad (fase de oscilación)",
+    incidence: "Muy Alta"
+  },
+  {
+    id: "isquios_biceps_femoral_corta",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["bíceps femoral (cabeza corta)", "cabeza corta"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 28,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Short head biceps femoris strains in kicking.",
+    updatedDate: "2026-08-01",
+    notes: "Monoarticular, inervado por el nervio peroneo común.",
+    mechanism: "Flexión de rodilla en velocidad",
+    incidence: "Alta"
+  },
+  {
+    id: "isquios_semitendinoso",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["semitendinoso"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 35,
+    minWeeks: 3,
+    maxWeeks: 5,
+    source: "BJSM / UEFA Elite Club Injury Study",
+    reference: "Ekstrand J. Semitendinosus muscle lesions in high-level football.",
+    updatedDate: "2026-08-01",
+    notes: "Tendón distal largo que forma parte de la pata de ganso.",
+    mechanism: "Extensión de cadera y carrera continua",
+    incidence: "Alta"
+  },
+  {
+    id: "isquios_semimembranoso",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["semimembranoso"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 42,
+    minWeeks: 3,
+    maxWeeks: 6,
+    source: "BJSM",
+    reference: "Askling CM, et al. Acute hamstring injuries in Swedish elite football players.",
+    updatedDate: "2026-08-01",
+    notes: "Inserción medial ancha profunda, muy solicitado en frenadas bruscas con cambio de dirección.",
+    mechanism: "Frenazos de golpe y giros",
+    incidence: "Alta"
+  },
+
+  // 3. Ingle y Cadera (Aductores y Flexores)
+  {
+    id: "aductor_largo_grave",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["aductor largo", "aductor largo (medio)", "aductor medio", "aductores", "ingle"],
+    severity: "Grave",
+    minDays: 28,
+    maxDays: 60,
+    minWeeks: 4,
+    maxWeeks: 8.5,
+    source: "Doha Agreement Meeting / BJSM",
+    reference: "Weir A, et al. Doha agreement meeting on terminology and definitions in groin pain in athletes. Br J Sports Med 2015; 49:768-774.",
+    updatedDate: "2026-08-01",
+    notes: "Principal responsable del dolor inguinal en futbolistas. Elevado riesgo de cronificación si no se respeta la cicatrización.",
+    mechanism: "Cambios de dirección, pases de interior, pubalgia",
+    incidence: "Muy Alta"
+  },
+  {
+    id: "aductor_mayor_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["aductor mayor"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 42,
+    minWeeks: 3,
+    maxWeeks: 6,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Adductor magnus traction strains in footballers.",
+    updatedDate: "2026-08-01",
+    notes: "Gran masa muscular posterior medial del muslo con doble inervación.",
+    mechanism: "Tracción extrema en giros",
+    incidence: "Alta"
+  },
+  {
+    id: "cadera_pectineo_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["pectíneo"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 28,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "BJSM / Aspetar",
+    reference: "Serner A, et al. Diagnosis of groin pain in athletes. Br J Sports Med.",
+    updatedDate: "2026-08-01",
+    notes: "Músculo profundo de la fosa iliopectínea.",
+    mechanism: "Flexión y aducción brusca de cadera",
+    incidence: "Moderada"
+  },
+  {
+    id: "cadera_gracil_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["grácil", "grácil (recto interno)", "recto interno"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 28,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Gracilis strain in football.",
+    updatedDate: "2026-08-01",
+    notes: "Músculo biarticular delgado de la cara interna del muslo.",
+    mechanism: "Movimientos de torsión con pie fijo",
+    incidence: "Moderada"
+  },
+  {
+    id: "cadera_psoas_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["psoas ilíaco", "psoas", "iliopsoas"],
+    severity: "Moderada",
+    minDays: 18,
+    maxDays: 35,
+    minWeeks: 2.5,
+    maxWeeks: 5,
+    source: "BJSM",
+    reference: "Hölmich P. Long-standing groin pain in sportspeople. Br J Sports Med.",
+    updatedDate: "2026-08-01",
+    notes: "Flexor primario de la cadera, fundamental en el balanceo y armado previo al golpeo.",
+    mechanism: "Flexión potente de la pierna en el golpeo",
+    incidence: "Moderada"
+  },
+  {
+    id: "cadera_tfl_leve",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["tensor de la fascia lata", "tfl"],
+    severity: "Leve",
+    minDays: 10,
+    maxDays: 21,
+    minWeeks: 1.5,
+    maxWeeks: 3,
+    source: "FIFA Training Centre",
+    reference: "FIFA Medical: Tensor fasciae latae overload in footballers.",
+    updatedDate: "2026-08-01",
+    notes: "Estabilizador anterolateral de la pelvis durante desplazamientos defensivos laterales.",
+    mechanism: "Carreras laterales y estabilización de pelvis",
+    incidence: "Leve/Mod"
+  },
+
+  // 4. Pierna Inferior (Pantorrilla)
+  {
+    id: "gemelo_interno_grave",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["gemelo interno", "gemelo interno (gastrocnemio)", "gastrocnemio medial", "gastrocnemio interno", "gemelo"],
+    severity: "Grave",
+    minDays: 28,
+    maxDays: 56,
+    minWeeks: 4,
+    maxWeeks: 8,
+    source: "BJSM / UEFA Elite Club Injury Study",
+    reference: "Green B, et al. Calf muscle strain injuries in elite football: A review. Br J Sports Med 2017.",
+    updatedDate: "2026-08-01",
+    notes: "Conocido clásicamente como 'tennis leg' / 'pierna de tenista'. Alta tasa de recurrencia si el regreso es precipitado.",
+    mechanism: "Saltos, aceleraciones, arrancadas",
+    incidence: "Muy Alta"
+  },
+  {
+    id: "gemelo_externo_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["gemelo externo", "gemelo externo (gastrocnemio)", "gastrocnemio lateral"],
+    severity: "Moderada",
+    minDays: 18,
+    maxDays: 35,
+    minWeeks: 2.5,
+    maxWeeks: 5,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Lateral gastrocnemius strain in footballers.",
+    updatedDate: "2026-08-01",
+    notes: "Menos frecuente que el medial pero susceptible a movimientos de cambio de dirección hacia el exterior.",
+    mechanism: "Empuje lateral",
+    incidence: "Moderada"
+  },
+  {
+    id: "pantorrilla_soleo_alta",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["sóleo"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 42,
+    minWeeks: 3,
+    maxWeeks: 6,
+    source: "BJSM / UEFA Studies",
+    reference: "Dixon JB. Gastrocnemius vs. soleus strain in athletes: clinical differentiation and recovery.",
+    updatedDate: "2026-08-01",
+    notes: "Músculo tónico rico en fibras lentas (tipo I). Puede parecer asintomático al inicio pero agravarse con fatiga acumulada.",
+    mechanism: "Fatiga muscular, carreras de larga duración",
+    incidence: "Alta"
+  },
+  {
+    id: "pantorrilla_tibial_ant",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["tibial anterior"],
+    severity: "Leve",
+    minDays: 7,
+    maxDays: 21,
+    minWeeks: 1,
+    maxWeeks: 3,
+    source: "FIFA Medical Network",
+    reference: "FIFA Medical: Anterior compartment shin splints and muscle strains.",
+    updatedDate: "2026-08-01",
+    notes: "Común en pretemporadas sobre campos sintéticos o césped duro.",
+    mechanism: "Sobrecarga por terrenos duros o golpeo",
+    incidence: "Leve/Mod"
+  },
+  {
+    id: "pantorrilla_peroneos",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["peroneo lateral", "peroneo lateral largo / corto", "peroneos"],
+    severity: "Leve",
+    minDays: 10,
+    maxDays: 24,
+    minWeeks: 1.5,
+    maxWeeks: 3.5,
+    source: "FIFA Football Medicine",
+    reference: "FIFA: Peroneal tendon and muscle strains associated with lateral ankle sprains.",
+    updatedDate: "2026-08-01",
+    notes: "Suele acompañar o derivar de esguinces del ligamento lateral externo del tobillo.",
+    mechanism: "Secundario a esguinces de tobillo por inversión",
+    incidence: "Leve"
+  },
+
+  // 5. Core y Tronco
+  {
+    id: "core_recto_abdominal",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["recto abdominal", "abdomen"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 30,
+    minWeeks: 2,
+    maxWeeks: 4.5,
+    source: "BJSM / FIFA Medical",
+    reference: "FIFA Sports Medicine: Abdominal wall injuries in professional soccer.",
+    updatedDate: "2026-08-01",
+    notes: "Afecta la pared abdominal anterior. Dolor acentuado con tos o flexión contra resistencia.",
+    mechanism: "Giros en el aire, saques de banda de larga distancia",
+    incidence: "Moderada"
+  },
+  {
+    id: "core_oblicuos",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["oblicuo", "oblicuo interno / externo", "oblicuos"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 32,
+    minWeeks: 2,
+    maxWeeks: 4.5,
+    source: "FIFA Medical Network",
+    reference: "FIFA: Internal and external oblique muscle strains in contact sports.",
+    updatedDate: "2026-08-01",
+    notes: "Frecuente en torsiones forzadas y choques aéreos.",
+    mechanism: "Torsiones de tronco bruscas en carrera o saltos",
+    incidence: "Moderada"
+  },
+  {
+    id: "core_erectores_columna",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["erectores de la columna", "zona lumbar", "erectores espinales", "espalda"],
+    severity: "Moderada",
+    minDays: 10,
+    maxDays: 24,
+    minWeeks: 1.5,
+    maxWeeks: 3.5,
+    source: "FIFA Medical Network",
+    reference: "FIFA Football Medicine: Paraspinal lumbar muscle injuries.",
+    updatedDate: "2026-08-01",
+    notes: "Contracturas y distensiones de la masa común lumbar por sobrecargas en campos pesados.",
+    mechanism: "Impactos, caídas y saltos repetitivos",
+    incidence: "Leve/Mod"
+  },
+
+  // 6. Exclusivos de Portero
+  {
+    id: "portero_supraespinoso",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["supraespinoso", "supraespinoso (hombro)", "manguito rotador", "hombro"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 45,
+    minWeeks: 3,
+    maxWeeks: 6.5,
+    source: "BJSM / FIFA Medical",
+    reference: "FIFA Sports Medicine: Goalkeeper shoulder injuries and rotator cuff tears.",
+    updatedDate: "2026-08-01",
+    notes: "Lesión típica de porteros al caer con el brazo extendido tras estirada a balón raso o aéreo.",
+    mechanism: "Estiradas, caídas apoyando el brazo",
+    incidence: "Alta"
+  },
+  {
+    id: "portero_subescapular",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["subescapular", "subescapular / redondo mayor", "redondo mayor"],
+    severity: "Moderada",
+    minDays: 18,
+    maxDays: 35,
+    minWeeks: 2.5,
+    maxWeeks: 5,
+    source: "FIFA Medical Network",
+    reference: "FIFA: Subscapularis and teres major strains in football goalkeepers.",
+    updatedDate: "2026-08-01",
+    notes: "Estrés repetitivo en saques de mano largos para contragolpes.",
+    mechanism: "Saques de mano de larga distancia",
+    incidence: "Moderada"
+  },
+  {
+    id: "portero_dorsal_ancho",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["dorsal ancho", "dorsal"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 28,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Latissimus dorsi contusions and strains.",
+    updatedDate: "2026-08-01",
+    notes: "Impactos directos contra postes o adversarios en balones divididos.",
+    mechanism: "Impactos contra el suelo o postes",
+    incidence: "Moderada"
+  },
+
   // ==========================================
-  // MUSLO POSTERIOR - ISQUIOTIBIALES
+  // GUÍAS GENERALES Y ARTICULARES PREVIAS
   // ==========================================
   {
     id: "isquios_rotura_mod",
@@ -52,7 +471,9 @@ export const RECOVERY_GUIDELINES: RecoveryGuideline[] = [
     source: "BJSM / UEFA Elite Club Injury Study",
     reference: "Ekstrand J, et al. Hamstring muscle injuries in professional football. Br J Sports Med 2012; 46:112-117.",
     updatedDate: "2026-08-01",
-    notes: "Lesión estructural tipo 3b (rotura parcial moderada). Plazo promedio de reincorporación deportiva: 28 días."
+    notes: "Lesión estructural tipo 3b (rotura parcial moderada). Plazo promedio de reincorporación deportiva: 28 días.",
+    mechanism: "Sprints a máxima velocidad (fase de oscilación)",
+    incidence: "Muy Alta"
   },
   {
     id: "isquios_rotura_grave",
@@ -593,9 +1014,9 @@ export function estimateRecovery(params: {
   severity?: string
   injuryDate?: string
 }): RecoveryEstimationResult {
-  const { injuryType, structure = "", severity = "Por determinar", injuryDate } = params
+  const { injuryType, structure = "", severity, injuryDate } = params
 
-  if (!injuryType || severity === "Por determinar") {
+  if (!injuryType) {
     return {
       hasEstimation: false,
       disclaimer: MEDICAL_DISCLAIMER
@@ -604,29 +1025,57 @@ export function estimateRecovery(params: {
 
   const normType = injuryType.trim().toLowerCase()
   const normStructure = structure.trim().toLowerCase()
-  const normSeverity = severity.trim()
+  const isSeveritySet = Boolean(severity && severity !== "Por determinar")
+  const targetSeverity = isSeveritySet ? severity!.trim() : null
 
-  // Buscar coincidencia en el catálogo
-  const candidate = RECOVERY_GUIDELINES.find(guide => {
+  // 1. Buscar coincidencia en el catálogo con severidad si está definida
+  let candidate = RECOVERY_GUIDELINES.find(guide => {
     const typeMatch =
       guide.injuryType.toLowerCase() === normType ||
-      (normType === "rotura muscular" && guide.injuryType === "Rotura muscular") ||
-      (normType === "microrrotura" && guide.injuryType === "Microrrotura") ||
-      (normType === "distensión muscular" && guide.injuryType === "Distensión muscular") ||
-      (normType === "tendinitis" && guide.injuryType === "Tendinopatía") ||
-      (normType === "sobrecarga muscular" && guide.injuryType === "Contractura")
+      (normType.includes("rotura") && guide.injuryType === "Rotura muscular") ||
+      (normType.includes("microrrotura") && guide.injuryType === "Microrrotura") ||
+      (normType.includes("distensi") && guide.injuryType === "Distensión muscular") ||
+      (normType.includes("tendin") && guide.injuryType === "Tendinopatía") ||
+      (normType.includes("sobrecarga") && guide.injuryType === "Contractura") ||
+      (normType.includes("contractura") && guide.injuryType === "Contractura") ||
+      (normType.includes("esguince") && guide.injuryType === "Esguince") ||
+      (normType.includes("contusi") && guide.injuryType === "Contusión")
 
     if (!typeMatch) return false
-    if (guide.severity !== normSeverity) return false
+    if (targetSeverity && guide.severity !== targetSeverity) return false
 
     // Si tiene keywords específicas, debe coincidir con alguna
     if (guide.structureKeywords.length > 0) {
-      return guide.structureKeywords.some(kw => normStructure.includes(kw.toLowerCase()))
+      return guide.structureKeywords.some(kw =>
+        normStructure.includes(kw.toLowerCase()) || kw.toLowerCase().includes(normStructure)
+      )
     }
 
     return true
   })
 
+  // 2. Si no hubo coincidencia porque severity era "Por determinar" o no estaba seteada, buscar con cualquier severidad de esa estructura
+  if (!candidate && normStructure) {
+    candidate = RECOVERY_GUIDELINES.find(guide => {
+      const typeMatch =
+        guide.injuryType.toLowerCase() === normType ||
+        (normType.includes("rotura") && guide.injuryType === "Rotura muscular") ||
+        (normType.includes("microrrotura") && guide.injuryType === "Microrrotura") ||
+        (normType.includes("distensi") && guide.injuryType === "Distensión muscular") ||
+        (normType.includes("tendin") && guide.injuryType === "Tendinopatía") ||
+        (normType.includes("sobrecarga") && guide.injuryType === "Contractura") ||
+        (normType.includes("contractura") && guide.injuryType === "Contractura") ||
+        (normType.includes("esguince") && guide.injuryType === "Esguince") ||
+        (normType.includes("contusi") && guide.injuryType === "Contusión")
+
+      if (!typeMatch) return false
+      return guide.structureKeywords.some(kw =>
+        normStructure.includes(kw.toLowerCase()) || kw.toLowerCase().includes(normStructure)
+      )
+    })
+  }
+
+  // 3. Si sigue sin candidato y la severidad es explícita "Por determinar" y no es estructura tabulada
   if (!candidate) {
     return {
       hasEstimation: false,
@@ -668,6 +1117,8 @@ export function estimateRecovery(params: {
     reference: candidate.reference,
     updatedDate: candidate.updatedDate,
     notes: candidate.notes,
+    mechanism: candidate.mechanism,
+    incidence: candidate.incidence,
     disclaimer: MEDICAL_DISCLAIMER
   }
 }

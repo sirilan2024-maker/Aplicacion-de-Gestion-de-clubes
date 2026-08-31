@@ -159,13 +159,38 @@ async function runM1Verification() {
   });
   assert(bicepsEst.hasEstimation === true, "Motor de estimación: reconoce Distensión muscular en Bíceps");
 
-  // 6.3 Ausencia de estimación segura cuando no existe evidencia médica o gravedad no definida
-  const unkEst = estimateRecovery({
-    injuryType: "Fractura",
-    structure: "Dedos",
-    severity: "Por determinar"
+  // 6.3 Verificación de Mapeo Anatómico de Lesiones Musculares en el Fútbol
+  const rectoAntEst = estimateRecovery({
+    injuryType: "Rotura muscular",
+    structure: "Recto anterior (cuádriceps)",
+    severity: "Grave"
   });
-  assert(unkEst.hasEstimation === false, "Motor de estimación: retorna hasEstimation: false seguro ante caso no tabulado");
+  assert(rectoAntEst.hasEstimation === true, "Motor de estimación: reconoce Recto anterior (cuádriceps)");
+  assert(Boolean(rectoAntEst.mechanism?.includes("Golpeo de balón")), "Mecanismo fútbol: detecta golpeo de balón en Recto anterior");
+
+  const bicepsFemoralEst = estimateRecovery({
+    injuryType: "Rotura muscular",
+    structure: "Bíceps femoral (Cabeza larga)",
+    severity: "Grave"
+  });
+  assert(bicepsFemoralEst.hasEstimation === true, "Motor de estimación: reconoce Bíceps femoral (Cabeza larga)");
+  assert(Boolean(bicepsFemoralEst.mechanism?.includes("Sprints")), "Mecanismo fútbol: detecta sprints a máxima velocidad");
+
+  const aductorEst = estimateRecovery({
+    injuryType: "Rotura muscular",
+    structure: "Aductor largo (medio)",
+    severity: "Grave"
+  });
+  assert(aductorEst.hasEstimation === true, "Motor de estimación: reconoce Aductor largo (medio)");
+  assert(Boolean(aductorEst.mechanism?.includes("Cambios de dirección")), "Mecanismo fútbol: detecta cambios de dirección y pubalgia");
+
+  const gemeloEst = estimateRecovery({
+    injuryType: "Rotura muscular",
+    structure: "Gemelo interno (Gastrocnemio)",
+    severity: "Grave"
+  });
+  assert(gemeloEst.hasEstimation === true, "Motor de estimación: reconoce Gemelo interno (Gastrocnemio)");
+  assert(Boolean(gemeloEst.mechanism?.includes("Saltos")), "Mecanismo fútbol: detecta saltos y arrancadas");
 
   // 6.4 Verificación del asset 3D GLTF oficial
   const fs = await import("fs");

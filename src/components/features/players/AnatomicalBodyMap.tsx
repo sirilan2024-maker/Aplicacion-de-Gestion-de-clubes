@@ -334,8 +334,18 @@ export const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "cadera_izq_ant",
     region: "Cadera / Pelvis",
-    structures: ["Cadera", "Ingle", "Aductores"],
-    defaultStructure: "Aductores",
+    structures: [
+      "Aductor largo (medio)",
+      "Aductor mayor",
+      "Pectíneo",
+      "Grácil (Recto interno)",
+      "Psoas ilíaco",
+      "Tensor de la fascia lata",
+      "Aductores",
+      "Cadera",
+      "Ingle"
+    ],
+    defaultStructure: "Aductor largo (medio)",
     view: "front",
     allowedLaterality: ["izquierda"],
     defaultLaterality: "izquierda",
@@ -348,8 +358,18 @@ export const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "cadera_der_ant",
     region: "Cadera / Pelvis",
-    structures: ["Cadera", "Ingle", "Aductores"],
-    defaultStructure: "Aductores",
+    structures: [
+      "Aductor largo (medio)",
+      "Aductor mayor",
+      "Pectíneo",
+      "Grácil (Recto interno)",
+      "Psoas ilíaco",
+      "Tensor de la fascia lata",
+      "Aductores",
+      "Cadera",
+      "Ingle"
+    ],
+    defaultStructure: "Aductor largo (medio)",
     view: "front",
     allowedLaterality: ["derecha"],
     defaultLaterality: "derecha",
@@ -364,8 +384,15 @@ export const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "muslo_izq_ant",
     region: "Muslo anterior",
-    structures: ["Cuádriceps", "Recto femoral", "Vasto interno", "Vasto externo"],
-    defaultStructure: "Cuádriceps",
+    structures: [
+      "Recto anterior (cuádriceps)",
+      "Vasto lateral (cuádriceps)",
+      "Vasto medial (cuádriceps)",
+      "Sartorio",
+      "Cuádriceps",
+      "Recto femoral"
+    ],
+    defaultStructure: "Recto anterior (cuádriceps)",
     view: "front",
     allowedLaterality: ["izquierda"],
     defaultLaterality: "izquierda",
@@ -378,8 +405,15 @@ export const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "muslo_der_ant",
     region: "Muslo anterior",
-    structures: ["Cuádriceps", "Recto femoral", "Vasto interno", "Vasto externo"],
-    defaultStructure: "Cuádriceps",
+    structures: [
+      "Recto anterior (cuádriceps)",
+      "Vasto lateral (cuádriceps)",
+      "Vasto medial (cuádriceps)",
+      "Sartorio",
+      "Cuádriceps",
+      "Recto femoral"
+    ],
+    defaultStructure: "Recto anterior (cuádriceps)",
     view: "front",
     allowedLaterality: ["derecha"],
     defaultLaterality: "derecha",
@@ -394,8 +428,15 @@ export const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "muslo_izq_post",
     region: "Muslo posterior",
-    structures: ["Isquiotibiales", "Bíceps femoral", "Semitendinoso", "Semimembranoso"],
-    defaultStructure: "Isquiotibiales",
+    structures: [
+      "Bíceps femoral (Cabeza larga)",
+      "Bíceps femoral (Cabeza corta)",
+      "Semitendinoso",
+      "Semimembranoso",
+      "Isquiotibiales",
+      "Bíceps femoral"
+    ],
+    defaultStructure: "Bíceps femoral (Cabeza larga)",
     view: "back",
     allowedLaterality: ["izquierda"],
     defaultLaterality: "izquierda",
@@ -408,8 +449,15 @@ export const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "muslo_der_post",
     region: "Muslo posterior",
-    structures: ["Isquiotibiales", "Bíceps femoral", "Semitendinoso", "Semimembranoso"],
-    defaultStructure: "Isquiotibiales",
+    structures: [
+      "Bíceps femoral (Cabeza larga)",
+      "Bíceps femoral (Cabeza corta)",
+      "Semitendinoso",
+      "Semimembranoso",
+      "Isquiotibiales",
+      "Bíceps femoral"
+    ],
+    defaultStructure: "Bíceps femoral (Cabeza larga)",
     view: "back",
     allowedLaterality: ["derecha"],
     defaultLaterality: "derecha",

@@ -785,7 +785,7 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
       {/* CUERPO PRINCIPAL: VISOR (3D O 2D) + PANEL DE CONFIGURACIÓN */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5 items-start">
         {/* COLUMNA VISOR: 3D O 2D */}
-        <div className="md:col-span-5 flex flex-col items-center justify-center">
+        <div className="md:col-span-6 lg:col-span-7 flex flex-col items-center justify-center">
           {viewMode === "3d" && !webGlError ? (
             <div className="w-full">
               <DynamicMannequin3D
@@ -893,7 +893,7 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
         </div>
 
         {/* COLUMNA DETALLE: SELECCIÓN EN DOS NIVELES Y LATERALIDAD */}
-        <div className="md:col-span-7 space-y-4">
+        <div className="md:col-span-6 lg:col-span-5 space-y-4">
           {/* Nivel 1: Zona / Región Seleccionada */}
           <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
             <div className="flex items-center justify-between">

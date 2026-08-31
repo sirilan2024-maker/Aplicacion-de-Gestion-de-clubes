@@ -167,7 +167,21 @@ async function runM1Verification() {
   });
   assert(unkEst.hasEstimation === false, "Motor de estimación: retorna hasEstimation: false seguro ante caso no tabulado");
 
-  // 6.4 Verificación del catálogo de piezas 3D y catálogo 2D
+  // 6.4 Verificación del asset 3D GLTF oficial
+  const fs = await import("fs");
+  const path = await import("path");
+  const glbPath = path.join(process.cwd(), "public", "models", "athlete_anatomy.glb");
+  assert(fs.existsSync(glbPath), "Asset GLTF: athlete_anatomy.glb existe en public/models/");
+  
+  if (fs.existsSync(glbPath)) {
+    const glbStats = fs.statSync(glbPath);
+    assert(glbStats.size > 500000 && glbStats.size < 5000000, `Tamaño del GLB optimizado para web (${(glbStats.size / 1024).toFixed(1)} KB)`);
+    const glbBuf = fs.readFileSync(glbPath);
+    const magic = glbBuf.readUInt32LE(0);
+    assert(magic === 0x46546c67, "Encabezado del archivo GLB es un binario glTF 2.0 válido (0x46546c67)");
+  }
+
+  // 6.5 Verificación del catálogo de piezas 3D y catálogo 2D
   const { MANNEQUIN_PIECES } = await import("../src/components/features/players/AnatomicalMannequin3D");
   assert(Boolean(MANNEQUIN_PIECES.codo_der), "Catálogo 3D: Codo derecho registrado");
   assert(Boolean(MANNEQUIN_PIECES.codo_izq), "Catálogo 3D: Codo izquierdo registrado");
@@ -175,6 +189,8 @@ async function runM1Verification() {
   assert(Boolean(MANNEQUIN_PIECES.muneca_der), "Catálogo 3D: Muñeca derecha registrada");
   assert(Boolean(MANNEQUIN_PIECES.mano_der), "Catálogo 3D: Mano/dedos derechos registrados");
   assert(Boolean(MANNEQUIN_PIECES.muslo_post_der), "Catálogo 3D: Muslo posterior derecho (isquios) registrado");
+  assert(Boolean(MANNEQUIN_PIECES.gluteo_der), "Catálogo 3D: Glúteo derecho registrado");
+  assert(Boolean(MANNEQUIN_PIECES.gluteo_izq), "Catálogo 3D: Glúteo izquierdo registrado");
 
   const { ANATOMICAL_REGIONS, buildDisplayLabel } = await import("../src/components/features/players/AnatomicalBodyMap");
   const hasArmRegion = ANATOMICAL_REGIONS.some(r => r.region === "Brazo");

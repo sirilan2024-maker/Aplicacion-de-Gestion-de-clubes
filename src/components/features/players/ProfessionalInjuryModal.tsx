@@ -552,153 +552,649 @@ export function ProfessionalInjuryModal({
             <div className="w-full h-full max-w-xl flex items-center justify-around">
               {/* AVATAR FRONTAL (Visible en Dual o Front) */}
               {(activeAvatarView === "dual" || activeAvatarView === "front") && (
-                <div
-                  onClick={() => {
-                    handleSelectMuscle({
-                      name: "Recto anterior (cuádriceps) der",
-                      region: "Muslo anterior",
-                      laterality: "derecha",
-                      view: "front"
-                    })
-                  }}
-                  className="relative w-48 sm:w-56 h-[380px] sm:h-[430px] flex items-center justify-center cursor-pointer group"
-                >
+                <div className="relative w-48 sm:w-56 h-[380px] sm:h-[430px] flex items-center justify-center">
                   <Image
                     src="/models/avatar_front_reference_clean.png"
                     alt="Anatomía Frontal"
                     width={280}
                     height={520}
                     priority
-                    className="w-full h-full object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)] group-hover:brightness-105 transition-all"
+                    className="w-full h-full object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)] pointer-events-none"
                   />
-                  <div className="absolute top-2 inset-x-0 text-center text-[10px] font-black uppercase text-slate-500 tracking-wider pointer-events-none">
-                    Vista Anterior
-                  </div>
 
-                  {/* RESALTADO DINÁMICO EN LA POSICIÓN EXACTA SI EL MÚSCULO ES FRONTAL */}
-                  {selectedStructure && activeCoord && activeCoord.view === "front" && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${activeCoord.x}%`,
-                        top: `${activeCoord.y}%`,
-                        width: `${activeCoord.w}px`,
-                        height: `${activeCoord.h}px`,
-                        transform: "translate(-50%, -50%)"
+                  {/* CAPA SVG INTERACTIVA: ZONAS ANATÓMICAS CLICABLES DIRECTAMENTE EN EL AVATAR */}
+                  <svg
+                    viewBox="0 0 255 495"
+                    className="absolute inset-0 w-full h-full z-20"
+                  >
+                    {/* Cráneo / Cara */}
+                    <ellipse
+                      cx="127.5" cy="42" rx="26" ry="32"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Cráneo / Cara"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Cráneo / Cara", region: "Cabeza", laterality: "central", view: "front" })
                       }}
-                      className="pointer-events-none z-10 animate-pulse rounded-full bg-red-600/50 filter blur-xs shadow-[0_0_25px_rgba(239,68,68,0.95)]"
-                    />
-                  )}
-
-                  {/* TARJETA CON PUNTERO DINÁMICAMENTE POSICIONADA EN EL MÚSCULO FRONTAL */}
-                  {selectedStructure && activeCoord && activeCoord.view === "front" && !isTooltipDismissed && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: activeCoord.pointerSide === "right" ? `${activeCoord.x + 14}%` : `${activeCoord.x - 42}%`,
-                        top: `${Math.max(10, Math.min(85, activeCoord.y - 4))}%`
-                      }}
-                      className="bg-slate-900/95 border border-red-500/80 rounded-xl p-2.5 shadow-2xl z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="font-bold text-white text-[11px] whitespace-nowrap">
-                          {selectedStructure.split("(")[0]}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setIsTooltipDismissed(true)
-                          }}
-                          className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
-                          title="Cerrar indicador"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <div className="text-[10px] font-bold text-red-400 flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-                        <span>{selectedLaterality.toUpperCase()}</span>
-                      </div>
-                      <div className="text-[9px] text-slate-400 mt-1">Zona seleccionada</div>
-                    </div>
-                  )}
+                      <title>Cráneo / Cara</title>
+                    </ellipse>
+
+                    {/* Cuello */}
+                    <rect
+                      x="115" y="74" width="25" height="18" rx="4"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Musculatura cervical"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Musculatura cervical", region: "Cuello", laterality: "central", view: "front" })
+                      }}
+                    >
+                      <title>Musculatura cervical</title>
+                    </rect>
+
+                    {/* Pectoral Mayor */}
+                    <rect
+                      x="94" y="94" width="67" height="42" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Pectoral mayor"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Pectoral mayor", region: "Tronco", laterality: "central", view: "front" })
+                      }}
+                    >
+                      <title>Pectoral mayor</title>
+                    </rect>
+
+                    {/* Recto Abdominal */}
+                    <rect
+                      x="106" y="138" width="43" height="66" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Recto abdominal"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Recto abdominal", region: "Tronco", laterality: "central", view: "front" })
+                      }}
+                    >
+                      <title>Recto abdominal</title>
+                    </rect>
+
+                    {/* Oblicuo Derecho */}
+                    <rect
+                      x="82" y="142" width="22" height="56" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Oblicuo interno / externo" && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Oblicuo interno / externo", region: "Tronco", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Oblicuo derecho</title>
+                    </rect>
+
+                    {/* Oblicuo Izquierdo */}
+                    <rect
+                      x="151" y="142" width="22" height="56" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Oblicuo interno / externo" && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Oblicuo interno / externo", region: "Tronco", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Oblicuo izquierdo</title>
+                    </rect>
+
+                    {/* Hombro Derecho */}
+                    <ellipse
+                      cx="78" cy="110" rx="17" ry="17"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Supraespinoso (Hombro der)"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Supraespinoso (Hombro der)", region: "Hombro", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Hombro derecho</title>
+                    </ellipse>
+
+                    {/* Hombro Izquierdo */}
+                    <ellipse
+                      cx="177" cy="110" rx="17" ry="17"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Supraespinoso (Hombro izq)"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Supraespinoso (Hombro izq)", region: "Hombro", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Hombro izquierdo</title>
+                    </ellipse>
+
+                    {/* Bíceps Brazo Derecho */}
+                    <rect
+                      x="56" y="128" width="22" height="46" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Bíceps braquial derecho" && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Bíceps braquial derecho", region: "Brazo", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Bíceps derecho</title>
+                    </rect>
+
+                    {/* Bíceps Brazo Izquierdo */}
+                    <rect
+                      x="177" y="128" width="22" height="46" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Bíceps braquial derecho" && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Bíceps braquial derecho", region: "Brazo", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Bíceps izquierdo</title>
+                    </rect>
+
+                    {/* Codo Derecho */}
+                    <circle
+                      cx="62" cy="182" r="12"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Codo / Epicóndilo derecho"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Codo / Epicóndilo derecho", region: "Codo", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Codo derecho</title>
+                    </circle>
+
+                    {/* Antebrazo Derecho */}
+                    <rect
+                      x="46" y="196" width="20" height="48" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Musculatura flexora / extensora"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Musculatura flexora / extensora", region: "Antebrazo", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Antebrazo derecho</title>
+                    </rect>
+
+                    {/* Muñeca / Mano Derecha */}
+                    <rect
+                      x="36" y="246" width="22" height="34" rx="5"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Muñeca / Escafoides derecho"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Muñeca / Escafoides derecho", region: "Muñeca", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Muñeca derecha</title>
+                    </rect>
+
+                    {/* Aductor Derecho (Ingle) */}
+                    <rect
+                      x="108" y="214" width="18" height="52" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.toLowerCase().includes("aductor") && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Aductor largo (medio) der", region: "Cadera / Pelvis", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Aductor derecho</title>
+                    </rect>
+
+                    {/* Aductor Izquierdo (Ingle) */}
+                    <rect
+                      x="129" y="214" width="18" height="52" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.toLowerCase().includes("aductor") && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Aductor largo (medio) izq", region: "Cadera / Pelvis", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Aductor izquierdo</title>
+                    </rect>
+
+                    {/* Cuádriceps / Recto Anterior Derecho */}
+                    <rect
+                      x="86" y="240" width="30" height="85" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        (selectedStructure.includes("cuádriceps") || selectedStructure.includes("Recto anterior") || selectedStructure.includes("Vasto")) && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Recto anterior (cuádriceps) der", region: "Muslo anterior", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Cuádriceps derecho</title>
+                    </rect>
+
+                    {/* Cuádriceps / Recto Anterior Izquierdo */}
+                    <rect
+                      x="139" y="240" width="30" height="85" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        (selectedStructure.includes("cuádriceps") || selectedStructure.includes("Recto anterior") || selectedStructure.includes("Vasto")) && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Recto anterior (cuádriceps) der", region: "Muslo anterior", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Cuádriceps izquierdo</title>
+                    </rect>
+
+                    {/* Rodilla Derecha */}
+                    <circle
+                      cx="100" cy="338" r="14"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("rotuliano") && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Rótula / Tendón rotuliano der", region: "Rodilla", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Rodilla derecha</title>
+                    </circle>
+
+                    {/* Rodilla Izquierda */}
+                    <circle
+                      cx="155" cy="338" r="14"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("rotuliano") && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Rótula / Tendón rotuliano der", region: "Rodilla", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Rodilla izquierda</title>
+                    </circle>
+
+                    {/* Tibia / Pierna Derecha */}
+                    <rect
+                      x="89" y="356" width="22" height="75" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        (selectedStructure.includes("Tibial") || selectedStructure.includes("Peroneo")) && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Tibial anterior derecho", region: "Pierna", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Tibia / Pierna derecha</title>
+                    </rect>
+
+                    {/* Tibia / Pierna Izquierda */}
+                    <rect
+                      x="144" y="356" width="22" height="75" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        (selectedStructure.includes("Tibial") || selectedStructure.includes("Peroneo")) && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Tibial anterior derecho", region: "Pierna", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Tibia / Pierna izquierda</title>
+                    </rect>
+
+                    {/* Tobillo / Pie Derecho */}
+                    <rect
+                      x="88" y="435" width="24" height="46" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("tobillo") && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Ligamentos tobillo / Aquiles der", region: "Tobillo", laterality: "derecha", view: "front" })
+                      }}
+                    >
+                      <title>Tobillo derecho</title>
+                    </rect>
+
+                    {/* Tobillo / Pie Izquierdo */}
+                    <rect
+                      x="143" y="435" width="24" height="46" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("tobillo") && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Ligamentos tobillo / Aquiles der", region: "Tobillo", laterality: "izquierda", view: "front" })
+                      }}
+                    >
+                      <title>Tobillo izquierdo</title>
+                    </rect>
+                  </svg>
                 </div>
               )}
 
               {/* AVATAR POSTERIOR (Visible en Dual o Back) */}
               {(activeAvatarView === "dual" || activeAvatarView === "back") && (
-                <div
-                  onClick={() => {
-                    handleSelectMuscle({
-                      name: "Bíceps femoral (Cabeza larga) der",
-                      region: "Muslo posterior",
-                      laterality: "derecha",
-                      view: "back"
-                    })
-                  }}
-                  className="relative w-48 sm:w-56 h-[380px] sm:h-[430px] flex items-center justify-center cursor-pointer group"
-                >
+                <div className="relative w-48 sm:w-56 h-[380px] sm:h-[430px] flex items-center justify-center">
                   <Image
                     src="/models/avatar_back_unlit.png"
                     alt="Anatomía Posterior"
                     width={280}
                     height={520}
                     priority
-                    className="w-full h-full object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)] group-hover:brightness-105 transition-all"
+                    className="w-full h-full object-contain filter drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)] pointer-events-none"
                   />
-                  <div className="absolute top-2 inset-x-0 text-center text-[10px] font-black uppercase text-slate-500 tracking-wider pointer-events-none">
-                    Vista Posterior
-                  </div>
 
-                  {/* RESALTADO DINÁMICO EN LA POSICIÓN EXACTA SI EL MÚSCULO ES DORSAL */}
-                  {selectedStructure && activeCoord && activeCoord.view === "back" && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${activeCoord.x}%`,
-                        top: `${activeCoord.y}%`,
-                        width: `${activeCoord.w}px`,
-                        height: `${activeCoord.h}px`,
-                        transform: "translate(-50%, -50%)"
+                  {/* CAPA SVG INTERACTIVA POSTERIOR */}
+                  <svg
+                    viewBox="0 0 255 495"
+                    className="absolute inset-0 w-full h-full z-20"
+                  >
+                    {/* Cuello Posterior */}
+                    <ellipse
+                      cx="127.5" cy="55" rx="22" ry="28"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Musculatura cervical"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Musculatura cervical", region: "Cuello", laterality: "central", view: "back" })
                       }}
-                      className="pointer-events-none z-10 animate-pulse rounded-full bg-red-600/50 filter blur-xs shadow-[0_0_25px_rgba(239,68,68,0.95)]"
-                    />
-                  )}
-
-                  {/* TARJETA CON PUNTERO DINÁMICAMENTE POSICIONADA EN EL MÚSCULO DORSAL */}
-                  {selectedStructure && activeCoord && activeCoord.view === "back" && !isTooltipDismissed && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: activeCoord.pointerSide === "right" ? `${activeCoord.x + 14}%` : `${activeCoord.x - 42}%`,
-                        top: `${Math.max(10, Math.min(85, activeCoord.y - 4))}%`
-                      }}
-                      className="bg-slate-900/95 border border-red-500/80 rounded-xl p-2.5 shadow-2xl z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="font-bold text-white text-[11px] whitespace-nowrap">
-                          {selectedStructure.split("(")[0]}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setIsTooltipDismissed(true)
-                          }}
-                          className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
-                          title="Cerrar indicador"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <div className="text-[10px] font-bold text-red-400 flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-                        <span>{selectedLaterality.toUpperCase()}</span>
-                      </div>
-                      <div className="text-[9px] text-slate-400 mt-1">Zona seleccionada</div>
-                    </div>
-                  )}
+                      <title>Cuello posterior</title>
+                    </ellipse>
+
+                    {/* Espalda / Dorsal Ancho */}
+                    <rect
+                      x="90" y="98" width="75" height="60" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Dorsal ancho"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Dorsal ancho", region: "Tronco", laterality: "central", view: "back" })
+                      }}
+                    >
+                      <title>Dorsal ancho</title>
+                    </rect>
+
+                    {/* Lumbar / Erectores Columna */}
+                    <rect
+                      x="105" y="160" width="45" height="45" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Erectores de la columna"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Erectores de la columna", region: "Tronco", laterality: "central", view: "back" })
+                      }}
+                    >
+                      <title>Lumbar / Erectores columna</title>
+                    </rect>
+
+                    {/* Hombro Posterior Derecho */}
+                    <ellipse
+                      cx="75" cy="110" rx="18" ry="18"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Subescapular / Redondo mayor (der)" && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Subescapular / Redondo mayor (der)", region: "Hombro", laterality: "derecha", view: "back" })
+                      }}
+                    >
+                      <title>Hombro posterior derecho</title>
+                    </ellipse>
+
+                    {/* Hombro Posterior Izquierdo */}
+                    <ellipse
+                      cx="180" cy="110" rx="18" ry="18"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Subescapular / Redondo mayor (der)" && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Subescapular / Redondo mayor (der)", region: "Hombro", laterality: "izquierda", view: "back" })
+                      }}
+                    >
+                      <title>Hombro posterior izquierdo</title>
+                    </ellipse>
+
+                    {/* Tríceps Derecho */}
+                    <rect
+                      x="56" y="130" width="20" height="48" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Tríceps braquial derecho" && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Tríceps braquial derecho", region: "Brazo", laterality: "derecha", view: "back" })
+                      }}
+                    >
+                      <title>Tríceps derecho</title>
+                    </rect>
+
+                    {/* Tríceps Izquierdo */}
+                    <rect
+                      x="179" y="130" width="20" height="48" rx="8"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure === "Tríceps braquial derecho" && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Tríceps braquial derecho", region: "Brazo", laterality: "izquierda", view: "back" })
+                      }}
+                    >
+                      <title>Tríceps izquierdo</title>
+                    </rect>
+
+                    {/* Glúteo Derecho */}
+                    <rect
+                      x="92" y="205" width="33" height="40" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("Glúteo") && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Glúteo mayor / medio derecho", region: "Cadera / Pelvis", laterality: "derecha", view: "back" })
+                      }}
+                    >
+                      <title>Glúteo derecho</title>
+                    </rect>
+
+                    {/* Glúteo Izquierdo */}
+                    <rect
+                      x="130" y="205" width="33" height="40" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("Glúteo") && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Glúteo mayor / medio izquierdo", region: "Cadera / Pelvis", laterality: "izquierda", view: "back" })
+                      }}
+                    >
+                      <title>Glúteo izquierdo</title>
+                    </rect>
+
+                    {/* Isquiotibiales Derechos (Bíceps femoral) */}
+                    <rect
+                      x="90" y="250" width="34" height="80" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        (selectedStructure.includes("femoral") || selectedStructure.includes("Semitendinoso") || selectedStructure.includes("Semimembranoso")) && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Bíceps femoral (Cabeza larga) der", region: "Muslo posterior", laterality: "derecha", view: "back" })
+                      }}
+                    >
+                      <title>Isquiotibiales derechos</title>
+                    </rect>
+
+                    {/* Isquiotibiales Izquierdos */}
+                    <rect
+                      x="131" y="250" width="34" height="80" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        (selectedStructure.includes("femoral") || selectedStructure.includes("Semitendinoso") || selectedStructure.includes("Semimembranoso")) && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Bíceps femoral (Cabeza larga) der", region: "Muslo posterior", laterality: "izquierda", view: "back" })
+                      }}
+                    >
+                      <title>Isquiotibiales izquierdos</title>
+                    </rect>
+
+                    {/* Gemelos Derechos */}
+                    <rect
+                      x="88" y="345" width="28" height="60" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("Gemelo") && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Gemelo interno (Gastrocnemio) der", region: "Pierna", laterality: "derecha", view: "back" })
+                      }}
+                    >
+                      <title>Gemelos derechos</title>
+                    </rect>
+
+                    {/* Gemelos Izquierdos */}
+                    <rect
+                      x="139" y="345" width="28" height="60" rx="10"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("Gemelo") && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Gemelo interno (Gastrocnemio) der", region: "Pierna", laterality: "izquierda", view: "back" })
+                      }}
+                    >
+                      <title>Gemelos izquierdos</title>
+                    </rect>
+
+                    {/* Sóleo / Aquiles Derecho */}
+                    <rect
+                      x="95" y="408" width="18" height="45" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("Sóleo") && selectedLaterality === "derecha"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Sóleo derecho", region: "Pierna", laterality: "derecha", view: "back" })
+                      }}
+                    >
+                      <title>Sóleo derecho</title>
+                    </rect>
+
+                    {/* Sóleo / Aquiles Izquierdo */}
+                    <rect
+                      x="142" y="408" width="18" height="45" rx="6"
+                      className={`cursor-pointer transition-all ${
+                        selectedStructure.includes("Sóleo") && selectedLaterality === "izquierda"
+                          ? "fill-red-600/60 stroke-red-400 stroke-2 filter drop-shadow-[0_0_12px_rgba(239,68,68,0.95)]"
+                          : "fill-transparent hover:fill-red-500/25 hover:stroke-red-400/80 hover:stroke-1"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectMuscle({ name: "Sóleo derecho", region: "Pierna", laterality: "izquierda", view: "back" })
+                      }}
+                    >
+                      <title>Sóleo izquierdo</title>
+                    </rect>
+                  </svg>
                 </div>
               )}
             </div>

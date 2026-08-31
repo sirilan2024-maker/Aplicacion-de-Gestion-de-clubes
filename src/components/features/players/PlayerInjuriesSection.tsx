@@ -609,12 +609,26 @@ export function PlayerInjuriesSection({
             </div>
 
             {injuries.length === 0 ? (
-              <div className="p-8 text-center bg-white border border-gray-200 rounded-2xl shadow-xs space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                <p className="text-sm font-bold text-gray-800">Sin lesiones registradas</p>
-                <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                  El jugador no presenta historial de lesiones en el club.
-                </p>
+              <div className="p-6 sm:p-8 text-center bg-gradient-to-br from-white via-slate-50 to-red-50/30 border-2 border-dashed border-red-200 rounded-3xl shadow-xs space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto shadow-xs">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-base font-black text-slate-900">Módulo de Lesiones Activo</p>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                    Este jugador no presenta lesiones activas ni previas. Puedes registrar una nueva lesión o consulta preventiva en cualquier momento usando el avatar interactivo.
+                  </p>
+                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsNewModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-red-200 hover:scale-105 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Registrar Lesión (Abrir Avatar)</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">

@@ -800,14 +800,23 @@ export default function GlobalPlayerProfilePage() {
               </div>
             </div>
             {!isEditing ? (
-              <button 
-                onClick={() => setIsEditing(true)}
-                disabled={player.status === 'inactive'}
-                className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 sm:mt-0 text-xs sm:text-sm"
-                title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
-              >
-                <Edit3 size={16} /> Editar Perfil
-              </button>
+              <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('medico')}
+                  className="flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer shadow-xs"
+                >
+                  <HeartPulse size={15} className="text-red-600" /> Módulo Lesiones (3D)
+                </button>
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  disabled={player.status === 'inactive'}
+                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+                  title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
+                >
+                  <Edit3 size={16} /> Editar Perfil
+                </button>
+              </div>
             ) : (
               <div className="flex w-full sm:w-auto gap-2 mt-2 sm:mt-0">
                 <button 

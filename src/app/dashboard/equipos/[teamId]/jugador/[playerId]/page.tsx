@@ -1389,6 +1389,10 @@ export default function GlobalPlayerProfilePage() {
                 <PlayerInjuriesSection 
                   playerId={player.id} 
                   playerName={`${player.first_name} ${player.last_name}`}
+                  playerNumber={player.dorsal || undefined}
+                  playerPosition={player.posicion || undefined}
+                  playerStatus={player.status === "active" ? "Disponible" : player.status}
+                  playerAvatarUrl={player.avatar_url || undefined}
                   onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
                 />
               </div>

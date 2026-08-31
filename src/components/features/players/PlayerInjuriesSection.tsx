@@ -43,10 +43,15 @@ import {
   RecoveryEstimationResult,
   MEDICAL_DISCLAIMER
 } from "@/lib/injuries/recovery-guidelines"
+import { ProfessionalInjuryModal } from "./ProfessionalInjuryModal"
 
 interface PlayerInjuriesSectionProps {
   playerId: string
   playerName?: string
+  playerNumber?: string | number
+  playerPosition?: string
+  playerStatus?: string
+  playerAvatarUrl?: string
   canManage?: boolean
   onInjuriesChange?: (hasActiveInjury: boolean, activeCount: number) => void
 }
@@ -109,6 +114,10 @@ const SEVERITY_OPTIONS = ["Leve", "Moderada", "Grave", "Por determinar"] as cons
 export function PlayerInjuriesSection({
   playerId,
   playerName = "el jugador",
+  playerNumber,
+  playerPosition,
+  playerStatus,
+  playerAvatarUrl,
   canManage = true,
   onInjuriesChange
 }: PlayerInjuriesSectionProps) {
@@ -727,230 +736,27 @@ export function PlayerInjuriesSection({
                     </tbody>
                   </table>
                 </div>
+                {/* 4. MODAL PROFESIONAL PARA REGISTRAR NUEVA LESIÓN (PANTALLA COMPLETA 1:1) */}
+                <ProfessionalInjuryModal
+                  isOpen={isNewModalOpen}
+                  onClose={() => setIsNewModalOpen(false)}
+                  player={{
+                    id: playerId,
+                    name: playerName,
+                    number: playerNumber || 23,
+                    position: playerPosition || "Centrocampista",
+                    status: playerStatus || "Disponible",
+                    avatarUrl: playerAvatarUrl
+                  }}
+                  onInjuryCreated={() => {
+                    setIsNewModalOpen(false)
+                    loadInjuries()
+                  }}
+                />
               </div>
             )}
           </div>
         </>
-      )}
-
-      {/* 4. MODAL PARA REGISTRAR NUEVA LESIÓN PROFESIONAL */}
-      {isNewModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[94vh] flex flex-col overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200">
-            {/* Cabecera */}
-            <div className="p-5 bg-gradient-to-r from-red-600 to-rose-700 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-white/20 rounded-xl">
-                  <Activity className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h4 className="text-base font-bold">Registrar Nueva Lesión Deportiva</h4>
-                  <p className="text-xs text-red-100">Jugador: {playerName}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsNewModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-white/20 transition-colors text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Formulario scrolleable */}
-            <form onSubmit={handleCreateInjury} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
-              {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* Fila 1: Fecha y Gravedad */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    Fecha de Lesión <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={injuryDate}
-                    onChange={e => setInjuryDate(e.target.value)}
-                    required
-                    className="w-full border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    Gravedad Inicial <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={severity}
-                    onChange={e => setSeverity(e.target.value as any)}
-                    className="w-full border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none"
-                  >
-                    {SEVERITY_OPTIONS.map(s => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Fila 2: Clasificación de Lesión */}
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">
-                  Clasificación / Tipo de Lesión <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={injuryType}
-                  onChange={e => setInjuryType(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none"
-                >
-                  {INJURY_CATEGORIES.map(cat => (
-                    <optgroup key={cat.category} label={`— ${cat.category} —`}>
-                      {cat.types.map(t => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              {injuryType === "Otra" && (
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    Especificar Diagnóstico <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={customType}
-                    onChange={e => setCustomType(e.target.value)}
-                    placeholder="Ej. Apofisitis tibial anterior"
-                    className="w-full border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none"
-                  />
-                </div>
-              )}
-
-              {/* MAPA ANATÓMICO INTERACTIVO */}
-              <div className="pt-1">
-                <AnatomicalBodyMap
-                  value={anatomicalSelection}
-                  onChange={setAnatomicalSelection}
-                />
-              </div>
-
-              {/* MOTOR DE ESTIMACIÓN ORIENTATIVA DE RECUPERACIÓN */}
-              <div className="p-4 bg-gradient-to-r from-blue-50/90 to-indigo-50/80 border border-blue-200 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black uppercase text-blue-900 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    Estimador Orientativo de Recuperación
-                  </span>
-                  {currentEstimation.hasEstimation && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (currentEstimation.estimatedReturnTo) {
-                          setExpectedReturnDate(currentEstimation.estimatedReturnTo)
-                        }
-                      }}
-                      className="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-lg border border-blue-200 hover:bg-blue-50 cursor-pointer"
-                    >
-                      Aplicar fecha sugerida
-                    </button>
-                  )}
-                </div>
-
-                {currentEstimation.hasEstimation ? (
-                  <div className="space-y-1.5">
-                    <div className="text-sm font-black text-blue-950">
-                      Tiempo habitual orientativo: {currentEstimation.rangeLabel}
-                    </div>
-                    {currentEstimation.estimatedReturnFrom && (
-                      <div className="text-xs text-blue-800">
-                        Ventana orientativa: <strong>{formatDate(currentEstimation.estimatedReturnFrom)}</strong> a <strong>{formatDate(currentEstimation.estimatedReturnTo)}</strong>
-                      </div>
-                    )}
-                    {currentEstimation.mechanism && (
-                      <div className="text-[11px] text-blue-900 bg-blue-100/60 px-2.5 py-1 rounded-lg">
-                        <strong>Mecanismo común:</strong> {currentEstimation.mechanism}
-                        {currentEstimation.incidence && (
-                          <span className="ml-2 font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded text-[10px]">
-                            Incidencia: {currentEstimation.incidence}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="text-[10px] text-blue-900/70 flex items-center gap-1 pt-1">
-                      <BookOpen className="w-3 h-3" />
-                      <span>Fuente: {currentEstimation.source} ({currentEstimation.reference})</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-blue-900/70 italic">
-                    Estimación no disponible para esta combinación. Introduce manualmente la previsión deportiva a continuación.
-                  </p>
-                )}
-
-                <div className="text-[10px] text-amber-800 bg-amber-50/80 p-2 rounded-xl border border-amber-200/60 flex items-start gap-1.5 mt-1">
-                  <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                  <span>{MEDICAL_DISCLAIMER}</span>
-                </div>
-              </div>
-
-              {/* Previsión de regreso acordada */}
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">
-                  Fecha Prevista de Regreso (Previsión Deportiva)
-                </label>
-                <input
-                  type="date"
-                  value={expectedReturnDate}
-                  onChange={e => setExpectedReturnDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Observaciones */}
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">
-                  Observaciones / Contexto de la Lesión
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Mecanismo lesional (entrenamiento/partido), sensación del jugador, pautas iniciales de descanso o derivación..."
-                  className="w-full border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"
-                />
-              </div>
-
-              {/* Botones de acción */}
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsNewModalOpen(false)}
-                  disabled={saving}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-sm shadow-red-200 cursor-pointer disabled:opacity-50"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Guardar Lesión
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {/* 5. MODAL PARA REGISTRAR EVOLUCIÓN */}

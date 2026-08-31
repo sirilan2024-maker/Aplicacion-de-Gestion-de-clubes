@@ -124,12 +124,66 @@ async function runM1Verification() {
   assert(tobilloEst.hasEstimation === true, "Motor de estimación: reconoce Esguince de Tobillo Leve");
   assert(tobilloEst.minDays === 7 && tobilloEst.maxDays === 14, "Motor de estimación: plazo 7–14 días correcto según FIFA");
 
+  // 6.2 Comprobación de miembros superiores (Hombro, Codo, Brazo, Muñeca, Mano)
+  const codoEst = estimateRecovery({
+    injuryType: "Esguince",
+    structure: "Codo",
+    severity: "Leve",
+    injuryDate: "2026-08-30"
+  });
+  assert(codoEst.hasEstimation === true, "Motor de estimación: reconoce Esguince de Codo Leve");
+  assert(codoEst.minDays === 7 && codoEst.maxDays === 16, "Codo: plazo 7–16 días según FIFA Football Medicine Manual");
+
+  const hombroEst = estimateRecovery({
+    injuryType: "Esguince",
+    structure: "Articulación acromioclavicular",
+    severity: "Moderada",
+    injuryDate: "2026-08-30"
+  });
+  assert(hombroEst.hasEstimation === true, "Motor de estimación: reconoce Esguince Acromioclavicular Moderado");
+  assert(hombroEst.minDays === 14 && hombroEst.maxDays === 35, "Hombro: plazo 14–35 días según BJSM / UEFA Studies");
+
+  const munecaEst = estimateRecovery({
+    injuryType: "Esguince",
+    structure: "Muñeca",
+    severity: "Leve",
+    injuryDate: "2026-08-30"
+  });
+  assert(munecaEst.hasEstimation === true, "Motor de estimación: reconoce Esguince de Muñeca Leve");
+
+  const bicepsEst = estimateRecovery({
+    injuryType: "Distensión muscular",
+    structure: "Bíceps",
+    severity: "Leve",
+    injuryDate: "2026-08-30"
+  });
+  assert(bicepsEst.hasEstimation === true, "Motor de estimación: reconoce Distensión muscular en Bíceps");
+
+  // 6.3 Ausencia de estimación segura cuando no existe evidencia médica o gravedad no definida
   const unkEst = estimateRecovery({
     injuryType: "Fractura",
     structure: "Dedos",
     severity: "Por determinar"
   });
   assert(unkEst.hasEstimation === false, "Motor de estimación: retorna hasEstimation: false seguro ante caso no tabulado");
+
+  // 6.4 Verificación del catálogo de piezas 3D y catálogo 2D
+  const { MANNEQUIN_PIECES } = await import("../src/components/features/players/AnatomicalMannequin3D");
+  assert(Boolean(MANNEQUIN_PIECES.codo_der), "Catálogo 3D: Codo derecho registrado");
+  assert(Boolean(MANNEQUIN_PIECES.codo_izq), "Catálogo 3D: Codo izquierdo registrado");
+  assert(Boolean(MANNEQUIN_PIECES.brazo_der), "Catálogo 3D: Brazo derecho (bíceps/tríceps) registrado");
+  assert(Boolean(MANNEQUIN_PIECES.muneca_der), "Catálogo 3D: Muñeca derecha registrada");
+  assert(Boolean(MANNEQUIN_PIECES.mano_der), "Catálogo 3D: Mano/dedos derechos registrados");
+  assert(Boolean(MANNEQUIN_PIECES.muslo_post_der), "Catálogo 3D: Muslo posterior derecho (isquios) registrado");
+
+  const { ANATOMICAL_REGIONS, buildDisplayLabel } = await import("../src/components/features/players/AnatomicalBodyMap");
+  const hasArmRegion = ANATOMICAL_REGIONS.some(r => r.region === "Brazo");
+  const hasElbowRegion = ANATOMICAL_REGIONS.some(r => r.region === "Codo");
+  const hasWristRegion = ANATOMICAL_REGIONS.some(r => r.region === "Muñeca");
+  assert(hasArmRegion && hasElbowRegion && hasWristRegion, "Catálogo 2D / accesibilidad: contiene Brazo, Codo y Muñeca");
+
+  const labelTest = buildDisplayLabel("Codo", "derecha");
+  assert(labelTest === "Codo derecho/a", "Generador de etiquetas: formatea lateralidad correctamente");
 
   // 7. Comprobación de no-regresión de datos de producción
   const { count: attendanceCount } = await supabase.from("attendance").select("id", { count: "exact", head: true });
@@ -148,10 +202,11 @@ async function runM1Verification() {
   assert(convocatoriasCount === 3648, `Convocatorias permanece exactamente en 3.648 (actual: ${convocatoriasCount})`);
 
   console.log("-----------------------------------------------------------------");
-  console.log(`RESULTADO SUITE M1: ${passed} PASADOS, ${failed} FALLIDOS`);
+  console.log(`RESULTADO SUITE M1.1: ${passed} PASADOS, ${failed} FALLIDOS`);
   console.log("=================================================================");
 
   if (failed > 0) process.exit(1);
 }
 
 runM1Verification();
+

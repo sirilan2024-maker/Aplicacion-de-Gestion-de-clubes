@@ -318,6 +318,236 @@ export const RECOVERY_GUIDELINES: RecoveryGuideline[] = [
   },
 
   // ==========================================
+  // MIEMBROS SUPERIORES - HOMBRO
+  // ==========================================
+  {
+    id: "hombro_acromio_leve",
+    injuryType: "Esguince",
+    structureKeywords: ["hombro", "clavícula", "acromioclavicular", "articulación acromioclavicular"],
+    severity: "Leve",
+    minDays: 7,
+    maxDays: 14,
+    minWeeks: 1,
+    maxWeeks: 2,
+    source: "FIFA Medical Guidelines",
+    reference: "FIFA Football Medicine Manual: Acromioclavicular Joint Sprains in Football.",
+    updatedDate: "2026-08-30",
+    notes: "Esguince acromioclavicular grado I por caída directa sobre el hombro. Vendaje funcional y movilidad progresiva."
+  },
+  {
+    id: "hombro_acromio_mod",
+    injuryType: "Esguince",
+    structureKeywords: ["hombro", "clavícula", "acromioclavicular", "articulación acromioclavicular"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 35,
+    minWeeks: 2,
+    maxWeeks: 5,
+    source: "BJSM / UEFA Studies",
+    reference: "Ekstrand J, et al. Shoulder injuries in professional football. Br J Sports Med 2013; 47:758-763.",
+    updatedDate: "2026-08-30",
+    notes: "Esguince grado II con subluxación parcial acromioclavicular. Fortalecimiento periescapular antes del contacto."
+  },
+  {
+    id: "hombro_luxacion_mod",
+    injuryType: "Luxación",
+    structureKeywords: ["hombro", "deltoides", "articulación acromioclavicular"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 45,
+    minWeeks: 3,
+    maxWeeks: 6.5,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Glenohumeral Instability and First-Time Dislocations in Goalkeepers.",
+    updatedDate: "2026-08-30",
+    notes: "Subluxación o luxación reducida cerrada sin fractura de reborde glenoideo. Estabilidad dinámica y prevención de recidiva."
+  },
+  {
+    id: "hombro_tendinopatia_leve",
+    injuryType: "Tendinopatía",
+    structureKeywords: ["hombro", "deltoides"],
+    severity: "Leve",
+    minDays: 10,
+    maxDays: 21,
+    minWeeks: 1.5,
+    maxWeeks: 3,
+    source: "Aspetar Sports Medicine Journal",
+    reference: "Aspetar: Rotator Cuff and Shoulder Overload in Overhead & Collision Athletes.",
+    updatedDate: "2026-08-30",
+    notes: "Sobrecarga de manguito o deltoides por apoyos y caídas repetidas."
+  },
+
+  // ==========================================
+  // MIEMBROS SUPERIORES - BRAZO (BÍCEPS / TRÍCEPS)
+  // ==========================================
+  {
+    id: "brazo_biceps_distension",
+    injuryType: "Distensión muscular",
+    structureKeywords: ["brazo", "bíceps", "tríceps"],
+    severity: "Leve",
+    minDays: 7,
+    maxDays: 14,
+    minWeeks: 1,
+    maxWeeks: 2,
+    source: "BJSM / Munich Consensus",
+    reference: "Mueller-Wohlfahrt HW, et al. Terminology and classification of muscle injuries. Br J Sports Med 2013.",
+    updatedDate: "2026-08-30",
+    notes: "Elongación o microrrotura grado 1 en bíceps o tríceps braquial tras hiperextensión o tracción."
+  },
+  {
+    id: "brazo_rotura_mod",
+    injuryType: "Rotura muscular",
+    structureKeywords: ["brazo", "bíceps", "tríceps"],
+    severity: "Moderada",
+    minDays: 21,
+    maxDays: 42,
+    minWeeks: 3,
+    maxWeeks: 6,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Arm muscle injuries in football and goalkeeper trauma.",
+    updatedDate: "2026-08-30",
+    notes: "Rotura fibrilar parcial moderada (grado 2) en musculatura braquial."
+  },
+
+  // ==========================================
+  // MIEMBROS SUPERIORES - CODO
+  // ==========================================
+  {
+    id: "codo_esguince_leve",
+    injuryType: "Esguince",
+    structureKeywords: ["codo", "epicóndilo", "articulación"],
+    severity: "Leve",
+    minDays: 7,
+    maxDays: 16,
+    minWeeks: 1,
+    maxWeeks: 2.5,
+    source: "FIFA Medical Guidelines",
+    reference: "FIFA Football Medicine Manual: Elbow sprain and hyperextension trauma in football.",
+    updatedDate: "2026-08-30",
+    notes: "Esguince capsulo-ligamentoso por hiperextensión al apoyar el brazo en caída o bloqueo de tiro."
+  },
+  {
+    id: "codo_epicondilitis_leve",
+    injuryType: "Tendinopatía",
+    structureKeywords: ["codo", "epicóndilo"],
+    severity: "Leve",
+    minDays: 14,
+    maxDays: 30,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "BJSM Guidelines",
+    reference: "Scott A, et al. Tendinopathy management in sports. Br J Sports Med 2020.",
+    updatedDate: "2026-08-30",
+    notes: "Epicondilalgia o sobrecarga en tendón conjunto extensor del antebrazo."
+  },
+  {
+    id: "codo_luxacion_mod",
+    injuryType: "Luxación",
+    structureKeywords: ["codo", "articulación"],
+    severity: "Moderada",
+    minDays: 28,
+    maxDays: 60,
+    minWeeks: 4,
+    maxWeeks: 8.5,
+    source: "FIFA Emergency Manual",
+    reference: "FIFA Football Emergency & Medicine Manual: Elbow dislocation and reduction protocols.",
+    updatedDate: "2026-08-30",
+    notes: "Luxación de codo sin fractura ósea asociada. Requiere inmovilización inicial y ganancia articular gradual."
+  },
+
+  // ==========================================
+  // MIEMBROS SUPERIORES - ANTEBRAZO Y MUÑECA
+  // ==========================================
+  {
+    id: "muneca_esguince_leve",
+    injuryType: "Esguince",
+    structureKeywords: ["muñeca", "antebrazo", "musculatura flexora", "musculatura extensora"],
+    severity: "Leve",
+    minDays: 7,
+    maxDays: 16,
+    minWeeks: 1,
+    maxWeeks: 2.5,
+    source: "FIFA Medical Network",
+    reference: "FIFA Sports Medicine: Wrist ligament sprains and support strapping in football.",
+    updatedDate: "2026-08-30",
+    notes: "Esguince de ligamentos radiocarpianos por hiperextensión en caída de apoyo."
+  },
+  {
+    id: "muneca_esguince_mod",
+    injuryType: "Esguince",
+    structureKeywords: ["muñeca", "antebrazo"],
+    severity: "Moderada",
+    minDays: 16,
+    maxDays: 35,
+    minWeeks: 2.5,
+    maxWeeks: 5,
+    source: "FIFA Medical Network",
+    reference: "FIFA Football Medicine Manual: Moderate wrist sprains with tear of scapholunate or dorsal ligaments.",
+    updatedDate: "2026-08-30",
+    notes: "Esguince grado II con inestabilidad funcional transitoria. Inmovilización y reincorporación con férula semirrígida."
+  },
+  {
+    id: "muneca_fractura_mod",
+    injuryType: "Fractura",
+    structureKeywords: ["muñeca", "escafoides", "radio", "cúbito", "antebrazo"],
+    severity: "Moderada",
+    minDays: 35,
+    maxDays: 65,
+    minWeeks: 5,
+    maxWeeks: 9,
+    source: "BJSM / FIFA Manual",
+    reference: "FIFA Football Medicine Manual: Distal radius and scaphoid fractures in football players.",
+    updatedDate: "2026-08-30",
+    notes: "Fisura o fractura no desplazada de radio distal o escafoides. Precisa consolidación radiológica completa antes de juego con contacto."
+  },
+
+  // ==========================================
+  // MIEMBROS SUPERIORES - MANO Y DEDOS
+  // ==========================================
+  {
+    id: "mano_dedo_esguince_leve",
+    injuryType: "Esguince",
+    structureKeywords: ["mano", "dedos", "metacarpos"],
+    severity: "Leve",
+    minDays: 5,
+    maxDays: 14,
+    minWeeks: 0.5,
+    maxWeeks: 2,
+    source: "FIFA Medical Guidelines",
+    reference: "FIFA Medical Manual: Finger and hand injuries in goalkeepers and field players.",
+    updatedDate: "2026-08-30",
+    notes: "Esguince colateral de interfalángica o capsulitis por impacto de balón. Sindactilia preventiva ('buddy taping')."
+  },
+  {
+    id: "mano_luxacion_mod",
+    injuryType: "Luxación",
+    structureKeywords: ["dedos", "mano"],
+    severity: "Moderada",
+    minDays: 14,
+    maxDays: 28,
+    minWeeks: 2,
+    maxWeeks: 4,
+    source: "FIFA Emergency Manual",
+    reference: "FIFA Sports Medicine: Interphalangeal dislocation reduction and athletic recovery.",
+    updatedDate: "2026-08-30",
+    notes: "Luxación interfalángica reducida. Inmovilización breve y protección en competición."
+  },
+  {
+    id: "mano_fractura_mod",
+    injuryType: "Fractura",
+    structureKeywords: ["metacarpos", "mano", "dedos"],
+    severity: "Moderada",
+    minDays: 28,
+    maxDays: 45,
+    minWeeks: 4,
+    maxWeeks: 6.5,
+    source: "BJSM Guidelines",
+    reference: "BJSM: Metacarpal fractures and return-to-play criteria in contact sports.",
+    updatedDate: "2026-08-30",
+    notes: "Fractura metacarpiana no quirúrgica (ej. 5º metacarpiano). Protección rígida homologada."
+  },
+
+  // ==========================================
   // TRAUMÁTICAS - CONTUSIÓN / GOLPE GENERAL
   // ==========================================
   {

@@ -1,9 +1,33 @@
 "use client"
 
 import React, { useState } from "react"
-import { MapPin, RotateCcw, Check, Sparkles } from "lucide-react"
+import dynamic from "next/dynamic"
+import {
+  MapPin,
+  Check,
+  Box,
+  Layout,
+  AlertTriangle,
+  Loader2,
+  ListFilter
+} from "lucide-react"
+import type { LateralityType, AnatomicalPieceData } from "./AnatomicalMannequin3D"
 
-export type LateralityType = "izquierda" | "derecha" | "bilateral" | "central" | "no_aplica"
+// Carga diferida / lazy del componente Three.js para aislamiento de SSR
+const DynamicMannequin3D = dynamic(
+  () => import("./AnatomicalMannequin3D").then(mod => mod.AnatomicalMannequin3D),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-80 sm:h-96 bg-slate-900 rounded-2xl flex flex-col items-center justify-center gap-3 text-slate-400">
+        <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+        <span className="text-xs font-semibold">Cargando visor 3D anatómico...</span>
+      </div>
+    )
+  }
+)
+
+export type { LateralityType }
 
 export interface AnatomicalSelection {
   bodyRegion: string
@@ -33,7 +57,8 @@ interface RegionConfig {
   rx?: number
 }
 
-const ANATOMICAL_REGIONS: RegionConfig[] = [
+// Catálogo completo de regiones anatómicas (usado para el mapa 2D y la selección accesible)
+export const ANATOMICAL_REGIONS: RegionConfig[] = [
   // Cabeza / Cuello
   {
     id: "cabeza",
@@ -128,7 +153,7 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "hombro_izq",
     region: "Hombro",
-    structures: ["Hombro", "Clavícula"],
+    structures: ["Hombro", "Deltoides", "Articulación acromioclavicular"],
     defaultStructure: "Hombro",
     view: "both",
     allowedLaterality: ["izquierda"],
@@ -142,7 +167,7 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "hombro_der",
     region: "Hombro",
-    structures: ["Hombro", "Clavícula"],
+    structures: ["Hombro", "Deltoides", "Articulación acromioclavicular"],
     defaultStructure: "Hombro",
     view: "both",
     allowedLaterality: ["derecha"],
@@ -152,6 +177,156 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
     w: 28,
     h: 26,
     rx: 8
+  },
+
+  // Brazos (Bíceps / Tríceps)
+  {
+    id: "brazo_izq",
+    region: "Brazo",
+    structures: ["Bíceps", "Tríceps"],
+    defaultStructure: "Bíceps",
+    view: "both",
+    allowedLaterality: ["izquierda"],
+    defaultLaterality: "izquierda",
+    x: 36,
+    y: 104,
+    w: 22,
+    h: 36,
+    rx: 6
+  },
+  {
+    id: "brazo_der",
+    region: "Brazo",
+    structures: ["Bíceps", "Tríceps"],
+    defaultStructure: "Bíceps",
+    view: "both",
+    allowedLaterality: ["derecha"],
+    defaultLaterality: "derecha",
+    x: 162,
+    y: 104,
+    w: 22,
+    h: 36,
+    rx: 6
+  },
+
+  // Codos
+  {
+    id: "codo_izq",
+    region: "Codo",
+    structures: ["Codo", "Epicóndilo", "Articulación"],
+    defaultStructure: "Codo",
+    view: "both",
+    allowedLaterality: ["izquierda"],
+    defaultLaterality: "izquierda",
+    x: 30,
+    y: 142,
+    w: 20,
+    h: 18,
+    rx: 5
+  },
+  {
+    id: "codo_der",
+    region: "Codo",
+    structures: ["Codo", "Epicóndilo", "Articulación"],
+    defaultStructure: "Codo",
+    view: "both",
+    allowedLaterality: ["derecha"],
+    defaultLaterality: "derecha",
+    x: 170,
+    y: 142,
+    w: 20,
+    h: 18,
+    rx: 5
+  },
+
+  // Antebrazos
+  {
+    id: "antebrazo_izq",
+    region: "Antebrazo",
+    structures: ["Musculatura flexora", "Musculatura extensora", "Radio", "Cúbito"],
+    defaultStructure: "Musculatura flexora",
+    view: "both",
+    allowedLaterality: ["izquierda"],
+    defaultLaterality: "izquierda",
+    x: 24,
+    y: 162,
+    w: 20,
+    h: 36,
+    rx: 6
+  },
+  {
+    id: "antebrazo_der",
+    region: "Antebrazo",
+    structures: ["Musculatura flexora", "Musculatura extensora", "Radio", "Cúbito"],
+    defaultStructure: "Musculatura flexora",
+    view: "both",
+    allowedLaterality: ["derecha"],
+    defaultLaterality: "derecha",
+    x: 176,
+    y: 162,
+    w: 20,
+    h: 36,
+    rx: 6
+  },
+
+  // Muñecas
+  {
+    id: "muneca_izq",
+    region: "Muñeca",
+    structures: ["Muñeca", "Escafoides"],
+    defaultStructure: "Muñeca",
+    view: "both",
+    allowedLaterality: ["izquierda"],
+    defaultLaterality: "izquierda",
+    x: 20,
+    y: 200,
+    w: 18,
+    h: 12,
+    rx: 4
+  },
+  {
+    id: "muneca_der",
+    region: "Muñeca",
+    structures: ["Muñeca", "Escafoides"],
+    defaultStructure: "Muñeca",
+    view: "both",
+    allowedLaterality: ["derecha"],
+    defaultLaterality: "derecha",
+    x: 182,
+    y: 200,
+    w: 18,
+    h: 12,
+    rx: 4
+  },
+
+  // Manos / Dedos
+  {
+    id: "mano_izq",
+    region: "Mano",
+    structures: ["Mano", "Metacarpos", "Dedos"],
+    defaultStructure: "Mano",
+    view: "both",
+    allowedLaterality: ["izquierda"],
+    defaultLaterality: "izquierda",
+    x: 16,
+    y: 214,
+    w: 20,
+    h: 22,
+    rx: 5
+  },
+  {
+    id: "mano_der",
+    region: "Mano",
+    structures: ["Mano", "Metacarpos", "Dedos"],
+    defaultStructure: "Mano",
+    view: "both",
+    allowedLaterality: ["derecha"],
+    defaultLaterality: "derecha",
+    x: 184,
+    y: 214,
+    w: 20,
+    h: 22,
+    rx: 5
   },
 
   // Cadera / Pelvis / Aductores (Frontal)
@@ -278,7 +453,7 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "pierna_izq_post",
     region: "Pierna",
-    structures: ["Gemelo interno", "Gemelo externo", "Sóleo"],
+    structures: ["Gemelo", "Sóleo", "Tibial anterior"],
     defaultStructure: "Sóleo",
     view: "back",
     allowedLaterality: ["izquierda"],
@@ -292,7 +467,7 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "pierna_der_post",
     region: "Pierna",
-    structures: ["Gemelo interno", "Gemelo externo", "Sóleo"],
+    structures: ["Gemelo", "Sóleo", "Tibial anterior"],
     defaultStructure: "Sóleo",
     view: "back",
     allowedLaterality: ["derecha"],
@@ -308,7 +483,7 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "pierna_izq_ant",
     region: "Pierna",
-    structures: ["Tibial anterior"],
+    structures: ["Tibial anterior", "Gemelo", "Sóleo"],
     defaultStructure: "Tibial anterior",
     view: "front",
     allowedLaterality: ["izquierda"],
@@ -322,7 +497,7 @@ const ANATOMICAL_REGIONS: RegionConfig[] = [
   {
     id: "pierna_der_ant",
     region: "Pierna",
-    structures: ["Tibial anterior"],
+    structures: ["Tibial anterior", "Gemelo", "Sóleo"],
     defaultStructure: "Tibial anterior",
     view: "front",
     allowedLaterality: ["derecha"],
@@ -412,14 +587,27 @@ export function buildDisplayLabel(structure: string, laterality: LateralityType)
 }
 
 export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
-  const [activeView, setActiveView] = useState<"front" | "back">("front")
-  const [hoveredRegion, setHoveredRegion] = useState<RegionConfig | null>(null)
+  // Modo de visualización: 3D por defecto, con opción 2D
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("3d")
+  const [activeView2D, setActiveView2D] = useState<"front" | "back">("front")
+  const [hoveredRegion2D, setHoveredRegion2D] = useState<RegionConfig | null>(null)
+  const [webGlError, setWebGlError] = useState<string | null>(null)
+  const [showAccessibleSelector, setShowAccessibleSelector] = useState<boolean>(false)
 
-  const visibleRegions = ANATOMICAL_REGIONS.filter(
-    r => r.view === "both" || r.view === activeView
-  )
+  // Manejador de selección desde el maniquí 3D
+  const handle3DSelect = (piece: AnatomicalPieceData) => {
+    const label = buildDisplayLabel(piece.defaultStructure, piece.laterality)
+    onChange({
+      bodyRegion: piece.region,
+      bodyStructure: piece.defaultStructure,
+      laterality: piece.laterality,
+      bodyView: "front",
+      displayLabel: label
+    })
+  }
 
-  const handleRegionClick = (reg: RegionConfig) => {
+  // Manejador de selección en el mapa 2D
+  const handle2DRegionClick = (reg: RegionConfig) => {
     const defaultLat = reg.defaultLaterality
     const struct = reg.defaultStructure
     const label = buildDisplayLabel(struct, defaultLat)
@@ -428,11 +616,12 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
       bodyRegion: reg.region,
       bodyStructure: struct,
       laterality: defaultLat,
-      bodyView: activeView,
+      bodyView: activeView2D,
       displayLabel: label
     })
   }
 
+  // Cambio de estructura anatómica de nivel 2
   const handleStructureChange = (structure: string) => {
     if (!value) return
     const newLabel = buildDisplayLabel(structure, value.laterality)
@@ -443,6 +632,7 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
     })
   }
 
+  // Cambio de lateralidad
   const handleLateralityChange = (lat: LateralityType) => {
     if (!value) return
     const newLabel = buildDisplayLabel(value.bodyStructure, lat)
@@ -453,125 +643,262 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
     })
   }
 
-  // Encuentra la configuración de la región actual
+  // Encuentra la configuración de la región actual para mostrar sus estructuras hijas
   const currentRegionConfig = ANATOMICAL_REGIONS.find(
-    r => r.region === value?.bodyRegion && (r.view === "both" || r.view === activeView)
+    r => r.region.toLowerCase() === value?.bodyRegion?.toLowerCase()
+  )
+
+  const visibleRegions2D = ANATOMICAL_REGIONS.filter(
+    r => r.view === "both" || r.view === activeView2D
   )
 
   return (
-    <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-4">
-      {/* Controles de vista */}
+    <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3 sm:p-4 space-y-4">
+      {/* Barra superior de controles: Modo 3D / 2D y Estado */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-200/80 pb-3">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-red-500 shrink-0" />
-          <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-            Localización Anatómica Interactiva
-          </span>
+          <div>
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wide">
+              Localizador Anatómico Profesional
+            </span>
+            <span className="hidden sm:inline text-[11px] text-slate-400 ml-2">
+              (Nivel 1: Región 3D → Nivel 2: Estructura)
+            </span>
+          </div>
         </div>
 
-        <div className="inline-flex p-0.5 bg-slate-200 rounded-xl w-full sm:w-auto">
+        {/* Conmutador de modo 3D / 2D */}
+        <div className="flex items-center gap-1.5 self-start sm:self-auto">
+          <div className="inline-flex p-0.5 bg-slate-200 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode("3d")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                viewMode === "3d"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>Avatar 3D</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("2d")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                viewMode === "2d"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Layout className="w-3.5 h-3.5" />
+              <span>Plano 2D</span>
+            </button>
+          </div>
+
           <button
             type="button"
-            onClick={() => setActiveView("front")}
-            className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
-              activeView === "front"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+            onClick={() => setShowAccessibleSelector(!showAccessibleSelector)}
+            className={`p-1.5 rounded-xl border text-xs transition-colors cursor-pointer ${
+              showAccessibleSelector
+                ? "bg-blue-50 border-blue-300 text-blue-700"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
             }`}
+            title="Abrir selector manual accesible"
           >
-            Vista Anterior (Frontal)
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveView("back")}
-            className={`flex-1 sm:flex-none px-3 py-1.5 sm:py-1 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
-              activeView === "back"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Vista Posterior (Dorsal)
+            <ListFilter className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-        {/* Silueta Anatómica SVG */}
-        <div className="md:col-span-5 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200 p-3 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-400 mb-2">
-            {activeView === "front" ? "Vista Anterior (Frontal)" : "Vista Posterior (Dorsal)"}
+      {/* Alerta de fallback en caso de error de WebGL */}
+      {webGlError && (
+        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            El navegador no pudo inicializar aceleración WebGL. Se ha activado automáticamente el <strong>Mapa Anatómico 2D</strong>.
           </span>
+        </div>
+      )}
 
-          <svg
-            viewBox="0 0 220 375"
-            className="w-44 h-72 select-none"
-            aria-label="Silueta anatómica deportiva"
-          >
-            {/* Silueta base anatómica */}
-            <g opacity="0.16" fill="#64748b" stroke="#475569" strokeWidth="1.5">
-              <circle cx="110" cy="33" r="20" />
-              <rect x="102" y="53" width="16" height="15" rx="3" />
-              <path d="M 68,68 L 152,68 L 140,165 L 80,165 Z" />
-              <path d="M 68,72 L 42,145 L 32,205 L 45,205 L 58,150 L 75,85 Z" />
-              <path d="M 152,72 L 178,145 L 188,205 L 175,205 L 162,150 L 145,85 Z" />
-              <path d="M 80,165 L 105,165 L 102,345 L 82,345 L 75,230 Z" />
-              <path d="M 140,165 L 115,165 L 118,345 L 138,345 L 145,230 Z" />
-            </g>
+      {/* Selector Manual Accesible (Navegación por teclado / sin ratón) */}
+      {showAccessibleSelector && (
+        <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3 animate-in fade-in duration-200 text-xs">
+          <div className="flex items-center justify-between font-bold text-blue-900">
+            <span>Selector Manual Accesible</span>
+            <button
+              type="button"
+              onClick={() => setShowAccessibleSelector(false)}
+              className="text-blue-600 hover:underline text-[11px]"
+            >
+              Cerrar
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-bold text-blue-800 uppercase mb-1">
+                Región Anatómica
+              </label>
+              <select
+                value={value?.bodyRegion || ""}
+                onChange={e => {
+                  const regName = e.target.value
+                  const reg = ANATOMICAL_REGIONS.find(r => r.region === regName)
+                  if (reg) {
+                    handle2DRegionClick(reg)
+                  }
+                }}
+                className="w-full border border-blue-200 rounded-lg p-2 bg-white text-slate-900 text-xs font-semibold"
+              >
+                <option value="">-- Seleccionar Región --</option>
+                {Array.from(new Set(ANATOMICAL_REGIONS.map(r => r.region))).map(reg => (
+                  <option key={reg} value={reg}>
+                    {reg}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            {/* Zonas anatómicas clickables */}
-            {visibleRegions.map(reg => {
-              const isSelected =
-                value?.bodyRegion === reg.region &&
-                (reg.allowedLaterality.includes(value?.laterality || ("" as any)) ||
-                  reg.defaultLaterality === value?.laterality)
-              const isHovered = hoveredRegion?.id === reg.id
-
-              return (
-                <g key={reg.id}>
-                  <rect
-                    x={reg.x}
-                    y={reg.y}
-                    width={reg.w}
-                    height={reg.h}
-                    rx={reg.rx || 4}
-                    className={`cursor-pointer transition-all duration-150 ${
-                      isSelected
-                        ? "fill-red-500 stroke-red-700 stroke-2 opacity-95 animate-pulse"
-                        : isHovered
-                        ? "fill-red-200 stroke-red-400 stroke-1.5 opacity-85"
-                        : "fill-blue-500/20 stroke-blue-400/50 stroke-1 hover:fill-red-200/60"
-                    }`}
-                    onMouseEnter={() => setHoveredRegion(reg)}
-                    onMouseLeave={() => setHoveredRegion(null)}
-                    onClick={() => handleRegionClick(reg)}
-                  />
-                  {isSelected && (
-                    <circle
-                      cx={reg.x + reg.w / 2}
-                      cy={reg.y + reg.h / 2}
-                      r="4"
-                      fill="#ffffff"
-                      className="pointer-events-none"
-                    />
-                  )}
-                </g>
-              )
-            })}
-          </svg>
-
-          <div className="w-full flex justify-between px-3 text-[9px] font-bold text-slate-400 uppercase mt-1">
-            <span>{activeView === "front" ? "← Lado Izq" : "← Lado Der"}</span>
-            <span>{activeView === "front" ? "Lado Der →" : "Lado Izq →"}</span>
+            {currentRegionConfig && (
+              <div>
+                <label className="block text-[11px] font-bold text-blue-800 uppercase mb-1">
+                  Estructura Específica
+                </label>
+                <select
+                  value={value?.bodyStructure || ""}
+                  onChange={e => handleStructureChange(e.target.value)}
+                  className="w-full border border-blue-200 rounded-lg p-2 bg-white text-slate-900 text-xs font-semibold"
+                >
+                  {currentRegionConfig.structures.map(struct => (
+                    <option key={struct} value={struct}>
+                      {struct}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
+      )}
 
-        {/* Panel de Estructura Anatómica y Lateralidad */}
+      {/* CUERPO PRINCIPAL: VISOR (3D O 2D) + PANEL DE CONFIGURACIÓN */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-5 items-start">
+        {/* COLUMNA VISOR: 3D O 2D */}
+        <div className="md:col-span-5 flex flex-col items-center justify-center">
+          {viewMode === "3d" && !webGlError ? (
+            <div className="w-full">
+              <DynamicMannequin3D
+                selectedRegionId={value?.bodyRegion}
+                selectedLaterality={value?.laterality}
+                onSelectPiece={handle3DSelect}
+                onError={err => {
+                  setWebGlError(err.message)
+                  setViewMode("2d")
+                }}
+              />
+            </div>
+          ) : (
+            /* MAPA 2D (ESQUEMÁTICO DE SEGURIDAD / FALLBACK) */
+            <div className="w-full flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200 p-3 shadow-xs">
+              <div className="w-full flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400">
+                  {activeView2D === "front" ? "Vista Anterior (Frontal)" : "Vista Posterior (Dorsal)"}
+                </span>
+                <div className="inline-flex p-0.5 bg-slate-100 rounded-lg text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveView2D("front")}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                      activeView2D === "front" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
+                    }`}
+                  >
+                    Frontal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView2D("back")}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                      activeView2D === "back" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
+                    }`}
+                  >
+                    Dorsal
+                  </button>
+                </div>
+              </div>
+
+              <svg
+                viewBox="0 0 220 375"
+                className="w-44 h-72 select-none"
+                aria-label="Silueta anatómica deportiva 2D"
+              >
+                {/* Silueta base anatómica */}
+                <g opacity="0.16" fill="#64748b" stroke="#475569" strokeWidth="1.5">
+                  <circle cx="110" cy="33" r="20" />
+                  <rect x="102" y="53" width="16" height="15" rx="3" />
+                  <path d="M 68,68 L 152,68 L 140,165 L 80,165 Z" />
+                  <path d="M 68,72 L 30,145 L 20,205 L 35,205 L 48,150 L 75,85 Z" />
+                  <path d="M 152,72 L 190,145 L 200,205 L 185,205 L 172,150 L 145,85 Z" />
+                  <path d="M 80,165 L 105,165 L 102,345 L 82,345 L 75,230 Z" />
+                  <path d="M 140,165 L 115,165 L 118,345 L 138,345 L 145,230 Z" />
+                </g>
+
+                {/* Zonas anatómicas clickables */}
+                {visibleRegions2D.map(reg => {
+                  const isSelected =
+                    value?.bodyRegion === reg.region &&
+                    (reg.allowedLaterality.includes(value?.laterality || ("" as any)) ||
+                      reg.defaultLaterality === value?.laterality)
+                  const isHovered = hoveredRegion2D?.id === reg.id
+
+                  return (
+                    <g key={reg.id}>
+                      <rect
+                        x={reg.x}
+                        y={reg.y}
+                        width={reg.w}
+                        height={reg.h}
+                        rx={reg.rx || 4}
+                        className={`cursor-pointer transition-all duration-150 ${
+                          isSelected
+                            ? "fill-red-500 stroke-red-700 stroke-2 opacity-95 animate-pulse"
+                            : isHovered
+                            ? "fill-red-200 stroke-red-400 stroke-1.5 opacity-85"
+                            : "fill-blue-500/20 stroke-blue-400/50 stroke-1 hover:fill-red-200/60"
+                        }`}
+                        onMouseEnter={() => setHoveredRegion2D(reg)}
+                        onMouseLeave={() => setHoveredRegion2D(null)}
+                        onClick={() => handle2DRegionClick(reg)}
+                      />
+                      {isSelected && (
+                        <circle
+                          cx={reg.x + reg.w / 2}
+                          cy={reg.y + reg.h / 2}
+                          r="4"
+                          fill="#ffffff"
+                          className="pointer-events-none"
+                        />
+                      )}
+                    </g>
+                  )
+                })}
+              </svg>
+
+              <div className="w-full flex justify-between px-3 text-[9px] font-bold text-slate-400 uppercase mt-1">
+                <span>{activeView2D === "front" ? "← Lado Izq" : "← Lado Der"}</span>
+                <span>{activeView2D === "front" ? "Lado Der →" : "Lado Izq →"}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* COLUMNA DETALLE: SELECCIÓN EN DOS NIVELES Y LATERALIDAD */}
         <div className="md:col-span-7 space-y-4">
-          {/* Zona Seleccionada */}
+          {/* Nivel 1: Zona / Región Seleccionada */}
           <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                Estructura Seleccionada
+                Estructura Seleccionada (Nivel 1 + Nivel 2)
               </span>
               {value && (
                 <button
@@ -590,10 +917,13 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
                 <span className="text-sm font-black text-slate-900">
                   {value.displayLabel}
                 </span>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                  {value.bodyRegion}
+                </span>
               </div>
             ) : (
               <p className="text-xs text-slate-400 italic">
-                Haz clic en el mapa corporal para seleccionar la zona afectada.
+                Haz clic o toca sobre el maniquí 3D para seleccionar la zona afectada.
               </p>
             )}
           </div>
@@ -632,11 +962,11 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
             </div>
           </div>
 
-          {/* Refinamiento de Estructura Concreta */}
+          {/* Nivel 2: Refinamiento de Estructura Anatómica Concreta */}
           {value && currentRegionConfig && (
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                Estructura Específica ({currentRegionConfig.region})
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                Nivel 2: Estructura Específica ({currentRegionConfig.region})
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {currentRegionConfig.structures.map(struct => {
@@ -661,26 +991,29 @@ export function AnatomicalBodyMap({ value, onChange }: AnatomicalBodyMapProps) {
             </div>
           )}
 
-          {/* Accesos rápidos frecuentes de fútbol */}
+          {/* Accesos Rápidos de Patologías Comunes de Fútbol */}
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
-              Patologías Comunes en Fútbol:
+              Patologías Habituales en Fútbol (Acceso Rápido):
             </span>
             <div className="flex flex-wrap gap-1.5">
               {[
                 { label: "Isquiotibiales Der.", region: "Muslo posterior", struct: "Isquiotibiales", lat: "derecha" as const, view: "back" as const },
                 { label: "Isquiotibiales Izq.", region: "Muslo posterior", struct: "Isquiotibiales", lat: "izquierda" as const, view: "back" as const },
-                { label: "Cuádriceps / Recto Femoral", region: "Muslo anterior", struct: "Recto femoral", lat: "derecha" as const, view: "front" as const },
+                { label: "Cuádriceps / Recto", region: "Muslo anterior", struct: "Recto femoral", lat: "derecha" as const, view: "front" as const },
                 { label: "Sóleo / Gemelo", region: "Pierna", struct: "Sóleo", lat: "derecha" as const, view: "back" as const },
                 { label: "Aductores / Ingle", region: "Cadera / Pelvis", struct: "Aductores", lat: "derecha" as const, view: "front" as const },
                 { label: "Ligamento Tobillo", region: "Tobillo", struct: "Tobillo externo", lat: "derecha" as const, view: "front" as const },
-                { label: "Tendón Rotuliano", region: "Rodilla", struct: "Tendón rotuliano", lat: "derecha" as const, view: "front" as const }
+                { label: "Tendón Rotuliano", region: "Rodilla", struct: "Tendón rotuliano", lat: "derecha" as const, view: "front" as const },
+                { label: "Codo / Hiperextensión", region: "Codo", struct: "Codo", lat: "derecha" as const, view: "front" as const },
+                { label: "Esguince Muñeca", region: "Muñeca", struct: "Muñeca", lat: "derecha" as const, view: "front" as const },
+                { label: "Hombro / Acromio", region: "Hombro", struct: "Articulación acromioclavicular", lat: "derecha" as const, view: "front" as const }
               ].map(f => (
                 <button
                   key={f.label}
                   type="button"
                   onClick={() => {
-                    setActiveView(f.view)
+                    setActiveView2D(f.view)
                     onChange({
                       bodyRegion: f.region,
                       bodyStructure: f.struct,

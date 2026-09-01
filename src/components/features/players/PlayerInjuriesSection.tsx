@@ -53,6 +53,8 @@ interface PlayerInjuriesSectionProps {
   playerStatus?: string
   playerAvatarUrl?: string
   canManage?: boolean
+  isOpenDirectly?: boolean
+  onCloseDirect?: () => void
   onInjuriesChange?: (hasActiveInjury: boolean, activeCount: number) => void
 }
 
@@ -119,6 +121,8 @@ export function PlayerInjuriesSection({
   playerStatus,
   playerAvatarUrl,
   canManage = true,
+  isOpenDirectly,
+  onCloseDirect,
   onInjuriesChange
 }: PlayerInjuriesSectionProps) {
   const [injuries, setInjuries] = useState<PlayerInjuryDTO[]>([])
@@ -127,6 +131,12 @@ export function PlayerInjuriesSection({
 
   // Modales
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (isOpenDirectly) {
+      setIsNewModalOpen(true)
+    }
+  }, [isOpenDirectly])
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false)
   const [isResolveModalOpen, setIsResolveModalOpen] = useState(false)
   const [selectedInjuryForAction, setSelectedInjuryForAction] = useState<PlayerInjuryDTO | null>(null)
@@ -774,23 +784,6 @@ export function PlayerInjuriesSection({
                     </tbody>
                   </table>
                 </div>
-                {/* 4. MODAL PROFESIONAL PARA REGISTRAR NUEVA LESIÓN (PANTALLA COMPLETA 1:1) */}
-                <ProfessionalInjuryModal
-                  isOpen={isNewModalOpen}
-                  onClose={() => setIsNewModalOpen(false)}
-                  player={{
-                    id: playerId,
-                    name: playerName,
-                    number: playerNumber || 23,
-                    position: playerPosition || "Centrocampista",
-                    status: playerStatus || "Disponible",
-                    avatarUrl: playerAvatarUrl
-                  }}
-                  onInjuryCreated={() => {
-                    setIsNewModalOpen(false)
-                    loadInjuries()
-                  }}
-                />
               </div>
             )}
           </div>
@@ -935,6 +928,28 @@ export function PlayerInjuriesSection({
           </div>
         </div>
       )}
+
+      {/* MODAL PROFESIONAL PARA REGISTRAR NUEVA LESIÓN (ACCESIBLE PARA TODOS LOS JUGADORES) */}
+      <ProfessionalInjuryModal
+        isOpen={isNewModalOpen}
+        onClose={() => {
+          setIsNewModalOpen(false)
+          onCloseDirect?.()
+        }}
+        player={{
+          id: playerId,
+          name: playerName || "Jugador",
+          number: playerNumber || "-",
+          position: playerPosition || "Jugador",
+          status: playerStatus || "Disponible",
+          avatarUrl: playerAvatarUrl
+        }}
+        onInjuryCreated={() => {
+          setIsNewModalOpen(false)
+          onCloseDirect?.()
+          loadInjuries()
+        }}
+      />
     </div>
   )
 }

@@ -133,6 +133,7 @@ export default function GlobalPlayerProfilePage() {
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
   const [hasActiveInjury, setHasActiveInjury] = useState<boolean>(false);
+  const [openInjuryModal, setOpenInjuryModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -774,12 +775,15 @@ export default function GlobalPlayerProfilePage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setActiveTab('medico')}
-                      title="Ver historial de lesiones del jugador"
+                      onClick={() => {
+                        setActiveTab('medico')
+                        setOpenInjuryModal(true)
+                      }}
+                      title="Abrir módulo y avatar de lesiones del jugador"
                       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-200 cursor-pointer transition-all"
                     >
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      🟢 LESIONES / ALTA (Ver)
+                      🟢 LESIONES / ALTA (Abrir 3D)
                     </button>
                   )}
                 </div>
@@ -789,10 +793,13 @@ export default function GlobalPlayerProfilePage() {
               <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
                 <button 
                   type="button"
-                  onClick={() => setActiveTab('medico')}
-                  className="flex items-center justify-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer shadow-xs"
+                  onClick={() => {
+                    setActiveTab('medico')
+                    setOpenInjuryModal(true)
+                  }}
+                  className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer shadow-md shadow-red-200 hover:scale-102"
                 >
-                  <HeartPulse size={15} className="text-red-600" /> Módulo Lesiones (3D)
+                  <HeartPulse size={15} className="text-white" /> Módulo Lesiones (3D)
                 </button>
                 <button 
                   onClick={() => setIsEditing(true)}
@@ -1239,9 +1246,25 @@ export default function GlobalPlayerProfilePage() {
 
         {/* PESTAÑA: FÍSICO & MÉDICO */}
         {activeTab === 'medico' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="md:col-span-1 space-y-6">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2">Antropometría</h3>
+          <div className="space-y-8">
+            {/* SECCIÓN M1: MÓDULO PROFESIONAL DE LESIONES DEPORTIVAS Y AVATAR */}
+            <div id="seccion-lesiones" className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-xs">
+              <PlayerInjuriesSection 
+                playerId={player.id} 
+                playerName={`${player.first_name} ${player.last_name}`}
+                playerNumber={player.dorsal || undefined}
+                playerPosition={player.posicion || undefined}
+                playerStatus={player.status === "active" ? "Disponible" : player.status}
+                playerAvatarUrl={player.avatar_url || undefined}
+                isOpenDirectly={openInjuryModal}
+                onCloseDirect={() => setOpenInjuryModal(false)}
+                onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+              <div className="md:col-span-1 space-y-6">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2">Antropometría</h3>
               <div className="flex flex-col gap-3.5 bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100">
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="flex-1">
@@ -1403,19 +1426,6 @@ export default function GlobalPlayerProfilePage() {
                 </div>
               )}
 
-              {/* SECCIÓN M1: HISTORIAL BÁSICO DE LESIONES */}
-              <div className="mt-8 pt-2">
-                <PlayerInjuriesSection 
-                  playerId={player.id} 
-                  playerName={`${player.first_name} ${player.last_name}`}
-                  playerNumber={player.dorsal || undefined}
-                  playerPosition={player.posicion || undefined}
-                  playerStatus={player.status === "active" ? "Disponible" : player.status}
-                  playerAvatarUrl={player.avatar_url || undefined}
-                  onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
-                />
-              </div>
-
               {/* TABLA HISTORIAL DE PROGRESIÓN (IMC / Peso) */}
               <h3 className="text-base sm:text-lg font-bold text-gray-900 border-b pb-2 mt-8 flex items-center gap-2">
                 <TrendingUp size={18} className="text-blue-500" />
@@ -1453,6 +1463,7 @@ export default function GlobalPlayerProfilePage() {
               </div>
             </div>
           </div>
+        </div>
         )}
 
         {/* PESTAÑA: ESTADÍSTICAS */}

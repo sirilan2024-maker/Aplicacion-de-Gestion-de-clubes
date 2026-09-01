@@ -43,7 +43,7 @@ export function InjuryManagement({
     cameraView,
     setCameraView,
     selectZone,
-  } = useAnatomySelection('isquiotibiales_der');
+  } = useAnatomySelection('');
 
   const {
     currentStep,

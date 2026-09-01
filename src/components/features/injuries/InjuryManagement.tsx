@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Shield, Edit2 } from 'lucide-react';
 import { InjuryHeader } from './InjuryHeader';
 import { InjuryStepper } from './InjuryStepper';
 import { AnatomyControls } from './AnatomyControls';
@@ -12,7 +13,7 @@ import { InjuryTypeStep } from './InjuryTypeStep';
 import { InjurySeverityStep } from './InjurySeverityStep';
 import { InjurySummary } from './InjurySummary';
 import { InjuryFooter } from './InjuryFooter';
-import { useAnatomySelection, ANATOMICAL_ZONES } from '@/hooks/useAnatomySelection';
+import { useAnatomySelection } from '@/hooks/useAnatomySelection';
 import { useInjuryWizard } from '@/hooks/useInjuryWizard';
 
 interface InjuryManagementProps {
@@ -35,6 +36,7 @@ export function InjuryManagement({
 }: InjuryManagementProps) {
   const [mode, setMode] = useState<'3D' | '2D'>('3D');
 
+  // En el mockup exacto de Marco Sanchez, Isquiotibiales Derecho está seleccionado
   const {
     selectedCode,
     selectedZone,
@@ -43,7 +45,7 @@ export function InjuryManagement({
     cameraView,
     setCameraView,
     selectZone,
-  } = useAnatomySelection('');
+  } = useAnatomySelection('isquiotibiales_der');
 
   const {
     currentStep,
@@ -59,7 +61,6 @@ export function InjuryManagement({
     onClose?.();
   });
 
-  // Sincronizar selección anatómica con el formulario del wizard
   useEffect(() => {
     if (selectedZone) {
       updateForm({
@@ -72,71 +73,141 @@ export function InjuryManagement({
   }, [selectedZone, updateForm]);
 
   const handleResetCamera = () => {
-    setCameraView('posterior');
+    setCameraView('frontal');
   };
 
+  const playerName = player.name || 'Marco Sanchez';
+  const playerNumber = player.number || '#8';
+  const playerPosition = player.position || 'Centrocampista';
+
   return (
-    <div className="w-full h-full max-h-[92vh] flex flex-col bg-slate-950 text-slate-100 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden font-sans">
-      {/* 1. Header del Jugador */}
+    <div className="w-full max-w-[1220px] bg-[#090d14] text-slate-100 rounded-2xl border border-[#1b2336] shadow-2xl overflow-hidden font-sans flex flex-col my-auto">
+      {/* 1. Encabezado superior con breadcrumb */}
       <InjuryHeader
-        playerName={player.name || 'Marco Sánchez'}
-        playerNumber={player.number || '#8'}
-        playerPosition={player.position || 'Centrocampista'}
-        playerAvatarUrl={player.avatarUrl}
-        isInjured={true}
+        playerName={playerName}
         onClose={onClose}
       />
 
-      {/* 2. Cuerpo Principal: Layout 2 Columnas (40%-45% Anatomía | 55%-60% Wizard) */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 sm:p-6 overflow-y-auto lg:overflow-hidden">
-        {/* COLUMNA IZQUIERDA: VISUALIZADOR ANATÓMICO */}
-        <section className="lg:col-span-5 flex flex-col justify-between space-y-4">
-          {/* Controles de Vista y Cámara */}
-          <AnatomyControls
-            mode={mode}
-            onModeChange={setMode}
-            cameraView={cameraView}
-            onViewChange={setCameraView}
-            onReset={handleResetCamera}
-          />
+      {/* 2. Cuerpo Principal en 2 Grandes Bloques (Exacto al Mockup) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 sm:p-5 flex-1 overflow-y-auto">
+        {/* ============================================================
+            COLUMNA IZQUIERDA: TARJETA DEL JUGADOR + VISUALIZADOR 3D/2D
+            ============================================================ */}
+        <section className="lg:col-span-6 flex flex-col gap-3.5">
+          {/* Subtarjeta 1: Ficha del Jugador (Marco Sanchez #8) */}
+          <div className="rounded-2xl bg-[#0c1017] border border-[#1c2436] p-3.5 sm:p-4 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3">
+              {/* Foto de Marco Sanchez */}
+              <div className="w-13 h-13 rounded-full overflow-hidden border border-slate-700 bg-slate-800 shrink-0">
+                <img
+                  src={player.avatarUrl || '/models/marco_sanchez.png'}
+                  alt={playerName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/models/marco_sanchez.png';
+                  }}
+                />
+              </div>
 
-          {/* Visor del Avatar Anatómico */}
-          <div className="flex-1 flex items-center justify-center">
-            <AnatomyViewer
-              mode={mode}
-              cameraView={cameraView}
-              selectedCode={selectedCode}
-              hoveredCode={hoveredCode}
-              onSelect={selectZone}
-              onHover={setHoveredCode}
-            />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight leading-tight">
+                    {playerName}
+                  </h2>
+                  <span className="text-xs sm:text-sm font-bold text-emerald-400 font-mono">
+                    {String(playerNumber).startsWith('#') ? playerNumber : `#${playerNumber}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium mt-0.5">
+                  <span>{playerPosition}</span>
+                  <Shield size={13} className="text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* Estado de disponibilidad: LESIONADO */}
+            <div className="flex flex-col items-end">
+              <div className="bg-[#240e15] border border-rose-500/60 text-rose-400 px-3 py-1 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span>LESIONADO</span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-medium mt-1">
+                Estado de disponibilidad
+              </span>
+            </div>
           </div>
 
-          {/* Carrusel de Selección Rápida Inferior */}
-          <AnatomyQuickSelect
-            selectedCode={selectedCode}
-            onSelect={selectZone}
-          />
+          {/* Subtarjeta 2: Visualizador Anatómico 3D / 2D con Avatar */}
+          <div className="rounded-2xl bg-[#0c1017] border border-[#1c2436] p-4 flex flex-col justify-between flex-1 shadow-xs">
+            <AnatomyControls
+              mode={mode}
+              onModeChange={setMode}
+              cameraView={cameraView}
+              onViewChange={setCameraView}
+              onReset={handleResetCamera}
+            />
+
+            <div className="my-2 flex-1 flex items-center justify-center">
+              <AnatomyViewer
+                mode={mode}
+                cameraView={cameraView}
+                selectedCode={selectedCode}
+                hoveredCode={hoveredCode}
+                onSelect={selectZone}
+                onHover={setHoveredCode}
+              />
+            </div>
+
+            <AnatomyQuickSelect
+              selectedCode={selectedCode}
+              onSelect={selectZone}
+            />
+          </div>
         </section>
 
-        {/* COLUMNA DERECHA: ASISTENTE DE LESIÓN (STEPPER 1 → 2 → 3 → 4) */}
-        <section className="lg:col-span-7 flex flex-col justify-between bg-slate-900/50 border border-slate-800/80 rounded-3xl p-4 sm:p-6 shadow-inner backdrop-blur-xs">
-          {/* Stepper Superior */}
-          <div className="shrink-0 mb-4">
+        {/* ============================================================
+            COLUMNA DERECHA: STEPPER 1 → 2 → 3 → 4 + WIZARD
+            ============================================================ */}
+        <section className="lg:col-span-6 flex flex-col justify-between bg-[#0c1017] border border-[#1c2436] rounded-2xl p-4 sm:p-5 shadow-xs">
+          {/* 1. Stepper Superior */}
+          <div className="mb-4">
             <InjuryStepper
               currentStep={currentStep}
               onStepClick={goToStep}
             />
           </div>
 
-          {/* Contenido Dinámico según el Paso Activo */}
-          <div className="flex-1 overflow-y-auto py-2">
+          {/* 2. Banner de Zona Seleccionada (Exacto al mockup) */}
+          <div className="bg-[#0b0f17] border border-[#1b2334] rounded-xl px-4 py-2.5 flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Shield size={16} className="text-emerald-400" />
+              <span className="text-xs text-slate-400">Zona seleccionada:</span>
+              <span className="text-xs sm:text-sm font-bold text-emerald-400">
+                {form.zonaAnatomica || selectedZone?.name || 'Isquiotibiales Derecho'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => goToStep(1)}
+              className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Edit2 size={13} />
+              <span>Cambiar</span>
+            </button>
+          </div>
+
+          {/* 3. Contenido según el paso activo */}
+          <div className="flex-1 overflow-y-auto">
             {currentStep === 1 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full">
+                {/* Panel izquierdo: Selector manual (Jerárquico) */}
                 <AnatomyManualSelector
                   selectedCode={selectedCode}
                   onSelect={selectZone}
                 />
+
+                {/* Panel derecho: Información de la zona con imagen posterior de piernas */}
                 <AnatomyZoneInfo zone={selectedZone} />
               </div>
             )}
@@ -162,7 +233,7 @@ export function InjuryManagement({
         </section>
       </div>
 
-      {/* 3. Footer Fijo con Navegación y Guardado */}
+      {/* 3. Barra de Navegación Inferior (Footer Fijo) */}
       <InjuryFooter
         currentStep={currentStep}
         totalSteps={4}

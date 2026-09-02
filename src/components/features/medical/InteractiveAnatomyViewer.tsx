@@ -46,6 +46,16 @@ export function InteractiveAnatomyViewer({
   const [hoveredSubportion, setHoveredSubportion] = useState<string | null>(null);
   const [zoomMode, setZoomMode] = useState<'macro' | 'micro'>('macro');
 
+  // Sincronizar vista de cámara automáticamente cuando cambia la zona seleccionada
+  React.useEffect(() => {
+    if (selectedCode && ANATOMICAL_ZONES[selectedCode]?.viewDefault) {
+      setCameraView(ANATOMICAL_ZONES[selectedCode].viewDefault === 'posterior' ? 'posterior' : 'frontal');
+    } else if (!selectedCode) {
+      setCameraView('frontal');
+      setZoomMode('macro');
+    }
+  }, [selectedCode]);
+
   // Mapear qué zonas anatómicas tienen lesiones activas o antecedentes
   const injuryStatusByZone = useMemo(() => {
     const map: Record<string, { hasActive: boolean; hasResolved: boolean; injury?: PlayerInjuryDTO }> = {};
@@ -510,11 +520,7 @@ export function InteractiveAnatomyViewer({
             {cameraView === 'frontal' && (
               <div className="relative w-[210px] h-[440px] flex items-center justify-center">
                 <img
-                  src={
-                    injuryStatusByZone['recto_femoral_der']?.hasActive || selectedCode === 'recto_femoral_der'
-                      ? '/models/avatar_exact_mockup.png'
-                      : '/models/avatar_front_reference_clean.png'
-                  }
+                  src="/models/avatar_front_reference_clean.png"
                   alt="Anatomía Frontal"
                   className="w-full h-full object-contain filter contrast-105 pointer-events-none"
                 />

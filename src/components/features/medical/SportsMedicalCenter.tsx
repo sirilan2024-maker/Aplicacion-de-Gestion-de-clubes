@@ -48,6 +48,7 @@ export function SportsMedicalCenter({
   const [injuries, setInjuries] = useState<PlayerInjuryDTO[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedZoneCode, setSelectedZoneCode] = useState<string>('isquiotibiales_der');
+  const [selectedSubportion, setSelectedSubportion] = useState<string>('union_miotendinosa');
   const [activeTab, setActiveTab] = useState<'estructura' | 'historial' | 'metricas'>('estructura');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedInjuryForModal, setSelectedInjuryForModal] = useState<PlayerInjuryDTO | null>(null);
@@ -76,13 +77,15 @@ export function SportsMedicalCenter({
   const activeInjuries = injuries.filter((i) => i.status === 'activa');
   const hasActive = activeInjuries.length > 0;
 
-  const handleSelectZone = (code: string) => {
+  const handleSelectZone = (code: string, subportionCode?: string) => {
     setSelectedZoneCode(code);
+    if (subportionCode) setSelectedSubportion(subportionCode);
     setActiveTab('estructura');
   };
 
-  const handleStartNewInjury = (zoneCode?: string) => {
+  const handleStartNewInjury = (zoneCode?: string, subportionCode?: string) => {
     if (zoneCode) setSelectedZoneCode(zoneCode);
+    if (subportionCode) setSelectedSubportion(subportionCode);
     setIsModalOpen(true);
   };
 
@@ -163,6 +166,8 @@ export function SportsMedicalCenter({
             selectedCode={selectedZoneCode}
             onSelectZone={handleSelectZone}
             injuries={injuries}
+            selectedSubportion={selectedSubportion}
+            onSelectSubportion={setSelectedSubportion}
             onSelectInjury={(id) => {
               const inj = injuries.find((i) => i.id === id);
               if (inj) setSelectedInjuryForModal(inj);
@@ -218,6 +223,8 @@ export function SportsMedicalCenter({
               <AnatomicalStructureCard
                 zoneCode={selectedZoneCode}
                 injuries={injuries}
+                selectedSubportion={selectedSubportion}
+                onSelectSubportion={setSelectedSubportion}
                 onStartNewInjury={handleStartNewInjury}
                 onSelectInjuryDetails={(inj) => setSelectedInjuryForModal(inj)}
               />
@@ -302,6 +309,7 @@ export function SportsMedicalCenter({
             status: playerStatus,
           }}
           initialZoneCode={selectedZoneCode}
+          initialSubportion={selectedSubportion}
           existingInjuries={injuries}
           onInjuryCreated={() => {
             loadInjuries();

@@ -4,28 +4,33 @@ import React from 'react';
 import {
   Activity,
   AlertTriangle,
-  Clock,
-  ShieldCheck,
-  PlusCircle,
-  FileText,
-  Calendar,
-  Layers,
   ArrowRight,
-  History as HistoryIcon
+  Calendar,
+  Clock,
+  ExternalLink,
+  History as HistoryIcon,
+  Layers,
+  PlusCircle,
+  ShieldCheck,
+  Target,
 } from 'lucide-react';
-import { ANATOMICAL_ZONES, AnatomicalZone } from '@/hooks/useAnatomySelection';
+import { ANATOMICAL_ZONES, AnatomicalZone, getSubportionsForStructure, TissueSubportion } from '@/hooks/useAnatomySelection';
 import { PlayerInjuryDTO } from '@/app/actions/injury-actions';
 
 interface AnatomicalStructureCardProps {
   zoneCode: string;
   injuries: PlayerInjuryDTO[];
-  onStartNewInjury: (zoneCode: string) => void;
+  selectedSubportion?: string;
+  onSelectSubportion?: (subportionCode: string) => void;
+  onStartNewInjury: (zoneCode: string, subportionCode?: string) => void;
   onSelectInjuryDetails: (injury: PlayerInjuryDTO) => void;
 }
 
 export function AnatomicalStructureCard({
   zoneCode,
   injuries = [],
+  selectedSubportion,
+  onSelectSubportion,
   onStartNewInjury,
   onSelectInjuryDetails,
 }: AnatomicalStructureCardProps) {
@@ -106,7 +111,57 @@ export function AnatomicalStructureCard({
         </div>
       </div>
 
-      {/* 2. Biomecánica y Mecanismo Lesional Típico en Fútbol */}
+      {/* 2. Subdivisión y Porción Anatómica Afectada (Precisión Clínica) */}
+      {(() => {
+        const subportions = getSubportionsForStructure(zone.code, zone.name);
+        const activeSubportion = selectedSubportion || subportions[1]?.code || subportions[0]?.code;
+
+        return (
+          <div className="space-y-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                <Target size={12} className="text-emerald-400" />
+                Porción Afectada (Precisión Quirúrgica)
+              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-300 font-bold">
+                {subportions.find((s) => s.code === activeSubportion)?.shortLabel || 'General'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              {subportions.map((sub) => {
+                const isSelected = activeSubportion === sub.code;
+                return (
+                  <button
+                    key={sub.code}
+                    type="button"
+                    onClick={() => onSelectSubportion?.(sub.code)}
+                    className={`p-2 rounded-lg text-left text-[11px] font-semibold transition-all border cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-emerald-950/90 border-emerald-500 text-white shadow-xs shadow-emerald-500/20'
+                        : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-bold truncate">{sub.shortLabel}</span>
+                      <span
+                        className={`text-[9px] px-1 py-0.2 rounded font-mono ${
+                          isSelected ? 'bg-emerald-500 text-black font-black' : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        M{sub.munichSuggested}
+                      </span>
+                    </div>
+                    <span className="text-[9px] opacity-75 line-clamp-1 mt-0.5">{sub.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 3. Biomecánica y Mecanismo Lesional Típico en Fútbol */}
       {zone.mecanismoComun && (
         <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs space-y-1">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -119,7 +174,7 @@ export function AnatomicalStructureCard({
         </div>
       )}
 
-      {/* 3. Lesión Activa (si existe en esta zona) */}
+      {/* 4. Lesión Activa (si existe en esta zona) */}
       {activeInjuries.length > 0 ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -157,7 +212,7 @@ export function AnatomicalStructureCard({
         </div>
       )}
 
-      {/* 4. Antecedentes Históricos y Riesgo de Recidiva */}
+      {/* 5. Antecedentes Históricos y Riesgo de Recidiva */}
       {resolvedInjuries.length > 0 && (
         <div className="space-y-1.5">
           <span className="text-[11px] font-bold uppercase text-amber-400 flex items-center gap-1.5">
@@ -175,11 +230,15 @@ export function AnatomicalStructureCard({
         </div>
       )}
 
-      {/* 5. Botón de Acción Principal: Registrar Nuevo Episodio */}
+      {/* 6. Botón de Acción Principal: Registrar Nuevo Episodio */}
       <div className="pt-2">
         <button
           type="button"
-          onClick={() => onStartNewInjury(zone.code)}
+          onClick={() => {
+            const subportions = getSubportionsForStructure(zone.code, zone.name);
+            const activeSub = selectedSubportion || subportions[1]?.code || subportions[0]?.code;
+            onStartNewInjury(zone.code, activeSub);
+          }}
           className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer"
         >
           <PlusCircle size={15} />

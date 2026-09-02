@@ -36,6 +36,7 @@ export interface PlayerInjuryDTO {
   actualReturnDate: string | null
   rtsPhase?: string | null
   rts_phase?: string | null
+  subzonePortion?: string | null
   updates?: InjuryUpdateDTO[]
   createdAt: string
   updatedAt: string
@@ -177,6 +178,7 @@ export async function getPlayerInjuriesAction(playerId: string): Promise<{
       estimatedReturnFrom: row.estimated_return_from || null,
       estimatedReturnTo: row.estimated_return_to || null,
       actualReturnDate: row.actual_return_date || null,
+      subzonePortion: row.subzone_portion || null,
       updates: updatesMap[row.id] || [],
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -548,6 +550,7 @@ export interface RegisterClinicalEpisodeInput {
   anatomicalZoneCode?: string
   bodyRegion?: string
   bodyStructure?: string
+  subzonePortion?: string
   laterality?: "izquierda" | "derecha" | "bilateral" | "central" | "no_aplica"
   bodyView?: "front" | "back"
   severity?: "Leve" | "Moderada" | "Grave" | "Por determinar"
@@ -654,6 +657,7 @@ export async function registerClinicalInjuryEpisodeAction(
           body_view: input.bodyView || "back",
           body_region: input.bodyRegion || "Miembros inferiores",
           body_structure: input.bodyStructure || input.injuryTypeName,
+          subzone_portion: input.subzonePortion || null,
           laterality: input.laterality || "derecha",
           severity: input.severity || "Moderada",
           estimated_min_days: input.estimatedMinDays || null,
@@ -760,6 +764,7 @@ export async function registerClinicalInjuryEpisodeAction(
       estimatedReturnFrom: newInjury.estimated_return_from,
       estimatedReturnTo: newInjury.estimated_return_to,
       actualReturnDate: newInjury.actual_return_date,
+      subzonePortion: newInjury.subzone_portion,
       createdAt: newInjury.created_at,
       updatedAt: newInjury.updated_at,
     }
@@ -968,6 +973,7 @@ export async function getInjuryEpisodeDetailsAction(injuryId: string): Promise<{
       estimatedReturnFrom: inj.estimated_return_from,
       estimatedReturnTo: inj.estimated_return_to,
       actualReturnDate: inj.actual_return_date,
+      subzonePortion: inj.subzone_portion,
       createdAt: inj.created_at,
       updatedAt: inj.updated_at,
     }

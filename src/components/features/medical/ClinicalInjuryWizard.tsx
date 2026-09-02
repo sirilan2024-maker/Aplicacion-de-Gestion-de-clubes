@@ -18,7 +18,7 @@ import {
   Camera,
   HeartPulse
 } from 'lucide-react';
-import { ANATOMICAL_ZONES, AnatomicalZone } from '@/hooks/useAnatomySelection';
+import { ANATOMICAL_ZONES, AnatomicalZone, getSubportionsForStructure, TissueSubportion } from '@/hooks/useAnatomySelection';
 import {
   registerClinicalInjuryEpisodeAction,
   PlayerInjuryDTO
@@ -37,6 +37,7 @@ interface ClinicalInjuryWizardProps {
     status?: string;
   };
   initialZoneCode?: string;
+  initialSubportion?: string;
   existingInjuries?: PlayerInjuryDTO[];
   onInjuryCreated: () => void;
 }
@@ -46,6 +47,7 @@ export function ClinicalInjuryWizard({
   onClose,
   player,
   initialZoneCode = 'isquiotibiales_der',
+  initialSubportion,
   existingInjuries = [],
   onInjuryCreated,
 }: ClinicalInjuryWizardProps) {
@@ -55,6 +57,7 @@ export function ClinicalInjuryWizard({
 
   // Paso 1: Localización y anatomía
   const [selectedZoneCode, setSelectedZoneCode] = useState<string>(initialZoneCode);
+  const [selectedSubportion, setSelectedSubportion] = useState<string>(initialSubportion || 'union_miotendinosa');
   const [laterality, setLaterality] = useState<'derecha' | 'izquierda' | 'bilateral' | 'central' | 'no_aplica'>('derecha');
   const [bodyView, setBodyView] = useState<'front' | 'back'>('back');
 
@@ -113,6 +116,22 @@ export function ClinicalInjuryWizard({
     }
   }, [currentZone]);
 
+  // Subporciones anatómicas específicas para la estructura seleccionada
+  const availableSubportions: TissueSubportion[] = useMemo(() => {
+    return getSubportionsForStructure(selectedZoneCode, currentZone?.name);
+  }, [selectedZoneCode, currentZone?.name]);
+
+  // Sincronizar sugerencia Múnich automática al cambiar de subporción
+  useEffect(() => {
+    const curSub = availableSubportions.find((s) => s.code === selectedSubportion);
+    if (curSub?.munichSuggested) {
+      const match = diagnosticTypes.find((d) => d.code === `MUNICH_${curSub.munichSuggested}`);
+      if (match) {
+        setSelectedTypeCode(match.code);
+      }
+    }
+  }, [selectedSubportion, availableSubportions]);
+
   // Tipos diagnósticos canónicos según tejido
   const diagnosticTypes = [
     { code: 'MUNICH_1A', name: 'Tipo 1A — Fatiga muscular funcional', category: 'muscular', minDays: 3, maxDays: 5 },
@@ -163,7 +182,8 @@ export function ClinicalInjuryWizard({
         injuryTypeName: selectedType.name,
         anatomicalZoneCode: currentZone.code,
         bodyRegion: currentZone.generalRegion,
-        bodyStructure: currentZone.name,
+        bodyStructure: `${currentZone.name} — ${availableSubportions.find((s) => s.code === selectedSubportion)?.shortLabel || 'General'}`,
+        subzonePortion: selectedSubportion,
         laterality,
         bodyView,
         severity,
@@ -320,6 +340,49 @@ export function ClinicalInjuryWizard({
                     <option value="back">Posterior (Dorsal)</option>
                     <option value="front">Anterior (Ventral)</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Selector de Porción Afectada (Precisión Quirúrgica) */}
+              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                    <HeartPulse size={13} className="text-emerald-400" />
+                    Porción Afectada del Tejido (Precisión Quirúrgica)
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-300 font-bold">
+                    Sugerencia Múnich Automática
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {availableSubportions.map((sub) => {
+                    const isSelected = selectedSubportion === sub.code;
+                    return (
+                      <button
+                        key={sub.code}
+                        type="button"
+                        onClick={() => setSelectedSubportion(sub.code)}
+                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-emerald-950/80 border-emerald-500 text-white shadow-xs shadow-emerald-500/20 ring-1 ring-emerald-500/50'
+                            : 'bg-slate-950/60 border-slate-800/90 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-bold text-xs">{sub.label}</span>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                              isSelected ? 'bg-emerald-500 text-black' : 'bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            M{sub.munichSuggested}
+                          </span>
+                        </div>
+                        <p className="text-[10px] opacity-75 mt-1 leading-normal">{sub.description}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

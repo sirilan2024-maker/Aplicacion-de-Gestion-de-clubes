@@ -1,5 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 
+export interface TissueSubportion {
+  code: string;
+  label: string;
+  shortLabel: string;
+  munichSuggested: '1A' | '1B' | '2A' | '2B' | '3A' | '3B' | '4';
+  description: string;
+}
+
 export interface AnatomicalZone {
   code: string;
   name: string;
@@ -11,6 +19,99 @@ export interface AnatomicalZone {
   incidencia?: 'Muy Alta' | 'Alta' | 'Moderada' | 'Leve' | 'Baja' | 'Grave';
   mecanismoComun?: string;
   munichDefault?: '1A' | '1B' | '2A' | '2B' | '3A' | '3B' | '4';
+  subportions?: TissueSubportion[];
+}
+
+export const CANONICAL_SUBPORTIONS: TissueSubportion[] = [
+  {
+    code: 'tercio_proximal',
+    label: 'Tercio Proximal / Inserción de Origen',
+    shortLabel: 'Proximal',
+    munichSuggested: '4',
+    description: 'Entesis o tendón proximal (zona de tracción excéntrica y avulsión)',
+  },
+  {
+    code: 'union_miotendinosa',
+    label: 'Unión Miotendinosa (UMT)',
+    shortLabel: 'Unión Miotendinosa',
+    munichSuggested: '3B',
+    description: 'Transición entre músculo y tendón (máxima vulnerabilidad en sprint y golpeo)',
+  },
+  {
+    code: 'vientre_muscular',
+    label: 'Vientre Muscular Central',
+    shortLabel: 'Vientre Muscular',
+    munichSuggested: '3A',
+    description: 'Porción contráctil central (rotura miofascial o intramuscular)',
+  },
+  {
+    code: 'tercio_distal',
+    label: 'Tercio Distal / Inserción Distal',
+    shortLabel: 'Distal',
+    munichSuggested: '3B',
+    description: 'Tendón libre distal o unión distal miotendinosa',
+  },
+];
+
+export const LIGAMENT_SUBPORTIONS: TissueSubportion[] = [
+  {
+    code: 'insercion_proximal',
+    label: 'Inserción Proximal (Origen óseo)',
+    shortLabel: 'Inserción Proximal',
+    munichSuggested: '4',
+    description: 'Desinserción o arrancamiento óseo proximal',
+  },
+  {
+    code: 'tercio_medio',
+    label: 'Tercio Medio (Cuerpo ligamentoso)',
+    shortLabel: 'Tercio Medio',
+    munichSuggested: '3B',
+    description: 'Disrupción intraligamentosa o rotura intersticial en el cuerpo',
+  },
+  {
+    code: 'insercion_distal',
+    label: 'Inserción Distal (Anclaje distal)',
+    shortLabel: 'Inserción Distal',
+    munichSuggested: '4',
+    description: 'Avulsión o arrancamiento en el anclaje óseo distal',
+  },
+];
+
+export const MENISCUS_SUBPORTIONS: TissueSubportion[] = [
+  {
+    code: 'cuerno_posterior',
+    label: 'Cuerno Posterior',
+    shortLabel: 'Cuerno Posterior',
+    munichSuggested: '3B',
+    description: 'Zona de mayor carga axial en flexión profunda de rodilla',
+  },
+  {
+    code: 'cuerpo_medio',
+    label: 'Cuerpo Medio',
+    shortLabel: 'Cuerpo Medio',
+    munichSuggested: '3B',
+    description: 'Roturas radiales o en asa de cubo',
+  },
+  {
+    code: 'cuerno_anterior',
+    label: 'Cuerno Anterior',
+    shortLabel: 'Cuerno Anterior',
+    munichSuggested: '3A',
+    description: 'Lesiones por compresión anterior e hiperextensión',
+  },
+];
+
+export function getSubportionsForStructure(zoneCode?: string, structureName?: string): TissueSubportion[] {
+  const code = (zoneCode || '').toLowerCase();
+  const name = (structureName || '').toLowerCase();
+
+  if (code.includes('menisco') || name.includes('menisco')) {
+    return MENISCUS_SUBPORTIONS;
+  }
+  if (code.includes('cruzado') || code.includes('lca') || code.includes('ligamento') || name.includes('ligamento') || name.includes('esguince')) {
+    return LIGAMENT_SUBPORTIONS;
+  }
+  return CANONICAL_SUBPORTIONS;
 }
 
 export const ANATOMICAL_ZONES: Record<string, AnatomicalZone> = {

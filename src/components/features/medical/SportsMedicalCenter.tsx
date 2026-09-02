@@ -47,11 +47,30 @@ export function SportsMedicalCenter({
 }: SportsMedicalCenterProps) {
   const [injuries, setInjuries] = useState<PlayerInjuryDTO[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedZoneCode, setSelectedZoneCode] = useState<string>('isquiotibiales_der');
+  const [selectedZoneCode, setSelectedZoneCode] = useState<string | null>(null);
   const [selectedSubportion, setSelectedSubportion] = useState<string>('union_miotendinosa');
   const [activeTab, setActiveTab] = useState<'estructura' | 'historial' | 'metricas'>('estructura');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedInjuryForModal, setSelectedInjuryForModal] = useState<PlayerInjuryDTO | null>(null);
+
+  // Mapeo inteligente de lesión a zona anatómica para foco inicial
+  const getZoneCodeFromInjury = (inj: PlayerInjuryDTO): string => {
+    const bs = (inj.bodyStructure || '').toLowerCase();
+    const lat = (inj.laterality || '').toLowerCase();
+    if (bs.includes('isquio') && lat.includes('izq')) return 'isquiotibiales_izq';
+    if (bs.includes('isquio')) return 'isquiotibiales_der';
+    if (bs.includes('recto') && lat.includes('izq')) return 'recto_femoral_izq';
+    if (bs.includes('recto') || bs.includes('cuad')) return 'recto_femoral_der';
+    if (bs.includes('gemelo') && lat.includes('izq')) return 'gastrocnemio_medial_izq';
+    if (bs.includes('gemelo') || bs.includes('gastro')) return 'gastrocnemio_medial_der';
+    if (bs.includes('soleo') && lat.includes('izq')) return 'soleo_izq';
+    if (bs.includes('soleo')) return 'soleo_der';
+    if (bs.includes('pubis') || bs.includes('pubalg')) return 'pubis';
+    if (bs.includes('cruzado') || bs.includes('lca')) return 'ligamento_cruzado_ant_der';
+    if (bs.includes('menisco')) return 'menisco_interno_der';
+    if (bs.includes('tobillo') || bs.includes('esguince')) return 'tobillo_der';
+    return 'recto_femoral_der';
+  };
 
   // Cargar lesiones reales desde Supabase a través de Server Action
   const loadInjuries = useCallback(async () => {
@@ -60,8 +79,21 @@ export function SportsMedicalCenter({
       const res = await getPlayerInjuriesAction(playerId);
       if (res.success && res.injuries) {
         setInjuries(res.injuries);
-        const hasActive = res.injuries.some((i) => i.status === 'activa');
+        const active = res.injuries.find((i) => i.status === 'activa');
+        const hasActive = Boolean(active);
         onInjuriesChange?.(hasActive);
+
+        // Si el jugador tiene lesión activa, enfocar automáticamente su zona
+        if (active) {
+          const zone = getZoneCodeFromInjury(active);
+          setSelectedZoneCode(zone);
+          if (active.subzonePortion) {
+            setSelectedSubportion(active.subzonePortion);
+          }
+        } else {
+          // Si está disponible o sin lesiones activas, dejar libre para exploración
+          setSelectedZoneCode(null);
+        }
       }
     } catch (err) {
       console.error('Error cargando historial de lesiones:', err);
@@ -149,7 +181,7 @@ export function SportsMedicalCenter({
 
           <button
             type="button"
-            onClick={() => handleStartNewInjury(selectedZoneCode)}
+            onClick={() => handleStartNewInjury(selectedZoneCode || undefined)}
             className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all shadow-md shadow-emerald-600/30 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus size={15} />
@@ -308,7 +340,7 @@ export function SportsMedicalCenter({
             avatarUrl: playerAvatarUrl,
             status: playerStatus,
           }}
-          initialZoneCode={selectedZoneCode}
+          initialZoneCode={selectedZoneCode || undefined}
           initialSubportion={selectedSubportion}
           existingInjuries={injuries}
           onInjuryCreated={() => {

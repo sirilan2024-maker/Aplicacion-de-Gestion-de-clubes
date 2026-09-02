@@ -18,11 +18,11 @@ import { ANATOMICAL_ZONES, AnatomicalZone, getSubportionsForStructure, TissueSub
 import { PlayerInjuryDTO } from '@/app/actions/injury-actions';
 
 interface AnatomicalStructureCardProps {
-  zoneCode: string;
+  zoneCode?: string | null;
   injuries: PlayerInjuryDTO[];
   selectedSubportion?: string;
   onSelectSubportion?: (subportionCode: string) => void;
-  onStartNewInjury: (zoneCode: string, subportionCode?: string) => void;
+  onStartNewInjury: (zoneCode?: string, subportionCode?: string) => void;
   onSelectInjuryDetails: (injury: PlayerInjuryDTO) => void;
 }
 
@@ -34,32 +34,17 @@ export function AnatomicalStructureCard({
   onStartNewInjury,
   onSelectInjuryDetails,
 }: AnatomicalStructureCardProps) {
-  const defaultZone: AnatomicalZone = {
-    code: 'isquiotibiales_der',
-    name: 'Isquiotibiales Derecho',
-    generalRegion: 'Isquiotibiales',
-    muscleGroup: 'Isquiotibiales',
-    laterality: 'Derecho',
-    thumbnailKey: 'muslo_post',
-    viewDefault: 'posterior',
-    incidencia: 'Muy Alta',
-    mecanismoComun: 'Sprints a máxima velocidad en fase de desaceleración / oscilación tardía.',
-    munichDefault: '3B',
-  };
-
-  const zone: AnatomicalZone = 
-    ANATOMICAL_ZONES[zoneCode] || 
-    ANATOMICAL_ZONES['isquiotibiales_der'] || 
-    Object.values(ANATOMICAL_ZONES)[0] || 
-    defaultZone;
+  const zone: AnatomicalZone | null = zoneCode ? (ANATOMICAL_ZONES[zoneCode] || null) : null;
 
   // Filtrar lesiones activas y antecedentes de esta estructura
   const { activeInjuries, resolvedInjuries } = React.useMemo(() => {
+    if (!zone) return { activeInjuries: [], resolvedInjuries: [] };
+
     const active: PlayerInjuryDTO[] = [];
     const resolved: PlayerInjuryDTO[] = [];
 
-    const zoneNameLower = (zone?.name || '').toLowerCase();
-    const zoneGroupLower = (zone?.muscleGroup || '').toLowerCase();
+    const zoneNameLower = (zone.name || '').toLowerCase();
+    const zoneGroupLower = (zone.muscleGroup || '').toLowerCase();
 
     injuries.forEach((inj) => {
       const bs = (inj.bodyStructure || '').toLowerCase();
@@ -80,9 +65,24 @@ export function AnatomicalStructureCard({
 
   if (!zone) {
     return (
-      <div className="w-full h-full bg-[#0b0f17] border border-slate-800/80 rounded-2xl p-5 flex flex-col items-center justify-center text-center text-slate-500">
-        <Layers size={32} className="mb-2 opacity-40 text-emerald-400" />
-        <span className="text-xs font-semibold">Selecciona una estructura en el visor anatómico</span>
+      <div className="w-full h-full min-h-[420px] bg-[#0b0f17] border border-slate-800/80 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
+          <Layers size={28} className="opacity-90" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-sm font-bold text-slate-200">Exploración Anatómica</h4>
+          <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            Toca cualquier músculo o articulación en el avatar para ver su estado clínico, antecedentes o registrar una nueva lesión.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onStartNewInjury('recto_femoral_der')}
+          className="mt-2 py-2 px-4 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+        >
+          <PlusCircle size={15} className="text-emerald-400" />
+          <span>Registrar Lesión Manualmente</span>
+        </button>
       </div>
     );
   }
@@ -91,23 +91,33 @@ export function AnatomicalStructureCard({
     <div className="w-full bg-[#0b0f17] border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xl space-y-4">
       {/* 1. Cabecera de la Estructura Anatómica */}
       <div className="space-y-1.5 border-b border-slate-800/60 pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
             {zone.generalRegion}
           </span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 font-bold">
             {zone.laterality || 'Bilateral'}
           </span>
+          {zone.isGoalkeeperZone && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/50 text-amber-300 font-bold flex items-center gap-1">
+              🧤 Especial Portero
+            </span>
+          )}
         </div>
 
         <h3 className="text-base sm:text-lg font-black text-white tracking-tight leading-tight">
           {zone.name}
         </h3>
 
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
           <span>Grupo: <strong className="text-slate-200">{zone.muscleGroup}</strong></span>
           <span>•</span>
-          <span>Incidencia fútbol: <strong className="text-amber-400">{zone.incidencia || 'Alta'}</strong></span>
+          <span>
+            Incidencia fútbol:{' '}
+            <strong className={zone.incidencia === 'Grave' || zone.incidencia === 'Muy Alta' ? 'text-rose-400 font-extrabold' : 'text-amber-400 font-bold'}>
+              {zone.incidencia || 'Alta'}
+            </strong>
+          </span>
         </div>
       </div>
 

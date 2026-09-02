@@ -23,6 +23,7 @@ import {
 } from '@/app/actions/injury-actions';
 import { ANATOMICAL_ZONES } from '@/hooks/useAnatomySelection';
 import { ClinicalInjuryWizard } from './ClinicalInjuryWizard';
+import { EpisodeClinicalDashboard } from './EpisodeClinicalDashboard';
 
 interface SportsMedicalCenterProps {
   playerId: string;
@@ -311,6 +312,21 @@ export function SportsMedicalCenter({
             setIsModalOpen(false);
           }}
         />
+      )}
+
+      {/* 4. Dashboard Longitudinal de Expediente Clínico */}
+      {selectedInjuryForModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-4xl max-h-[95vh] overflow-y-auto">
+            <EpisodeClinicalDashboard
+              injuryId={selectedInjuryForModal.id}
+              onClose={() => setSelectedInjuryForModal(null)}
+              onInjuryUpdated={() => {
+                loadInjuries();
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

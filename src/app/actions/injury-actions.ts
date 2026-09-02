@@ -775,3 +775,562 @@ export async function registerClinicalInjuryEpisodeAction(
     return { success: false, error: err.message || "Error inesperado al registrar el episodio clínico." }
   }
 }
+
+// ==============================================================================
+// FASE 5: DTOs Y SERVER ACTIONS PARA SEGUIMIENTO CLÍNICO LONGITUDINAL
+// ==============================================================================
+
+export interface InjuryExaminationDTO {
+  id: string
+  clubId: string
+  injuryId: string
+  playerId: string
+  examinationDate: string
+  examinerName: string | null
+  painAtRest: number | null
+  painOnPalpation: number | null
+  painOnContraction: number | null
+  painOnStretch: number | null
+  functionalStatus: string | null
+  clinicalFindings: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface InjuryPainRecordDTO {
+  id: string
+  injuryId: string
+  recordDate: string
+  painScore: number
+  context: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface InjuryFunctionalAssessmentDTO {
+  id: string
+  injuryId: string
+  assessmentDate: string
+  assessmentType: "rom" | "fuerza" | "estabilidad"
+  structureOrJoint: string
+  laterality: string | null
+  testName: string
+  metricValue: number | null
+  metricUnit: string | null
+  symmetryPercentage: number | null
+  resultInterpretation: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface InjuryMedicalTestDTO {
+  id: string
+  injuryId: string
+  testType: string
+  testDate: string
+  facilityOrDoctor: string | null
+  reportSummary: string
+  keyFindings: string | null
+  imageOrFileUrl: string | null
+  createdAt: string
+}
+
+export interface InjuryTreatmentDTO {
+  id: string
+  injuryId: string
+  treatmentName: string
+  treatmentCategory: string
+  startDate: string
+  endDate: string | null
+  professionalName: string | null
+  responseToTreatment: string | null
+  status: string
+  notes: string | null
+  createdAt: string
+}
+
+export interface InjuryStatusHistoryDTO {
+  id: string
+  injuryId: string
+  fromStatus: string | null
+  toStatus: string
+  transitionDate: string
+  changedByName?: string | null
+  reason: string | null
+}
+
+export interface EpisodeClinicalDetailsDTO {
+  injury: PlayerInjuryDTO
+  examinations: InjuryExaminationDTO[]
+  painRecords: InjuryPainRecordDTO[]
+  functionalAssessments: InjuryFunctionalAssessmentDTO[]
+  medicalTests: InjuryMedicalTestDTO[]
+  treatments: InjuryTreatmentDTO[]
+  statusHistory: InjuryStatusHistoryDTO[]
+}
+
+/**
+ * Obtiene el expediente longitudinal completo de un episodio lesional específico.
+ */
+export async function getInjuryEpisodeDetailsAction(injuryId: string): Promise<{
+  success: boolean
+  details?: EpisodeClinicalDetailsDTO
+  error?: string
+}> {
+  try {
+    if (!injuryId) return { success: false, error: "ID de lesión no especificado." }
+
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    // 1. Obtener lesión maestra
+    const { data: inj, error: injErr } = await admin
+      .from("player_injuries")
+      .select("*")
+      .eq("id", injuryId)
+      .eq("club_id", clubId)
+      .single()
+
+    if (injErr || !inj) return { success: false, error: "Episodio no encontrado o no pertenece a este club." }
+
+    // 2. Obtener revisiones clínicas
+    const { data: exams } = await admin
+      .from("injury_examinations")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("examination_date", { ascending: false })
+
+    // 3. Obtener registros de dolor EVA
+    const { data: pain } = await admin
+      .from("injury_pain_records")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("record_date", { ascending: true })
+
+    // 4. Obtener valoraciones funcionales (ROM y fuerza)
+    const { data: assessments } = await admin
+      .from("injury_functional_assessments")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("assessment_date", { ascending: false })
+
+    // 5. Obtener pruebas médicas e imagen
+    const { data: tests } = await admin
+      .from("injury_medical_tests")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("test_date", { ascending: false })
+
+    // 6. Obtener tratamientos
+    const { data: treats } = await admin
+      .from("injury_treatments")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("start_date", { ascending: false })
+
+    // 7. Obtener historial de estados
+    const { data: history } = await admin
+      .from("injury_status_history")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("transition_date", { ascending: false })
+
+    const mappedInjury: PlayerInjuryDTO = {
+      id: inj.id,
+      clubId: inj.club_id,
+      playerId: inj.player_id,
+      injuryDate: inj.injury_date,
+      injuryType: inj.injury_type,
+      notes: inj.notes,
+      expectedReturnDate: inj.expected_return_date,
+      status: inj.status,
+      bodyView: inj.body_view,
+      bodyRegion: inj.body_region,
+      bodyStructure: inj.body_structure,
+      bodySide: inj.body_side,
+      laterality: inj.laterality,
+      severity: inj.severity,
+      estimatedMinDays: inj.estimated_min_days,
+      estimatedMaxDays: inj.estimated_max_days,
+      estimatedReturnFrom: inj.estimated_return_from,
+      estimatedReturnTo: inj.estimated_return_to,
+      actualReturnDate: inj.actual_return_date,
+      createdAt: inj.created_at,
+      updatedAt: inj.updated_at,
+    }
+
+    const mappedExams: InjuryExaminationDTO[] = (exams || []).map((e: any) => ({
+      id: e.id,
+      clubId: e.club_id,
+      injuryId: e.injury_id,
+      playerId: e.player_id,
+      examinationDate: e.examination_date,
+      examinerName: e.examiner_name,
+      painAtRest: e.pain_at_rest,
+      painOnPalpation: e.pain_on_palpation,
+      painOnContraction: e.pain_on_contraction,
+      painOnStretch: e.pain_on_stretch,
+      functionalStatus: e.functional_status,
+      clinicalFindings: e.clinical_findings,
+      notes: e.notes,
+      createdAt: e.created_at,
+    }))
+
+    const mappedPain: InjuryPainRecordDTO[] = (pain || []).map((p: any) => ({
+      id: p.id,
+      injuryId: p.injury_id,
+      recordDate: p.record_date,
+      painScore: Number(p.pain_score),
+      context: p.context,
+      notes: p.notes,
+      createdAt: p.created_at,
+    }))
+
+    const mappedAssessments: InjuryFunctionalAssessmentDTO[] = (assessments || []).map((a: any) => ({
+      id: a.id,
+      injuryId: a.injury_id,
+      assessmentDate: a.assessment_date,
+      assessmentType: a.assessment_type,
+      structureOrJoint: a.structure_or_joint,
+      laterality: a.laterality,
+      testName: a.test_name,
+      metricValue: a.metric_value !== null ? Number(a.metric_value) : null,
+      metricUnit: a.metric_unit,
+      symmetryPercentage: a.symmetry_percentage !== null ? Number(a.symmetry_percentage) : null,
+      resultInterpretation: a.result_interpretation,
+      notes: a.notes,
+      createdAt: a.created_at,
+    }))
+
+    const mappedTests: InjuryMedicalTestDTO[] = (tests || []).map((t: any) => ({
+      id: t.id,
+      injuryId: t.injury_id,
+      testType: t.test_type,
+      testDate: t.test_date,
+      facilityOrDoctor: t.facility_or_doctor,
+      reportSummary: t.report_summary,
+      keyFindings: t.key_findings,
+      imageOrFileUrl: t.image_or_file_url,
+      createdAt: t.created_at,
+    }))
+
+    const mappedTreats: InjuryTreatmentDTO[] = (treats || []).map((tr: any) => ({
+      id: tr.id,
+      injuryId: tr.injury_id,
+      treatmentName: tr.treatment_name,
+      treatmentCategory: tr.treatment_category,
+      startDate: tr.start_date,
+      endDate: tr.end_date,
+      professionalName: tr.professional_name,
+      responseToTreatment: tr.response_to_treatment,
+      status: tr.status,
+      notes: tr.notes,
+      createdAt: tr.created_at,
+    }))
+
+    const mappedHistory: InjuryStatusHistoryDTO[] = (history || []).map((h: any) => ({
+      id: h.id,
+      injuryId: h.injury_id,
+      fromStatus: h.from_status,
+      toStatus: h.to_status,
+      transitionDate: h.transition_date,
+      reason: h.reason,
+    }))
+
+    return {
+      success: true,
+      details: {
+        injury: mappedInjury,
+        examinations: mappedExams,
+        painRecords: mappedPain,
+        functionalAssessments: mappedAssessments,
+        medicalTests: mappedTests,
+        treatments: mappedTreats,
+        statusHistory: mappedHistory,
+      },
+    }
+  } catch (err: any) {
+    console.error("[getInjuryEpisodeDetailsAction] Error fatal:", err)
+    return { success: false, error: err.message || "Error al consultar expediente clínico." }
+  }
+}
+
+/**
+ * Añade una nueva revisión clínica al historial sin sobrescribir revisiones previas.
+ */
+export async function addInjuryExaminationAction(input: {
+  injuryId: string
+  playerId: string
+  examinationDate: string
+  examinerName?: string
+  painAtRest: number
+  painOnPalpation: number
+  painOnContraction: number
+  painOnStretch: number
+  functionalStatus: string
+  clinicalFindings: string
+  notes?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    // 1. Insertar examen clínico
+    const { error: examErr } = await admin.from("injury_examinations").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        player_id: input.playerId,
+        examination_date: input.examinationDate,
+        examiner_id: context.profile.id,
+        examiner_name: input.examinerName || `${context.profile.first_name || ""} ${context.profile.last_name || ""}`.trim() || "Fisioterapeuta",
+        pain_at_rest: input.painAtRest,
+        pain_on_palpation: input.painOnPalpation,
+        pain_on_contraction: input.painOnContraction,
+        pain_on_stretch: input.painOnStretch,
+        functional_status: input.functionalStatus,
+        clinical_findings: input.clinicalFindings,
+        notes: input.notes || null,
+      },
+    ])
+
+    if (examErr) return { success: false, error: examErr.message }
+
+    // 2. Registrar en serie de dolor EVA
+    const maxPain = Math.max(input.painAtRest, input.painOnPalpation, input.painOnContraction, input.painOnStretch)
+    await admin.from("injury_pain_records").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        player_id: input.playerId,
+        record_date: input.examinationDate,
+        pain_score: maxPain,
+        context: "revision_periodica",
+        notes: `Dolor palpación: ${input.painOnPalpation}/10, contracción: ${input.painOnContraction}/10`,
+      },
+    ])
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al añadir revisión clínica" }
+  }
+}
+
+/**
+ * Añade una evaluación funcional (ROM o fuerza muscular) al expediente.
+ */
+export async function addFunctionalAssessmentAction(input: {
+  injuryId: string
+  assessmentDate: string
+  assessmentType: "rom" | "fuerza" | "estabilidad"
+  structureOrJoint: string
+  laterality: string
+  testName: string
+  metricValue?: number
+  metricUnit: string
+  symmetryPercentage?: number
+  resultInterpretation?: string
+  notes?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    const { error: fErr } = await admin.from("injury_functional_assessments").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        assessment_date: input.assessmentDate,
+        assessment_type: input.assessmentType,
+        structure_or_joint: input.structureOrJoint,
+        laterality: input.laterality,
+        test_name: input.testName,
+        metric_value: input.metricValue ?? null,
+        metric_unit: input.metricUnit,
+        symmetry_percentage: input.symmetryPercentage ?? null,
+        result_interpretation: input.resultInterpretation || "Evaluación clínica objetiva",
+        notes: input.notes || null,
+      },
+    ])
+
+    if (fErr) return { success: false, error: fErr.message }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al registrar valoración funcional" }
+  }
+}
+
+/**
+ * Añade una prueba médica o de imagen (Ecografía, RM, etc.).
+ */
+export async function addMedicalTestAction(input: {
+  injuryId: string
+  testType: string
+  testDate: string
+  facilityOrDoctor?: string
+  reportSummary: string
+  keyFindings?: string
+  imageOrFileUrl?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    const { error: tErr } = await admin.from("injury_medical_tests").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        test_type: input.testType,
+        test_date: input.testDate,
+        facility_or_doctor: input.facilityOrDoctor || null,
+        report_summary: input.reportSummary,
+        key_findings: input.keyFindings || null,
+        image_or_file_url: input.imageOrFileUrl || null,
+      },
+    ])
+
+    if (tErr) return { success: false, error: tErr.message }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al registrar prueba médica" }
+  }
+}
+
+/**
+ * Añade un tratamiento o terapia aplicada (fisioterapia, invasiva, etc.).
+ */
+export async function addInjuryTreatmentAction(input: {
+  injuryId: string
+  treatmentName: string
+  treatmentCategory: string
+  startDate: string
+  endDate?: string
+  professionalName?: string
+  responseToTreatment?: string
+  status?: string
+  notes?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    const { error: trErr } = await admin.from("injury_treatments").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        treatment_name: input.treatmentName,
+        treatment_category: input.treatmentCategory,
+        start_date: input.startDate,
+        end_date: input.endDate || null,
+        professional_name: input.professionalName || null,
+        response_to_treatment: input.responseToTreatment || "favorable",
+        status: input.status || "activo",
+        notes: input.notes || null,
+      },
+    ])
+
+    if (trErr) return { success: false, error: trErr.message }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al registrar tratamiento" }
+  }
+}
+
+/**
+ * Registra una transición de estado en el historial médico (injury_status_history)
+ * y actualiza coherente y opcionalmente player_injuries.
+ */
+export async function transitionInjuryStatusAction(input: {
+  injuryId: string
+  newStatus: "activa" | "recuperado"
+  newRtsPhase?: string
+  reason: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    // 1. Obtener estado anterior
+    const { data: currentInj } = await admin
+      .from("player_injuries")
+      .select("status, rts_phase, player_id")
+      .eq("id", input.injuryId)
+      .eq("club_id", clubId)
+      .single()
+
+    if (!currentInj) return { success: false, error: "Lesión no encontrada" }
+
+    // 2. Registrar en injury_status_history
+    await admin.from("injury_status_history").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        from_status: currentInj.status,
+        to_status: input.newStatus,
+        changed_by: context.profile.id,
+        reason: input.reason,
+      },
+    ])
+
+    // 3. Actualizar player_injuries
+    const updatePayload: any = {
+      status: input.newStatus,
+    }
+    if (input.newRtsPhase) updatePayload.rts_phase = input.newRtsPhase
+    if (input.newStatus === "recuperado") {
+      updatePayload.actual_return_date = new Date().toISOString().split("T")[0]
+    }
+
+    await admin.from("player_injuries").update(updatePayload).eq("id", input.injuryId).eq("club_id", clubId)
+
+    try {
+      revalidatePath(`/dashboard/club/jugador/${currentInj.player_id}`)
+      revalidatePath(`/dashboard/players/${currentInj.player_id}/fisico-lesiones`)
+    } catch {
+      // ignore
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al actualizar estado del episodio" }
+  }
+}

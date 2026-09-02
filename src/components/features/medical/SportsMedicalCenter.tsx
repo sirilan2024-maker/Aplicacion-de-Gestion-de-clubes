@@ -24,6 +24,7 @@ import {
 import { ANATOMICAL_ZONES } from '@/hooks/useAnatomySelection';
 import { ClinicalInjuryWizard } from './ClinicalInjuryWizard';
 import { EpisodeClinicalDashboard } from './EpisodeClinicalDashboard';
+import { RtsRehabilitationDashboard } from './RtsRehabilitationDashboard';
 
 interface SportsMedicalCenterProps {
   playerId: string;
@@ -267,26 +268,21 @@ export function SportsMedicalCenter({
             )}
 
             {activeTab === 'metricas' && (
-              <div className="p-4 rounded-2xl bg-[#0b0f17] border border-slate-800 space-y-3 text-xs">
-                <span className="font-bold text-slate-200 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                  <TrendingUp size={13} className="text-emerald-400" />
-                  Criterios Funcionales Return to Sport
-                </span>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  Las evaluaciones de fuerza, dolor en escala EVA y rango de movimiento (ROM) se vinculan al episodio lesional activo para validar objetivamente cada fase de retorno al juego.
-                </p>
-
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
-                    <span className="block text-[10px] text-slate-400">Escala EVA Dolor</span>
-                    <span className="text-lg font-black text-emerald-400">0 / 10</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
-                    <span className="block text-[10px] text-slate-400">Simetría Fuerza</span>
-                    <span className="text-lg font-black text-emerald-400">95%</span>
-                  </div>
+              activeInjuries.length > 0 ? (
+                <RtsRehabilitationDashboard
+                  injury={activeInjuries[0]}
+                  onInjuryUpdated={() => loadInjuries()}
+                />
+              ) : injuries.length > 0 ? (
+                <RtsRehabilitationDashboard
+                  injury={injuries[0]}
+                  onInjuryUpdated={() => loadInjuries()}
+                />
+              ) : (
+                <div className="p-8 text-center text-slate-500 text-xs bg-[#0b0f17] rounded-2xl border border-slate-800">
+                  No hay lesiones activas para este jugador. Registra un nuevo episodio clínico para habilitar la progresión Return to Sport.
                 </div>
-              </div>
+              )
             )}
           </div>
         </div>

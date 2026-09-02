@@ -34,6 +34,8 @@ export interface PlayerInjuryDTO {
   estimatedReturnFrom: string | null
   estimatedReturnTo: string | null
   actualReturnDate: string | null
+  rtsPhase?: string | null
+  rts_phase?: string | null
   updates?: InjuryUpdateDTO[]
   createdAt: string
   updatedAt: string
@@ -1332,5 +1334,349 @@ export async function transitionInjuryStatusAction(input: {
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || "Error al actualizar estado del episodio" }
+  }
+}
+
+// ==============================================================================
+// FASE 6: DTOs Y SERVER ACTIONS PARA REHABILITACIÓN Y RETURN TO SPORT (RTS)
+// ==============================================================================
+
+export interface InjuryRehabSessionDTO {
+  id: string
+  clubId: string
+  injuryId: string
+  sessionDate: string
+  rtsPhase: string
+  specialistName: string | null
+  sessionType: string
+  totalDurationMinutes: number | null
+  rpeLoad: number | null
+  painExperienced: number | null
+  exercisesSummary: string | null
+  tolerance: string
+  notes: string | null
+  createdAt: string
+}
+
+export interface RtsCriteriaItem {
+  id: string
+  category: "dolor" | "rom" | "fuerza" | "campo" | "confianza" | "especifico"
+  label: string
+  description?: string
+  status: "cumplido" | "pendiente" | "no_cumplido" | "no_evaluado"
+  evidence?: string
+  evaluatorName?: string
+  evaluatedAt?: string
+}
+
+export interface InjuryRtsMilestoneDTO {
+  id: string
+  clubId: string
+  injuryId: string
+  stage: string
+  targetDate: string | null
+  achievedDate: string | null
+  status: "pendiente" | "cumplido" | "no_cumplido"
+  criteriaChecklist: RtsCriteriaItem[]
+  clearedBy: string | null
+  notes: string | null
+  createdAt: string
+}
+
+export interface EpisodeRtsDetailsDTO {
+  injury: PlayerInjuryDTO
+  sessions: InjuryRehabSessionDTO[]
+  milestones: InjuryRtsMilestoneDTO[]
+  currentPhase: string
+  averageRpe: number
+  averageSessionPain: number
+}
+
+/**
+ * Obtiene el expediente de readaptación y progresión RTS del episodio.
+ */
+export async function getInjuryRtsDetailsAction(injuryId: string): Promise<{
+  success: boolean
+  rtsDetails?: EpisodeRtsDetailsDTO
+  error?: string
+}> {
+  try {
+    if (!injuryId) return { success: false, error: "ID de lesión no especificado." }
+
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    // 1. Obtener lesión
+    const { data: inj, error: injErr } = await admin
+      .from("player_injuries")
+      .select("*")
+      .eq("id", injuryId)
+      .eq("club_id", clubId)
+      .single()
+
+    if (injErr || !inj) return { success: false, error: "Episodio no encontrado." }
+
+    // 2. Obtener sesiones de rehabilitación
+    const { data: sessions } = await admin
+      .from("injury_rehabilitation_sessions")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+      .order("session_date", { ascending: false })
+
+    // 3. Obtener hitos RTS
+    const { data: milestones } = await admin
+      .from("injury_rts_milestones")
+      .select("*")
+      .eq("injury_id", injuryId)
+      .eq("club_id", clubId)
+
+    const mappedInjury: PlayerInjuryDTO = {
+      id: inj.id,
+      clubId: inj.club_id,
+      playerId: inj.player_id,
+      injuryDate: inj.injury_date,
+      injuryType: inj.injury_type,
+      notes: inj.notes,
+      expectedReturnDate: inj.expected_return_date,
+      status: inj.status,
+      bodyView: inj.body_view,
+      bodyRegion: inj.body_region,
+      bodyStructure: inj.body_structure,
+      bodySide: inj.body_side,
+      laterality: inj.laterality,
+      severity: inj.severity,
+      estimatedMinDays: inj.estimated_min_days,
+      estimatedMaxDays: inj.estimated_max_days,
+      estimatedReturnFrom: inj.estimated_return_from,
+      estimatedReturnTo: inj.estimated_return_to,
+      actualReturnDate: inj.actual_return_date,
+      createdAt: inj.created_at,
+      updatedAt: inj.updated_at,
+    }
+
+    const mappedSessions: InjuryRehabSessionDTO[] = (sessions || []).map((s: any) => ({
+      id: s.id,
+      clubId: s.club_id,
+      injuryId: s.injury_id,
+      sessionDate: s.session_date,
+      rtsPhase: s.rts_phase,
+      specialistName: s.specialist_name,
+      sessionType: s.session_type,
+      totalDurationMinutes: s.total_duration_minutes,
+      rpeLoad: s.rpe_load,
+      painExperienced: s.pain_experienced,
+      exercisesSummary: s.exercises_summary,
+      tolerance: s.tolerance,
+      notes: s.notes,
+      createdAt: s.created_at,
+    }))
+
+    const mappedMilestones: InjuryRtsMilestoneDTO[] = (milestones || []).map((m: any) => ({
+      id: m.id,
+      clubId: m.club_id,
+      injuryId: m.injury_id,
+      stage: m.stage,
+      targetDate: m.target_date,
+      achievedDate: m.achieved_date,
+      status: m.status || "pendiente",
+      criteriaChecklist: Array.isArray(m.criteria_checklist) ? m.criteria_checklist : [],
+      clearedBy: m.cleared_by,
+      notes: m.notes,
+      createdAt: m.created_at,
+    }))
+
+    // Métricas descriptivas de carga y respuesta
+    const rpeValues = mappedSessions.map((s) => s.rpeLoad).filter((v): v is number => v !== null)
+    const painValues = mappedSessions.map((s) => s.painExperienced).filter((v): v is number => v !== null)
+
+    const avgRpe = rpeValues.length > 0 ? Number((rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length).toFixed(1)) : 0
+    const avgPain = painValues.length > 0 ? Number((painValues.reduce((a, b) => a + b, 0) / painValues.length).toFixed(1)) : 0
+
+    return {
+      success: true,
+      rtsDetails: {
+        injury: mappedInjury,
+        sessions: mappedSessions,
+        milestones: mappedMilestones,
+        currentPhase: inj.rts_phase || "fase_1_aguda",
+        averageRpe: avgRpe,
+        averageSessionPain: avgPain,
+      },
+    }
+  } catch (err: any) {
+    console.error("[getInjuryRtsDetailsAction] Error fatal:", err)
+    return { success: false, error: err.message || "Error al consultar detalles de readaptación RTS." }
+  }
+}
+
+/**
+ * Añade una sesión de rehabilitación o readaptación de campo.
+ */
+export async function addRehabilitationSessionAction(input: {
+  injuryId: string
+  sessionDate: string
+  rtsPhase: string
+  specialistName?: string
+  sessionType: string
+  totalDurationMinutes: number
+  rpeLoad: number
+  painExperienced: number
+  exercisesSummary: string
+  tolerance?: string
+  notes?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    const { error: sessErr } = await admin.from("injury_rehabilitation_sessions").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        session_date: input.sessionDate,
+        rts_phase: input.rtsPhase,
+        specialist_name: input.specialistName || `${context.profile.first_name || ""} ${context.profile.last_name || ""}`.trim() || "Readaptador",
+        session_type: input.sessionType,
+        total_duration_minutes: input.totalDurationMinutes,
+        rpe_load: input.rpeLoad,
+        pain_experienced: input.painExperienced,
+        exercises_summary: input.exercisesSummary,
+        tolerance: input.tolerance || "optima",
+        notes: input.notes || null,
+      },
+    ])
+
+    if (sessErr) return { success: false, error: sessErr.message }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al registrar sesión de rehabilitación." }
+  }
+}
+
+/**
+ * Guarda o actualiza el checklist de criterios de un hito Return to Sport específico.
+ */
+export async function saveRtsMilestoneCriteriaAction(input: {
+  injuryId: string
+  stage: string
+  targetDate?: string
+  achievedDate?: string
+  status: "pendiente" | "cumplido" | "no_cumplido"
+  criteriaChecklist: RtsCriteriaItem[]
+  clearedBy?: string
+  notes?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    // Comprobar si ya existe el hito para esta lesión y etapa
+    const { data: existing } = await admin
+      .from("injury_rts_milestones")
+      .select("id")
+      .eq("injury_id", input.injuryId)
+      .eq("stage", input.stage)
+      .maybeSingle()
+
+    const payload = {
+      club_id: clubId,
+      injury_id: input.injuryId,
+      stage: input.stage,
+      target_date: input.targetDate || null,
+      achieved_date: input.achievedDate || null,
+      status: input.status,
+      criteria_checklist: input.criteriaChecklist,
+      cleared_by: input.clearedBy || `${context.profile.first_name || ""} ${context.profile.last_name || ""}`.trim(),
+      notes: input.notes || null,
+    }
+
+    if (existing) {
+      const { error: upErr } = await admin.from("injury_rts_milestones").update(payload).eq("id", existing.id)
+      if (upErr) return { success: false, error: upErr.message }
+    } else {
+      const { error: inErr } = await admin.from("injury_rts_milestones").insert([payload])
+      if (inErr) return { success: false, error: inErr.message }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al guardar criterios RTS." }
+  }
+}
+
+/**
+ * Asienta la decisión explícita del profesional para avanzar de fase Return to Sport
+ * y registra la transición en injury_status_history.
+ */
+export async function advanceRtsPhaseAction(input: {
+  injuryId: string
+  newPhase: string
+  reason: string
+  clearedBy?: string
+  markRecoveredIfFinal?: boolean
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) return { success: false, error: "No autenticado" }
+
+    const clubId = context.profile.club_id
+    if (!clubId) return { success: false, error: "Usuario sin club" }
+
+    const admin = createAdminClient()
+
+    const { data: currentInj } = await admin
+      .from("player_injuries")
+      .select("status, rts_phase, player_id")
+      .eq("id", input.injuryId)
+      .single()
+
+    if (!currentInj) return { success: false, error: "Lesión no encontrada" }
+
+    const updatePayload: any = {
+      rts_phase: input.newPhase,
+    }
+
+    // Si avanza a Return to Performance o final y el profesional lo declara recuperado
+    if (input.markRecoveredIfFinal || input.newPhase === "fase_8_performance" || input.newPhase === "fase_7_rts") {
+      if (input.markRecoveredIfFinal) {
+        updatePayload.status = "recuperado"
+        updatePayload.actual_return_date = new Date().toISOString().split("T")[0]
+      }
+    }
+
+    await admin.from("player_injuries").update(updatePayload).eq("id", input.injuryId).eq("club_id", clubId)
+
+    // Registrar en injury_status_history
+    await admin.from("injury_status_history").insert([
+      {
+        club_id: clubId,
+        injury_id: input.injuryId,
+        from_status: currentInj.status,
+        to_status: updatePayload.status || currentInj.status,
+        changed_by: context.profile.id,
+        reason: `Avance a fase RTS '${input.newPhase}': ${input.reason}`,
+      },
+    ])
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error al avanzar fase Return to Sport." }
   }
 }

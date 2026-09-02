@@ -18,7 +18,6 @@ import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
-import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
 import { SportsMedicalCenter } from "@/components/features/medical/SportsMedicalCenter";
 
 interface PlayerData {
@@ -1260,26 +1259,6 @@ export default function GlobalPlayerProfilePage() {
                 onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
               />
             </div>
-
-            {/* VISTA ANTERIOR PRESERVADA (MODO DE COMPATIBILIDAD) */}
-            <details className="text-xs text-slate-500 bg-slate-900/40 p-3 rounded-2xl border border-slate-800">
-              <summary className="cursor-pointer font-bold text-slate-400 hover:text-slate-200">
-                Ver Módulo Anterior (Modo de Compatibilidad Preservado)
-              </summary>
-              <div className="mt-4">
-                <PlayerInjuriesSection 
-                  playerId={player.id} 
-                  playerName={`${player.first_name} ${player.last_name}`}
-                  playerNumber={player.dorsal || undefined}
-                  playerPosition={player.posicion || undefined}
-                  playerStatus={player.status === "active" ? "Disponible" : player.status}
-                  playerAvatarUrl={player.avatar_url || undefined}
-                  isOpenDirectly={openInjuryModal}
-                  onCloseDirect={() => setOpenInjuryModal(false)}
-                  onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
-                />
-              </div>
-            </details>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
               <div className="md:col-span-1 space-y-6">

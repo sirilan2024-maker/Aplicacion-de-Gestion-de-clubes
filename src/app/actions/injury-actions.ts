@@ -537,3 +537,241 @@ export async function resolveInjuryAction(
     return { success: false, error: err.message || "Error inesperado al resolver lesión" }
   }
 }
+
+export interface RegisterClinicalEpisodeInput {
+  playerId: string
+  injuryDate: string
+  injuryTypeCode?: string
+  injuryTypeName: string
+  anatomicalZoneCode?: string
+  bodyRegion?: string
+  bodyStructure?: string
+  laterality?: "izquierda" | "derecha" | "bilateral" | "central" | "no_aplica"
+  bodyView?: "front" | "back"
+  severity?: "Leve" | "Moderada" | "Grave" | "Por determinar"
+  isRecurrence?: boolean
+  parentInjuryId?: string | null
+  mechanismDetails?: string
+  diagnosisNotes?: string
+  expectedReturnDate?: string
+  estimatedMinDays?: number | null
+  estimatedMaxDays?: number | null
+  estimatedReturnFrom?: string | null
+  estimatedReturnTo?: string | null
+  // Evaluación clínica inicial
+  examinerName?: string
+  painAtRest?: number
+  painOnPalpation?: number
+  painOnContraction?: number
+  painOnStretch?: number
+  functionalStatus?: string
+  clinicalFindings?: string
+  // Pruebas complementarias iniciales
+  medicalTestType?: string
+  medicalTestSummary?: string
+  medicalTestFindings?: string
+  medicalTestFileUrl?: string
+}
+
+/**
+ * FASE 4: Registro Clínico Integral de Nuevo Episodio Lesional.
+ * Crea el episodio maestro en player_injuries, vincula catálogos de Fase 2,
+ * asienta el estado inicial en injury_status_history y registra la valoración
+ * clínica inicial en injury_examinations y injury_pain_records.
+ */
+export async function registerClinicalInjuryEpisodeAction(
+  input: RegisterClinicalEpisodeInput
+): Promise<{
+  success: boolean
+  injury?: PlayerInjuryDTO
+  error?: string
+}> {
+  try {
+    if (!input.playerId || !input.injuryDate || !input.injuryTypeName) {
+      return { success: false, error: "Datos clínicos obligatorios incompletos (jugador, fecha o diagnóstico)." }
+    }
+
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (authError || !context) {
+      return { success: false, error: "No autenticado" }
+    }
+
+    const clubId = context.profile.club_id
+    if (!clubId) {
+      return { success: false, error: "Usuario sin club asignado" }
+    }
+
+    const role = context.profile.role
+    if (!STAFF_ROLES.includes(role)) {
+      return { success: false, error: "Permisos insuficientes para registrar episodios médicos." }
+    }
+
+    const admin = createAdminClient()
+
+    // 1. Resolver anatomical_zone_id si se especificó un código
+    let anatomicalZoneId: string | null = null
+    if (input.anatomicalZoneCode) {
+      const { data: zoneRow } = await admin
+        .from("anatomical_zones")
+        .select("id")
+        .eq("code", input.anatomicalZoneCode)
+        .maybeSingle()
+      if (zoneRow) anatomicalZoneId = zoneRow.id
+    }
+
+    // 2. Resolver injury_type_id si se especificó un código
+    let injuryTypeId: string | null = null
+    if (input.injuryTypeCode) {
+      const { data: typeRow } = await admin
+        .from("injury_types")
+        .select("id")
+        .eq("code", input.injuryTypeCode)
+        .maybeSingle()
+      if (typeRow) injuryTypeId = typeRow.id
+    }
+
+    // 3. Insertar episodio maestro en player_injuries
+    const { data: newInjury, error: insertErr } = await admin
+      .from("player_injuries")
+      .insert([
+        {
+          club_id: clubId,
+          player_id: input.playerId,
+          injury_date: input.injuryDate,
+          injury_type: input.injuryTypeName, // compatibilidad legacy
+          injury_type_id: injuryTypeId,
+          anatomical_zone_id: anatomicalZoneId,
+          parent_injury_id: input.parentInjuryId || null,
+          is_recurrence: Boolean(input.isRecurrence),
+          rts_phase: "fase_1_aguda",
+          mechanism_details: input.mechanismDetails || null,
+          diagnosis_notes: input.diagnosisNotes || null,
+          notes: input.diagnosisNotes || null,
+          expected_return_date: input.expectedReturnDate || null,
+          status: "activa",
+          body_view: input.bodyView || "back",
+          body_region: input.bodyRegion || "Miembros inferiores",
+          body_structure: input.bodyStructure || input.injuryTypeName,
+          laterality: input.laterality || "derecha",
+          severity: input.severity || "Moderada",
+          estimated_min_days: input.estimatedMinDays || null,
+          estimated_max_days: input.estimatedMaxDays || null,
+          estimated_return_from: input.estimatedReturnFrom || null,
+          estimated_return_to: input.estimatedReturnTo || null,
+        },
+      ])
+      .select()
+      .single()
+
+    if (insertErr || !newInjury) {
+      console.error("[registerClinicalInjuryEpisodeAction] Error en player_injuries:", insertErr)
+      return { success: false, error: insertErr?.message || "No se pudo registrar la lesión." }
+    }
+
+    // 4. Registrar transición inicial en injury_status_history
+    await admin.from("injury_status_history").insert([
+      {
+        club_id: clubId,
+        injury_id: newInjury.id,
+        from_status: null,
+        to_status: "activa",
+        changed_by: context.profile.id,
+        reason: "Alta de nuevo episodio lesional y valoración clínica inicial",
+      },
+    ])
+
+    // 5. Registrar evaluación clínica inicial en injury_examinations si se aportaron datos
+    const examiner = input.examinerName || `${context.profile.first_name || ""} ${context.profile.last_name || ""}`.trim() || "Fisioterapeuta / Médico"
+    const hasClinicalExam =
+      input.painAtRest !== undefined ||
+      input.painOnPalpation !== undefined ||
+      input.functionalStatus ||
+      input.clinicalFindings
+
+    if (hasClinicalExam) {
+      await admin.from("injury_examinations").insert([
+        {
+          club_id: clubId,
+          injury_id: newInjury.id,
+          player_id: input.playerId,
+          examination_date: input.injuryDate,
+          examiner_id: context.profile.id,
+          examiner_name: examiner,
+          pain_at_rest: input.painAtRest ?? 2,
+          pain_on_palpation: input.painOnPalpation ?? 6,
+          pain_on_contraction: input.painOnContraction ?? 7,
+          pain_on_stretch: input.painOnStretch ?? 6,
+          functional_status: input.functionalStatus || "Limitación funcional moderada en flexo-extensión",
+          clinical_findings: input.clinicalFindings || "Dolor selectivo a la palpación e impotencia funcional en gestos excéntricos.",
+          notes: input.diagnosisNotes || null,
+        },
+      ])
+
+      // Registrar dolor en escala EVA inicial (0-10) en injury_pain_records
+      const maxPain = Math.max(input.painAtRest ?? 0, input.painOnPalpation ?? 0, input.painOnContraction ?? 5)
+      await admin.from("injury_pain_records").insert([
+        {
+          club_id: clubId,
+          injury_id: newInjury.id,
+          player_id: input.playerId,
+          record_date: input.injuryDate,
+          pain_score: maxPain,
+          context: "valoracion_inicial",
+          notes: "Evaluación del dolor en el momento del diagnóstico",
+        },
+      ])
+    }
+
+    // 6. Registrar prueba médica complementaria si se adjuntó
+    if (input.medicalTestType && input.medicalTestSummary) {
+      await admin.from("injury_medical_tests").insert([
+        {
+          club_id: clubId,
+          injury_id: newInjury.id,
+          test_type: input.medicalTestType,
+          test_date: input.injuryDate,
+          facility_or_doctor: examiner,
+          report_summary: input.medicalTestSummary,
+          key_findings: input.medicalTestFindings || null,
+          image_or_file_url: input.medicalTestFileUrl || null,
+        },
+      ])
+    }
+
+    const mapped: PlayerInjuryDTO = {
+      id: newInjury.id,
+      clubId: newInjury.club_id,
+      playerId: newInjury.player_id,
+      injuryDate: newInjury.injury_date,
+      injuryType: newInjury.injury_type,
+      notes: newInjury.notes,
+      expectedReturnDate: newInjury.expected_return_date,
+      status: newInjury.status,
+      bodyView: newInjury.body_view,
+      bodyRegion: newInjury.body_region,
+      bodyStructure: newInjury.body_structure,
+      bodySide: newInjury.body_side,
+      laterality: newInjury.laterality,
+      severity: newInjury.severity,
+      estimatedMinDays: newInjury.estimated_min_days,
+      estimatedMaxDays: newInjury.estimated_max_days,
+      estimatedReturnFrom: newInjury.estimated_return_from,
+      estimatedReturnTo: newInjury.estimated_return_to,
+      actualReturnDate: newInjury.actual_return_date,
+      createdAt: newInjury.created_at,
+      updatedAt: newInjury.updated_at,
+    }
+
+    try {
+      revalidatePath(`/dashboard/club/jugador/${newInjury.player_id}`)
+      revalidatePath(`/dashboard/players/${newInjury.player_id}/fisico-lesiones`)
+    } catch {
+      // Ignorar fuera de ruta
+    }
+
+    return { success: true, injury: mapped }
+  } catch (err: any) {
+    console.error("[registerClinicalInjuryEpisodeAction] Error fatal:", err)
+    return { success: false, error: err.message || "Error inesperado al registrar el episodio clínico." }
+  }
+}

@@ -22,7 +22,7 @@ import {
   resolveInjuryAction
 } from '@/app/actions/injury-actions';
 import { ANATOMICAL_ZONES } from '@/hooks/useAnatomySelection';
-import { ProfessionalInjuryModal } from '@/components/features/players/ProfessionalInjuryModal';
+import { ClinicalInjuryWizard } from './ClinicalInjuryWizard';
 
 interface SportsMedicalCenterProps {
   playerId: string;
@@ -291,9 +291,9 @@ export function SportsMedicalCenter({
         </div>
       </div>
 
-      {/* 3. Modal Profesional de Creación / Detalle de Lesión */}
+      {/* 3. Asistente Profesional de Alta y Registro Clínico de Lesión */}
       {isModalOpen && (
-        <ProfessionalInjuryModal
+        <ClinicalInjuryWizard
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           player={{
@@ -304,6 +304,8 @@ export function SportsMedicalCenter({
             avatarUrl: playerAvatarUrl,
             status: playerStatus,
           }}
+          initialZoneCode={selectedZoneCode}
+          existingInjuries={injuries}
           onInjuryCreated={() => {
             loadInjuries();
             setIsModalOpen(false);

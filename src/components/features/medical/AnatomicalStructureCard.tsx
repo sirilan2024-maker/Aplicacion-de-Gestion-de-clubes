@@ -29,7 +29,24 @@ export function AnatomicalStructureCard({
   onStartNewInjury,
   onSelectInjuryDetails,
 }: AnatomicalStructureCardProps) {
-  const zone: AnatomicalZone | undefined = ANATOMICAL_ZONES[zoneCode] || ANATOMICAL_ZONES['isquiotibiales_der'];
+  const defaultZone: AnatomicalZone = {
+    code: 'isquiotibiales_der',
+    name: 'Isquiotibiales Derecho',
+    generalRegion: 'Isquiotibiales',
+    muscleGroup: 'Isquiotibiales',
+    laterality: 'Derecho',
+    thumbnailKey: 'muslo_post',
+    viewDefault: 'posterior',
+    incidencia: 'Muy Alta',
+    mecanismoComun: 'Sprints a máxima velocidad en fase de desaceleración / oscilación tardía.',
+    munichDefault: '3B',
+  };
+
+  const zone: AnatomicalZone = 
+    ANATOMICAL_ZONES[zoneCode] || 
+    ANATOMICAL_ZONES['isquiotibiales_der'] || 
+    Object.values(ANATOMICAL_ZONES)[0] || 
+    defaultZone;
 
   // Filtrar lesiones activas y antecedentes de esta estructura
   const { activeInjuries, resolvedInjuries } = React.useMemo(() => {

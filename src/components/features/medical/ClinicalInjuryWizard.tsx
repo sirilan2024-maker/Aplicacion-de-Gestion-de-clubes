@@ -82,7 +82,24 @@ export function ClinicalInjuryWizard({
   const [medicalTestSummary, setMedicalTestSummary] = useState<string>('Ecografía musculoesquelética en plano longitudinal y transversal');
   const [medicalTestFindings, setMedicalTestFindings] = useState<string>('Desestructuración fibrilar con halo hipoecoico menor de 1.5 cm.');
 
-  const currentZone: AnatomicalZone = ANATOMICAL_ZONES[selectedZoneCode] || ANATOMICAL_ZONES['isquiotibiales_der'];
+  const defaultZone: AnatomicalZone = {
+    code: 'isquiotibiales_der',
+    name: 'Isquiotibiales Derecho',
+    generalRegion: 'Isquiotibiales',
+    muscleGroup: 'Isquiotibiales',
+    laterality: 'Derecho',
+    thumbnailKey: 'muslo_post',
+    viewDefault: 'posterior',
+    incidencia: 'Muy Alta',
+    mecanismoComun: 'Sprints a máxima velocidad en fase de desaceleración / oscilación tardía.',
+    munichDefault: '3B',
+  };
+
+  const currentZone: AnatomicalZone = 
+    ANATOMICAL_ZONES[selectedZoneCode] || 
+    ANATOMICAL_ZONES['isquiotibiales_der'] || 
+    Object.values(ANATOMICAL_ZONES)[0] || 
+    defaultZone;
 
   // Sincronizar lateralidad y vista al cambiar zona
   useEffect(() => {
@@ -116,7 +133,7 @@ export function ClinicalInjuryWizard({
   const recoveryEstimation: RecoveryEstimationResult = useMemo(() => {
     return estimateRecovery({
       injuryType: selectedType.name.includes('Rotura') ? 'Rotura muscular' : selectedType.name,
-      structure: currentZone.name,
+      structure: currentZone?.name || 'Isquiotibiales Derecho',
       severity,
       injuryDate,
     });

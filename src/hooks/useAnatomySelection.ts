@@ -369,6 +369,30 @@ export const ANATOMICAL_ZONES: Record<string, AnatomicalZone> = {
   },
 
   // === ISQUIOTIBIALES ===
+  isquiotibiales_der: {
+    code: 'isquiotibiales_der',
+    name: 'Isquiotibiales Derecho',
+    generalRegion: 'Isquiotibiales',
+    muscleGroup: 'Isquiotibiales',
+    laterality: 'Derecho',
+    thumbnailKey: 'muslo_post',
+    viewDefault: 'posterior',
+    incidencia: 'Muy Alta',
+    mecanismoComun: 'Sprints a máxima velocidad en fase de desaceleración / oscilación tardía.',
+    munichDefault: '3B',
+  },
+  isquiotibiales_izq: {
+    code: 'isquiotibiales_izq',
+    name: 'Isquiotibiales Izquierdo',
+    generalRegion: 'Isquiotibiales',
+    muscleGroup: 'Isquiotibiales',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'muslo_post',
+    viewDefault: 'posterior',
+    incidencia: 'Muy Alta',
+    mecanismoComun: 'Sprints a máxima velocidad en fase de desaceleración / oscilación tardía.',
+    munichDefault: '3B',
+  },
   biceps_femoral_larga_der: {
     code: 'biceps_femoral_larga_der',
     name: 'Bíceps femoral (Cabeza larga) Derecho',

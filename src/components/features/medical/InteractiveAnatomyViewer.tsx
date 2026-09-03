@@ -66,7 +66,23 @@ export function InteractiveAnatomyViewer({
       const lat = (inj.laterality || '').toLowerCase();
 
       // Mapeo detallado de estructuras
-      if (bs.includes('biceps femoral') && bs.includes('corta')) {
+      if (bs.includes('deltoides') && bs.includes('post')) {
+        code = lat.includes('izq') ? 'deltoides_post_izq' : 'deltoides_post_der';
+      } else if (bs.includes('deltoides')) {
+        code = lat.includes('izq') ? 'deltoides_ant_izq' : 'deltoides_ant_der';
+      } else if (bs.includes('biceps braquial') || (bs.includes('brazo') && bs.includes('biceps'))) {
+        code = lat.includes('izq') ? 'biceps_braquial_izq' : 'biceps_braquial_der';
+      } else if (bs.includes('triceps') || (bs.includes('brazo') && bs.includes('triceps'))) {
+        code = lat.includes('izq') ? 'triceps_braquial_izq' : 'triceps_braquial_der';
+      } else if (bs.includes('codo')) {
+        code = lat.includes('izq') ? 'codo_izq' : 'codo_der';
+      } else if (bs.includes('antebrazo') && bs.includes('extensor')) {
+        code = lat.includes('izq') ? 'antebrazo_extensores_izq' : 'antebrazo_extensores_der';
+      } else if (bs.includes('antebrazo')) {
+        code = lat.includes('izq') ? 'antebrazo_flexores_izq' : 'antebrazo_flexores_der';
+      } else if (bs.includes('muñeca') || bs.includes('mano') || bs.includes('dedo')) {
+        code = lat.includes('izq') ? 'muneca_mano_izq' : 'muneca_mano_der';
+      } else if (bs.includes('biceps femoral') && bs.includes('corta')) {
         code = lat.includes('izq') ? 'biceps_femoral_corta_izq' : 'biceps_femoral_corta_der';
       } else if (bs.includes('biceps femoral') || (bs.includes('isquio') && bs.includes('larga'))) {
         code = lat.includes('izq') ? 'biceps_femoral_larga_izq' : 'biceps_femoral_larga_der';
@@ -161,7 +177,6 @@ export function InteractiveAnatomyViewer({
     if (zone?.viewDefault) {
       setCameraView(zone.viewDefault === 'frontal' ? 'frontal' : 'posterior');
     }
-    setZoomMode('micro');
   };
 
   const handleSelectSubportionClick = (subCode: string) => {
@@ -171,17 +186,17 @@ export function InteractiveAnatomyViewer({
     }
   };
 
-  // Helper visual para estilos de cada elemento vectorial
+  // Helper visual para estilos de cada elemento vectorial: ROJO CUANDO ESTÁ LESIONADO O SELECCIONADO PARA LESIÓN
   const getShapeClasses = (code: string) => {
     const isSelected = selectedCode === code;
     const hasActive = injuryStatusByZone[code]?.hasActive;
     if (isSelected) {
-      return 'fill-emerald-500/50 stroke-emerald-400 stroke-2 cursor-pointer shadow-lg';
+      return 'fill-rose-600/70 stroke-rose-400 stroke-[2.5px] cursor-pointer shadow-lg animate-pulse';
     }
     if (hasActive) {
-      return 'fill-rose-600/60 stroke-rose-400 stroke-2 animate-pulse cursor-pointer';
+      return 'fill-rose-600/70 stroke-rose-400 stroke-2 animate-pulse cursor-pointer';
     }
-    return 'fill-transparent hover:fill-emerald-400/30 stroke-slate-500/30 hover:stroke-emerald-400/80 stroke-1 cursor-pointer transition-all';
+    return 'fill-transparent hover:fill-rose-500/30 stroke-slate-500/25 hover:stroke-rose-400/80 stroke-1 cursor-pointer transition-all';
   };
 
   return (
@@ -314,14 +329,15 @@ export function InteractiveAnatomyViewer({
               <button
                 type="button"
                 onClick={() => setZoomMode('micro')}
-                className="text-emerald-400 font-bold shrink-0 hover:underline cursor-pointer"
+                className="text-rose-400 font-bold shrink-0 hover:underline cursor-pointer flex items-center gap-1"
               >
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                 {currentZone.name}
               </button>
               {zoomMode === 'micro' && (
                 <>
                   <ChevronRight size={12} className="text-slate-600 shrink-0" />
-                  <span className="text-emerald-300 font-extrabold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/40 text-[11px] shrink-0 font-mono">
+                  <span className="text-rose-300 font-extrabold bg-rose-950/80 px-2 py-0.5 rounded-full border border-rose-500/40 text-[11px] shrink-0 font-mono">
                     {availableSubportions.find((s) => s.code === selectedSubportion)?.shortLabel || 'Unión Miotendinosa'}
                   </span>
                 </>
@@ -331,7 +347,7 @@ export function InteractiveAnatomyViewer({
             <>
               <ChevronRight size={12} className="text-slate-700 shrink-0" />
               <span className="text-slate-500 text-[11px] font-normal italic">
-                Selecciona una zona en el cuerpo para examinarla
+                Selecciona una zona en el cuerpo o en las pestañas para examinarla
               </span>
             </>
           )}
@@ -358,9 +374,9 @@ export function InteractiveAnatomyViewer({
           <div className="relative w-full h-full max-w-lg flex flex-col items-center justify-center p-4 z-10 animate-fade-in">
             {/* Tarjeta de Guía Anatómica Flotante */}
             <div className="absolute top-2 left-4 z-20 flex flex-col gap-1 pointer-events-none">
-              <span className="text-[10px] font-bold font-mono uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+              <span className="text-[10px] font-bold font-mono uppercase text-rose-400 tracking-wider flex items-center gap-1">
                 <Crosshair size={12} />
-                Enfoque Anatómico de Alta Resolución
+                Enfoque de Lesión de Alta Resolución
               </span>
               <h4 className="text-base font-black text-white">{currentZone?.name || 'Estructura seleccionada'}</h4>
               <p className="text-[11px] text-slate-400 max-w-xs leading-tight">
@@ -399,8 +415,8 @@ export function InteractiveAnatomyViewer({
                     d="M105,45 L155,45 L165,95 L95,95 Z"
                     className={`transition-all ${
                       selectedSubportion === 'tercio_proximal'
-                        ? 'fill-emerald-500/50 stroke-emerald-400 stroke-2'
-                        : 'fill-slate-800/60 hover:fill-emerald-400/25 stroke-slate-700/60 stroke-1'
+                        ? 'fill-rose-600/60 stroke-rose-400 stroke-2 animate-pulse'
+                        : 'fill-slate-800/60 hover:fill-rose-500/25 stroke-slate-700/60 stroke-1'
                     }`}
                   />
                   <line x1="165" y1="70" x2="205" y2="70" className="stroke-slate-600 stroke-1 stroke-dasharray-2" />
@@ -423,14 +439,12 @@ export function InteractiveAnatomyViewer({
                     d="M95,95 L165,95 L175,150 L85,150 Z"
                     className={`transition-all ${
                       selectedSubportion === 'union_miotendinosa'
-                        ? 'fill-emerald-500/50 stroke-emerald-400 stroke-2'
-                        : selectedCode && injuryStatusByZone[selectedCode]?.hasActive
-                        ? 'fill-rose-600/50 stroke-rose-400 stroke-2 animate-pulse'
-                        : 'fill-slate-800/70 hover:fill-emerald-400/25 stroke-slate-700/60 stroke-1'
+                        ? 'fill-rose-600/70 stroke-rose-400 stroke-2 animate-pulse'
+                        : 'fill-slate-800/70 hover:fill-rose-500/25 stroke-slate-700/60 stroke-1'
                     }`}
                   />
                   <line x1="175" y1="122" x2="205" y2="122" className="stroke-slate-600 stroke-1" />
-                  <text x="210" y="122" className="text-[10px] fill-emerald-400 font-bold">
+                  <text x="210" y="122" className="text-[10px] fill-rose-400 font-bold">
                     Unión Miotendinosa ★
                   </text>
                   <text x="210" y="134" className="text-[8px] fill-slate-400 font-mono">
@@ -449,8 +463,8 @@ export function InteractiveAnatomyViewer({
                     d="M85,150 L175,150 L168,210 L92,210 Z"
                     className={`transition-all ${
                       selectedSubportion === 'vientre_muscular'
-                        ? 'fill-emerald-500/50 stroke-emerald-400 stroke-2'
-                        : 'fill-slate-800/60 hover:fill-emerald-400/25 stroke-slate-700/60 stroke-1'
+                        ? 'fill-rose-600/60 stroke-rose-400 stroke-2 animate-pulse'
+                        : 'fill-slate-800/60 hover:fill-rose-500/25 stroke-slate-700/60 stroke-1'
                     }`}
                   />
                   <line x1="172" y1="180" x2="205" y2="180" className="stroke-slate-600 stroke-1" />
@@ -473,8 +487,8 @@ export function InteractiveAnatomyViewer({
                     d="M92,210 L168,210 L155,275 L105,275 Z"
                     className={`transition-all ${
                       selectedSubportion === 'tercio_distal'
-                        ? 'fill-emerald-500/50 stroke-emerald-400 stroke-2'
-                        : 'fill-slate-800/60 hover:fill-emerald-400/25 stroke-slate-700/60 stroke-1'
+                        ? 'fill-rose-600/60 stroke-rose-400 stroke-2 animate-pulse'
+                        : 'fill-slate-800/60 hover:fill-rose-500/25 stroke-slate-700/60 stroke-1'
                     }`}
                   />
                   <line x1="162" y1="242" x2="205" y2="242" className="stroke-slate-600 stroke-1 stroke-dasharray-2" />
@@ -500,8 +514,8 @@ export function InteractiveAnatomyViewer({
                     })`}
                     className="pointer-events-none"
                   >
-                    <circle r="14" className="fill-emerald-500/30 stroke-emerald-400 stroke-1 animate-ping" />
-                    <circle r="7" className="fill-emerald-500 stroke-white stroke-2 shadow-lg" />
+                    <circle r="14" className="fill-rose-500/30 stroke-rose-400 stroke-1 animate-ping" />
+                    <circle r="7" className="fill-rose-500 stroke-white stroke-2 shadow-lg" />
                     <circle r="2" className="fill-black" />
                   </g>
                 )}
@@ -526,7 +540,133 @@ export function InteractiveAnatomyViewer({
                 />
 
                 <svg viewBox="0 0 255 495" className="absolute inset-0 w-full h-full z-10" preserveAspectRatio="xMidYMid meet">
-                  {/* --- TREN SUPERIOR / PORTERO (FRONTAL) --- */}
+                  {/* --- BRAZOS Y MIEMBROS SUPERIORES (FRONTAL) --- */}
+                  {/* Deltoides anterior / medio Izquierdo y Derecho */}
+                  <path
+                    d="M60,110 Q50,125 55,144 Q70,140 76,120 Z"
+                    onClick={() => handleSelectZoneMacro('deltoides_ant_izq')}
+                    onMouseEnter={() => setHoveredCode('deltoides_ant_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('deltoides_ant_izq')}
+                  >
+                    <title>Deltoides anterior/medio Izquierdo</title>
+                  </path>
+                  <path
+                    d="M195,110 Q205,125 200,144 Q185,140 179,120 Z"
+                    onClick={() => handleSelectZoneMacro('deltoides_ant_der')}
+                    onMouseEnter={() => setHoveredCode('deltoides_ant_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('deltoides_ant_der')}
+                  >
+                    <title>Deltoides anterior/medio Derecho</title>
+                  </path>
+
+                  {/* Bíceps braquial Izquierdo y Derecho */}
+                  <rect
+                    x="48"
+                    y="142"
+                    width="18"
+                    height="38"
+                    rx="6"
+                    onClick={() => handleSelectZoneMacro('biceps_braquial_izq')}
+                    onMouseEnter={() => setHoveredCode('biceps_braquial_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('biceps_braquial_izq')}
+                  >
+                    <title>Bíceps braquial Izquierdo</title>
+                  </rect>
+                  <rect
+                    x="189"
+                    y="142"
+                    width="18"
+                    height="38"
+                    rx="6"
+                    onClick={() => handleSelectZoneMacro('biceps_braquial_der')}
+                    onMouseEnter={() => setHoveredCode('biceps_braquial_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('biceps_braquial_der')}
+                  >
+                    <title>Bíceps braquial Derecho</title>
+                  </rect>
+
+                  {/* Codo / Epicóndilo Frontal Izquierdo y Derecho */}
+                  <circle
+                    cx="55"
+                    cy="184"
+                    r="9"
+                    onClick={() => handleSelectZoneMacro('codo_izq')}
+                    onMouseEnter={() => setHoveredCode('codo_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('codo_izq')}
+                  >
+                    <title>Codo / Epicóndilo Izquierdo</title>
+                  </circle>
+                  <circle
+                    cx="200"
+                    cy="184"
+                    r="9"
+                    onClick={() => handleSelectZoneMacro('codo_der')}
+                    onMouseEnter={() => setHoveredCode('codo_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('codo_der')}
+                  >
+                    <title>Codo / Epicóndilo Derecho</title>
+                  </circle>
+
+                  {/* Antebrazo (Flexores) Izquierdo y Derecho */}
+                  <rect
+                    x="40"
+                    y="194"
+                    width="18"
+                    height="46"
+                    rx="5"
+                    onClick={() => handleSelectZoneMacro('antebrazo_flexores_izq')}
+                    onMouseEnter={() => setHoveredCode('antebrazo_flexores_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('antebrazo_flexores_izq')}
+                  >
+                    <title>Antebrazo (Flexores) Izquierdo</title>
+                  </rect>
+                  <rect
+                    x="197"
+                    y="194"
+                    width="18"
+                    height="46"
+                    rx="5"
+                    onClick={() => handleSelectZoneMacro('antebrazo_flexores_der')}
+                    onMouseEnter={() => setHoveredCode('antebrazo_flexores_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('antebrazo_flexores_der')}
+                  >
+                    <title>Antebrazo (Flexores) Derecho</title>
+                  </rect>
+
+                  {/* Muñeca y Mano Izquierda y Derecha */}
+                  <ellipse
+                    cx="34"
+                    cy="252"
+                    rx="11"
+                    ry="15"
+                    onClick={() => handleSelectZoneMacro('muneca_mano_izq')}
+                    onMouseEnter={() => setHoveredCode('muneca_mano_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('muneca_mano_izq')}
+                  >
+                    <title>Muñeca y Mano Izquierda</title>
+                  </ellipse>
+                  <ellipse
+                    cx="221"
+                    cy="252"
+                    rx="11"
+                    ry="15"
+                    onClick={() => handleSelectZoneMacro('muneca_mano_der')}
+                    onMouseEnter={() => setHoveredCode('muneca_mano_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('muneca_mano_der')}
+                  >
+                    <title>Muñeca y Mano Derecha</title>
+                  </ellipse>
+
                   {/* Supraespinoso / Hombro Izquierdo y Derecho */}
                   <circle
                     cx="70"
@@ -563,7 +703,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('pectoral_mayor_izq')}
                   >
-                    <title>Pectoral mayor Izquierdo (Bloqueos y caídas portero)</title>
+                    <title>Pectoral mayor Izquierdo</title>
                   </rect>
                   <rect
                     x="133"
@@ -576,10 +716,9 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('pectoral_mayor_der')}
                   >
-                    <title>Pectoral mayor Derecho (Bloqueos y caídas portero)</title>
+                    <title>Pectoral mayor Derecho</title>
                   </rect>
 
-                  {/* --- CORE Y TRONCO (FRONTAL) --- */}
                   {/* Recto Abdominal */}
                   <rect
                     x="113"
@@ -592,7 +731,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('recto_abdominal')}
                   >
-                    <title>Recto abdominal (Core - Saques de banda y giros en el aire)</title>
+                    <title>Recto abdominal (Core)</title>
                   </rect>
 
                   {/* Oblicuo Abdominal Izquierdo y Derecho */}
@@ -607,7 +746,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('oblicuo_abdomen_izq')}
                   >
-                    <title>Oblicuo abdominal Izquierdo (Torsiones bruscas)</title>
+                    <title>Oblicuo abdominal Izquierdo</title>
                   </rect>
                   <rect
                     x="145"
@@ -620,10 +759,9 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('oblicuo_abdomen_der')}
                   >
-                    <title>Oblicuo abdominal Derecho (Torsiones bruscas)</title>
+                    <title>Oblicuo abdominal Derecho</title>
                   </rect>
 
-                  {/* --- PELVIS, FLEXORES Y ADUCTORES (FRONTAL) --- */}
                   {/* Pubis / Sínfisis Púbica */}
                   <ellipse
                     cx="127.5"
@@ -650,7 +788,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('psoas_iliaco_izq')}
                   >
-                    <title>Psoas ilíaco Izquierdo (Flexión en golpeo)</title>
+                    <title>Psoas ilíaco Izquierdo</title>
                   </rect>
                   <rect
                     x="132"
@@ -663,7 +801,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('psoas_iliaco_der')}
                   >
-                    <title>Psoas ilíaco Derecho (Flexión en golpeo)</title>
+                    <title>Psoas ilíaco Derecho</title>
                   </rect>
 
                   {/* Tensor de la Fascia Lata Izquierdo y Derecho */}
@@ -678,7 +816,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('tensor_fascia_lata_izq')}
                   >
-                    <title>Tensor de la fascia lata Izquierdo (Estabilización pélvica)</title>
+                    <title>Tensor de la fascia lata Izquierdo</title>
                   </rect>
                   <rect
                     x="165"
@@ -691,7 +829,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('tensor_fascia_lata_der')}
                   >
-                    <title>Tensor de la fascia lata Derecho (Estabilización pélvica)</title>
+                    <title>Tensor de la fascia lata Derecho</title>
                   </rect>
 
                   {/* Pectíneo Izquierdo y Derecho */}
@@ -706,7 +844,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('pectineo_izq')}
                   >
-                    <title>Pectíneo Izquierdo (Flexión y aducción)</title>
+                    <title>Pectíneo Izquierdo</title>
                   </rect>
                   <rect
                     x="131"
@@ -719,7 +857,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('pectineo_der')}
                   >
-                    <title>Pectíneo Derecho (Flexión y aducción)</title>
+                    <title>Pectíneo Derecho</title>
                   </rect>
 
                   {/* Aductor Largo Izquierdo y Derecho */}
@@ -734,7 +872,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('aductor_largo_izq')}
                   >
-                    <title>Aductor largo Izquierdo (Pases de interior y giros)</title>
+                    <title>Aductor largo Izquierdo</title>
                   </rect>
                   <rect
                     x="130"
@@ -747,7 +885,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('aductor_largo_der')}
                   >
-                    <title>Aductor largo Derecho (Pases de interior y giros)</title>
+                    <title>Aductor largo Derecho</title>
                   </rect>
 
                   {/* Aductor Mayor Izquierdo y Derecho */}
@@ -762,7 +900,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('aductor_mayor_izq')}
                   >
-                    <title>Aductor mayor Izquierdo (Tracción extrema)</title>
+                    <title>Aductor mayor Izquierdo</title>
                   </rect>
                   <rect
                     x="127"
@@ -775,10 +913,10 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('aductor_mayor_der')}
                   >
-                    <title>Aductor mayor Derecho (Tracción extrema)</title>
+                    <title>Aductor mayor Derecho</title>
                   </rect>
 
-                  {/* Grácil (Recto Interno) Izquierdo y Derecho */}
+                  {/* Grácil Izquierdo y Derecho */}
                   <rect
                     x="122"
                     y="246"
@@ -790,7 +928,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('gracil_izq')}
                   >
-                    <title>Grácil Izquierdo (Torsión con pie fijo)</title>
+                    <title>Grácil Izquierdo</title>
                   </rect>
                   <rect
                     x="124"
@@ -803,10 +941,9 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('gracil_der')}
                   >
-                    <title>Grácil Derecho (Torsión con pie fijo)</title>
+                    <title>Grácil Derecho</title>
                   </rect>
 
-                  {/* --- CUÁDRICEPS Y MUSLO ANTERIOR (FRONTAL) --- */}
                   {/* Recto anterior (cuádriceps) Izquierdo y Derecho */}
                   <rect
                     x="97"
@@ -847,7 +984,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('vasto_lateral_izq')}
                   >
-                    <title>Vasto lateral Izquierdo (Extensión y desaceleración)</title>
+                    <title>Vasto lateral Izquierdo</title>
                   </rect>
                   <rect
                     x="157"
@@ -860,7 +997,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('vasto_lateral_der')}
                   >
-                    <title>Vasto lateral Derecho (Extensión y desaceleración)</title>
+                    <title>Vasto lateral Derecho</title>
                   </rect>
 
                   {/* Vasto Medial Izquierdo y Derecho */}
@@ -875,7 +1012,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('vasto_medial_izq')}
                   >
-                    <title>Vasto medial Izquierdo (Estabilización de rótula)</title>
+                    <title>Vasto medial Izquierdo</title>
                   </rect>
                   <rect
                     x="128"
@@ -888,7 +1025,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('vasto_medial_der')}
                   >
-                    <title>Vasto medial Derecho (Estabilización de rótula)</title>
+                    <title>Vasto medial Derecho</title>
                   </rect>
 
                   {/* Sartorio Izquierdo y Derecho */}
@@ -901,7 +1038,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('sartorio_izq')}
                   >
-                    <title>Sartorio Izquierdo (Flexión combinada cadera y rodilla)</title>
+                    <title>Sartorio Izquierdo</title>
                   </path>
                   <path
                     d="M165,212 Q144,258 126,302"
@@ -912,7 +1049,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('sartorio_der')}
                   >
-                    <title>Sartorio Derecho (Flexión combinada cadera y rodilla)</title>
+                    <title>Sartorio Derecho</title>
                   </path>
 
                   {/* Rodilla / LCA / Menisco */}
@@ -928,7 +1065,6 @@ export function InteractiveAnatomyViewer({
                     <title>LCA y Meniscos Rodilla Derecha</title>
                   </circle>
 
-                  {/* --- PIERNA INFERIOR (FRONTAL) --- */}
                   {/* Tibial Anterior Izquierdo y Derecho */}
                   <rect
                     x="105"
@@ -941,7 +1077,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('tibial_anterior_izq')}
                   >
-                    <title>Tibial anterior Izquierdo (Sobrecarga y terrenos duros)</title>
+                    <title>Tibial anterior Izquierdo</title>
                   </rect>
                   <rect
                     x="135"
@@ -954,7 +1090,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('tibial_anterior_der')}
                   >
-                    <title>Tibial anterior Derecho (Sobrecarga y terrenos duros)</title>
+                    <title>Tibial anterior Derecho</title>
                   </rect>
 
                   {/* Peroneos Laterales Izquierdos y Derechos */}
@@ -969,7 +1105,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('peroneo_lateral_izq')}
                   >
-                    <title>Peroneos laterales Izquierdos (Esguince por inversión)</title>
+                    <title>Peroneos laterales Izquierdos</title>
                   </rect>
                   <rect
                     x="151"
@@ -982,7 +1118,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('peroneo_lateral_der')}
                   >
-                    <title>Peroneos laterales Derechos (Esguince por inversión)</title>
+                    <title>Peroneos laterales Derechos</title>
                   </rect>
 
                   {/* Tobillos */}
@@ -993,7 +1129,7 @@ export function InteractiveAnatomyViewer({
                     onClick={() => handleSelectZoneMacro('tobillo_der')}
                     onMouseEnter={() => setHoveredCode('tobillo_der')}
                     onMouseLeave={() => setHoveredCode(null)}
-                    className="fill-transparent cursor-pointer hover:fill-emerald-400/25 stroke-slate-500/20"
+                    className="fill-transparent cursor-pointer hover:fill-rose-400/25 stroke-slate-500/20"
                   >
                     <title>Ligamento Tobillo Izquierdo</title>
                   </circle>
@@ -1004,7 +1140,7 @@ export function InteractiveAnatomyViewer({
                     onClick={() => handleSelectZoneMacro('tobillo_der')}
                     onMouseEnter={() => setHoveredCode('tobillo_der')}
                     onMouseLeave={() => setHoveredCode(null)}
-                    className="fill-transparent cursor-pointer hover:fill-emerald-400/25 stroke-slate-500/20"
+                    className="fill-transparent cursor-pointer hover:fill-rose-400/25 stroke-slate-500/20"
                   >
                     <title>Ligamento Tobillo Derecho</title>
                   </circle>
@@ -1022,7 +1158,133 @@ export function InteractiveAnatomyViewer({
                 />
 
                 <svg viewBox="0 0 255 495" className="absolute inset-0 w-full h-full z-10" preserveAspectRatio="xMidYMid meet">
-                  {/* --- ESPALDA Y HOMBRO POSTERIOR (PORTERO / TRONCO) --- */}
+                  {/* --- BRAZOS Y MIEMBROS SUPERIORES (POSTERIOR) --- */}
+                  {/* Deltoides posterior Izquierdo y Derecho */}
+                  <path
+                    d="M60,110 Q50,125 55,144 Q70,140 76,120 Z"
+                    onClick={() => handleSelectZoneMacro('deltoides_post_izq')}
+                    onMouseEnter={() => setHoveredCode('deltoides_post_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('deltoides_post_izq')}
+                  >
+                    <title>Deltoides posterior Izquierdo</title>
+                  </path>
+                  <path
+                    d="M195,110 Q205,125 200,144 Q185,140 179,120 Z"
+                    onClick={() => handleSelectZoneMacro('deltoides_post_der')}
+                    onMouseEnter={() => setHoveredCode('deltoides_post_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('deltoides_post_der')}
+                  >
+                    <title>Deltoides posterior Derecho</title>
+                  </path>
+
+                  {/* Tríceps braquial Izquierdo y Derecho */}
+                  <rect
+                    x="48"
+                    y="142"
+                    width="18"
+                    height="40"
+                    rx="6"
+                    onClick={() => handleSelectZoneMacro('triceps_braquial_izq')}
+                    onMouseEnter={() => setHoveredCode('triceps_braquial_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('triceps_braquial_izq')}
+                  >
+                    <title>Tríceps braquial Izquierdo</title>
+                  </rect>
+                  <rect
+                    x="189"
+                    y="142"
+                    width="18"
+                    height="40"
+                    rx="6"
+                    onClick={() => handleSelectZoneMacro('triceps_braquial_der')}
+                    onMouseEnter={() => setHoveredCode('triceps_braquial_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('triceps_braquial_der')}
+                  >
+                    <title>Tríceps braquial Derecho</title>
+                  </rect>
+
+                  {/* Codo / Olécranon Posterior Izquierdo y Derecho */}
+                  <circle
+                    cx="55"
+                    cy="184"
+                    r="9"
+                    onClick={() => handleSelectZoneMacro('codo_izq')}
+                    onMouseEnter={() => setHoveredCode('codo_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('codo_izq')}
+                  >
+                    <title>Codo / Olécranon Izquierdo</title>
+                  </circle>
+                  <circle
+                    cx="200"
+                    cy="184"
+                    r="9"
+                    onClick={() => handleSelectZoneMacro('codo_der')}
+                    onMouseEnter={() => setHoveredCode('codo_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('codo_der')}
+                  >
+                    <title>Codo / Olécranon Derecho</title>
+                  </circle>
+
+                  {/* Antebrazo (Extensores) Izquierdo y Derecho */}
+                  <rect
+                    x="40"
+                    y="194"
+                    width="18"
+                    height="46"
+                    rx="5"
+                    onClick={() => handleSelectZoneMacro('antebrazo_extensores_izq')}
+                    onMouseEnter={() => setHoveredCode('antebrazo_extensores_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('antebrazo_extensores_izq')}
+                  >
+                    <title>Antebrazo (Extensores) Izquierdo</title>
+                  </rect>
+                  <rect
+                    x="197"
+                    y="194"
+                    width="18"
+                    height="46"
+                    rx="5"
+                    onClick={() => handleSelectZoneMacro('antebrazo_extensores_der')}
+                    onMouseEnter={() => setHoveredCode('antebrazo_extensores_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('antebrazo_extensores_der')}
+                  >
+                    <title>Antebrazo (Extensores) Derecho</title>
+                  </rect>
+
+                  {/* Muñeca y Dorso Mano Izquierda y Derecha */}
+                  <ellipse
+                    cx="34"
+                    cy="252"
+                    rx="11"
+                    ry="15"
+                    onClick={() => handleSelectZoneMacro('muneca_mano_izq')}
+                    onMouseEnter={() => setHoveredCode('muneca_mano_izq')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('muneca_mano_izq')}
+                  >
+                    <title>Muñeca y Dorso Mano Izquierda</title>
+                  </ellipse>
+                  <ellipse
+                    cx="221"
+                    cy="252"
+                    rx="11"
+                    ry="15"
+                    onClick={() => handleSelectZoneMacro('muneca_mano_der')}
+                    onMouseEnter={() => setHoveredCode('muneca_mano_der')}
+                    onMouseLeave={() => setHoveredCode(null)}
+                    className={getShapeClasses('muneca_mano_der')}
+                  >
+                    <title>Muñeca y Dorso Mano Derecha</title>
+                  </ellipse>
+
                   {/* Subescapular / Redondo Mayor Izquierdo y Derecho */}
                   <circle
                     cx="89"
@@ -1033,7 +1295,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('subescapular_izq')}
                   >
-                    <title>Subescapular / Redondo mayor Izquierdo (Saques de mano)</title>
+                    <title>Subescapular / Redondo mayor Izquierdo</title>
                   </circle>
                   <circle
                     cx="166"
@@ -1044,7 +1306,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('subescapular_der')}
                   >
-                    <title>Subescapular / Redondo mayor Derecho (Saques de mano)</title>
+                    <title>Subescapular / Redondo mayor Derecho</title>
                   </circle>
 
                   {/* Dorsal Ancho Izquierdo y Derecho */}
@@ -1059,7 +1321,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('dorsal_ancho_izq')}
                   >
-                    <title>Dorsal ancho Izquierdo (Caídas e impactos contra postes)</title>
+                    <title>Dorsal ancho Izquierdo</title>
                   </rect>
                   <rect
                     x="138"
@@ -1072,7 +1334,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('dorsal_ancho_der')}
                   >
-                    <title>Dorsal ancho Derecho (Caídas e impactos contra postes)</title>
+                    <title>Dorsal ancho Derecho</title>
                   </rect>
 
                   {/* Erectores de la Columna (Masa Lumbar) */}
@@ -1087,10 +1349,10 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('erectores_columna')}
                   >
-                    <title>Erectores de la columna (Impactos axiales y saltos)</title>
+                    <title>Erectores de la columna</title>
                   </rect>
 
-                  {/* --- GLÚTEOS (POSTERIOR) --- */}
+                  {/* Glúteos */}
                   <rect
                     x="85"
                     y="198"
@@ -1118,8 +1380,7 @@ export function InteractiveAnatomyViewer({
                     <title>Glúteo mayor Derecho</title>
                   </rect>
 
-                  {/* --- ISQUIOTIBIALES DESGLOSADOS (POSTERIOR) --- */}
-                  {/* Semitendinoso Izquierdo y Derecho (Medial Proximal) */}
+                  {/* Semitendinoso Izquierdo y Derecho */}
                   <rect
                     x="107"
                     y="234"
@@ -1131,7 +1392,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('semitendinoso_izq')}
                   >
-                    <title>Semitendinoso Izquierdo (Extensión y carrera continua)</title>
+                    <title>Semitendinoso Izquierdo</title>
                   </rect>
                   <rect
                     x="133"
@@ -1144,10 +1405,10 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('semitendinoso_der')}
                   >
-                    <title>Semitendinoso Derecho (Extensión y carrera continua)</title>
+                    <title>Semitendinoso Derecho</title>
                   </rect>
 
-                  {/* Semimembranoso Izquierdo y Derecho (Medial Distal/Profundo) */}
+                  {/* Semimembranoso Izquierdo y Derecho */}
                   <rect
                     x="115"
                     y="256"
@@ -1159,7 +1420,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('semimembranoso_izq')}
                   >
-                    <title>Semimembranoso Izquierdo (Frenazos de golpe y giros)</title>
+                    <title>Semimembranoso Izquierdo</title>
                   </rect>
                   <rect
                     x="126"
@@ -1172,10 +1433,10 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('semimembranoso_der')}
                   >
-                    <title>Semimembranoso Derecho (Frenazos de golpe y giros)</title>
+                    <title>Semimembranoso Derecho</title>
                   </rect>
 
-                  {/* Bíceps Femoral Cabeza Larga Izquierda y Derecha (Lateral) */}
+                  {/* Bíceps Femoral Cabeza Larga Izquierda y Derecha */}
                   <rect
                     x="92"
                     y="234"
@@ -1187,7 +1448,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('biceps_femoral_larga_izq')}
                   >
-                    <title>Bíceps femoral cabeza larga Izquierda (Sprints a máxima velocidad)</title>
+                    <title>Bíceps femoral cabeza larga Izquierda</title>
                   </rect>
                   <rect
                     x="145"
@@ -1200,10 +1461,10 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('biceps_femoral_larga_der')}
                   >
-                    <title>Bíceps femoral cabeza larga Derecha (Sprints a máxima velocidad)</title>
+                    <title>Bíceps femoral cabeza larga Derecha</title>
                   </rect>
 
-                  {/* Bíceps Femoral Cabeza Corta Izquierda y Derecha (Lateral Distal) */}
+                  {/* Bíceps Femoral Cabeza Corta Izquierda y Derecha */}
                   <rect
                     x="86"
                     y="268"
@@ -1215,7 +1476,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('biceps_femoral_corta_izq')}
                   >
-                    <title>Bíceps femoral cabeza corta Izquierda (Flexión en velocidad)</title>
+                    <title>Bíceps femoral cabeza corta Izquierda</title>
                   </rect>
                   <rect
                     x="156"
@@ -1228,10 +1489,9 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('biceps_femoral_corta_der')}
                   >
-                    <title>Bíceps femoral cabeza corta Derecha (Flexión en velocidad)</title>
+                    <title>Bíceps femoral cabeza corta Derecha</title>
                   </rect>
 
-                  {/* --- PANTORRILLA (POSTERIOR) --- */}
                   {/* Gemelo Interno (Gastrocnemio Medial) */}
                   <rect
                     x="111"
@@ -1244,7 +1504,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('gastrocnemio_medial_izq')}
                   >
-                    <title>Gemelo interno Izquierdo (Saltos y arrancadas)</title>
+                    <title>Gemelo interno Izquierdo</title>
                   </rect>
                   <rect
                     x="127"
@@ -1257,7 +1517,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('gastrocnemio_medial_der')}
                   >
-                    <title>Gemelo interno Derecho (Saltos y arrancadas)</title>
+                    <title>Gemelo interno Derecho</title>
                   </rect>
 
                   {/* Gemelo Externo (Gastrocnemio Lateral) */}
@@ -1272,7 +1532,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('gastrocnemio_lateral_izq')}
                   >
-                    <title>Gemelo externo Izquierdo (Empuje lateral)</title>
+                    <title>Gemelo externo Izquierdo</title>
                   </rect>
                   <rect
                     x="145"
@@ -1285,7 +1545,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('gastrocnemio_lateral_der')}
                   >
-                    <title>Gemelo externo Derecho (Empuje lateral)</title>
+                    <title>Gemelo externo Derecho</title>
                   </rect>
 
                   {/* Sóleo */}
@@ -1300,7 +1560,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('soleo_izq')}
                   >
-                    <title>Sóleo Izquierdo (Fatiga y resistencia)</title>
+                    <title>Sóleo Izquierdo</title>
                   </rect>
                   <rect
                     x="133"
@@ -1313,7 +1573,7 @@ export function InteractiveAnatomyViewer({
                     onMouseLeave={() => setHoveredCode(null)}
                     className={getShapeClasses('soleo_der')}
                   >
-                    <title>Sóleo Derecho (Fatiga y resistencia)</title>
+                    <title>Sóleo Derecho</title>
                   </rect>
                 </svg>
               </div>
@@ -1326,7 +1586,7 @@ export function InteractiveAnatomyViewer({
                   <img
                     src={
                       cameraView === 'lateral_der'
-                        ? '/models/avatar_exact_mockup.png'
+                        ? '/models/avatar_back_unlit.png'
                         : '/models/avatar_front_reference_clean.png'
                     }
                     alt={`Vista Lateral ${cameraView}`}
@@ -1348,15 +1608,15 @@ export function InteractiveAnatomyViewer({
       {/* 4. Barra Inferior de Información y Estado */}
       <div className="px-4 py-2 bg-[#0c1017]/95 border-t border-slate-800/60 flex items-center justify-between text-xs z-20">
         <div className="flex items-center gap-2">
-          <Layers size={14} className="text-emerald-400" />
+          <Layers size={14} className="text-rose-400" />
           <span className="text-slate-400 font-medium">Estructura activa:</span>
           <span className="font-bold text-white">
             {(hoveredCode && ANATOMICAL_ZONES[hoveredCode]?.name) ||
               (selectedCode && ANATOMICAL_ZONES[selectedCode]?.name) ||
-              'Haz clic sobre una zona para examinar'}
+              'Haz clic sobre una zona o búscala en las pestañas'}
           </span>
           {zoomMode === 'micro' && (
-            <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/70 font-mono font-bold">
+            <span className="text-[10px] text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-800/70 font-mono font-bold">
               Porción: {availableSubportions.find((s) => s.code === (hoveredSubportion || selectedSubportion))?.shortLabel || 'UMT'}
             </span>
           )}
@@ -1364,7 +1624,7 @@ export function InteractiveAnatomyViewer({
 
         {((hoveredCode && injuryStatusByZone[hoveredCode]?.hasActive) ||
           (selectedCode && injuryStatusByZone[selectedCode]?.hasActive)) && (
-          <div className="flex items-center gap-1.5 text-rose-400 font-bold text-[11px]">
+          <div className="flex items-center gap-1.5 text-rose-400 font-bold text-[11px] animate-pulse">
             <ShieldAlert size={14} />
             <span>Episodio Lesional Activo Registrado</span>
           </div>

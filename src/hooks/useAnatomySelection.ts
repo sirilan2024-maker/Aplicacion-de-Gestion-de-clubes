@@ -1411,7 +1411,288 @@ export const ANATOMICAL_ZONES: Record<string, AnatomicalZone> = {
     munichDefault: '2A',
     isGoalkeeperZone: true,
   },
+
+  // === TREN SUPERIOR Y BRAZOS (MIEMBROS SUPERIORES) ===
+  deltoides_ant_der: {
+    code: 'deltoides_ant_der',
+    name: 'Deltoides anterior / medio Derecho',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Hombro',
+    laterality: 'Derecho',
+    thumbnailKey: 'hombro',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Contusiones directas en caídas, choques hombro con hombro y sobrecarga por lanzamientos.',
+    munichDefault: '1A',
+  },
+  deltoides_ant_izq: {
+    code: 'deltoides_ant_izq',
+    name: 'Deltoides anterior / medio Izquierdo',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Hombro',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'hombro',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Contusiones directas en caídas, choques hombro con hombro y sobrecarga por lanzamientos.',
+    munichDefault: '1A',
+  },
+  deltoides_post_der: {
+    code: 'deltoides_post_der',
+    name: 'Deltoides posterior Derecho',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Hombro',
+    laterality: 'Derecho',
+    thumbnailKey: 'hombro',
+    viewDefault: 'posterior',
+    incidencia: 'Leve',
+    mecanismoComun: 'Tracción en caídas hacia atrás y desaceleración brusca de brazos.',
+    munichDefault: '1A',
+  },
+  deltoides_post_izq: {
+    code: 'deltoides_post_izq',
+    name: 'Deltoides posterior Izquierdo',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Hombro',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'hombro',
+    viewDefault: 'posterior',
+    incidencia: 'Leve',
+    mecanismoComun: 'Tracción en caídas hacia atrás y desaceleración brusca de brazos.',
+    munichDefault: '1A',
+  },
+  biceps_braquial_der: {
+    code: 'biceps_braquial_der',
+    name: 'Bíceps braquial Derecho',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Brazo',
+    laterality: 'Derecho',
+    thumbnailKey: 'brazo',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Flexión potente resistida, tirones en forcejeos o paradas de balón.',
+    munichDefault: '2A',
+  },
+  biceps_braquial_izq: {
+    code: 'biceps_braquial_izq',
+    name: 'Bíceps braquial Izquierdo',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Brazo',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'brazo',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Flexión potente resistida, tirones en forcejeos o paradas de balón.',
+    munichDefault: '2A',
+  },
+  triceps_braquial_der: {
+    code: 'triceps_braquial_der',
+    name: 'Tríceps braquial Derecho',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Brazo',
+    laterality: 'Derecho',
+    thumbnailKey: 'brazo',
+    viewDefault: 'posterior',
+    incidencia: 'Leve',
+    mecanismoComun: 'Extensión forzada de codo en caídas apoyando la mano o lanzamientos.',
+    munichDefault: '2A',
+  },
+  triceps_braquial_izq: {
+    code: 'triceps_braquial_izq',
+    name: 'Tríceps braquial Izquierdo',
+    generalRegion: 'Hombro y Brazo',
+    muscleGroup: 'Brazo',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'brazo',
+    viewDefault: 'posterior',
+    incidencia: 'Leve',
+    mecanismoComun: 'Extensión forzada de codo en caídas apoyando la mano o lanzamientos.',
+    munichDefault: '2A',
+  },
+  codo_der: {
+    code: 'codo_der',
+    name: 'Codo / Epicóndilo Derecho',
+    generalRegion: 'Codo y Antebrazo',
+    muscleGroup: 'Articulación del Codo',
+    laterality: 'Derecho',
+    thumbnailKey: 'codo',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Hiperextensión en caídas o impacto directo con el terreno de juego.',
+    munichDefault: '1A',
+  },
+  codo_izq: {
+    code: 'codo_izq',
+    name: 'Codo / Epicóndilo Izquierdo',
+    generalRegion: 'Codo y Antebrazo',
+    muscleGroup: 'Articulación del Codo',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'codo',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Hiperextensión en caídas o impacto directo con el terreno de juego.',
+    munichDefault: '1A',
+  },
+  antebrazo_flexores_der: {
+    code: 'antebrazo_flexores_der',
+    name: 'Antebrazo (Flexores) Derecho',
+    generalRegion: 'Codo y Antebrazo',
+    muscleGroup: 'Antebrazo',
+    laterality: 'Derecho',
+    thumbnailKey: 'antebrazo',
+    viewDefault: 'frontal',
+    incidencia: 'Leve',
+    mecanismoComun: 'Sobrecarga en agarres, paradas de balón en porteros y tracción de muñeca.',
+    munichDefault: '2A',
+  },
+  antebrazo_flexores_izq: {
+    code: 'antebrazo_flexores_izq',
+    name: 'Antebrazo (Flexores) Izquierdo',
+    generalRegion: 'Codo y Antebrazo',
+    muscleGroup: 'Antebrazo',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'antebrazo',
+    viewDefault: 'frontal',
+    incidencia: 'Leve',
+    mecanismoComun: 'Sobrecarga en agarres, paradas de balón en porteros y tracción de muñeca.',
+    munichDefault: '2A',
+  },
+  antebrazo_extensores_der: {
+    code: 'antebrazo_extensores_der',
+    name: 'Antebrazo (Extensores) Derecho',
+    generalRegion: 'Codo y Antebrazo',
+    muscleGroup: 'Antebrazo',
+    laterality: 'Derecho',
+    thumbnailKey: 'antebrazo',
+    viewDefault: 'posterior',
+    incidencia: 'Leve',
+    mecanismoComun: 'Sobrecarga por microtraumatismo repetitivo o caídas con muñeca en flexión.',
+    munichDefault: '2A',
+  },
+  antebrazo_extensores_izq: {
+    code: 'antebrazo_extensores_izq',
+    name: 'Antebrazo (Extensores) Izquierdo',
+    generalRegion: 'Codo y Antebrazo',
+    muscleGroup: 'Antebrazo',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'antebrazo',
+    viewDefault: 'posterior',
+    incidencia: 'Leve',
+    mecanismoComun: 'Sobrecarga por microtraumatismo repetitivo o caídas con muñeca en flexión.',
+    munichDefault: '2A',
+  },
+  muneca_mano_der: {
+    code: 'muneca_mano_der',
+    name: 'Muñeca y Mano Derecha',
+    generalRegion: 'Muñeca y Mano',
+    muscleGroup: 'Muñeca y Dedos',
+    laterality: 'Derecho',
+    thumbnailKey: 'muneca',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Esguince por hiperextensión en caídas al suelo o disparos a corta distancia en porteros.',
+    munichDefault: '1A',
+  },
+  muneca_mano_izq: {
+    code: 'muneca_mano_izq',
+    name: 'Muñeca y Mano Izquierda',
+    generalRegion: 'Muñeca y Mano',
+    muscleGroup: 'Muñeca y Dedos',
+    laterality: 'Izquierdo',
+    thumbnailKey: 'muneca',
+    viewDefault: 'frontal',
+    incidencia: 'Moderada',
+    mecanismoComun: 'Esguince por hiperextensión en caídas al suelo o disparos a corta distancia en porteros.',
+    munichDefault: '1A',
+  },
 };
+
+export type AnatomicalTabCategory = 'todos' | 'superior' | 'core' | 'muslos' | 'piernas' | 'portero';
+
+export interface AnatomicalTabInfo {
+  id: AnatomicalTabCategory;
+  label: string;
+  badge?: string;
+}
+
+export const ANATOMICAL_TABS: AnatomicalTabInfo[] = [
+  { id: 'todos', label: 'Todos los Músculos' },
+  { id: 'superior', label: 'Tren Superior y Brazos' },
+  { id: 'core', label: 'Core y Espalda' },
+  { id: 'muslos', label: 'Muslos y Cadera' },
+  { id: 'piernas', label: 'Piernas y Tobillos' },
+  { id: 'portero', label: '🧤 Especial Portero' },
+];
+
+export function getTabCategoryForZone(zone: AnatomicalZone): AnatomicalTabCategory {
+  if (zone.isGoalkeeperZone) return 'portero';
+  const reg = (zone.generalRegion || '').toLowerCase();
+  const grp = (zone.muscleGroup || '').toLowerCase();
+  const name = (zone.name || '').toLowerCase();
+
+  if (
+    reg.includes('hombro') ||
+    reg.includes('brazo') ||
+    reg.includes('codo') ||
+    reg.includes('antebrazo') ||
+    reg.includes('muñeca') ||
+    reg.includes('mano') ||
+    grp.includes('brazo') ||
+    grp.includes('codo') ||
+    name.includes('deltoides') ||
+    name.includes('bíceps braquial') ||
+    name.includes('tríceps')
+  ) {
+    return 'superior';
+  }
+  if (
+    reg.includes('core') ||
+    reg.includes('tronco') ||
+    reg.includes('espalda') ||
+    grp.includes('abdominal') ||
+    grp.includes('paravertebral') ||
+    name.includes('recto abdominal') ||
+    name.includes('oblicuo') ||
+    name.includes('erectores')
+  ) {
+    return 'core';
+  }
+  if (
+    reg.includes('muslo') ||
+    reg.includes('cadera') ||
+    reg.includes('ingle') ||
+    grp.includes('isquiotibial') ||
+    grp.includes('cuádriceps') ||
+    grp.includes('aductor') ||
+    grp.includes('flexores') ||
+    name.includes('isquio') ||
+    name.includes('femoral') ||
+    name.includes('cuádriceps') ||
+    name.includes('sartorio') ||
+    name.includes('grácil') ||
+    name.includes('psoas') ||
+    name.includes('fascia lata') ||
+    name.includes('pubis')
+  ) {
+    return 'muslos';
+  }
+  if (
+    reg.includes('pantorrilla') ||
+    reg.includes('pierna') ||
+    reg.includes('tobillo') ||
+    reg.includes('pie') ||
+    grp.includes('gastrocnemio') ||
+    grp.includes('sóleo') ||
+    name.includes('gemelo') ||
+    name.includes('sóleo') ||
+    name.includes('tibial') ||
+    name.includes('peroneo') ||
+    name.includes('aquiles')
+  ) {
+    return 'piernas';
+  }
+  return 'superior';
+}
 
 export const QUICK_SELECT_LIST = [
   { key: 'cadera', label: 'Pubis (Pubalgia)', defaultCode: 'pubis' },

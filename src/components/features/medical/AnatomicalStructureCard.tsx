@@ -24,6 +24,7 @@ interface AnatomicalStructureCardProps {
   onSelectSubportion?: (subportionCode: string) => void;
   onStartNewInjury: (zoneCode?: string, subportionCode?: string) => void;
   onSelectInjuryDetails: (injury: PlayerInjuryDTO) => void;
+  onResolveInjury?: (injury: PlayerInjuryDTO) => void;
 }
 
 export function AnatomicalStructureCard({
@@ -33,6 +34,7 @@ export function AnatomicalStructureCard({
   onSelectSubportion,
   onStartNewInjury,
   onSelectInjuryDetails,
+  onResolveInjury,
 }: AnatomicalStructureCardProps) {
   const zone: AnatomicalZone | null = zoneCode ? (ANATOMICAL_ZONES[zoneCode] || null) : null;
 
@@ -200,10 +202,12 @@ export function AnatomicalStructureCard({
           {activeInjuries.map((inj) => (
             <div
               key={inj.id}
-              onClick={() => onSelectInjuryDetails(inj)}
-              className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/40 hover:border-rose-400 transition-all cursor-pointer flex items-center justify-between"
+              className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/40 hover:border-rose-400 transition-all flex items-center justify-between gap-2"
             >
-              <div className="flex flex-col">
+              <div
+                onClick={() => onSelectInjuryDetails(inj)}
+                className="flex flex-col cursor-pointer flex-1"
+              >
                 <span className="text-xs font-bold text-white leading-tight">
                   {inj.injuryType}
                 </span>
@@ -211,7 +215,30 @@ export function AnatomicalStructureCard({
                   Fecha lesión: <strong className="text-slate-200">{inj.injuryDate}</strong> • Gravedad: <strong className="text-rose-400">{inj.severity}</strong>
                 </span>
               </div>
-              <ArrowRight size={14} className="text-rose-400 shrink-0" />
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {onResolveInjury && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onResolveInjury(inj);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                    title="Dar de alta médica a este episodio"
+                  >
+                    <ShieldCheck size={12} />
+                    <span>Dar Alta</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onSelectInjuryDetails(inj)}
+                  className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <ArrowRight size={14} className="text-rose-400" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

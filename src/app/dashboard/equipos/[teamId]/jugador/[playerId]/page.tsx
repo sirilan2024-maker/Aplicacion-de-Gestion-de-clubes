@@ -18,7 +18,7 @@ import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
-import { SportsMedicalCenter } from "@/components/features/medical/SportsMedicalCenter";
+import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
 
 interface PlayerData {
   id: string;
@@ -1247,15 +1247,17 @@ export default function GlobalPlayerProfilePage() {
         {/* PESTAÑA: FÍSICO & MÉDICO */}
         {activeTab === 'medico' && (
           <div className="space-y-8">
-            {/* SECCIÓN FASE 3: NUEVO SISTEMA VISUAL Y MEDICAL CENTER PROFESIONAL */}
-            <div id="seccion-lesiones">
-              <SportsMedicalCenter 
+            {/* SECCIÓN M1: MÓDULO PROFESIONAL DE LESIONES DEPORTIVAS Y AVATAR */}
+            <div id="seccion-lesiones" className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-xs">
+              <PlayerInjuriesSection 
                 playerId={player.id} 
                 playerName={`${player.first_name} ${player.last_name}`}
                 playerNumber={player.dorsal || undefined}
                 playerPosition={player.posicion || undefined}
                 playerStatus={player.status === "active" ? "Disponible" : player.status}
                 playerAvatarUrl={player.avatar_url || undefined}
+                isOpenDirectly={openInjuryModal}
+                onCloseDirect={() => setOpenInjuryModal(false)}
                 onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}
               />
             </div>

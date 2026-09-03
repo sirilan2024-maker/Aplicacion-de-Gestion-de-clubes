@@ -36,7 +36,7 @@ export function InjuryManagement({
 }: InjuryManagementProps) {
   const [mode, setMode] = useState<'3D' | '2D'>('3D');
 
-  // En el mockup exacto de Marco Sanchez, Isquiotibiales Derecho está seleccionado
+  // Inicio limpio sin zona preseleccionada fija
   const {
     selectedCode,
     selectedZone,
@@ -45,7 +45,7 @@ export function InjuryManagement({
     cameraView,
     setCameraView,
     selectZone,
-  } = useAnatomySelection('isquiotibiales_der');
+  } = useAnatomySelection('');
 
   const {
     currentStep,
@@ -183,7 +183,7 @@ export function InjuryManagement({
               <Shield size={16} className="text-emerald-400" />
               <span className="text-xs text-slate-400">Zona seleccionada:</span>
               <span className="text-xs sm:text-sm font-bold text-emerald-400">
-                {form.zonaAnatomica || selectedZone?.name || 'Isquiotibiales Derecho'}
+                {form.zonaAnatomica || selectedZone?.name || 'Selecciona un músculo o estructura'}
               </span>
             </div>
 

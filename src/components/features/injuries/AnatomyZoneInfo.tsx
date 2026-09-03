@@ -7,11 +7,11 @@ interface AnatomyZoneInfoProps {
 }
 
 export function AnatomyZoneInfo({ zone }: AnatomyZoneInfoProps) {
-  // Valores mostrados según la zona o los datos del mockup si es Isquiotibiales Derecho
-  const regionGeneral = zone?.generalRegion || 'Miembros inferiores';
-  const grupoMuscular = zone?.muscleGroup || 'Isquiotibiales';
-  const zonaAnatomica = zone?.name || 'Isquiotibiales Derecho';
-  const codigoInterno = zone?.code || 'isquiotibiales_der';
+  // Valores mostrados según la zona seleccionada
+  const regionGeneral = zone?.generalRegion || 'Sin seleccionar';
+  const grupoMuscular = zone?.muscleGroup || '—';
+  const zonaAnatomica = zone?.name || 'Ninguna zona seleccionada';
+  const codigoInterno = zone?.code || '—';
 
   return (
     <div className="w-full flex flex-col justify-between h-full">

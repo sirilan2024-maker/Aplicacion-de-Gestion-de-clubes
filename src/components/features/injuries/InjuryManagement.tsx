@@ -76,6 +76,17 @@ export function InjuryManagement({
     setCameraView('frontal');
   };
 
+  const handleChangeZone = () => {
+    selectZone('');
+    updateForm({
+      zonaAnatomica: '',
+      regionGeneral: '',
+      muscleGroup: '',
+      zonaCode: '',
+    });
+    goToStep(1);
+  };
+
   const playerName = player.name || 'Marco Sanchez';
   const playerNumber = player.number || '#8';
   const playerPosition = player.position || 'Centrocampista';
@@ -187,24 +198,36 @@ export function InjuryManagement({
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => goToStep(1)}
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <Edit2 size={13} />
-              <span>Cambiar</span>
-            </button>
+            {selectedCode && (
+              <button
+                type="button"
+                onClick={handleChangeZone}
+                className="text-xs text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 px-2.5 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                title="Limpiar selección actual y elegir otra zona"
+              >
+                <Edit2 size={13} className="text-emerald-400" />
+                <span>Cambiar / Elegir otro</span>
+              </button>
+            )}
           </div>
 
           {/* 3. Contenido según el paso activo */}
           <div className="flex-1 overflow-y-auto">
             {currentStep === 1 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full">
-                {/* Panel izquierdo: Selector manual (Jerárquico) */}
+                {/* Panel izquierdo: Selector manual (Jerárquico) con soporte para añadir músculos */}
                 <AnatomyManualSelector
                   selectedCode={selectedCode}
                   onSelect={selectZone}
+                  onCustomZoneCreated={(newZone) => {
+                    selectZone(newZone.code);
+                    updateForm({
+                      zonaAnatomica: newZone.name,
+                      regionGeneral: newZone.generalRegion,
+                      muscleGroup: newZone.muscleGroup,
+                      zonaCode: newZone.code,
+                    });
+                  }}
                 />
 
                 {/* Panel derecho: Información de la zona con imagen posterior de piernas */}

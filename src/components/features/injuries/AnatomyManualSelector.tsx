@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Info } from 'lucide-react';
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Info, Plus, X, Sparkles, Check } from 'lucide-react';
+import { ANATOMICAL_ZONES, AnatomicalZone } from '@/hooks/useAnatomySelection';
 
 interface AnatomyManualSelectorProps {
   selectedCode: string;
   onSelect: (code: string) => void;
+  onCustomZoneCreated?: (newZone: AnatomicalZone) => void;
 }
 
 interface TreeCategory {
@@ -19,7 +21,7 @@ interface TreeCategory {
   }[];
 }
 
-const ANATOMY_TREE: TreeCategory[] = [
+const INITIAL_ANATOMY_TREE: TreeCategory[] = [
   {
     id: 'cabeza',
     label: 'Cabeza y Cuello',
@@ -236,16 +238,25 @@ const ANATOMY_TREE: TreeCategory[] = [
   },
 ];
 
-export function AnatomyManualSelector({ selectedCode, onSelect }: AnatomyManualSelectorProps) {
-  // Categorías abiertas
+export function AnatomyManualSelector({
+  selectedCode,
+  onSelect,
+  onCustomZoneCreated,
+}: AnatomyManualSelectorProps) {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
     miembros_inf: true,
   });
 
-  // Subgrupos abiertos
   const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({
     isquiotibiales: true,
   });
+
+  // Modal para añadir músculo personalizado
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState<boolean>(false);
+  const [customName, setCustomName] = useState<string>('');
+  const [customRegion, setCustomRegion] = useState<string>('Muslos y Cadera');
+  const [customLaterality, setCustomLaterality] = useState<'Derecho' | 'Izquierdo' | 'Bilateral' | 'No aplica'>('Derecho');
+  const [customList, setCustomList] = useState<{ code: string; label: string }[]>([]);
 
   const toggleCategory = (catId: string) => {
     setOpenCategories((prev) => ({ ...prev, [catId]: !prev[catId] }));
@@ -255,20 +266,89 @@ export function AnatomyManualSelector({ selectedCode, onSelect }: AnatomyManualS
     setOpenSubgroups((prev) => ({ ...prev, [subId]: !prev[subId] }));
   };
 
+  const handleCreateCustomMuscle = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customName.trim()) return;
+
+    const code = `custom_${Date.now()}`;
+    const formattedName = `${customName.trim()} (${customLaterality})`;
+
+    const newZone: AnatomicalZone = {
+      code,
+      name: formattedName,
+      generalRegion: customRegion,
+      muscleGroup: customName.trim(),
+      laterality: customLaterality,
+      thumbnailKey: 'hombro',
+      viewDefault: 'frontal',
+      incidencia: 'Moderada',
+      mecanismoComun: 'Lesión o sobrecarga deportiva específica en músculo personalizado.',
+      munichDefault: '1A',
+    };
+
+    // Registrar en memoria global
+    ANATOMICAL_ZONES[code] = newZone;
+
+    // Añadir a lista de personalizados
+    setCustomList((prev) => [...prev, { code, label: formattedName }]);
+
+    // Seleccionar de inmediato
+    onSelect(code);
+    onCustomZoneCreated?.(newZone);
+
+    // Cerrar modal
+    setCustomName('');
+    setIsCustomModalOpen(false);
+  };
+
   return (
     <div className="w-full space-y-2">
-      {/* Encabezado */}
+      {/* Encabezado con botón de añadir músculo */}
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
           <span>Selector manual</span>
           <span className="text-slate-400 font-normal">(Jerárquico)</span>
         </h4>
-        <Info size={13} className="text-slate-400" />
+        <button
+          type="button"
+          onClick={() => setIsCustomModalOpen(true)}
+          className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+        >
+          <Plus size={12} />
+          <span>Añadir Músculo</span>
+        </button>
       </div>
 
       {/* Árbol Jerárquico */}
       <div className="bg-[#0b0f17] border border-[#1b2334] rounded-xl p-2 text-xs space-y-1 max-h-[340px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
-        {ANATOMY_TREE.map((cat) => {
+        {/* Músculos personalizados si el usuario los ha añadido */}
+        {customList.length > 0 && (
+          <div className="rounded-lg mb-1 p-1 bg-emerald-950/20 border border-emerald-500/30">
+            <div className="text-[10px] font-bold text-emerald-400 px-1 py-0.5 flex items-center gap-1">
+              <Sparkles size={11} />
+              <span>Músculos Añadidos Personalizados</span>
+            </div>
+            <div className="space-y-0.5 pt-1">
+              {customList.map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => onSelect(c.code)}
+                  className={`w-full text-left py-1 px-2 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+                    selectedCode === c.code
+                      ? 'bg-emerald-900/70 text-emerald-200 font-bold border border-emerald-400'
+                      : 'text-slate-300 hover:bg-slate-800/40'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  <span className="truncate">{c.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {INITIAL_ANATOMY_TREE.map((cat) => {
           const isCatOpen = !!openCategories[cat.id];
           const hasSelectedInCat = cat.subgroups.some((sg) =>
             sg.zones.some((z) => z.code === selectedCode)
@@ -360,6 +440,98 @@ export function AnatomyManualSelector({ selectedCode, onSelect }: AnatomyManualS
           );
         })}
       </div>
+
+      {/* Modal para Añadir Músculo Personalizado */}
+      {isCustomModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#0b0f17] border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-950 border border-emerald-500 flex items-center justify-center">
+                  <Plus size={16} className="text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Añadir Músculo Personalizado</h4>
+                  <p className="text-[11px] text-slate-400">Define una nueva estructura anatómica</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomModalOpen(false)}
+                className="text-slate-500 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomMuscle} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Nombre del Músculo o Estructura <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Ej: Psoas menor, Tendón de Aquiles distal, Fascia plantar..."
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Región Corporal</label>
+                  <select
+                    value={customRegion}
+                    onChange={(e) => setCustomRegion(e.target.value)}
+                    className="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-xs"
+                  >
+                    <option value="Cabeza y Cuello">Cabeza y Cuello</option>
+                    <option value="Tronco y Core">Tronco y Core</option>
+                    <option value="Miembros Superiores">Miembros Superiores</option>
+                    <option value="Tronco Inferior y Pelvis">Pelvis y Cadera</option>
+                    <option value="Muslos y Cadera">Muslos y Cadera</option>
+                    <option value="Piernas y Tobillos">Piernas y Tobillos</option>
+                    <option value="Pie y Dedos">Pie y Dedos</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Lateralidad</label>
+                  <select
+                    value={customLaterality}
+                    onChange={(e) => setCustomLaterality(e.target.value as any)}
+                    className="w-full px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-xs"
+                  >
+                    <option value="Derecho">Derecha</option>
+                    <option value="Izquierdo">Izquierda</option>
+                    <option value="Bilateral">Centro / Bilateral</option>
+                    <option value="No aplica">No aplica</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModalOpen(false)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/30"
+                >
+                  <Check size={14} />
+                  <span>Añadir y Seleccionar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

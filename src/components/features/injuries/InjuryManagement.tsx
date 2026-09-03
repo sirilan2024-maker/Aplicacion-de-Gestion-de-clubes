@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Edit2 } from 'lucide-react';
 import { InjuryHeader } from './InjuryHeader';
 import { InjuryStepper } from './InjuryStepper';
@@ -13,7 +13,7 @@ import { InjuryTypeStep } from './InjuryTypeStep';
 import { InjurySeverityStep } from './InjurySeverityStep';
 import { InjurySummary } from './InjurySummary';
 import { InjuryFooter } from './InjuryFooter';
-import { useAnatomySelection } from '@/hooks/useAnatomySelection';
+import { useAnatomySelection, ANATOMICAL_ZONES } from '@/hooks/useAnatomySelection';
 import { useInjuryWizard } from '@/hooks/useInjuryWizard';
 
 interface InjuryManagementProps {
@@ -72,18 +72,41 @@ export function InjuryManagement({
     }
   }, [selectedZone, updateForm]);
 
+  const handleSelectZone = useCallback((code: string) => {
+    selectZone(code);
+    if (!code) {
+      updateForm({
+        zonaAnatomica: '',
+        regionGeneral: '',
+        muscleGroup: '',
+        zonaCode: '',
+      });
+      return;
+    }
+    const zone = ANATOMICAL_ZONES[code];
+    if (zone) {
+      updateForm({
+        zonaAnatomica: zone.name,
+        regionGeneral: zone.generalRegion,
+        muscleGroup: zone.muscleGroup,
+        zonaCode: zone.code,
+      });
+    } else {
+      updateForm({
+        zonaAnatomica: code,
+        regionGeneral: 'Estructura seleccionada',
+        muscleGroup: code,
+        zonaCode: code,
+      });
+    }
+  }, [selectZone, updateForm]);
+
   const handleResetCamera = () => {
     setCameraView('frontal');
   };
 
   const handleChangeZone = () => {
-    selectZone('');
-    updateForm({
-      zonaAnatomica: '',
-      regionGeneral: '',
-      muscleGroup: '',
-      zonaCode: '',
-    });
+    handleSelectZone('');
     goToStep(1);
   };
 
@@ -164,14 +187,14 @@ export function InjuryManagement({
                 cameraView={cameraView}
                 selectedCode={selectedCode}
                 hoveredCode={hoveredCode}
-                onSelect={selectZone}
+                onSelect={handleSelectZone}
                 onHover={setHoveredCode}
               />
             </div>
 
             <AnatomyQuickSelect
               selectedCode={selectedCode}
-              onSelect={selectZone}
+              onSelect={handleSelectZone}
             />
           </div>
         </section>
@@ -218,15 +241,9 @@ export function InjuryManagement({
                 {/* Panel izquierdo: Selector manual (Jerárquico) con soporte para añadir músculos */}
                 <AnatomyManualSelector
                   selectedCode={selectedCode}
-                  onSelect={selectZone}
+                  onSelect={handleSelectZone}
                   onCustomZoneCreated={(newZone) => {
-                    selectZone(newZone.code);
-                    updateForm({
-                      zonaAnatomica: newZone.name,
-                      regionGeneral: newZone.generalRegion,
-                      muscleGroup: newZone.muscleGroup,
-                      zonaCode: newZone.code,
-                    });
+                    handleSelectZone(newZone.code);
                   }}
                 />
 

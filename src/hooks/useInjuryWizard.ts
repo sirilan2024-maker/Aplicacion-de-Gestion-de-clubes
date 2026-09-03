@@ -58,26 +58,18 @@ export function useInjuryWizard(playerId: string, onSaved?: () => void) {
   }, []);
 
   const nextStep = useCallback(() => {
-    if (currentStep === 1 && !form.zonaAnatomica) {
-      toast.error('Por favor, selecciona primero un músculo o zona en el avatar.');
-      return;
-    }
     setCurrentStep((prev) => Math.min(prev + 1, 4));
-  }, [currentStep, form.zonaAnatomica]);
+  }, []);
 
   const prevStep = useCallback(() => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
   const goToStep = useCallback((step: number) => {
-    if (step > 1 && !form.zonaAnatomica) {
-      toast.error('Por favor, selecciona primero un músculo o zona en el avatar.');
-      return;
-    }
     if (step >= 1 && step <= 4) {
       setCurrentStep(step);
     }
-  }, [form.zonaAnatomica]);
+  }, []);
 
   const saveInjury = useCallback(async () => {
     if (!playerId) {

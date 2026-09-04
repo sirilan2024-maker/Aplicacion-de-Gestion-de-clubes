@@ -14,7 +14,7 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
   ] = await Promise.all([
     supabase
       .from('teams')
-      .select('id, name, ffcv_url, color, category')
+      .select('id, name, ffcv_url, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_last_synced_at, color, category')
       .eq('id', teamId)
       .single(),
     supabase
@@ -34,6 +34,16 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
       .select('*'),
   ]);
 
+  let groupInfo = null;
+  if (teamData?.ffcv_group_id) {
+    const { data: grp } = await supabase
+      .from('ffcv_groups')
+      .select('*')
+      .eq('ffcv_group_id', teamData.ffcv_group_id)
+      .single();
+    groupInfo = grp || null;
+  }
+
   return (
     <TeamMatchesView
       teamId={teamId}
@@ -42,6 +52,7 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
       serverTeams={allTeams || []}
       serverPlayers={players || []}
       serverConvocatorias={convocatorias || []}
+      serverGroupInfo={groupInfo}
     />
   );
 }

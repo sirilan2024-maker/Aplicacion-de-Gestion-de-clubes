@@ -17,7 +17,7 @@ import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
-import { isFormativeCategory } from "@/lib/utils";
+import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 
 interface PlayerData {
   id: string;
@@ -710,7 +710,29 @@ export default function GlobalPlayerProfilePage() {
             </div>
           </div>
         )}
-        <div className="h-16 sm:h-20 bg-gradient-to-r from-blue-700 to-indigo-800"></div>
+        <div className="min-h-16 sm:h-20 bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 px-3 sm:px-8 py-2.5 sm:py-0 flex items-center justify-end relative overflow-hidden">
+          <div className="absolute inset-0 bg-radial from-white/10 via-transparent to-transparent opacity-50 pointer-events-none" />
+          <div className="flex items-center gap-2 sm:gap-3 text-white z-10 max-w-full">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/15 border border-white/20 backdrop-blur-xs flex items-center justify-center shadow-xs shrink-0">
+              <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="text-right min-w-0">
+              <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
+                <span className="text-xs sm:text-sm font-black tracking-wide text-white drop-shadow-xs truncate max-w-[220px] sm:max-w-none">
+                  {teamName || 'Sin Equipo Asignado'}
+                </span>
+                {teamCategory && !teamCategory.toLowerCase().includes('general') && teamCategory.toLowerCase() !== (teamName || '').toLowerCase() && (
+                  <span className="px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white shrink-0">
+                    {teamCategory}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] text-blue-100/80 font-medium block">
+                Equipo actual
+              </span>
+            </div>
+          </div>
+        </div>
         <div className="px-3 sm:px-8 pb-4 sm:pb-6">
           <div className="relative flex flex-col sm:flex-row sm:justify-between items-start sm:items-center mb-3 sm:mb-4 gap-3 sm:gap-4">
             <div className="flex items-center gap-3 sm:gap-6 w-full">
@@ -754,8 +776,8 @@ export default function GlobalPlayerProfilePage() {
               </div>
               <div className="flex-1 min-w-0 pt-1 pl-1 sm:pl-3">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
-                  <h1 className="text-lg sm:text-2xl md:text-3xl font-black text-gray-900 tracking-tight break-words line-clamp-2">
-                    {player.first_name} {player.last_name}
+                  <h1 className="text-base sm:text-2xl md:text-3xl font-black text-gray-900 tracking-tight break-words leading-tight" title={`${player.first_name} ${player.last_name}`}>
+                    {getFirstNameAndFirstSurname(player.first_name, player.last_name)}
                   </h1>
                   {player.dorsal && (
                     <span className="bg-gray-900 text-white font-bold px-2 py-0.5 rounded text-xs sm:text-sm md:text-base shrink-0">
@@ -775,7 +797,7 @@ export default function GlobalPlayerProfilePage() {
                   }`}>
                     {player.status === 'active' || player.status === 'Activo' ? 'Activo' : player.status || 'Activo'}
                   </span>
-                  {hasActiveInjury ? (
+                  {hasActiveInjury && (
                     <button
                       type="button"
                       onClick={() => setActiveTab('medico')}
@@ -783,20 +805,7 @@ export default function GlobalPlayerProfilePage() {
                       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase bg-red-600 hover:bg-red-700 text-white shadow-xs animate-pulse cursor-pointer transition-all"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                      🔴 BAJA POR LESIÓN (Ver)
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('medico')
-                        setOpenInjuryModal(true)
-                      }}
-                      title="Abrir módulo y avatar de lesiones del jugador"
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-200 cursor-pointer transition-all"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      🟢 LESIONES / ALTA (Abrir 3D)
+                      🔴 BAJA POR LESIÓN
                     </button>
                   )}
                 </div>
@@ -804,16 +813,6 @@ export default function GlobalPlayerProfilePage() {
             </div>
             {!isEditing ? (
               <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('medico')
-                    setOpenInjuryModal(true)
-                  }}
-                  className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl font-bold transition-all text-xs cursor-pointer shadow-md shadow-red-200 hover:scale-102"
-                >
-                  <HeartPulse size={15} className="text-white" /> Módulo Lesiones (3D)
-                </button>
                 <button 
                   onClick={() => setIsEditing(true)}
                   disabled={player.status === 'inactive'}

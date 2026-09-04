@@ -131,3 +131,27 @@ export function isFormativeCategory(teamCategory?: string | null, teamName?: str
   return true;
 }
 
+/**
+ * Retorna el nombre de pila y únicamente el primer apellido del jugador
+ * para que encaje perfectamente en pantallas móviles y no desborde.
+ * Respeta partículas compuestas como 'de la Rosa', 'del Campo', 'de Lucas'.
+ * @example "Carlos" + "García Martínez" -> "Carlos García"
+ * @example "Álvaro" + "de la Cruz Sánchez" -> "Álvaro de la Cruz"
+ */
+export function getFirstNameAndFirstSurname(firstName?: string | null, lastName?: string | null): string {
+  const first = (firstName || '').trim();
+  const last = (lastName || '').trim();
+  if (!last) return first;
+  
+  const parts = last.split(/\s+/);
+  let firstSurname = parts[0] || '';
+  
+  if (parts.length >= 3 && parts[0].toLowerCase() === 'de' && parts[1].toLowerCase() === 'la') {
+    firstSurname = `${parts[0]} ${parts[1]} ${parts[2]}`;
+  } else if (parts.length >= 2 && (parts[0].toLowerCase() === 'de' || parts[0].toLowerCase() === 'del')) {
+    firstSurname = `${parts[0]} ${parts[1]}`;
+  }
+  
+  return `${first} ${firstSurname}`.trim();
+}
+

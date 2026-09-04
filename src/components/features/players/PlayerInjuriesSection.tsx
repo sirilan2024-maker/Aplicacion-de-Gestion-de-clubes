@@ -55,7 +55,7 @@ interface PlayerInjuriesSectionProps {
   canManage?: boolean
   isOpenDirectly?: boolean
   onCloseDirect?: () => void
-  onInjuriesChange?: (hasActiveInjury: boolean, activeCount: number) => void
+  onInjuriesChange?: (hasActiveInjury: boolean, activeCount?: number) => void
 }
 
 // Catálogo estructurado de tipos de lesiones
@@ -131,12 +131,6 @@ export function PlayerInjuriesSection({
 
   // Modales
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
-
-  useEffect(() => {
-    if (isOpenDirectly) {
-      setIsNewModalOpen(true)
-    }
-  }, [isOpenDirectly])
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false)
   const [isResolveModalOpen, setIsResolveModalOpen] = useState(false)
   const [selectedInjuryForAction, setSelectedInjuryForAction] = useState<PlayerInjuryDTO | null>(null)
@@ -171,21 +165,29 @@ export function PlayerInjuriesSection({
       const res = await getPlayerInjuriesAction(playerId)
       if (res.success && res.injuries) {
         setInjuries(res.injuries)
-        const activeCount = res.injuries.filter(i => i.status === "activa").length
-        onInjuriesChange?.(activeCount > 0, activeCount)
       } else {
         setError(res.error || "Error al cargar lesiones")
       }
     } catch (err: any) {
-      setError(err.message || "Error al cargar lesiones")
+      setError(
+        err.message?.includes("fetch")
+          ? "Error de conexión con el servidor. Por favor recarga la página (F5)."
+          : err.message || "Error al cargar lesiones"
+      )
     } finally {
       setLoading(false)
     }
-  }, [playerId, onInjuriesChange])
+  }, [playerId])
 
   useEffect(() => {
     loadInjuries()
   }, [loadInjuries])
+
+  // Notificar al componente padre de forma segura en el ciclo de efectos
+  useEffect(() => {
+    const activeCount = injuries.filter(i => i.status === "activa").length
+    onInjuriesChange?.(activeCount > 0, activeCount)
+  }, [injuries, onInjuriesChange])
 
   // Cálculo en tiempo real del estimador orientativo
   const currentEstimation: RecoveryEstimationResult = estimateRecovery({
@@ -231,12 +233,7 @@ export function PlayerInjuriesSection({
 
       if (res.success && res.injury) {
         const newInj = res.injury!
-        setInjuries(prev => {
-          const updated = [newInj, ...prev.filter(x => x.id !== newInj.id)]
-          const activeCount = updated.filter(i => i.status === "activa").length
-          onInjuriesChange?.(activeCount > 0, activeCount)
-          return updated
-        })
+        setInjuries(prev => [newInj, ...prev.filter(x => x.id !== newInj.id)])
         setIsNewModalOpen(false)
         // Reset form
         setNotes("")
@@ -251,7 +248,11 @@ export function PlayerInjuriesSection({
         setFormError(res.error || "Error al registrar la lesión")
       }
     } catch (err: any) {
-      setFormError(err.message || "Error inesperado al registrar la lesión")
+      setFormError(
+        err.message?.includes("fetch")
+          ? "Error de conexión con el servidor. Por favor recarga la página (F5)."
+          : err.message || "Error inesperado al registrar la lesión"
+      )
     } finally {
       setSaving(false)
     }
@@ -291,7 +292,11 @@ export function PlayerInjuriesSection({
         alert(res.error || "Error al registrar evolución")
       }
     } catch (err: any) {
-      alert(err.message || "Error inesperado")
+      alert(
+        err.message?.includes("fetch")
+          ? "Error de conexión con el servidor. Por favor recarga la página (F5)."
+          : err.message || "Error inesperado"
+      )
     } finally {
       setSaving(false)
     }
@@ -310,12 +315,7 @@ export function PlayerInjuriesSection({
 
       if (res.success && res.injury) {
         const resolvedInj = res.injury!
-        setInjuries(prev => {
-          const updated = prev.map(inj => (inj.id === resolvedInj.id ? resolvedInj : inj))
-          const activeCount = updated.filter(i => i.status === "activa").length
-          onInjuriesChange?.(activeCount > 0, activeCount)
-          return updated
-        })
+        setInjuries(prev => prev.map(inj => (inj.id === resolvedInj.id ? resolvedInj : inj)))
         setIsResolveModalOpen(false)
         setResolutionNotes("")
         setSelectedInjuryForAction(null)
@@ -325,7 +325,11 @@ export function PlayerInjuriesSection({
         alert(res.error || "Error al marcar recuperación")
       }
     } catch (err: any) {
-      alert(err.message || "Error inesperado")
+      alert(
+        err.message?.includes("fetch")
+          ? "Error de conexión con el servidor. Por favor recarga la página (F5)."
+          : err.message || "Error inesperado"
+      )
     } finally {
       setSaving(false)
     }
@@ -440,22 +444,10 @@ export function PlayerInjuriesSection({
           {/* 2. PANEL DE LESIÓN ACTIVA */}
           {activeInjuries.length > 0 && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-red-700 flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
-                  Lesión Activa en Seguimiento ({activeInjuries.length})
-                </span>
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => setIsNewModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Registrar Otra Lesión</span>
-                  </button>
-                )}
-              </div>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-red-700 flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+                Lesión Activa en Seguimiento ({activeInjuries.length})
+              </span>
 
               {activeInjuries.map(act => (
                 <div
@@ -598,47 +590,21 @@ export function PlayerInjuriesSection({
 
           {/* 3. HISTORIAL COMPLETO DE LESIONES */}
           <div className="space-y-3 pt-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-                  <History className="w-4 h-4 text-gray-400" />
-                  Historial Cronológico de Lesiones
-                </span>
-                <span className="text-xs text-gray-400 font-semibold">({injuries.length} registros)</span>
-              </div>
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => setIsNewModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Añadir Otra Lesión al Historial</span>
-                </button>
-              )}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                <History className="w-4 h-4 text-gray-400" />
+                Historial Cronológico de Lesiones
+              </span>
+              <span className="text-xs text-gray-400">{injuries.length} registros</span>
             </div>
 
             {injuries.length === 0 ? (
-              <div className="p-6 sm:p-8 text-center bg-gradient-to-br from-white via-slate-50 to-red-50/30 border-2 border-dashed border-red-200 rounded-3xl shadow-xs space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto shadow-xs">
-                  <Activity className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-base font-black text-slate-900">Módulo de Lesiones Activo</p>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                    Este jugador no presenta lesiones activas ni previas. Puedes registrar una nueva lesión o consulta preventiva en cualquier momento usando el avatar interactivo.
-                  </p>
-                </div>
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => setIsNewModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-red-200 hover:scale-105 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Registrar Lesión (Abrir Avatar)</span>
-                  </button>
-                )}
+              <div className="p-8 text-center bg-white border border-gray-200 rounded-2xl shadow-xs space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                <p className="text-sm font-bold text-gray-800">Sin lesiones registradas</p>
+                <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                  El jugador no presenta historial de lesiones en el club.
+                </p>
               </div>
             ) : (
               <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
@@ -784,6 +750,23 @@ export function PlayerInjuriesSection({
                     </tbody>
                   </table>
                 </div>
+                {/* 4. MODAL PROFESIONAL PARA REGISTRAR NUEVA LESIÓN (PANTALLA COMPLETA 1:1) */}
+                <ProfessionalInjuryModal
+                  isOpen={isNewModalOpen}
+                  onClose={() => setIsNewModalOpen(false)}
+                  player={{
+                    id: playerId,
+                    name: playerName,
+                    number: playerNumber || 23,
+                    position: playerPosition || "Centrocampista",
+                    status: playerStatus || "Disponible",
+                    avatarUrl: playerAvatarUrl
+                  }}
+                  onInjuryCreated={() => {
+                    setIsNewModalOpen(false)
+                    loadInjuries()
+                  }}
+                />
               </div>
             )}
           </div>
@@ -931,7 +914,7 @@ export function PlayerInjuriesSection({
 
       {/* MODAL PROFESIONAL PARA REGISTRAR NUEVA LESIÓN (ACCESIBLE PARA TODOS LOS JUGADORES) */}
       <ProfessionalInjuryModal
-        isOpen={isNewModalOpen}
+        isOpen={isNewModalOpen || !!isOpenDirectly}
         onClose={() => {
           setIsNewModalOpen(false)
           onCloseDirect?.()

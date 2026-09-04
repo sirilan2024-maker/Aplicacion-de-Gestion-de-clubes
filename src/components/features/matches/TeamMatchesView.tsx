@@ -3,20 +3,32 @@
 import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
+import { FFCVMatchesSection } from "@/components/features/matches/FFCVMatchesSection"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 import { TeamDisciplineView } from "@/components/features/matches/TeamDisciplineView"
 import { ActasView } from "@/components/features/matches/ActasView"
-import { AlertCircle, FileText } from "lucide-react"
+import { AlertCircle, FileText, Trophy, Calendar } from "lucide-react"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
 import { useExport } from "@/components/providers/ExportContext"
 
 interface TeamMatchesViewProps {
   teamId: string;
-  serverTeamData?: { id: string; name: string; ffcv_url?: string | null; color?: string; category?: string } | null;
+  serverTeamData?: {
+    id: string;
+    name: string;
+    ffcv_url?: string | null;
+    ffcv_season_id?: string | null;
+    ffcv_competition_id?: string | null;
+    ffcv_group_id?: string | null;
+    ffcv_team_id?: string | null;
+    color?: string;
+    category?: string;
+  } | null;
   serverMatches?: any[];
   serverTeams?: any[];
   serverPlayers?: any[];
   serverConvocatorias?: any[];
+  serverGroupInfo?: any;
 }
 
 export function TeamMatchesView({
@@ -26,11 +38,16 @@ export function TeamMatchesView({
   serverTeams = [],
   serverPlayers = [],
   serverConvocatorias = [],
+  serverGroupInfo = null,
 }: TeamMatchesViewProps) {
   const searchParams = useSearchParams()
   const initialView = (searchParams.get('view') as any) || 'partidos'
   const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'actas'>(initialView)
+  const [matchesSubTab, setMatchesSubTab] = useState<'club' | 'ffcv'>('club')
+  
   const [ffcvUrl] = useState<string | null>(serverTeamData?.ffcv_url || null)
+  const [ffcvGroupId] = useState<string | null>(serverTeamData?.ffcv_group_id || null)
+  const [ffcvTeamId] = useState<string | null>(serverTeamData?.ffcv_team_id || null)
   const [teamName] = useState<string>(serverTeamData?.name || "")
   const [editingMatch, setEditingMatch] = useState<any>(null)
 
@@ -102,7 +119,7 @@ export function TeamMatchesView({
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Toggle View */}
+      {/* Toggle View Principal */}
       <div className="flex justify-center mb-6">
         <div className="flex flex-col sm:flex-row bg-slate-100 p-1.5 rounded-2xl sm:rounded-full w-full sm:w-auto gap-1 sm:gap-0">
           <button
@@ -113,7 +130,7 @@ export function TeamMatchesView({
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            Calendario y Resultados
+            Partidos
           </button>
           <button
             onClick={() => setViewMode('clasificacion')}
@@ -176,6 +193,7 @@ export function TeamMatchesView({
         </div>
       )}
 
+      {/* Renderizado de Vistas */}
       {viewMode === 'actas' ? (
         <ActasView
           matches={data.matches}
@@ -186,7 +204,12 @@ export function TeamMatchesView({
           userTeamIds={[teamId]}
         />
       ) : viewMode === 'clasificacion' ? (
-        <FFCVStandings ffcvUrl={ffcvUrl} teamName={teamName} />
+        <FFCVStandings
+          ffcvGroupId={ffcvGroupId}
+          ffcvTeamId={ffcvTeamId}
+          ffcvUrl={ffcvUrl}
+          teamName={teamName}
+        />
       ) : viewMode === 'disciplina' ? (
         <div className="pt-2">
           <TeamDisciplineView
@@ -197,18 +220,56 @@ export function TeamMatchesView({
           />
         </div>
       ) : (
-        <div className="pt-2">
-          <GlobalMatchesView
-            initialMatches={data.matches}
-            teams={data.teams}
-            players={data.players}
-            convocatorias={data.convocatorias}
-            fixedTeamId={teamId}
-          />
+        /* VISTA "PARTIDOS" (Doble Sección: Partidos del Club vs Calendario FFCV) */
+        <div className="space-y-6 pt-2">
+          {ffcvGroupId && (
+            <div className="flex items-center justify-start border-b border-slate-200 pb-3 gap-2">
+              <button
+                onClick={() => setMatchesSubTab('club')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  matchesSubTab === 'club'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                Partidos del Club
+              </button>
+
+              <button
+                onClick={() => setMatchesSubTab('ffcv')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  matchesSubTab === 'ffcv'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                Calendario Oficial FFCV
+              </button>
+            </div>
+          )}
+
+          {matchesSubTab === 'club' || !ffcvGroupId ? (
+            <GlobalMatchesView
+              initialMatches={data.matches}
+              teams={data.teams}
+              players={data.players}
+              convocatorias={data.convocatorias}
+              fixedTeamId={teamId}
+            />
+          ) : (
+            <FFCVMatchesSection
+              ffcvGroupId={ffcvGroupId}
+              ffcvTeamId={ffcvTeamId}
+              teamName={teamName}
+              groupInfo={serverGroupInfo}
+            />
+          )}
         </div>
       )}
 
-      {/* Modal for adding new match */}
+      {/* Modal for adding new internal match */}
       {editingMatch && (
         <ManageMatchModal
           match={editingMatch}

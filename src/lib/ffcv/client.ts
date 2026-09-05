@@ -32,9 +32,11 @@ const FFCV_BASE_URL = 'https://ffcv.es/competiciones/api';
 
 interface RequestOptions {
   timeoutMs?: number;
+  retries?: number;
+  retryDelayMs?: number;
 }
 
-async function ffcvGet<T>(endpoint: string, params: Record<string, string | number | undefined> = {}, options: RequestOptions = {}): Promise<T> {
+async function singleFfcvGet<T>(endpoint: string, params: Record<string, string | number | undefined> = {}, options: RequestOptions = {}): Promise<T> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null) {
@@ -93,6 +95,35 @@ async function ffcvGet<T>(endpoint: string, params: Record<string, string | numb
       reject(new FFCVApiError(`Network error: ${err.message}`, url));
     });
   });
+}
+
+async function ffcvGet<T>(endpoint: string, params: Record<string, string | number | undefined> = {}, options: RequestOptions = {}): Promise<T> {
+  const maxRetries = options.retries ?? 3;
+  let delay = options.retryDelayMs ?? 400;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await singleFfcvGet<T>(endpoint, params, options);
+    } catch (err: any) {
+      const isRetryable = err instanceof FFCVApiError && (
+        err.statusCode === 429 ||
+        err.statusCode === 503 ||
+        err.statusCode === 500 ||
+        err.statusCode === 502 ||
+        err.statusCode === 504 ||
+        err.message.includes('Network error') ||
+        err.message.includes('timed out')
+      );
+
+      if (attempt < maxRetries && isRetryable) {
+        await new Promise(res => setTimeout(res, delay));
+        delay = Math.min(delay * 2, 3000);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Unreachable');
 }
 
 /**

@@ -157,6 +157,9 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
                 Centro de Control
               </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {data.activeSeason?.name ? `Temporada Oficial ${data.activeSeason.name.replace(/^TEMPORADA\s+/i, '')}` : "Temporada Oficial 2025/26"} · {kpis.activeTeams} Equipos Federados
+              </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Panel ejecutivo de dirección y mando operativo
@@ -194,7 +197,8 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
         const hasMatches = upcomingMatches.length > 0;
         const hasApercibidos = (alerts.apercibidosCount ?? 0) > 0;
         const hasUnreported = (alerts.unreportedMatchesCount ?? 0) > 0;
-        const hasPendingItems = hasInscriptions || hasFees || hasMatches || hasApercibidos || hasUnreported;
+        const hasInjuries = (alerts.activeInjuriesCount ?? 0) > 0;
+        const hasPendingItems = hasInscriptions || hasFees || hasMatches || hasApercibidos || hasUnreported || hasInjuries;
 
         return (
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4">
@@ -242,7 +246,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     </div>
                     <div className="flex items-center gap-2 self-end">
                       <Link
-                        href="/admin/secretaria"
+                        href="/dashboard/inscripciones"
                         className="text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
                       >
                         <span>Ver Secretaría</span>
@@ -270,7 +274,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     </div>
                     <div className="flex items-center gap-2 self-end">
                       <Link
-                        href="/admin/tesoreria"
+                        href="/dashboard/treasury"
                         className="text-xs font-bold text-orange-900 bg-orange-200/80 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
                       >
                         <span>Ver Tesorería</span>
@@ -296,7 +300,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     </div>
                     <div className="flex items-center gap-2 self-end">
                       <Link
-                        href="/admin/calendario"
+                        href="/dashboard/matches"
                         className="text-xs font-bold text-purple-900 bg-purple-200/80 hover:bg-purple-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
                       >
                         <span>Ver calendario</span>
@@ -316,7 +320,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                           {alerts.apercibidosCount} {alerts.apercibidosCount === 1 ? "jugador apercibido" : "jugadores apercibidos"} con 4 amarillas
                         </p>
                         <p className="text-[11px] text-rose-800/80 mt-0.5">
-                          Riesgo de sanción en la próxima jornada
+                          Riesgo de sanción federativa en la próxima jornada
                         </p>
                       </div>
                     </div>
@@ -340,7 +344,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                           {alerts.unreportedMatchesCount} {alerts.unreportedMatchesCount === 1 ? "partido finalizado" : "partidos finalizados"} sin marcador
                         </p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          Pendiente de registrar resultado en acta
+                          Pendiente de registrar resultado en acta oficial
                         </p>
                       </div>
                     </div>
@@ -349,6 +353,30 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                       className="self-end text-xs font-bold text-slate-800 bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
                     >
                       <span>Cargar actas</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                )}
+
+                {/* Alerta 6: Bajas médicas y enfermería */}
+                {hasInjuries && (
+                  <div className="p-4 rounded-xl bg-rose-50/60 border border-rose-200 flex flex-col justify-between gap-3 shadow-xs">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-base shrink-0 select-none mt-0.5" role="img" aria-label="Alerta enfermería">🩺</span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-rose-950 text-xs sm:text-sm">
+                          {alerts.activeInjuriesCount} {alerts.activeInjuriesCount === 1 ? "jugador de baja médica" : "jugadores de baja médica"} en enfermería
+                        </p>
+                        <p className="text-[11px] text-rose-800/80 mt-0.5">
+                          Seguimiento clínico y proceso de recuperación RTS
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/dashboard/club/miembros"
+                      className="self-end text-xs font-bold text-rose-900 bg-rose-200/80 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
+                    >
+                      <span>Ver miembros</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
@@ -366,19 +394,23 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
             <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
               <Trophy className="w-4 h-4" />
             </div>
-            <h2 className="font-bold text-slate-900 text-base">Situación Deportiva</h2>
+            <div>
+              <h2 className="font-bold text-slate-900 text-base">Situación Deportiva</h2>
+              <p className="text-[11px] text-slate-400">Datos consolidados de competición oficial y rendimiento del club</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/club/estadisticas"
               className="text-xs font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
             >
-              <span>Ver estadísticas</span>
+              <span>Ver estadísticas completas</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
 
+        {/* 4 KPIs Principales */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {/* Jugadores */}
           <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
@@ -418,18 +450,23 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
             </Link>
           </div>
 
-          {/* Efectividad Global */}
+          {/* Efectividad Global Auditada */}
           <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Efectividad</span>
               <TrendingUp className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{sports?.globalWinRate ?? 34}%</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900">
+                {typeof sports?.globalWinRate === "number" ? sports.globalWinRate.toFixed(1) : "0.0"}%
+              </span>
               <span className="text-[11px] font-medium text-emerald-600 font-bold">victorias</span>
             </div>
             <div className="text-[11px] text-slate-500 mt-1 truncate">
-              {sports?.wins ?? 104}V · {sports?.draws ?? 40}E · {sports?.losses ?? 161}D ({sports?.totalPlayedMatches ?? 305} jugados)
+              {sports?.wins ?? 0}V · {sports?.draws ?? 0}E · {sports?.losses ?? 0}D ({sports?.totalPlayedMatches ?? 0} oficiales)
+            </div>
+            <div className="text-[10px] text-indigo-600 font-semibold mt-0.5">
+              {sports?.points ?? 0} pts · {typeof sports?.pointsPercentage === "number" ? sports.pointsPercentage.toFixed(1) : "0.0"}% puntos
             </div>
           </div>
 
@@ -452,6 +489,159 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
             </Link>
           </div>
         </div>
+
+        {/* Micro-panel de Referentes y Enfermería */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+          {/* Máximo Goleador */}
+          <div className="p-3 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Máximo Goleador</span>
+              <p className="text-xs font-black text-slate-900 truncate mt-0.5">
+                {sports?.topScorer ? sports.topScorer.playerName : "Sin registros"}
+              </p>
+              <p className="text-[11px] text-emerald-600 font-bold">
+                {sports?.topScorer ? `${sports.topScorer.goals} goles · ${sports.topScorer.teamName}` : "-"}
+              </p>
+            </div>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Trophy className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Más Minutos */}
+          <div className="p-3 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Más Minutos Disputados</span>
+              <p className="text-xs font-black text-slate-900 truncate mt-0.5">
+                {sports?.topMinutes ? sports.topMinutes.playerName : "Sin registros"}
+              </p>
+              <p className="text-[11px] text-blue-600 font-bold">
+                {sports?.topMinutes ? `${sports.topMinutes.minutesPlayed} min · ${sports.topMinutes.teamName}` : "-"}
+              </p>
+            </div>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Estado de Enfermería */}
+          <div className="p-3 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estado de Enfermería</span>
+              <p className="text-xs font-black text-slate-900 truncate mt-0.5">
+                {(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "Sin bajas activas" : `${data.injuries.activeInjuriesCount} en recuperación`}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "Plantilla médica disponible al 100%" : "Seguimiento médico en curso"}
+              </p>
+            </div>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+              <Activity className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+
+        {/* Sub-bloque: Situación por Equipos */}
+        {sports?.teamStats && sports.teamStats.length > 0 && (
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Situación por Equipos
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Rendimiento oficial FFCV y clasificación por categoría
+                </p>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                {sports.teamStats.length} Equipos Federados
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+              {sports.teamStats.map((team) => {
+                const isPositiveGD = team.goalDiff > 0;
+                const isNeutralGD = team.goalDiff === 0;
+                return (
+                  <div
+                    key={team.teamId}
+                    className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-200 hover:shadow-xs transition-all flex flex-col justify-between gap-3 group"
+                  >
+                    <div>
+                      {/* Header del Equipo */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+                              {team.teamName}
+                            </h4>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase shrink-0">
+                              {team.teamCategory}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                            {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición FFCV"}
+                          </p>
+                        </div>
+                        {team.currentPosition ? (
+                          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 border ${
+                            team.currentPosition <= 3
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : team.currentPosition <= 8
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}>
+                            {team.currentPosition}º {team.totalTeamsInGroup ? `/ ${team.totalTeamsInGroup}` : ""}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Métricas clave en rejilla compacta */}
+                      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-center">
+                        <div className="p-1.5 rounded-lg bg-slate-50">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Puntos</span>
+                          <span className="text-xs sm:text-sm font-black text-indigo-700">{team.points} pts</span>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-slate-50">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Partidos</span>
+                          <span className="text-xs sm:text-sm font-bold text-slate-800">{team.matchesPlayed} PJ</span>
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-slate-50">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Efectividad</span>
+                          <span className="text-xs sm:text-sm font-bold text-emerald-700">{team.winRate}% V</span>
+                        </div>
+                      </div>
+
+                      {/* Detalle V-E-D y Goles */}
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-0.5">
+                        <span className="font-semibold text-slate-700">
+                          {team.wins}V · {team.draws}E · {team.losses}D
+                        </span>
+                        <span className="font-medium text-slate-600">
+                          {team.goalsFor} GF / {team.goalsAgainst} GC (
+                          <span className={isPositiveGD ? "text-emerald-600 font-bold" : isNeutralGD ? "text-slate-500" : "text-rose-600 font-bold"}>
+                            {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
+                          </span>)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Botón Acción */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                      <Link
+                        href={`/dashboard/equipos/${team.teamId}/analisis`}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all"
+                      >
+                        <span>Ver análisis del equipo</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── 3. BLOQUE: SITUACIÓN ECONÓMICA ── */}

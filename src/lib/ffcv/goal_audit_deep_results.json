@@ -1,0 +1,1125 @@
+{
+  "goalDiscrepancies": [
+    {
+      "team": "CADETE A",
+      "matchday": 4,
+      "date": "2025-11-09",
+      "homeTeam": "C.F. At. San Bartolomé 'A'",
+      "awayTeam": "Sporting Saladar 'A'",
+      "codacta": "26377165",
+      "myOfficialGoals": 6,
+      "rivalOfficialGoals": 2,
+      "ourGoalsCountInActa": 7,
+      "rivalGoalsCountInActa": 1,
+      "diff": -1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "22220381",
+          "nombre_jugador": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+          "minuto": "5",
+          "tipo_gol": "101",
+          "alias": "",
+          "nombre_real": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+          "nombre_visible": "TORQUI HAMDOUNI, ABDERRAHIM TALAL"
+        },
+        {
+          "codjugador": "9861958",
+          "nombre_jugador": "FRANCO ELIAS, JHON",
+          "minuto": "23",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "FRANCO ELIAS, JHON",
+          "nombre_visible": "FRANCO ELIAS, JHON"
+        },
+        {
+          "codjugador": "9846187",
+          "nombre_jugador": "RUFETE ALBALADEJO, MARCOS",
+          "minuto": "25",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "RUFETE ALBALADEJO, MARCOS",
+          "nombre_visible": "RUFETE ALBALADEJO, MARCOS"
+        },
+        {
+          "codjugador": "902219499",
+          "nombre_jugador": "ROMERO FERNANDEZ, FRANCISCO",
+          "minuto": "33",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ROMERO FERNANDEZ, FRANCISCO",
+          "nombre_visible": "ROMERO FERNANDEZ, FRANCISCO"
+        },
+        {
+          "codjugador": "9861958",
+          "nombre_jugador": "FRANCO ELIAS, JHON",
+          "minuto": "39",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "FRANCO ELIAS, JHON",
+          "nombre_visible": "FRANCO ELIAS, JHON"
+        },
+        {
+          "codjugador": "902219499",
+          "nombre_jugador": "ROMERO FERNANDEZ, FRANCISCO",
+          "minuto": "50",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ROMERO FERNANDEZ, FRANCISCO",
+          "nombre_visible": "ROMERO FERNANDEZ, FRANCISCO"
+        },
+        {
+          "codjugador": "902744084",
+          "nombre_jugador": "RGABI, MOURAD",
+          "minuto": "68",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "RGABI, MOURAD",
+          "nombre_visible": "RGABI, MOURAD"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "21837177",
+          "nombre_jugador": "ISMAEL MANSSOR CEREZO",
+          "minuto": "19",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ISMAEL MANSSOR CEREZO",
+          "nombre_visible": "ISMAEL MANSSOR CEREZO"
+        }
+      ]
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 18,
+      "date": "2026-03-07",
+      "homeTeam": "C.D. Montesinos",
+      "awayTeam": "Sporting Saladar 'A'",
+      "codacta": "26377263",
+      "myOfficialGoals": 3,
+      "rivalOfficialGoals": 1,
+      "ourGoalsCountInActa": 2,
+      "rivalGoalsCountInActa": 2,
+      "diff": 1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "904653876",
+          "nombre_jugador": "ATOUZANI, MOHAMMED",
+          "minuto": "10",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ATOUZANI, MOHAMMED",
+          "nombre_visible": "ATOUZANI, MOHAMMED"
+        },
+        {
+          "codjugador": "22220381",
+          "nombre_jugador": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+          "minuto": "68",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+          "nombre_visible": "TORQUI HAMDOUNI, ABDERRAHIM TALAL"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "900126659",
+          "nombre_jugador": "HUGHES KEHOE, FINNLEY",
+          "minuto": "18",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "HUGHES KEHOE, FINNLEY",
+          "nombre_visible": "HUGHES KEHOE, FINNLEY"
+        },
+        {
+          "codjugador": "22220805",
+          "nombre_jugador": "JARMOUNI ZARMOUNI, ILYAS",
+          "minuto": "60",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "JARMOUNI ZARMOUNI, ILYAS",
+          "nombre_visible": "JARMOUNI ZARMOUNI, ILYAS"
+        }
+      ]
+    },
+    {
+      "team": "CADETE B",
+      "matchday": 5,
+      "date": "2025-11-15",
+      "homeTeam": "C.F. Racing Playas de Orihuela",
+      "awayTeam": "Sporting Saladar 'B'",
+      "codacta": "26376988",
+      "myOfficialGoals": 3,
+      "rivalOfficialGoals": 0,
+      "ourGoalsCountInActa": 2,
+      "rivalGoalsCountInActa": 2,
+      "diff": 1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "9850534",
+          "nombre_jugador": "PONCE ANTEQUERA, MARCOS",
+          "minuto": "5",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "PONCE ANTEQUERA, MARCOS",
+          "nombre_visible": "PONCE ANTEQUERA, MARCOS"
+        },
+        {
+          "codjugador": "902411049",
+          "nombre_jugador": "RAHHOU, MOHAMMED ASHRAF",
+          "minuto": "35",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "RAHHOU, MOHAMMED ASHRAF",
+          "nombre_visible": "RAHHOU, MOHAMMED ASHRAF"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "30843320",
+          "nombre_jugador": "MEUWIS, LONYORI HAPPY",
+          "minuto": "48",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MEUWIS, LONYORI HAPPY",
+          "nombre_visible": "MEUWIS, LONYORI HAPPY"
+        },
+        {
+          "codjugador": "901398244",
+          "nombre_jugador": "LOPEZ BERNABE, HUGO",
+          "minuto": "52",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LOPEZ BERNABE, HUGO",
+          "nombre_visible": "LOPEZ BERNABE, HUGO"
+        }
+      ]
+    },
+    {
+      "team": "INFANTIL A",
+      "matchday": 7,
+      "date": "2025-11-29",
+      "homeTeam": "Sporting Saladar 'A'",
+      "awayTeam": "C.F. At. Rabaloche",
+      "codacta": "26380956",
+      "myOfficialGoals": 2,
+      "rivalOfficialGoals": 3,
+      "ourGoalsCountInActa": 3,
+      "rivalGoalsCountInActa": 2,
+      "diff": -1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "29020222",
+          "nombre_jugador": "SALHI BOTABBASS, ADAM",
+          "minuto": "11",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "SALHI BOTABBASS, ADAM",
+          "nombre_visible": "SALHI BOTABBASS, ADAM"
+        },
+        {
+          "codjugador": "28442905",
+          "nombre_jugador": "BEJJI, RIDA",
+          "minuto": "34",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "BEJJI, RIDA",
+          "nombre_visible": "BEJJI, RIDA"
+        },
+        {
+          "codjugador": "902110551",
+          "nombre_jugador": "VASQUEZ RESTREPO, MATHIAS",
+          "minuto": "43",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "VASQUEZ RESTREPO, MATHIAS",
+          "nombre_visible": "VASQUEZ RESTREPO, MATHIAS"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "22102426",
+          "nombre_jugador": "EL KABLAOUI, FARISS",
+          "minuto": "47",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL KABLAOUI, FARISS",
+          "nombre_visible": "EL KABLAOUI, FARISS"
+        },
+        {
+          "codjugador": "27440479",
+          "nombre_jugador": "CABRERA MORA, ERIK",
+          "minuto": "65",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "CABRERA MORA, ERIK",
+          "nombre_visible": "CABRERA MORA, ERIK"
+        }
+      ]
+    },
+    {
+      "team": "INFANTIL A",
+      "matchday": 25,
+      "date": "2026-05-23",
+      "homeTeam": "Sporting Saladar 'A'",
+      "awayTeam": "Callosa Deportiva C.F. 'A'",
+      "codacta": "26465056",
+      "myOfficialGoals": 9,
+      "rivalOfficialGoals": 1,
+      "ourGoalsCountInActa": 8,
+      "rivalGoalsCountInActa": 2,
+      "diff": 1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "28399002",
+          "nombre_jugador": "ABADOU EL HIMER, RAYANE",
+          "minuto": "3",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ABADOU EL HIMER, RAYANE",
+          "nombre_visible": "ABADOU EL HIMER, RAYANE"
+        },
+        {
+          "codjugador": "28399002",
+          "nombre_jugador": "ABADOU EL HIMER, RAYANE",
+          "minuto": "12",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ABADOU EL HIMER, RAYANE",
+          "nombre_visible": "ABADOU EL HIMER, RAYANE"
+        },
+        {
+          "codjugador": "31115916",
+          "nombre_jugador": "BASSIM IHIMJI, IMRAN",
+          "minuto": "25",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "BASSIM IHIMJI, IMRAN",
+          "nombre_visible": "BASSIM IHIMJI, IMRAN"
+        },
+        {
+          "codjugador": "28631725",
+          "nombre_jugador": "MORA VALLE, FERNANDO",
+          "minuto": "28",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MORA VALLE, FERNANDO",
+          "nombre_visible": "MORA VALLE, FERNANDO"
+        },
+        {
+          "codjugador": "25695710",
+          "nombre_jugador": "AMMOU, MOHAMED",
+          "minuto": "40",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "AMMOU, MOHAMED",
+          "nombre_visible": "AMMOU, MOHAMED"
+        },
+        {
+          "codjugador": "28631177",
+          "nombre_jugador": "MAS CORTES, MARIO",
+          "minuto": "50",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MAS CORTES, MARIO",
+          "nombre_visible": "MAS CORTES, MARIO"
+        },
+        {
+          "codjugador": "28399002",
+          "nombre_jugador": "ABADOU EL HIMER, RAYANE",
+          "minuto": "55",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ABADOU EL HIMER, RAYANE",
+          "nombre_visible": "ABADOU EL HIMER, RAYANE"
+        },
+        {
+          "codjugador": "28631177",
+          "nombre_jugador": "MAS CORTES, MARIO",
+          "minuto": "56",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MAS CORTES, MARIO",
+          "nombre_visible": "MAS CORTES, MARIO"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "904898981",
+          "nombre_jugador": "ZGHAIDI LEMTAFAH, BILAL",
+          "minuto": "37",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ZGHAIDI LEMTAFAH, BILAL",
+          "nombre_visible": "ZGHAIDI LEMTAFAH, BILAL"
+        },
+        {
+          "codjugador": "28038768",
+          "nombre_jugador": "PEIRÓ BAÑÓN, SAMUEL",
+          "minuto": "60",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "PEIRÓ BAÑÓN, SAMUEL",
+          "nombre_visible": "PEIRÓ BAÑÓN, SAMUEL"
+        }
+      ]
+    },
+    {
+      "team": "INFANTIL B",
+      "matchday": 4,
+      "date": "2025-11-08",
+      "homeTeam": "Sporting Saladar 'B'",
+      "awayTeam": "C.D. Cox 'A'",
+      "codacta": "26380754",
+      "myOfficialGoals": 0,
+      "rivalOfficialGoals": 14,
+      "ourGoalsCountInActa": 1,
+      "rivalGoalsCountInActa": 13,
+      "diff": -1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "31123524",
+          "nombre_jugador": "GARCIA ANDREU, MARIO",
+          "minuto": "26",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "GARCIA ANDREU, MARIO",
+          "nombre_visible": "GARCIA ANDREU, MARIO"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "28723965",
+          "nombre_jugador": "LLOPIS TRIGUEROS, ADRIAN",
+          "minuto": "1",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LLOPIS TRIGUEROS, ADRIAN",
+          "nombre_visible": "LLOPIS TRIGUEROS, ADRIAN"
+        },
+        {
+          "codjugador": "28108358",
+          "nombre_jugador": "JIMENEZ RUIZ, AROM SEBASTHIAN",
+          "minuto": "2",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "JIMENEZ RUIZ, AROM SEBASTHIAN",
+          "nombre_visible": "JIMENEZ RUIZ, AROM SEBASTHIAN"
+        },
+        {
+          "codjugador": "28724055",
+          "nombre_jugador": "NAVARRO GARCIA, NICOLAS",
+          "minuto": "3",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "NAVARRO GARCIA, NICOLAS",
+          "nombre_visible": "NAVARRO GARCIA, NICOLAS"
+        },
+        {
+          "codjugador": "21844071",
+          "nombre_jugador": "OUHADOU OUMCH, AMIR",
+          "minuto": "4",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "OUHADOU OUMCH, AMIR",
+          "nombre_visible": "OUHADOU OUMCH, AMIR"
+        },
+        {
+          "codjugador": "28724055",
+          "nombre_jugador": "NAVARRO GARCIA, NICOLAS",
+          "minuto": "7",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "NAVARRO GARCIA, NICOLAS",
+          "nombre_visible": "NAVARRO GARCIA, NICOLAS"
+        },
+        {
+          "codjugador": "21847964",
+          "nombre_jugador": "RAGUANI ANNANI, OUALID",
+          "minuto": "18",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "RAGUANI ANNANI, OUALID",
+          "nombre_visible": "RAGUANI ANNANI, OUALID"
+        },
+        {
+          "codjugador": "902266437",
+          "nombre_jugador": "BE DIAF HARICI, ABDULLAH",
+          "minuto": "27",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "BE DIAF HARICI, ABDULLAH",
+          "nombre_visible": "BE DIAF HARICI, ABDULLAH"
+        },
+        {
+          "codjugador": "21847965",
+          "nombre_jugador": "EL MOKTATIFI NABBAH, OMAR",
+          "minuto": "28",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL MOKTATIFI NABBAH, OMAR",
+          "nombre_visible": "EL MOKTATIFI NABBAH, OMAR"
+        },
+        {
+          "codjugador": "21844071",
+          "nombre_jugador": "OUHADOU OUMCH, AMIR",
+          "minuto": "45",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "OUHADOU OUMCH, AMIR",
+          "nombre_visible": "OUHADOU OUMCH, AMIR"
+        },
+        {
+          "codjugador": "902266437",
+          "nombre_jugador": "BE DIAF HARICI, ABDULLAH",
+          "minuto": "47",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "BE DIAF HARICI, ABDULLAH",
+          "nombre_visible": "BE DIAF HARICI, ABDULLAH"
+        },
+        {
+          "codjugador": "9826173",
+          "nombre_jugador": "NAVARRO SOLA, RODRIGO",
+          "minuto": "53",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "NAVARRO SOLA, RODRIGO",
+          "nombre_visible": "NAVARRO SOLA, RODRIGO"
+        },
+        {
+          "codjugador": "21847965",
+          "nombre_jugador": "EL MOKTATIFI NABBAH, OMAR",
+          "minuto": "54",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL MOKTATIFI NABBAH, OMAR",
+          "nombre_visible": "EL MOKTATIFI NABBAH, OMAR"
+        },
+        {
+          "codjugador": "902266437",
+          "nombre_jugador": "BE DIAF HARICI, ABDULLAH",
+          "minuto": "56",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "BE DIAF HARICI, ABDULLAH",
+          "nombre_visible": "BE DIAF HARICI, ABDULLAH"
+        }
+      ]
+    },
+    {
+      "team": "INFANTIL B",
+      "matchday": 18,
+      "date": "2026-03-07",
+      "homeTeam": "Sporting Saladar 'B'",
+      "awayTeam": "C.F. Racing Playas de Orihuela 'A'",
+      "codacta": "26380851",
+      "myOfficialGoals": 1,
+      "rivalOfficialGoals": 9,
+      "ourGoalsCountInActa": 2,
+      "rivalGoalsCountInActa": 8,
+      "diff": -1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "127056",
+          "nombre_jugador": "PAREDES HERNANDEZ, GUSTAVO",
+          "minuto": "20",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "PAREDES HERNANDEZ, GUSTAVO",
+          "nombre_visible": "PAREDES HERNANDEZ, GUSTAVO"
+        },
+        {
+          "codjugador": "31124262",
+          "nombre_jugador": "PASTOR MARTINEZ, MARIO",
+          "minuto": "47",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "PASTOR MARTINEZ, MARIO",
+          "nombre_visible": "PASTOR MARTINEZ, MARIO"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "29788176",
+          "nombre_jugador": "LONG, OSCAR JAMES",
+          "minuto": "3",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LONG, OSCAR JAMES",
+          "nombre_visible": "LONG, OSCAR JAMES"
+        },
+        {
+          "codjugador": "29788176",
+          "nombre_jugador": "LONG, OSCAR JAMES",
+          "minuto": "5",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LONG, OSCAR JAMES",
+          "nombre_visible": "LONG, OSCAR JAMES"
+        },
+        {
+          "codjugador": "27646210",
+          "nombre_jugador": "MAMECHE, REDWAN",
+          "minuto": "6",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MAMECHE, REDWAN",
+          "nombre_visible": "MAMECHE, REDWAN"
+        },
+        {
+          "codjugador": "17067468",
+          "nombre_jugador": "MEZIOUD, MOHAMED EL AMINE",
+          "minuto": "8",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MEZIOUD, MOHAMED EL AMINE",
+          "nombre_visible": "MEZIOUD, MOHAMED EL AMINE"
+        },
+        {
+          "codjugador": "29788176",
+          "nombre_jugador": "LONG, OSCAR JAMES",
+          "minuto": "19",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LONG, OSCAR JAMES",
+          "nombre_visible": "LONG, OSCAR JAMES"
+        },
+        {
+          "codjugador": "9826881",
+          "nombre_jugador": "VERA NAVARRO, SERGIO",
+          "minuto": "31",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "VERA NAVARRO, SERGIO",
+          "nombre_visible": "VERA NAVARRO, SERGIO"
+        },
+        {
+          "codjugador": "9826881",
+          "nombre_jugador": "VERA NAVARRO, SERGIO",
+          "minuto": "56",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "VERA NAVARRO, SERGIO",
+          "nombre_visible": "VERA NAVARRO, SERGIO"
+        },
+        {
+          "codjugador": "29788176",
+          "nombre_jugador": "LONG, OSCAR JAMES",
+          "minuto": "60",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LONG, OSCAR JAMES",
+          "nombre_visible": "LONG, OSCAR JAMES"
+        }
+      ]
+    },
+    {
+      "team": "JUVENIL A",
+      "matchday": 18,
+      "date": "2026-02-22",
+      "homeTeam": "C.D. Murada 'A'",
+      "awayTeam": "Sporting Saladar 'A'",
+      "codacta": "26355718",
+      "myOfficialGoals": 4,
+      "rivalOfficialGoals": 2,
+      "ourGoalsCountInActa": 3,
+      "rivalGoalsCountInActa": 3,
+      "diff": 1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "9858830",
+          "nombre_jugador": "EL ORF CHAKIR, MOHAMED AMIN",
+          "minuto": "20",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL ORF CHAKIR, MOHAMED AMIN",
+          "nombre_visible": "EL ORF CHAKIR, MOHAMED AMIN"
+        },
+        {
+          "codjugador": "9866525",
+          "nombre_jugador": "KHAEF ALLAH DAGHMANI, MOHAMMED",
+          "minuto": "75",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "KHAEF ALLAH DAGHMANI, MOHAMMED",
+          "nombre_visible": "KHAEF ALLAH DAGHMANI, MOHAMMED"
+        },
+        {
+          "codjugador": "22423631",
+          "nombre_jugador": "SAMI, BADRE",
+          "minuto": "89",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "SAMI, BADRE",
+          "nombre_visible": "SAMI, BADRE"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "9835503",
+          "nombre_jugador": "FARISSI KHATIS, MOHAMED",
+          "minuto": "10",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "FARISSI KHATIS, MOHAMED",
+          "nombre_visible": "FARISSI KHATIS, MOHAMED"
+        },
+        {
+          "codjugador": "9830524",
+          "nombre_jugador": "MARTINEZ GOMEZ, JOEL",
+          "minuto": "22",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MARTINEZ GOMEZ, JOEL",
+          "nombre_visible": "MARTINEZ GOMEZ, JOEL"
+        },
+        {
+          "codjugador": "9830524",
+          "nombre_jugador": "MARTINEZ GOMEZ, JOEL",
+          "minuto": "30",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MARTINEZ GOMEZ, JOEL",
+          "nombre_visible": "MARTINEZ GOMEZ, JOEL"
+        }
+      ]
+    },
+    {
+      "team": "JUVENIL A",
+      "matchday": 29,
+      "date": "2026-05-22",
+      "homeTeam": "Sporting Saladar 'A'",
+      "awayTeam": "Granja de Rocamora C.F. 'A'",
+      "codacta": "26355812",
+      "myOfficialGoals": 5,
+      "rivalOfficialGoals": 5,
+      "ourGoalsCountInActa": 6,
+      "rivalGoalsCountInActa": 4,
+      "diff": -1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "9858830",
+          "nombre_jugador": "EL ORF CHAKIR, MOHAMED AMIN",
+          "minuto": "15",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL ORF CHAKIR, MOHAMED AMIN",
+          "nombre_visible": "EL ORF CHAKIR, MOHAMED AMIN"
+        },
+        {
+          "codjugador": "9858830",
+          "nombre_jugador": "EL ORF CHAKIR, MOHAMED AMIN",
+          "minuto": "18",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL ORF CHAKIR, MOHAMED AMIN",
+          "nombre_visible": "EL ORF CHAKIR, MOHAMED AMIN"
+        },
+        {
+          "codjugador": "31114133",
+          "nombre_jugador": "TABITI BENMELLOUK, MOHA",
+          "minuto": "23",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "TABITI BENMELLOUK, MOHA",
+          "nombre_visible": "TABITI BENMELLOUK, MOHA"
+        },
+        {
+          "codjugador": "28855023",
+          "nombre_jugador": "MAHDAD LITIME, MORAD",
+          "minuto": "28",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MAHDAD LITIME, MORAD",
+          "nombre_visible": "MAHDAD LITIME, MORAD"
+        },
+        {
+          "codjugador": "28855023",
+          "nombre_jugador": "MAHDAD LITIME, MORAD",
+          "minuto": "39",
+          "tipo_gol": "101",
+          "alias": "",
+          "nombre_real": "MAHDAD LITIME, MORAD",
+          "nombre_visible": "MAHDAD LITIME, MORAD"
+        },
+        {
+          "codjugador": "900197170",
+          "nombre_jugador": "EL ALLAM, ALA EDDINE",
+          "minuto": "77",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "EL ALLAM, ALA EDDINE",
+          "nombre_visible": "EL ALLAM, ALA EDDINE"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "9764605",
+          "nombre_jugador": "MORA ANDREU, JAVIER",
+          "minuto": "3",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MORA ANDREU, JAVIER",
+          "nombre_visible": "MORA ANDREU, JAVIER"
+        },
+        {
+          "codjugador": "9793167",
+          "nombre_jugador": "CUTILLAS SALINAS, SAUL",
+          "minuto": "9",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "CUTILLAS SALINAS, SAUL",
+          "nombre_visible": "CUTILLAS SALINAS, SAUL"
+        },
+        {
+          "codjugador": "9841682",
+          "nombre_jugador": "RAMON MANRESA, TOMAS",
+          "minuto": "75",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "RAMON MANRESA, TOMAS",
+          "nombre_visible": "RAMON MANRESA, TOMAS"
+        },
+        {
+          "codjugador": "9841682",
+          "nombre_jugador": "RAMON MANRESA, TOMAS",
+          "minuto": "77",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "RAMON MANRESA, TOMAS",
+          "nombre_visible": "RAMON MANRESA, TOMAS"
+        }
+      ]
+    },
+    {
+      "team": "JUVENIL B",
+      "matchday": 24,
+      "date": "2026-04-18",
+      "homeTeam": "Sporting Saladar 'B'",
+      "awayTeam": "At. Benejúzar 'A'",
+      "codacta": "26350005",
+      "myOfficialGoals": 3,
+      "rivalOfficialGoals": 0,
+      "ourGoalsCountInActa": 0,
+      "rivalGoalsCountInActa": 2,
+      "diff": 3,
+      "ourGoalsEvents": [],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "9835990",
+          "nombre_jugador": "SANCHEZ MAS, MARIO",
+          "minuto": "25",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "SANCHEZ MAS, MARIO",
+          "nombre_visible": "SANCHEZ MAS, MARIO"
+        },
+        {
+          "codjugador": "21836970",
+          "nombre_jugador": "LARHRIB, YASIN",
+          "minuto": "66",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "LARHRIB, YASIN",
+          "nombre_visible": "LARHRIB, YASIN"
+        }
+      ]
+    },
+    {
+      "team": "JUVENIL B",
+      "matchday": 27,
+      "date": "2026-05-09",
+      "homeTeam": "Internazionale Orihuela C.D. 'A'",
+      "awayTeam": "Sporting Saladar 'B'",
+      "codacta": "26350028",
+      "myOfficialGoals": 6,
+      "rivalOfficialGoals": 2,
+      "ourGoalsCountInActa": 5,
+      "rivalGoalsCountInActa": 3,
+      "diff": 1,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "904861571",
+          "nombre_jugador": "ADERDOUR, ADEM",
+          "minuto": "30",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "ADERDOUR, ADEM",
+          "nombre_visible": "ADERDOUR, ADEM"
+        },
+        {
+          "codjugador": "31207866",
+          "nombre_jugador": "QOTBI ZERIDIK, MEROUANE",
+          "minuto": "45",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "QOTBI ZERIDIK, MEROUANE",
+          "nombre_visible": "QOTBI ZERIDIK, MEROUANE"
+        },
+        {
+          "codjugador": "31207866",
+          "nombre_jugador": "QOTBI ZERIDIK, MEROUANE",
+          "minuto": "60",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "QOTBI ZERIDIK, MEROUANE",
+          "nombre_visible": "QOTBI ZERIDIK, MEROUANE"
+        },
+        {
+          "codjugador": "9829240",
+          "nombre_jugador": "LEKHDASSI EL MOUHAJID, ADNAN",
+          "minuto": "85",
+          "tipo_gol": "101",
+          "alias": "",
+          "nombre_real": "LEKHDASSI EL MOUHAJID, ADNAN",
+          "nombre_visible": "LEKHDASSI EL MOUHAJID, ADNAN"
+        },
+        {
+          "codjugador": "31207866",
+          "nombre_jugador": "QOTBI ZERIDIK, MEROUANE",
+          "minuto": "88",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "QOTBI ZERIDIK, MEROUANE",
+          "nombre_visible": "QOTBI ZERIDIK, MEROUANE"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "9720750",
+          "nombre_jugador": "BOIAN FILIP, EDUARD ADRIAN",
+          "minuto": "42",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "BOIAN FILIP, EDUARD ADRIAN",
+          "nombre_visible": "BOIAN FILIP, EDUARD ADRIAN"
+        },
+        {
+          "codjugador": "9720750",
+          "nombre_jugador": "BOIAN FILIP, EDUARD ADRIAN",
+          "minuto": "55",
+          "tipo_gol": "102",
+          "alias": "",
+          "nombre_real": "BOIAN FILIP, EDUARD ADRIAN",
+          "nombre_visible": "BOIAN FILIP, EDUARD ADRIAN"
+        },
+        {
+          "codjugador": "29255123",
+          "nombre_jugador": "MARCHESI, DANTE",
+          "minuto": "61",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "MARCHESI, DANTE",
+          "nombre_visible": "MARCHESI, DANTE"
+        }
+      ]
+    },
+    {
+      "team": "SENIOR",
+      "matchday": 14,
+      "date": "2026-01-11",
+      "homeTeam": "Sporting Dolores C.F. 'A'",
+      "awayTeam": "Sporting Saladar",
+      "codacta": "26331718",
+      "myOfficialGoals": 3,
+      "rivalOfficialGoals": 0,
+      "ourGoalsCountInActa": 1,
+      "rivalGoalsCountInActa": 3,
+      "diff": 2,
+      "ourGoalsEvents": [
+        {
+          "codjugador": "29122626",
+          "nombre_jugador": "JEBBOURI KHLIFI, ANASS",
+          "minuto": "3",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "JEBBOURI KHLIFI, ANASS",
+          "nombre_visible": "JEBBOURI KHLIFI, ANASS"
+        }
+      ],
+      "rivalGoalsEvents": [
+        {
+          "codjugador": "9826478",
+          "nombre_jugador": "KHALFI MAHFOUDY, NABIL",
+          "minuto": "10",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "KHALFI MAHFOUDY, NABIL",
+          "nombre_visible": "KHALFI MAHFOUDY, NABIL"
+        },
+        {
+          "codjugador": "9799558",
+          "nombre_jugador": "PENALVA MARTINEZ, FRANCISCO MANUEL",
+          "minuto": "45",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "PENALVA MARTINEZ, FRANCISCO MANUEL",
+          "nombre_visible": "PENALVA MARTINEZ, FRANCISCO MANUEL"
+        },
+        {
+          "codjugador": "9767333",
+          "nombre_jugador": "PASTOR DIAZ, JESUS",
+          "minuto": "77",
+          "tipo_gol": "100",
+          "alias": "",
+          "nombre_real": "PASTOR DIAZ, JESUS",
+          "nombre_visible": "PASTOR DIAZ, JESUS"
+        }
+      ]
+    }
+  ],
+  "ownGoalEvents": [],
+  "allMatchGoalsSample": [
+    {
+      "team": "CADETE A",
+      "matchday": 1,
+      "codacta": "26377143",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "9826188",
+        "nombre_jugador": "HERNANDEZ RUIZ, MARTIN",
+        "minuto": "4",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "HERNANDEZ RUIZ, MARTIN",
+        "nombre_visible": "HERNANDEZ RUIZ, MARTIN"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 1,
+      "codacta": "26377143",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "22220381",
+        "nombre_jugador": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+        "minuto": "12",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+        "nombre_visible": "TORQUI HAMDOUNI, ABDERRAHIM TALAL"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 1,
+      "codacta": "26377143",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "9861958",
+        "nombre_jugador": "FRANCO ELIAS, JHON",
+        "minuto": "51",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "FRANCO ELIAS, JHON",
+        "nombre_visible": "FRANCO ELIAS, JHON"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 1,
+      "codacta": "26377143",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "901833957",
+        "nombre_jugador": "BENSAAD BENTAYED, ADAM",
+        "minuto": "80",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "BENSAAD BENTAYED, ADAM",
+        "nombre_visible": "BENSAAD BENTAYED, ADAM"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 3,
+      "codacta": "26377157",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "902219499",
+        "nombre_jugador": "ROMERO FERNANDEZ, FRANCISCO",
+        "minuto": "14",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "ROMERO FERNANDEZ, FRANCISCO",
+        "nombre_visible": "ROMERO FERNANDEZ, FRANCISCO"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 3,
+      "codacta": "26377157",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "900197170",
+        "nombre_jugador": "EL ALLAM, ALA EDDINE",
+        "minuto": "22",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "EL ALLAM, ALA EDDINE",
+        "nombre_visible": "EL ALLAM, ALA EDDINE"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 3,
+      "codacta": "26377157",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "904558252",
+        "nombre_jugador": "ZAIDI JOUHARI, ILYAS",
+        "minuto": "40",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "ZAIDI JOUHARI, ILYAS",
+        "nombre_visible": "ZAIDI JOUHARI, ILYAS"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 3,
+      "codacta": "26377157",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "902219499",
+        "nombre_jugador": "ROMERO FERNANDEZ, FRANCISCO",
+        "minuto": "65",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "ROMERO FERNANDEZ, FRANCISCO",
+        "nombre_visible": "ROMERO FERNANDEZ, FRANCISCO"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 4,
+      "codacta": "26377165",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "22220381",
+        "nombre_jugador": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+        "minuto": "5",
+        "tipo_gol": "101",
+        "alias": "",
+        "nombre_real": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+        "nombre_visible": "TORQUI HAMDOUNI, ABDERRAHIM TALAL"
+      }
+    },
+    {
+      "team": "CADETE A",
+      "matchday": 4,
+      "codacta": "26377165",
+      "isOurTeam": true,
+      "goal": {
+        "codjugador": "9861958",
+        "nombre_jugador": "FRANCO ELIAS, JHON",
+        "minuto": "23",
+        "tipo_gol": "100",
+        "alias": "",
+        "nombre_real": "FRANCO ELIAS, JHON",
+        "nombre_visible": "FRANCO ELIAS, JHON"
+      }
+    }
+  ]
+}

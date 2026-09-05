@@ -1,0 +1,153 @@
+{
+  "verifiedAt": "2026-09-05T17:08:45.725Z",
+  "matchesCount": 182,
+  "wins": 62,
+  "draws": 24,
+  "losses": 96,
+  "gf": 374,
+  "gc": 518,
+  "playerGoals": 363,
+  "rivalOwnGoals": 5,
+  "adminGoals": 6,
+  "yellows": 382,
+  "reds": 15,
+  "winRate": "34.07%",
+  "points": 210,
+  "maxPoints": 546,
+  "pointsPct": "38.46%",
+  "teamResults": {
+    "CADETE A": {
+      "pj": 24,
+      "v": 11,
+      "e": 5,
+      "d": 8,
+      "gf": 52,
+      "gc": 48
+    },
+    "CADETE B": {
+      "pj": 24,
+      "v": 7,
+      "e": 2,
+      "d": 15,
+      "gf": 45,
+      "gc": 62
+    },
+    "INFANTIL A": {
+      "pj": 26,
+      "v": 13,
+      "e": 3,
+      "d": 10,
+      "gf": 77,
+      "gc": 52
+    },
+    "INFANTIL B": {
+      "pj": 24,
+      "v": 0,
+      "e": 4,
+      "d": 20,
+      "gf": 19,
+      "gc": 160
+    },
+    "JUVENIL A": {
+      "pj": 26,
+      "v": 13,
+      "e": 3,
+      "d": 10,
+      "gf": 67,
+      "gc": 59
+    },
+    "JUVENIL B": {
+      "pj": 28,
+      "v": 9,
+      "e": 3,
+      "d": 16,
+      "gf": 65,
+      "gc": 83
+    },
+    "SENIOR": {
+      "pj": 30,
+      "v": 9,
+      "e": 4,
+      "d": 17,
+      "gf": 49,
+      "gc": 54
+    }
+  },
+  "ownGoalsList": [
+    {
+      "team": "CADETE A",
+      "jornada": 18,
+      "fecha": "2026-03-07",
+      "codacta": "26377263",
+      "jugadorRival": "HUGHES KEHOE, FINNLEY",
+      "minuto": "18",
+      "tipoGol": "102"
+    },
+    {
+      "team": "CADETE B",
+      "jornada": 20,
+      "fecha": "2026-03-28",
+      "codacta": "26377092",
+      "jugadorRival": "HLINKA, ARTEM",
+      "minuto": "22",
+      "tipoGol": "102"
+    },
+    {
+      "team": "INFANTIL A",
+      "jornada": 25,
+      "fecha": "2026-05-23",
+      "codacta": "26465056",
+      "jugadorRival": "PEIRÓ BAÑÓN, SAMUEL",
+      "minuto": "60",
+      "tipoGol": "102"
+    },
+    {
+      "team": "JUVENIL A",
+      "jornada": 18,
+      "fecha": "2026-02-22",
+      "codacta": "26355718",
+      "jugadorRival": "FARISSI KHATIS, MOHAMED",
+      "minuto": "10",
+      "tipoGol": "102"
+    },
+    {
+      "team": "JUVENIL B",
+      "jornada": 27,
+      "fecha": "2026-05-09",
+      "codacta": "26350028",
+      "jugadorRival": "BOIAN FILIP, EDUARD ADRIAN",
+      "minuto": "55",
+      "tipoGol": "102"
+    }
+  ],
+  "marioGarciaAndreu": {
+    "id": "1fddf67d-9b7f-4f23-9516-17a28d980389",
+    "name": "Mario García",
+    "dorsal": 19,
+    "teams": {},
+    "teamMatches": {
+      "INFANTIL B": 23
+    },
+    "matches": 23,
+    "starts": 23,
+    "minutes": 1610,
+    "goals": 1,
+    "yellows": 1,
+    "reds": 0
+  },
+  "marioMaciaGarcia": {
+    "id": "033ba22e-bbfb-431b-9163-6f15f9a89817",
+    "name": "Mario Macia Garcia",
+    "dorsal": 7,
+    "teams": {},
+    "teamMatches": {
+      "INFANTIL B": 23
+    },
+    "matches": 23,
+    "starts": 23,
+    "minutes": 1610,
+    "goals": 5,
+    "yellows": 4,
+    "reds": 0
+  }
+}

@@ -17,13 +17,13 @@ export default async function PartidosPage() {
     .from("partidos")
     .select(`
       *,
-      equipo:teams (id, name, category)
+      equipo:teams (id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url)
     `)
     .order("fecha_hora", { ascending: true })
 
   let teamsQuery = supabase
     .from("teams")
-    .select("id, name, category")
+    .select("id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url")
     .order("name", { ascending: true })
 
 

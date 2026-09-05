@@ -53,43 +53,8 @@ export async function syncGroupFFCV(
     errors.push(`Failed to fetch matchdays: ${err.message}`);
   }
 
-  // 2. Upsert FFCV Group Record
-  const groupRecord: FFCVGroupRecord = {
-    ffcv_season_id: seasonId,
-    ffcv_competition_id: competitionId,
-    ffcv_group_id: groupId,
-    season_name: null,
-    competition_name: competitionName || null,
-    group_name: groupName || null,
-    total_matchdays: totalMatchdays || 0,
-    total_teams: 0,
-    last_synced_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
-  const { error: groupErr } = await supabase
-    .from('ffcv_groups')
-    .upsert(groupRecord, { onConflict: 'ffcv_season_id,ffcv_competition_id,ffcv_group_id' });
-
-  if (groupErr) {
-    errors.push(`Error saving group: ${groupErr.message}`);
-  }
-
-  // 3. Determine which matchdays to process
-  let targetMatchdays: number[] = [];
-  if (specificMatchday !== undefined && specificMatchday !== null) {
-    targetMatchdays = [specificMatchday];
-  } else if (syncAllMatchdays && allMatchdays.length > 0) {
-    targetMatchdays = allMatchdays;
-  } else if (allMatchdays.length > 0) {
-    targetMatchdays = allMatchdays;
-  } else {
-    targetMatchdays = [1];
-  }
-
+  // 2. Standings sync (Fetch J1 / active standing) to determine total teams
   let detectedTotalTeams = 0;
-
-  // 4. Standings sync (Fetch J1 / active standing)
   const standingsMatchday = specificMatchday !== undefined && specificMatchday !== null ? specificMatchday : 1;
   try {
     const standingsRes = await fetchGroupStandings({ groupId, matchday: standingsMatchday });
@@ -121,10 +86,44 @@ export async function syncGroupFFCV(
     errors.push(`Error fetching standings for J${standingsMatchday}: ${err.message}`);
   }
 
-  // 5. Process matches for each target matchday
+  // 3. Upsert FFCV Group Record
+  const groupRecord: FFCVGroupRecord = {
+    ffcv_season_id: seasonId,
+    ffcv_competition_id: competitionId,
+    ffcv_group_id: groupId,
+    season_name: null,
+    competition_name: competitionName || null,
+    group_name: groupName || null,
+    total_matchdays: totalMatchdays || 0,
+    total_teams: detectedTotalTeams || 0,
+    last_synced_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const { error: groupErr } = await supabase
+    .from('ffcv_groups')
+    .upsert(groupRecord, { onConflict: 'ffcv_season_id,ffcv_competition_id,ffcv_group_id' });
+
+  if (groupErr) {
+    errors.push(`Error saving group: ${groupErr.message}`);
+  }
+
+  // 4. Determine which matchdays to process
+  let targetMatchdays: number[] = [];
+  if (specificMatchday !== undefined && specificMatchday !== null) {
+    targetMatchdays = [specificMatchday];
+  } else if (syncAllMatchdays && allMatchdays.length > 0) {
+    targetMatchdays = allMatchdays;
+  } else if (allMatchdays.length > 0) {
+    targetMatchdays = allMatchdays;
+  } else {
+    targetMatchdays = [1];
+  }
+
+  // 5. Process matches and standings for each target matchday
   for (const matchday of targetMatchdays) {
     try {
-      // Matches for this matchday
+      // 5.1 Matches for this matchday
       const matchesRes = await fetchMatchdayResults({
         seasonId,
         competitionId,
@@ -157,18 +156,46 @@ export async function syncGroupFFCV(
         }
       }
 
+      // 5.2 Standings for this matchday
+      try {
+        const standingsRes = await fetchGroupStandings({ groupId, matchday });
+        if (standingsRes && standingsRes.clasificacion && Array.isArray(standingsRes.clasificacion) && standingsRes.clasificacion.length > 0) {
+          if (standingsRes.clasificacion.length > detectedTotalTeams) {
+            detectedTotalTeams = standingsRes.clasificacion.length;
+          }
+
+          const standingRecords: FFCVStandingRecord[] = standingsRes.clasificacion.map(item =>
+            normalizeStandingItem(item, {
+              seasonId,
+              competitionId,
+              groupId,
+              matchday
+            })
+          );
+
+          if (standingRecords.length > 0) {
+            const { error: standErr } = await supabase
+              .from('ffcv_standings')
+              .upsert(standingRecords, { onConflict: 'ffcv_group_id,matchday,team_ffcv_id' });
+
+            if (standErr) {
+              errors.push(`Error upserting standings for matchday ${matchday}: ${standErr.message}`);
+            } else {
+              standingsCount += standingRecords.length;
+            }
+          }
+        }
+      } catch (standErr: any) {
+        // Standings might not exist for future unscheduled matchdays
+        console.warn(`[syncGroupFFCV] Standings for matchday ${matchday} not available or error: ${standErr.message}`);
+      }
+
       matchdaysSynced.push(matchday);
+      // Small throttle between matchdays
+      await new Promise(r => setTimeout(r, 60));
     } catch (err: any) {
       errors.push(`Error processing matchday ${matchday}: ${err.message}`);
     }
-  }
-
-  // Update total teams in group if detected
-  if (detectedTotalTeams > 0) {
-    await supabase
-      .from('ffcv_groups')
-      .update({ total_teams: detectedTotalTeams, updated_at: new Date().toISOString() })
-      .match({ ffcv_season_id: seasonId, ffcv_competition_id: competitionId, ffcv_group_id: groupId });
   }
 
   return {
@@ -243,13 +270,17 @@ export async function syncAllConfiguredFFCVTeams(
 ): Promise<FFCVBatchSyncResult> {
   const supabase = customSupabaseClient || createAdminClient();
 
-  // 1. Query all teams with FFCV configuration
+  // 1. Query all teams with FFCV configuration belonging to active seasons
   const { data: teams, error: teamsErr } = await supabase
     .from('teams')
-    .select('id, name, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id')
+    .select(`
+      id, name, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, season_id,
+      season:seasons!inner ( id, is_active )
+    `)
     .not('ffcv_group_id', 'is', null)
     .not('ffcv_season_id', 'is', null)
-    .not('ffcv_competition_id', 'is', null);
+    .not('ffcv_competition_id', 'is', null)
+    .eq('season.is_active', true);
 
   if (teamsErr) {
     throw new Error(`Failed to query configured FFCV teams: ${teamsErr.message}`);

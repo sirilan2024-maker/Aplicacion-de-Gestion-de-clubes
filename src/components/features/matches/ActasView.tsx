@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { UploadCloud, CheckCircle2, AlertCircle, FileText, Search, RefreshCw, Eye, Edit3, ArrowRight, ShieldCheck, ChevronRight, ExternalLink, Maximize2, X, Trophy, Dumbbell, Sparkles, Layers } from "lucide-react"
 import { ActaConciliationModal } from "./ActaConciliationModal"
 import { createClient } from "@/lib/supabase/client"
@@ -16,6 +17,7 @@ interface ActasViewProps {
 }
 
 export function ActasView({ matches, teams, players = [], convocatorias = [], isReadOnly = false, userRole = '', userTeamIds = [] }: ActasViewProps) {
+  const searchParams = useSearchParams()
   const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'coordinador'
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -29,6 +31,26 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
   const [selectedTeamId, setSelectedTeamId] = useState<string>("all")
   const [selectedMatchId, setSelectedMatchId] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
+
+  // Sincronizar selección de partido desde URL (codacta, matchId, partidoId, ffcv_match_id)
+  useEffect(() => {
+    const targetParam = searchParams.get('codacta') || searchParams.get('matchId') || searchParams.get('partidoId') || searchParams.get('ffcv_match_id')
+    if (targetParam && matches && matches.length > 0) {
+      const found = matches.find((m: any) =>
+        m.id === targetParam ||
+        m.ffcv_match_id === targetParam ||
+        m.codacta === targetParam ||
+        (m.acta_oficial_url && m.acta_oficial_url.includes(targetParam))
+      )
+      if (found) {
+        setSelectedMatchId(found.id)
+        if (found.equipo_id) {
+          setSelectedTeamId(found.equipo_id)
+        }
+      }
+    }
+  }, [searchParams, matches])
+
 
   // Estado del visor y conciliación
   const [activeSignedUrl, setActiveSignedUrl] = useState<string | null>(null)

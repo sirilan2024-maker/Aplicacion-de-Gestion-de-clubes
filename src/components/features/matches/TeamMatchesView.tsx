@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
 import { FFCVMatchesSection } from "@/components/features/matches/FFCVMatchesSection"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
@@ -40,10 +40,46 @@ export function TeamMatchesView({
   serverConvocatorias = [],
   serverGroupInfo = null,
 }: TeamMatchesViewProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const initialView = (searchParams.get('view') as any) || 'partidos'
   const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'actas'>(initialView)
-  const [matchesSubTab, setMatchesSubTab] = useState<'club' | 'ffcv'>('club')
+  const [matchesSubTab, setMatchesSubTab] = useState<'club' | 'ffcv'>(searchParams.get('sub') === 'ffcv' ? 'ffcv' : 'club')
+
+  useEffect(() => {
+    const v = searchParams.get('view')
+    if (v === 'actas' || v === 'clasificacion' || v === 'disciplina' || v === 'partidos') {
+      setViewMode(v)
+    } else if (!v) {
+      setViewMode('partidos')
+    }
+    const sub = searchParams.get('sub')
+    if (sub === 'ffcv' || sub === 'club') {
+      setMatchesSubTab(sub)
+    } else if (!sub) {
+      setMatchesSubTab('club')
+    }
+  }, [searchParams])
+
+  const handleViewChange = (newView: 'partidos' | 'clasificacion' | 'disciplina' | 'actas') => {
+    setViewMode(newView)
+    if (newView === 'partidos') {
+      setMatchesSubTab('club')
+      router.replace(`/dashboard/equipos/${teamId}/partidos`)
+    } else {
+      router.replace(`/dashboard/equipos/${teamId}/partidos?view=${newView}`)
+    }
+  }
+
+  const handleSubTabChange = (newSub: 'club' | 'ffcv') => {
+    setMatchesSubTab(newSub)
+    if (newSub === 'club') {
+      router.replace(`/dashboard/equipos/${teamId}/partidos`)
+    } else {
+      router.replace(`/dashboard/equipos/${teamId}/partidos?sub=ffcv`)
+    }
+  }
+
   
   const [ffcvUrl] = useState<string | null>(serverTeamData?.ffcv_url || null)
   const [ffcvGroupId] = useState<string | null>(serverTeamData?.ffcv_group_id || null)
@@ -123,7 +159,7 @@ export function TeamMatchesView({
       <div className="flex justify-center mb-6">
         <div className="flex flex-col sm:flex-row bg-slate-100 p-1.5 rounded-2xl sm:rounded-full w-full sm:w-auto gap-1 sm:gap-0">
           <button
-            onClick={() => setViewMode('partidos')}
+            onClick={() => handleViewChange('partidos')}
             className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all ${
               viewMode === 'partidos'
                 ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
@@ -133,7 +169,7 @@ export function TeamMatchesView({
             Partidos
           </button>
           <button
-            onClick={() => setViewMode('clasificacion')}
+            onClick={() => handleViewChange('clasificacion')}
             className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all ${
               viewMode === 'clasificacion'
                 ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
@@ -143,7 +179,7 @@ export function TeamMatchesView({
             Clasificación
           </button>
           <button
-            onClick={() => setViewMode('actas')}
+            onClick={() => handleViewChange('actas')}
             className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
               viewMode === 'actas'
                 ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
@@ -153,7 +189,7 @@ export function TeamMatchesView({
             <FileText size={16} /> Actas
           </button>
           <button
-            onClick={() => setViewMode('disciplina')}
+            onClick={() => handleViewChange('disciplina')}
             className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
               viewMode === 'disciplina'
                 ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50'
@@ -185,7 +221,7 @@ export function TeamMatchesView({
             </div>
           </div>
           <button
-            onClick={() => setViewMode('disciplina')}
+            onClick={() => handleViewChange('disciplina')}
             className="w-full sm:w-auto px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
           >
             Ver Detalles
@@ -225,7 +261,7 @@ export function TeamMatchesView({
           {ffcvGroupId && (
             <div className="flex items-center justify-start border-b border-slate-200 pb-3 gap-2">
               <button
-                onClick={() => setMatchesSubTab('club')}
+                onClick={() => handleSubTabChange('club')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                   matchesSubTab === 'club'
                     ? 'bg-slate-900 text-white shadow-xs'
@@ -237,7 +273,7 @@ export function TeamMatchesView({
               </button>
 
               <button
-                onClick={() => setMatchesSubTab('ffcv')}
+                onClick={() => handleSubTabChange('ffcv')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                   matchesSubTab === 'ffcv'
                     ? 'bg-blue-600 text-white shadow-xs'
@@ -260,11 +296,13 @@ export function TeamMatchesView({
             />
           ) : (
             <FFCVMatchesSection
+              teamId={teamId}
               ffcvGroupId={ffcvGroupId}
               ffcvTeamId={ffcvTeamId}
               teamName={teamName}
               groupInfo={serverGroupInfo}
             />
+
           )}
         </div>
       )}

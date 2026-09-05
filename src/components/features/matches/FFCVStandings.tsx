@@ -49,10 +49,10 @@ export function FFCVStandings({
 
         if (data) {
           setStandings(data as FFCVStandingRecord[]);
-          // Default to first/latest matchday available
+          // Default to latest matchday available
           const jSet = Array.from(new Set(data.map((s: any) => s.matchday))).sort((a: any, b: any) => a - b);
           if (jSet.length > 0) {
-            setSelectedJornada(jSet[0] as number);
+            setSelectedJornada(jSet[jSet.length - 1] as number);
           }
         }
       } catch (err: any) {

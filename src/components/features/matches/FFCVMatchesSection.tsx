@@ -7,6 +7,7 @@ import { FFCVMatchRecord, FFCVGroupRecord } from "@/lib/ffcv/types";
 import { FFCVActaModal } from "./FFCVActaModal";
 
 interface FFCVMatchesSectionProps {
+  teamId?: string | null;
   ffcvGroupId?: string | null;
   ffcvTeamId?: string | null;
   teamName: string;
@@ -15,16 +16,23 @@ interface FFCVMatchesSectionProps {
 }
 
 export function FFCVMatchesSection({
+  teamId,
   ffcvGroupId,
   ffcvTeamId,
   teamName,
   initialMatches = [],
   groupInfo,
 }: FFCVMatchesSectionProps) {
+
   const [matches, setMatches] = useState<FFCVMatchRecord[]>(initialMatches);
   const [loading, setLoading] = useState(initialMatches.length === 0 && !!ffcvGroupId);
   const [selectedJornada, setSelectedJornada] = useState<number>(1);
-  const [viewingActa, setViewingActa] = useState<{ codacta: string; homeName: string; awayName: string } | null>(null);
+  const [viewingActa, setViewingActa] = useState<{
+    codacta: string;
+    matchId?: string;
+    homeName: string;
+    awayName: string;
+  } | null>(null);
 
   // Fetch FFCV matches from Supabase
   useEffect(() => {
@@ -332,6 +340,7 @@ export function FFCVMatchesSection({
                     <button
                       onClick={() => setViewingActa({
                         codacta: m.codacta!,
+                        matchId: m.ffcv_match_id,
                         homeName: m.home_team_name,
                         awayName: m.away_team_name
                       })}
@@ -352,11 +361,15 @@ export function FFCVMatchesSection({
       {viewingActa && (
         <FFCVActaModal
           codacta={viewingActa.codacta}
+          matchId={viewingActa.matchId}
+          teamId={teamId || undefined}
           homeTeamName={viewingActa.homeName}
           awayTeamName={viewingActa.awayName}
           onClose={() => setViewingActa(null)}
         />
       )}
+
     </div>
   );
 }
+

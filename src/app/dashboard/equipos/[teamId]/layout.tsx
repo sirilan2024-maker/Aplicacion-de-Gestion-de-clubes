@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, Users, CalendarIcon, LayoutList, Download, Activity, Trophy, Plus, BarChart3 } from "lucide-react";
+import { ArrowLeft, Users, CalendarIcon, LayoutList, Download, Activity, Trophy, Plus, BarChart3, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { ExportProvider } from "@/components/providers/ExportContext";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -54,6 +54,7 @@ export default function TeamLayout({
   const tabs = [
     { name: "Plantilla", href: `/dashboard/equipos/${teamId}/plantilla`, icon: Users },
     { name: "Partidos", href: `/dashboard/equipos/${teamId}/partidos`, icon: Trophy },
+    { name: "Análisis FFCV", href: `/dashboard/equipos/${teamId}/analisis`, icon: TrendingUp },
     { name: "Entrenamientos", href: `/dashboard/equipos/${teamId}/entrenamientos`, icon: CalendarIcon },
     { name: "Rendimiento", href: `/dashboard/equipos/${teamId}/rendimiento`, icon: Activity },
     { name: "Asistencia", href: `/dashboard/equipos/${teamId}/asistencia`, icon: LayoutList },

@@ -116,23 +116,15 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
       playerMap.set(p.id, { name: fullName, dorsal: p.dorsal, teamId: p.team_id })
     })
 
-    // 4. Obtener partidos del club
-    let matchQuery = supabase
-      .from('partidos')
-      .select('id, equipo_id, resultado_propio, resultado_rival, estado, season_id')
+    // 4. Obtener partidos legítimos del club (FFCV oficiales o partidos internos donde juega el club)
+    // Obtenemos los grupos y equipos FFCV del club para consolidar el Partido Deportivo Único
+    const { data: teamsFfcvData } = await supabase
+      .from('teams')
+      .select('id, name, category, ffcv_group_id, ffcv_team_id')
       .eq('club_id', clubId)
 
-    if (seasonFilterId && seasonFilterId !== 'todas') {
-      matchQuery = matchQuery.eq('season_id', seasonFilterId)
-    }
-
-    const { data: matchesData, error: matchError } = await matchQuery
-    if (matchError) {
-      return { success: false, error: matchError.message }
-    }
-
-    const matches = matchesData || []
-    const matchIds = matches.map(m => m.id)
+    const teamFfcvMap = new Map<string, any>()
+    teamsFfcvData?.forEach(t => teamFfcvMap.set(t.id, t))
 
     // Calcular estadísticas por equipo y KPIs globales de partidos
     const teamStatsMap = new Map<string, TeamStatDTO>()
@@ -159,12 +151,41 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
     let goalsFor = 0
     let goalsAgainst = 0
 
-    matches.forEach(m => {
-      // Solo contar partidos que tengan resultado registrado
-      if (m.resultado_propio !== null && m.resultado_rival !== null) {
+    // Consultar ffcv_matches para los grupos oficiales del club
+    const groupIds = (teamsFfcvData || []).map(t => t.ffcv_group_id).filter(Boolean)
+    let ffcvMatches: any[] = []
+    if (groupIds.length > 0) {
+      const { data: fData } = await supabase
+        .from('ffcv_matches')
+        .select('*')
+        .in('ffcv_group_id', groupIds)
+        .not('home_score', 'is', null)
+
+      ffcvMatches = fData || []
+    }
+
+    // Filtrar exclusivamente los partidos donde participa el Sporting Saladar
+    const processedMatchKeys = new Set<string>()
+
+    for (const team of (teamsFfcvData || [])) {
+      if (!team.ffcv_group_id) continue
+      const tMatches = ffcvMatches.filter(m => {
+        if (m.ffcv_group_id !== team.ffcv_group_id) return false
+        const isTeamId = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || String(m.away_team_ffcv_id) === String(team.ffcv_team_id)
+        const isName = (m.home_team_name || '').toLowerCase().includes('saladar') || (m.away_team_name || '').toLowerCase().includes('saladar')
+        return isTeamId || isName
+      })
+
+      tMatches.forEach(m => {
+        const uniqueKey = m.codacta || m.id || `${team.id}_${m.matchday}_${m.match_date}`
+        if (processedMatchKeys.has(uniqueKey)) return
+        processedMatchKeys.add(uniqueKey)
+
+        const isHome = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || (m.home_team_name || '').toLowerCase().includes('saladar')
+        const gf = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0)
+        const ga = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0)
+
         totalMatches++
-        const gf = m.resultado_propio || 0
-        const ga = m.resultado_rival || 0
         goalsFor += gf
         goalsAgainst += ga
 
@@ -176,7 +197,7 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
         else if (isDraw) draws++
         else if (isLoss) losses++
 
-        const tStat = teamStatsMap.get(m.equipo_id)
+        const tStat = teamStatsMap.get(team.id)
         if (tStat) {
           tStat.matchesPlayed++
           tStat.goalsFor += gf
@@ -187,18 +208,31 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
           else if (isLoss) tStat.losses++
           tStat.winRate = tStat.matchesPlayed > 0 ? Math.round((tStat.wins / tStat.matchesPlayed) * 100) : 0
         }
-      }
-    })
+      })
+    }
 
     const teamStats = Array.from(teamStatsMap.values()).sort((a, b) => b.matchesPlayed - a.matchesPlayed)
 
-    // 5. Obtener convocatorias para estadísticas de jugadores
+    // 5. Estadísticas de Jugadores desde convocatorias
+    let matchQuery = supabase
+      .from('partidos')
+      .select('id, equipo_id')
+      .eq('club_id', clubId)
+      .in('equipo_id', teamIds)
+
+    if (seasonFilterId && seasonFilterId !== 'todas') {
+      matchQuery = matchQuery.eq('season_id', seasonFilterId)
+    }
+
+    const { data: clubPartidos } = await matchQuery
+    const clubMatchIds = (clubPartidos || []).map(p => p.id)
+
     let convocatorias: any[] = []
-    if (matchIds.length > 0) {
+    if (clubMatchIds.length > 0) {
       const { data: convData } = await supabase
         .from('convocatorias')
         .select('player_id, partido_id, goals, yellow_cards, red_cards, minutes_played')
-        .in('partido_id', matchIds)
+        .in('partido_id', clubMatchIds)
       
       convocatorias = convData || []
     }

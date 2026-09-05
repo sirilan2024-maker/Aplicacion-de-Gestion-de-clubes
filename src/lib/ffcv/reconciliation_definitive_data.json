@@ -1,0 +1,580 @@
+{
+  "generatedAt": "2026-09-05T17:00:24.073Z",
+  "teamGoalReconciliation": {
+    "CADETE A": {
+      "equipo": "CADETE A",
+      "golesMarcadorOficial": 52,
+      "golesJugadoresActas": 51,
+      "golesPropiaMetaRival": 1,
+      "golesAdministrativosComite": 0,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 52,
+      "diferencia": 0
+    },
+    "CADETE B": {
+      "equipo": "CADETE B",
+      "golesMarcadorOficial": 45,
+      "golesJugadoresActas": 43,
+      "golesPropiaMetaRival": 1,
+      "golesAdministrativosComite": 1,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 45,
+      "diferencia": 0
+    },
+    "INFANTIL A": {
+      "equipo": "INFANTIL A",
+      "golesMarcadorOficial": 77,
+      "golesJugadoresActas": 76,
+      "golesPropiaMetaRival": 1,
+      "golesAdministrativosComite": 0,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 77,
+      "diferencia": 0
+    },
+    "INFANTIL B": {
+      "equipo": "INFANTIL B",
+      "golesMarcadorOficial": 19,
+      "golesJugadoresActas": 19,
+      "golesPropiaMetaRival": 0,
+      "golesAdministrativosComite": 0,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 19,
+      "diferencia": 0
+    },
+    "JUVENIL A": {
+      "equipo": "JUVENIL A",
+      "golesMarcadorOficial": 67,
+      "golesJugadoresActas": 66,
+      "golesPropiaMetaRival": 1,
+      "golesAdministrativosComite": 0,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 67,
+      "diferencia": 0
+    },
+    "JUVENIL B": {
+      "equipo": "JUVENIL B",
+      "golesMarcadorOficial": 65,
+      "golesJugadoresActas": 61,
+      "golesPropiaMetaRival": 1,
+      "golesAdministrativosComite": 3,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 65,
+      "diferencia": 0
+    },
+    "SENIOR": {
+      "equipo": "SENIOR",
+      "golesMarcadorOficial": 49,
+      "golesJugadoresActas": 47,
+      "golesPropiaMetaRival": 0,
+      "golesAdministrativosComite": 2,
+      "golesNoAsignadosActa": 0,
+      "sumaTotalExplicada": 49,
+      "diferencia": 0
+    }
+  },
+  "teamCardReconciliation": {
+    "CADETE A": {
+      "equipo": "CADETE A",
+      "amarillasActas": 40,
+      "rojasActas": 2
+    },
+    "CADETE B": {
+      "equipo": "CADETE B",
+      "amarillasActas": 38,
+      "rojasActas": 2
+    },
+    "INFANTIL A": {
+      "equipo": "INFANTIL A",
+      "amarillasActas": 25,
+      "rojasActas": 1
+    },
+    "INFANTIL B": {
+      "equipo": "INFANTIL B",
+      "amarillasActas": 22,
+      "rojasActas": 0
+    },
+    "JUVENIL A": {
+      "equipo": "JUVENIL A",
+      "amarillasActas": 69,
+      "rojasActas": 6
+    },
+    "JUVENIL B": {
+      "equipo": "JUVENIL B",
+      "amarillasActas": 50,
+      "rojasActas": 3
+    },
+    "SENIOR": {
+      "equipo": "SENIOR",
+      "amarillasActas": 138,
+      "rojasActas": 1
+    }
+  },
+  "adminMatches": [
+    {
+      "team": "CADETE B",
+      "matchday": 5,
+      "codacta": "26376988",
+      "officialScore": "3-0",
+      "adminGoals": 1,
+      "reason": "Resolución federativa / gol administrativo"
+    },
+    {
+      "team": "JUVENIL B",
+      "matchday": 24,
+      "codacta": "26350005",
+      "officialScore": "3-0",
+      "adminGoals": 3,
+      "reason": "Victoria administrativa 3-0 otorgada por Comité de Competición FFCV (Incomparecencia / Alineación indebida rival)"
+    },
+    {
+      "team": "SENIOR",
+      "matchday": 14,
+      "codacta": "26331718",
+      "officialScore": "3-0",
+      "adminGoals": 2,
+      "reason": "Resolución de Comité FFCV (Partido finalizado administrativamente 3-0)"
+    }
+  ],
+  "ownGoalsDetail": [
+    {
+      "type": "Saladar_Own_Goal_For_Rival",
+      "team": "CADETE A",
+      "matchday": 4,
+      "codacta": "26377165",
+      "player": "RUFETE ALBALADEJO, MARCOS",
+      "minute": "25"
+    },
+    {
+      "type": "Rival_Own_Goal_For_Saladar",
+      "team": "CADETE A",
+      "matchday": 18,
+      "codacta": "26377263",
+      "rivalPlayer": "HUGHES KEHOE, FINNLEY",
+      "minute": "18"
+    },
+    {
+      "type": "Saladar_Own_Goal_For_Rival",
+      "team": "CADETE B",
+      "matchday": 20,
+      "codacta": "26377092",
+      "player": "GARCIA VARON, DARIO",
+      "minute": "34"
+    },
+    {
+      "type": "Rival_Own_Goal_For_Saladar",
+      "team": "CADETE B",
+      "matchday": 20,
+      "codacta": "26377092",
+      "rivalPlayer": "HLINKA, ARTEM",
+      "minute": "22"
+    },
+    {
+      "type": "Saladar_Own_Goal_For_Rival",
+      "team": "INFANTIL A",
+      "matchday": 7,
+      "codacta": "26380956",
+      "player": "VASQUEZ RESTREPO, MATHIAS",
+      "minute": "43"
+    },
+    {
+      "type": "Rival_Own_Goal_For_Saladar",
+      "team": "INFANTIL A",
+      "matchday": 25,
+      "codacta": "26465056",
+      "rivalPlayer": "PEIRÓ BAÑÓN, SAMUEL",
+      "minute": "60"
+    },
+    {
+      "type": "Saladar_Own_Goal_For_Rival",
+      "team": "INFANTIL B",
+      "matchday": 4,
+      "codacta": "26380754",
+      "player": "GARCIA ANDREU, MARIO",
+      "minute": "26"
+    },
+    {
+      "type": "Saladar_Own_Goal_For_Rival",
+      "team": "INFANTIL B",
+      "matchday": 18,
+      "codacta": "26380851",
+      "player": "PAREDES HERNANDEZ, GUSTAVO",
+      "minute": "20"
+    },
+    {
+      "type": "Rival_Own_Goal_For_Saladar",
+      "team": "JUVENIL A",
+      "matchday": 18,
+      "codacta": "26355718",
+      "rivalPlayer": "FARISSI KHATIS, MOHAMED",
+      "minute": "10"
+    },
+    {
+      "type": "Saladar_Own_Goal_For_Rival",
+      "team": "JUVENIL A",
+      "matchday": 29,
+      "codacta": "26355812",
+      "player": "TABITI BENMELLOUK, MOHA",
+      "minute": "23"
+    },
+    {
+      "type": "Rival_Own_Goal_For_Saladar",
+      "team": "JUVENIL B",
+      "matchday": 27,
+      "codacta": "26350028",
+      "rivalPlayer": "BOIAN FILIP, EDUARD ADRIAN",
+      "minute": "55"
+    }
+  ],
+  "topScorers": [
+    {
+      "id": null,
+      "name": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+      "dorsal": 10,
+      "teams": "CADETE A / JUVENIL A / JUVENIL B",
+      "teamMatches": {
+        "CADETE A": 24,
+        "JUVENIL A": 1,
+        "JUVENIL B": 10
+      },
+      "matches": 35,
+      "starts": 30,
+      "minutes": 2470,
+      "goals": 18,
+      "yellows": 2,
+      "reds": 0,
+      "goalsPerMatch": "0.51"
+    },
+    {
+      "id": null,
+      "name": "ABADOU EL HIMER, RAYANE",
+      "dorsal": 24,
+      "teams": "INFANTIL A",
+      "teamMatches": {
+        "INFANTIL A": 25
+      },
+      "matches": 25,
+      "starts": 25,
+      "minutes": 1750,
+      "goals": 16,
+      "yellows": 0,
+      "reds": 0,
+      "goalsPerMatch": "0.64"
+    },
+    {
+      "id": "43f855fa-7a74-4306-88b5-8612f3b2d518",
+      "name": "mohamed Amin el orf chakir",
+      "dorsal": 23,
+      "teams": "JUVENIL A / SENIOR",
+      "teamMatches": {
+        "JUVENIL A": 21,
+        "SENIOR": 4
+      },
+      "matches": 25,
+      "starts": 18,
+      "minutes": 1620,
+      "goals": 15,
+      "yellows": 6,
+      "reds": 1,
+      "goalsPerMatch": "0.60"
+    },
+    {
+      "id": "99945786-2b28-4b13-917c-39b4b6818bdd",
+      "name": "Adam Salhi Botabbass",
+      "dorsal": 23,
+      "teams": "CADETE B / INFANTIL A",
+      "teamMatches": {
+        "CADETE B": 1,
+        "INFANTIL A": 23
+      },
+      "matches": 24,
+      "starts": 19,
+      "minutes": 1330,
+      "goals": 15,
+      "yellows": 1,
+      "reds": 0,
+      "goalsPerMatch": "0.63"
+    },
+    {
+      "id": null,
+      "name": "PONCE ANTEQUERA, MARCOS",
+      "dorsal": 18,
+      "teams": "CADETE B / JUVENIL B",
+      "teamMatches": {
+        "CADETE B": 24,
+        "JUVENIL B": 2
+      },
+      "matches": 26,
+      "starts": 23,
+      "minutes": 1840,
+      "goals": 14,
+      "yellows": 2,
+      "reds": 0,
+      "goalsPerMatch": "0.54"
+    },
+    {
+      "id": "e99b715a-e6c2-466d-a45b-22a1f8b4efbb",
+      "name": "adem Aderdour",
+      "dorsal": 9,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 16
+      },
+      "matches": 16,
+      "starts": 16,
+      "minutes": 1440,
+      "goals": 14,
+      "yellows": 0,
+      "reds": 0,
+      "goalsPerMatch": "0.88"
+    },
+    {
+      "id": "d0f6db44-8a71-45eb-b690-57f03e377b0e",
+      "name": "José Luis Fernández Avilés",
+      "dorsal": 18,
+      "teams": "JUVENIL A / SENIOR",
+      "teamMatches": {
+        "JUVENIL A": 21,
+        "SENIOR": 1
+      },
+      "matches": 22,
+      "starts": 15,
+      "minutes": 1350,
+      "goals": 14,
+      "yellows": 3,
+      "reds": 0,
+      "goalsPerMatch": "0.64"
+    },
+    {
+      "id": "bea3f700-7e8a-4848-a991-233e4d4108c9",
+      "name": "Adnan Lekhdassi el mouhafid",
+      "dorsal": 19,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 24
+      },
+      "matches": 24,
+      "starts": 23,
+      "minutes": 2070,
+      "goals": 13,
+      "yellows": 5,
+      "reds": 0,
+      "goalsPerMatch": "0.54"
+    },
+    {
+      "id": "e1c135d1-138d-48ee-84df-d6d59de713c0",
+      "name": "ANASS JEBBOURI KHLIFI",
+      "dorsal": 25,
+      "teams": "SENIOR",
+      "teamMatches": {
+        "SENIOR": 27
+      },
+      "matches": 27,
+      "starts": 17,
+      "minutes": 1530,
+      "goals": 12,
+      "yellows": 3,
+      "reds": 0,
+      "goalsPerMatch": "0.44"
+    },
+    {
+      "id": "1c0ec527-8ab9-440f-bb42-aa042e7f4b9a",
+      "name": "Rida Bejji",
+      "dorsal": 12,
+      "teams": "CADETE B / INFANTIL A",
+      "teamMatches": {
+        "CADETE B": 2,
+        "INFANTIL A": 12
+      },
+      "matches": 14,
+      "starts": 10,
+      "minutes": 700,
+      "goals": 12,
+      "yellows": 3,
+      "reds": 0,
+      "goalsPerMatch": "0.86"
+    }
+  ],
+  "topMinutes": [
+    {
+      "id": null,
+      "name": "TORQUI HAMDOUNI, ABDERRAHIM TALAL",
+      "dorsal": 10,
+      "teams": "CADETE A / JUVENIL A / JUVENIL B",
+      "teamMatches": {
+        "CADETE A": 24,
+        "JUVENIL A": 1,
+        "JUVENIL B": 10
+      },
+      "matches": 35,
+      "starts": 30,
+      "minutes": 2470,
+      "goals": 18,
+      "yellows": 2,
+      "reds": 0,
+      "goalsPerMatch": "0.51"
+    },
+    {
+      "id": "13f4d905-a5c7-417a-94ed-4f3cfb66b5fd",
+      "name": "GUILLERMO BALLESTER GIMENEZ",
+      "dorsal": 2,
+      "teams": "SENIOR",
+      "teamMatches": {
+        "SENIOR": 27
+      },
+      "matches": 27,
+      "starts": 27,
+      "minutes": 2430,
+      "goals": 5,
+      "yellows": 15,
+      "reds": 0,
+      "goalsPerMatch": "0.19"
+    },
+    {
+      "id": "82658280-d560-4e18-985b-5ba1958a8ba8",
+      "name": "TOMAS VALERO HERRERO",
+      "dorsal": 3,
+      "teams": "SENIOR",
+      "teamMatches": {
+        "SENIOR": 28
+      },
+      "matches": 28,
+      "starts": 26,
+      "minutes": 2340,
+      "goals": 0,
+      "yellows": 11,
+      "reds": 0,
+      "goalsPerMatch": "0.00"
+    },
+    {
+      "id": "027610f1-4dd1-48e2-a01a-ac952f3966f5",
+      "name": "Yerai Montero Cabrera",
+      "dorsal": 13,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 28
+      },
+      "matches": 28,
+      "starts": 25,
+      "minutes": 2250,
+      "goals": 6,
+      "yellows": 4,
+      "reds": 0,
+      "goalsPerMatch": "0.21"
+    },
+    {
+      "id": null,
+      "name": "TOURQUI BERRFAI, MOHAMMED",
+      "dorsal": 30,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 27
+      },
+      "matches": 27,
+      "starts": 24,
+      "minutes": 2160,
+      "goals": 5,
+      "yellows": 2,
+      "reds": 0,
+      "goalsPerMatch": "0.19"
+    },
+    {
+      "id": "ca9bad32-261f-4dc8-b463-dddc09fa768d",
+      "name": "OSCAR GIRONA NAVARRO",
+      "dorsal": 8,
+      "teams": "SENIOR",
+      "teamMatches": {
+        "SENIOR": 27
+      },
+      "matches": 27,
+      "starts": 24,
+      "minutes": 2160,
+      "goals": 2,
+      "yellows": 14,
+      "reds": 0,
+      "goalsPerMatch": "0.07"
+    },
+    {
+      "id": null,
+      "name": "BENSAAD BENTAYED, ADAM",
+      "dorsal": 6,
+      "teams": "CADETE A / JUVENIL B",
+      "teamMatches": {
+        "CADETE A": 19,
+        "JUVENIL B": 11
+      },
+      "matches": 30,
+      "starts": 25,
+      "minutes": 2090,
+      "goals": 1,
+      "yellows": 0,
+      "reds": 0,
+      "goalsPerMatch": "0.03"
+    },
+    {
+      "id": null,
+      "name": "ESSAHAL SABIR, MOHAMMED",
+      "dorsal": 18,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 27
+      },
+      "matches": 27,
+      "starts": 23,
+      "minutes": 2070,
+      "goals": 2,
+      "yellows": 5,
+      "reds": 0,
+      "goalsPerMatch": "0.07"
+    },
+    {
+      "id": "4110f3f0-7385-4ad7-96a7-4b28e107943d",
+      "name": "Denis Lukiyanov Gonzalez",
+      "dorsal": 10,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 25
+      },
+      "matches": 25,
+      "starts": 23,
+      "minutes": 2070,
+      "goals": 5,
+      "yellows": 4,
+      "reds": 0,
+      "goalsPerMatch": "0.20"
+    },
+    {
+      "id": "bea3f700-7e8a-4848-a991-233e4d4108c9",
+      "name": "Adnan Lekhdassi el mouhafid",
+      "dorsal": 19,
+      "teams": "JUVENIL B",
+      "teamMatches": {
+        "JUVENIL B": 24
+      },
+      "matches": 24,
+      "starts": 23,
+      "minutes": 2070,
+      "goals": 13,
+      "yellows": 5,
+      "reds": 0,
+      "goalsPerMatch": "0.54"
+    }
+  ],
+  "allPlayersStatsCount": 164,
+  "marioMacia": {
+    "id": "033ba22e-bbfb-431b-9163-6f15f9a89817",
+    "name": "Mario Macia Garcia",
+    "dorsal": 7,
+    "teams": {},
+    "teamMatches": {
+      "INFANTIL B": 23
+    },
+    "matches": 23,
+    "starts": 23,
+    "subsIn": 0,
+    "subsOut": 0,
+    "minutes": 1610,
+    "goals": 5,
+    "yellows": 4,
+    "reds": 0
+  }
+}

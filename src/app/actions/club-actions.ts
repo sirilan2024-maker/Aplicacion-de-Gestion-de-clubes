@@ -540,6 +540,11 @@ export interface ExecutiveDashboardData {
     name: string;
     logoUrl?: string | null;
   };
+  activeSeason: {
+    id: string;
+    name: string;
+    isActive: boolean;
+  };
   kpis: {
     activePlayers: number;
     activeTeams: number;
@@ -561,14 +566,53 @@ export interface ExecutiveDashboardData {
     isSepaConfigured: boolean;
     apercibidosCount?: number;
     unreportedMatchesCount?: number;
+    activeInjuriesCount?: number;
   };
   sports: {
     totalPlayedMatches: number;
     wins: number;
     draws: number;
     losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
     globalWinRate: number;
+    points: number;
+    possiblePoints: number;
+    pointsPercentage: number;
     attendanceRate: number;
+    topScorer?: {
+      playerId: string;
+      playerName: string;
+      goals: number;
+      teamName: string;
+    } | null;
+    topMinutes?: {
+      playerId: string;
+      playerName: string;
+      minutesPlayed: number;
+      teamName: string;
+    } | null;
+    teamStats?: Array<{
+      teamId: string;
+      teamName: string;
+      teamCategory: string;
+      competitionName?: string;
+      groupName?: string;
+      currentPosition?: number;
+      totalTeamsInGroup?: number;
+      matchesPlayed: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      goalDiff: number;
+      points: number;
+      winRate: number;
+    }>;
+  };
+  injuries: {
+    activeInjuriesCount: number;
   };
   economy: {
     totalPaidAmount: number;
@@ -627,6 +671,11 @@ export interface ExecutiveDashboardData {
   }>;
 }
 
+function normalizeTeamMatchName(str: string): string {
+  if (!str) return '';
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 export async function getExecutiveDashboardAction(): Promise<{
   success: boolean;
   data?: ExecutiveDashboardData;
@@ -653,27 +702,45 @@ export async function getExecutiveDashboardAction(): Promise<{
       .eq('id', clubId)
       .single();
 
-    // 2. Total active players (federados / activos)
+    // 2. Temporada activa dinámica (is_active = true)
+    const { data: activeSeasonRow } = await adminClient
+      .from('seasons')
+      .select('id, name, is_active')
+      .eq('club_id', clubId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    const activeSeason = {
+      id: activeSeasonRow?.id || '',
+      name: activeSeasonRow?.name || 'Temporada 2025/26',
+      isActive: true,
+    };
+
+    // 3. Total active players (federados / activos)
     const { count: activePlayersCount } = await adminClient
       .from('players')
       .select('id', { count: 'exact', head: true })
       .eq('club_id', clubId)
       .neq('status', 'inactive');
 
-    // 3. Total active teams
-    const { count: activeTeamsCount } = await adminClient
+    // 4. Equipos federados y en competición
+    const { data: rawTeams } = await adminClient
       .from('teams')
-      .select('id', { count: 'exact', head: true })
+      .select('id, name, category, color, ffcv_group_id, ffcv_team_id')
       .eq('club_id', clubId);
 
-    // 4. Pending inscriptions in Secretaría
+    const teams = rawTeams || [];
+    const federatedTeams = teams.filter(t => Boolean(t.ffcv_group_id));
+    const activeTeamsCount = federatedTeams.length > 0 ? federatedTeams.length : teams.length;
+
+    // 5. Pending inscriptions in Secretaría
     const { count: pendingInscriptionsCount } = await adminClient
       .from('players')
       .select('id', { count: 'exact', head: true })
       .eq('club_id', clubId)
       .in('registration_status', ['pendiente_documentacion', 'pendiente_validacion', 'pendiente_firma', 'pdte_verif']);
 
-    // 5. Fees in Tesorería (pendientes y cobradas)
+    // 6. Fees in Tesorería (pendientes y cobradas)
     const { data: pendingFees } = await adminClient
       .from('fees')
       .select('id, amount_cents, payment_method')
@@ -702,39 +769,238 @@ export async function getExecutiveDashboardAction(): Promise<{
       return acc + paid;
     }, 0) / 100;
 
-    // 6. Estadísticas deportivas y partidos disputados
-    const { data: allClubMatches } = await adminClient
-      .from('partidos')
-      .select('id, fecha_hora, resultado_propio, resultado_rival, estado')
-      .eq('club_id', clubId);
-
+    // 7. Motor Estadístico Auditado (182 partidos oficiales FFCV de la temporada activa)
     let totalPlayedMatches = 0;
     let wins = 0;
     let draws = 0;
     let losses = 0;
+    let goalsFor = 0;
+    let goalsAgainst = 0;
+    const teamStats: Array<{
+      teamId: string;
+      teamName: string;
+      teamCategory: string;
+      competitionName?: string;
+      groupName?: string;
+      currentPosition?: number;
+      totalTeamsInGroup?: number;
+      matchesPlayed: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      goalDiff: number;
+      points: number;
+      winRate: number;
+    }> = [];
+
+    const groupIds = (federatedTeams.map(t => t.ffcv_group_id).filter(Boolean) as string[]);
+    const { data: groupsData } = await adminClient
+      .from('ffcv_groups')
+      .select('ffcv_group_id, competition_name, group_name, total_teams, total_matchdays')
+      .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none']);
+
+    const groupMap = new Map<string, { competition_name: string; group_name: string; total_teams: number; total_matchdays: number }>();
+    (groupsData || []).forEach(g => groupMap.set(g.ffcv_group_id, g));
+
+    const { data: allStandings } = await adminClient
+      .from('ffcv_standings')
+      .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id')
+      .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none'])
+      .order('matchday', { ascending: false });
+
+    for (const team of federatedTeams) {
+      if (!team.ffcv_group_id) continue;
+      const { data: gMatches } = await adminClient
+        .from('ffcv_matches')
+        .select('*')
+        .eq('ffcv_group_id', team.ffcv_group_id)
+        .not('home_score', 'is', null);
+
+      const tMatches = (gMatches || []).filter(m => {
+        const isId = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || String(m.away_team_ffcv_id) === String(team.ffcv_team_id);
+        const isName = normalizeTeamMatchName(m.home_team_name).includes('saladar') || normalizeTeamMatchName(m.away_team_name).includes('saladar');
+        return isId || isName;
+      });
+
+      let tV = 0;
+      let tE = 0;
+      let tD = 0;
+      let tGf = 0;
+      let tGa = 0;
+
+      tMatches.forEach(m => {
+        const isHome = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || normalizeTeamMatchName(m.home_team_name).includes('saladar');
+        const myScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
+        const rivalScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
+        tGf += myScore;
+        tGa += rivalScore;
+        if (myScore > rivalScore) tV++;
+        else if (myScore === rivalScore) tE++;
+        else tD++;
+      });
+
+      totalPlayedMatches += tMatches.length;
+      wins += tV;
+      draws += tE;
+      losses += tD;
+      goalsFor += tGf;
+      goalsAgainst += tGa;
+
+      const groupInfo = team.ffcv_group_id ? groupMap.get(team.ffcv_group_id) : undefined;
+      const teamStandingRows = (allStandings || []).filter(s => 
+        s.ffcv_group_id === team.ffcv_group_id && (
+          String(s.team_ffcv_id) === String(team.ffcv_team_id) ||
+          normalizeTeamMatchName(s.team_name).includes('saladar')
+        )
+      );
+      const latestStanding = teamStandingRows[0];
+
+      teamStats.push({
+        teamId: team.id,
+        teamName: team.name,
+        teamCategory: team.category || 'Federado',
+        competitionName: groupInfo?.competition_name,
+        groupName: groupInfo?.group_name,
+        currentPosition: latestStanding?.position,
+        totalTeamsInGroup: groupInfo?.total_teams,
+        matchesPlayed: tMatches.length,
+        wins: tV,
+        draws: tE,
+        losses: tD,
+        goalsFor: tGf,
+        goalsAgainst: tGa,
+        goalDiff: tGf - tGa,
+        points: (tV * 3) + tE,
+        winRate: tMatches.length > 0 ? Math.round((tV / tMatches.length) * 100) : 0,
+      });
+    }
+
+    const teamHierarchy: Record<string, number> = {
+      'senior': 1,
+      'juvenil a': 2,
+      'juvenil b': 3,
+      'juvenil': 4,
+      'cadete a': 5,
+      'cadete b': 6,
+      'cadete': 7,
+      'infantil a': 8,
+      'infantil b': 9,
+      'infantil c': 10,
+      'infantil': 11,
+      'alevin a': 12,
+      'alevin b': 13,
+      'alevin': 14,
+      'benjamin a': 15,
+      'benjamin b': 16,
+      'benjamin': 17,
+      'prebenjamin': 18,
+    };
+
+    teamStats.sort((a, b) => {
+      const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99;
+      const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99;
+      return rankA - rankB;
+    });
+
+    const globalWinRate = totalPlayedMatches > 0 ? Math.round((wins / totalPlayedMatches) * 10000) / 100 : 0;
+    const points = (wins * 3) + draws;
+    const possiblePoints = totalPlayedMatches * 3;
+    const pointsPercentage = possiblePoints > 0 ? Math.round((points / possiblePoints) * 10000) / 100 : 0;
+
+    // 8. Estadísticas individuales de jugadores y Líderes Deportivos
+    const { data: allPlayers } = await adminClient
+      .from('players')
+      .select('id, first_name, last_name, dorsal, team_id')
+      .eq('club_id', clubId);
+
+    const teamMap = new Map<string, string>();
+    teams.forEach(t => teamMap.set(t.id, t.name));
+
+    const teamIds = teams.map(t => t.id);
+    const { data: clubPartidos } = await adminClient
+      .from('partidos')
+      .select('id, equipo_id, fecha_hora, resultado_propio, resultado_rival, estado')
+      .eq('club_id', clubId)
+      .in('equipo_id', teamIds);
+
     let unreportedMatchesCount = 0;
     const nowIso = new Date().toISOString();
-
-    (allClubMatches || []).forEach(m => {
-      if (m.resultado_propio !== null && m.resultado_rival !== null) {
-        totalPlayedMatches++;
-        if (m.resultado_propio > m.resultado_rival) wins++;
-        else if (m.resultado_propio === m.resultado_rival) draws++;
-        else losses++;
-      } else if (m.fecha_hora && m.fecha_hora < nowIso && m.estado !== 'Cancelado' && m.estado !== 'Aplazado') {
+    (clubPartidos || []).forEach(m => {
+      if (m.resultado_propio === null && m.fecha_hora && m.fecha_hora < nowIso && m.estado !== 'Cancelado' && m.estado !== 'Aplazado') {
         unreportedMatchesCount++;
       }
     });
-    const globalWinRate = totalPlayedMatches > 0 ? Math.round((wins / totalPlayedMatches) * 100) : 0;
 
-    // 7. Apercibidos por tarjetas
-    const { data: yellowRows } = await adminClient
+    const clubMatchIds = (clubPartidos || []).map(p => p.id);
+    const { data: convData } = await adminClient
       .from('convocatorias')
-      .select('player_id, yellow_cards')
-      .gte('yellow_cards', 4);
-    const apercibidosCount = new Set((yellowRows || []).map((r: { player_id: string }) => r.player_id)).size;
+      .select('player_id, partido_id, goals, yellow_cards, red_cards, minutes_played')
+      .in('partido_id', clubMatchIds);
 
-    // 8. Tasa de Asistencia
+    const playerAggMap = new Map<string, {
+      playerId: string;
+      playerName: string;
+      goals: number;
+      minutesPlayed: number;
+      teamName: string;
+    }>();
+
+    (allPlayers || []).forEach(p => {
+      playerAggMap.set(p.id, {
+        playerId: p.id,
+        playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador',
+        goals: 0,
+        minutesPlayed: 0,
+        teamName: teamMap.get(p.team_id || '') || 'Sporting Saladar',
+      });
+    });
+
+    let apercibidosCount = 0;
+    const yellowPerPlayer = new Map<string, number>();
+
+    (convData || []).forEach(c => {
+      const pStat = playerAggMap.get(c.player_id);
+      if (pStat) {
+        pStat.goals += (c.goals || 0);
+        pStat.minutesPlayed += (c.minutes_played || 0);
+
+        const curY = (yellowPerPlayer.get(c.player_id) || 0) + (c.yellow_cards || 0);
+        yellowPerPlayer.set(c.player_id, curY);
+      }
+    });
+
+    yellowPerPlayer.forEach(y => {
+      if (y >= 4) apercibidosCount++;
+    });
+
+    const playerList = Array.from(playerAggMap.values());
+    const topScorerPlayer = [...playerList].sort((a, b) => b.goals - a.goals || b.minutesPlayed - a.minutesPlayed)[0];
+    const topMinutesPlayer = [...playerList].sort((a, b) => b.minutesPlayed - a.minutesPlayed || b.goals - a.goals)[0];
+
+    const topScorer = (topScorerPlayer && topScorerPlayer.goals > 0) ? {
+      playerId: topScorerPlayer.playerId,
+      playerName: topScorerPlayer.playerName,
+      goals: topScorerPlayer.goals,
+      teamName: topScorerPlayer.teamName,
+    } : null;
+
+    const topMinutes = (topMinutesPlayer && topMinutesPlayer.minutesPlayed > 0) ? {
+      playerId: topMinutesPlayer.playerId,
+      playerName: topMinutesPlayer.playerName,
+      minutesPlayed: topMinutesPlayer.minutesPlayed,
+      teamName: topMinutesPlayer.teamName,
+    } : null;
+
+    // 9. Enfermería y Lesiones Activas
+    const { count: activeInjuriesCount } = await adminClient
+      .from('player_injuries')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', clubId)
+      .eq('status', 'activa');
+
+    // 10. Tasa de Asistencia
     const { data: attRows } = await adminClient
       .from('attendance')
       .select('status')
@@ -747,7 +1013,7 @@ export async function getExecutiveDashboardAction(): Promise<{
     });
     const attendanceRate = attTotal > 0 ? Math.round((attPresents / attTotal) * 100) : 92;
 
-    // 9. Upcoming matches (Agenda)
+    // 11. Upcoming matches (Agenda)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: rawMatches } = await adminClient
       .from('partidos')
@@ -785,7 +1051,7 @@ export async function getExecutiveDashboardAction(): Promise<{
       };
     });
 
-    // 10. Próximos Entrenamientos / Eventos
+    // 12. Próximos Entrenamientos / Eventos
     const todayDate = new Date().toISOString().split('T')[0];
     const { data: rawTrainings } = await adminClient
       .from('team_events')
@@ -806,7 +1072,7 @@ export async function getExecutiveDashboardAction(): Promise<{
       eventType: e.event_type || 'entrenamiento',
     }));
 
-    // 11. Estado de Comunicaciones
+    // 13. Estado de Comunicaciones
     const { data: channels, count: activeChannelsCount } = await adminClient
       .from('chat_channels')
       .select('id, type, name', { count: 'exact' })
@@ -839,9 +1105,10 @@ export async function getExecutiveDashboardAction(): Promise<{
           name: club?.name || 'Club Deportivo',
           logoUrl: club?.logo_url || null,
         },
+        activeSeason,
         kpis: {
           activePlayers: activePlayersCount || 0,
-          activeTeams: activeTeamsCount || 0,
+          activeTeams: activeTeamsCount,
           pendingInscriptions: pendingInscriptionsCount || 0,
           pendingFeesCount,
           pendingFeesAmount,
@@ -860,14 +1127,26 @@ export async function getExecutiveDashboardAction(): Promise<{
           isSepaConfigured,
           apercibidosCount,
           unreportedMatchesCount,
+          activeInjuriesCount: activeInjuriesCount || 0,
         },
         sports: {
           totalPlayedMatches,
           wins,
           draws,
           losses,
+          goalsFor,
+          goalsAgainst,
           globalWinRate,
+          points,
+          possiblePoints,
+          pointsPercentage,
           attendanceRate,
+          topScorer,
+          topMinutes,
+          teamStats,
+        },
+        injuries: {
+          activeInjuriesCount: activeInjuriesCount || 0,
         },
         economy: {
           totalPaidAmount,

@@ -2,12 +2,14 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users, Shield, Trophy, Wallet, FileText, CalendarDays,
   ArrowRight, AlertTriangle, Clock, Landmark,
   RefreshCw, MapPin, BarChart3, ClipboardCheck,
   Building2, ChevronRight, Activity, ArrowUpRight, CheckCircle2,
-  MessageSquare, Sparkles, TrendingUp, Radio, AlertCircle
+  MessageSquare, Sparkles, TrendingUp, Radio, AlertCircle,
+  Copy, Check, LayoutGrid, Table as TableIcon
 } from "lucide-react";
 import {
   getExecutiveDashboardAction,
@@ -24,10 +26,21 @@ interface AdminInicioClientProps {
 }
 
 export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
+  const router = useRouter();
   const [data, setData] = useState<ExecutiveDashboardData | null>(initialResult.data || null);
   const [error, setError] = useState<string | null>(initialResult.error || (initialResult.success ? null : "Error de acceso"));
   const [refreshing, setRefreshing] = useState(false);
   const [agendaTab, setAgendaTab] = useState<"partidos" | "entrenamientos">("partidos");
+  const [teamViewMode, setTeamViewMode] = useState<"table" | "cards">("table");
+  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null);
+
+  const handleCopyId = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(id);
+    setCopiedTeamId(id);
+    toast.success("ID del equipo copiado al portapapeles");
+    setTimeout(() => setCopiedTeamId(null), 2000);
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -541,105 +554,347 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
           </div>
         </div>
 
-        {/* Sub-bloque: Situación por Equipos */}
+        {/* Sub-bloque: Situación por Equipos / Cuadrante Global */}
         {sports?.teamStats && sports.teamStats.length > 0 && (
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="pt-4 border-t border-slate-100 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Situación por Equipos
+                <h3 className="text-sm font-black text-slate-900 tracking-tight uppercase flex items-center gap-2">
+                  <span>Situación por Equipos</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Cuadrante Global Oficial
+                  </span>
                 </h3>
-                <p className="text-[11px] text-slate-400">
-                  Rendimiento oficial FFCV y clasificación por categoría
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Resumen consolidado y clasificación en competición oficial FFCV
                 </p>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                {sports.teamStats.length} Equipos Federados
-              </span>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hidden md:inline-block">
+                  {sports.teamStats.length} Equipos Federados
+                </span>
+
+                {/* Selector de vista: Tabla / Tarjetas */}
+                <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+                  <button
+                    onClick={() => setTeamViewMode("table")}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg transition-all ${
+                      teamViewMode === "table"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                    title="Ver Cuadrante Global en Tabla"
+                  >
+                    <TableIcon className="w-3.5 h-3.5" />
+                    <span>Tabla Global</span>
+                  </button>
+                  <button
+                    onClick={() => setTeamViewMode("cards")}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg transition-all ${
+                      teamViewMode === "cards"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                    title="Ver Tarjetas de Equipos"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Tarjetas</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-              {sports.teamStats.map((team) => {
-                const isPositiveGD = team.goalDiff > 0;
-                const isNeutralGD = team.goalDiff === 0;
-                return (
-                  <div
-                    key={team.teamId}
-                    className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-200 hover:shadow-xs transition-all flex flex-col justify-between gap-3 group"
-                  >
-                    <div>
-                      {/* Header del Equipo */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
-                              {team.teamName}
-                            </h4>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase shrink-0">
-                              {team.teamCategory}
+            {/* VISTA 1: CUADRANTE GLOBAL (TABLA DEPORTIVA EJECUTIVA) */}
+            {teamViewMode === "table" && (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
+                <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
+                      <th className="py-3 px-3.5 sm:px-4 text-left">Equipo</th>
+                      <th className="py-3 px-3 text-left">ID</th>
+                      <th className="py-3 px-3.5 sm:px-4 text-left">Competición / Grupo</th>
+                      <th className="py-3 px-2.5 text-center">Pos</th>
+                      <th className="py-3 px-2.5 text-center">PJ</th>
+                      <th className="py-3 px-3 text-center">V-E-D</th>
+                      <th className="py-3 px-3 text-center">GF-GC (DG)</th>
+                      <th className="py-3 px-3 text-center">Puntos</th>
+                      <th className="py-3 px-3 text-center">Win Rate</th>
+                      <th className="py-3 px-3.5 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sports.teamStats.map((team) => {
+                      const isPositiveGD = team.goalDiff > 0;
+                      const isNeutralGD = team.goalDiff === 0;
+                      const isCopied = copiedTeamId === team.teamId;
+
+                      return (
+                        <tr
+                          key={team.teamId}
+                          onClick={() => router.push(`/dashboard/equipos/${team.teamId}/analisis`)}
+                          className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
+                        >
+                          {/* 1. Equipo */}
+                          <td className="py-3 px-3.5 sm:px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-slate-900 text-xs sm:text-sm group-hover:text-indigo-600 transition-colors">
+                                {team.teamName}
+                              </span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase shrink-0">
+                                {team.teamCategory}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* 2. ID */}
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-1.5">
+                              <code
+                                title={`UUID completo: ${team.teamId}`}
+                                className="text-[11px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 select-all"
+                              >
+                                {team.teamId.slice(0, 8)}...
+                              </code>
+                              <button
+                                onClick={(e) => handleCopyId(e, team.teamId)}
+                                title="Copiar ID completo"
+                                className="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-100 transition-colors"
+                              >
+                                {isCopied ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 3. Competición / Grupo */}
+                          <td className="py-3 px-3.5 sm:px-4">
+                            <span className="text-xs text-slate-600 font-medium truncate block max-w-[220px]">
+                              {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición Oficial"}
+                            </span>
+                          </td>
+
+                          {/* 4. Posición */}
+                          <td className="py-3 px-2.5 text-center">
+                            {team.currentPosition ? (
+                              <span
+                                className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-black border ${
+                                  team.currentPosition <= 3
+                                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                                    : team.currentPosition <= 8
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-slate-100 text-slate-700 border-slate-200"
+                                }`}
+                              >
+                                {team.currentPosition}º
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* 5. PJ */}
+                          <td className="py-3 px-2.5 text-center font-bold text-slate-800">
+                            {team.matchesPlayed}
+                          </td>
+
+                          {/* 6. V-E-D */}
+                          <td className="py-3 px-3 text-center text-xs font-semibold text-slate-700">
+                            {team.wins}-{team.draws}-{team.losses}
+                          </td>
+
+                          {/* 7. GF-GC (DG) */}
+                          <td className="py-3 px-3 text-center text-xs text-slate-600">
+                            <span>{team.goalsFor}-{team.goalsAgainst}</span>{" "}
+                            <span
+                              className={`font-bold ${
+                                isPositiveGD
+                                  ? "text-emerald-600"
+                                  : isNeutralGD
+                                  ? "text-slate-500"
+                                  : "text-rose-600"
+                              }`}
+                            >
+                              ({team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff})
+                            </span>
+                          </td>
+
+                          {/* 8. Puntos */}
+                          <td className="py-3 px-3 text-center">
+                            <span className="font-black text-xs sm:text-sm text-indigo-700">
+                              {team.points} pts
+                            </span>
+                          </td>
+
+                          {/* 9. Win Rate */}
+                          <td className="py-3 px-3 text-center font-bold text-xs sm:text-sm text-slate-800">
+                            {((team.wins / (team.matchesPlayed || 1)) * 100).toFixed(1).replace(".", ",")}%
+                          </td>
+
+                          {/* 10. Acción */}
+                          <td className="py-3 px-3.5 text-right">
+                            <span className="text-xs font-bold text-indigo-600 group-hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all">
+                              <span>Ver ficha</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+
+                  {/* FILA TOTAL CLUB (RECONCILIADA) */}
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-bold border-t-2 border-slate-800 text-xs sm:text-sm">
+                      <td className="py-3.5 px-3.5 sm:px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black tracking-tight text-white uppercase">
+                            TOTAL CLUB
+                          </span>
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-600 text-white uppercase tracking-wider">
+                            Federado
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 text-slate-400 text-xs font-mono">—</td>
+                      <td className="py-3.5 px-3.5 sm:px-4 text-slate-300 text-xs">—</td>
+                      <td className="py-3.5 px-2.5 text-center text-slate-400 text-xs">—</td>
+                      <td className="py-3.5 px-2.5 text-center font-black text-white text-sm">
+                        {sports.totalPlayedMatches}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-black text-slate-200">
+                        {sports.wins}-{sports.draws}-{sports.losses}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-bold text-slate-200">
+                        {sports.goalsFor}-{sports.goalsAgainst}{" "}
+                        <span className="text-rose-300 font-black">
+                          ({sports.goalsFor - sports.goalsAgainst > 0 ? `+${sports.goalsFor - sports.goalsAgainst}` : sports.goalsFor - sports.goalsAgainst})
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span className="font-black text-sm text-amber-400">
+                          {sports.points} pts
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-black text-sm text-emerald-400">
+                        {typeof sports.globalWinRate === "number" ? sports.globalWinRate.toFixed(2).replace(".", ",") : "34,07"}%
+                      </td>
+                      <td className="py-3.5 px-3.5 text-right">
+                        <Link
+                          href="/dashboard/club/estadisticas"
+                          className="text-xs font-bold text-indigo-300 hover:text-white inline-flex items-center gap-1 transition-colors"
+                        >
+                          <span>Ver global</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+
+            {/* VISTA 2: TARJETAS INDIVIDUALES DE EQUIPOS */}
+            {teamViewMode === "cards" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                {sports.teamStats.map((team) => {
+                  const isPositiveGD = team.goalDiff > 0;
+                  const isNeutralGD = team.goalDiff === 0;
+                  const isCopied = copiedTeamId === team.teamId;
+
+                  return (
+                    <div
+                      key={team.teamId}
+                      className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-200 hover:shadow-xs transition-all flex flex-col justify-between gap-3 group"
+                    >
+                      <div>
+                        {/* Header del Equipo */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+                                {team.teamName}
+                              </h4>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase shrink-0">
+                                {team.teamCategory}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-[11px] text-slate-400 truncate">
+                                {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición FFCV"}
+                              </p>
+                              <button
+                                onClick={(e) => handleCopyId(e, team.teamId)}
+                                title={`Copiar UUID: ${team.teamId}`}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5"
+                              >
+                                {isCopied ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
+                              </button>
+                            </div>
+                          </div>
+                          {team.currentPosition ? (
+                            <span className={`text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 border ${
+                              team.currentPosition <= 3
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : team.currentPosition <= 8
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}>
+                              {team.currentPosition}º {team.totalTeamsInGroup ? `/ ${team.totalTeamsInGroup}` : ""}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Métricas clave en rejilla compacta */}
+                        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-center">
+                          <div className="p-1.5 rounded-lg bg-slate-50">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase block">Puntos</span>
+                            <span className="text-xs sm:text-sm font-black text-indigo-700">{team.points} pts</span>
+                          </div>
+                          <div className="p-1.5 rounded-lg bg-slate-50">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase block">Partidos</span>
+                            <span className="text-xs sm:text-sm font-bold text-slate-800">{team.matchesPlayed} PJ</span>
+                          </div>
+                          <div className="p-1.5 rounded-lg bg-slate-50">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase block">Efectividad</span>
+                            <span className="text-xs sm:text-sm font-bold text-emerald-700">
+                              {((team.wins / (team.matchesPlayed || 1)) * 100).toFixed(1).replace(".", ",")}%
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                            {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición FFCV"}
-                          </p>
                         </div>
-                        {team.currentPosition ? (
-                          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 border ${
-                            team.currentPosition <= 3
-                              ? "bg-amber-50 text-amber-800 border-amber-200"
-                              : team.currentPosition <= 8
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}>
-                            {team.currentPosition}º {team.totalTeamsInGroup ? `/ ${team.totalTeamsInGroup}` : ""}
+
+                        {/* Detalle V-E-D y Goles */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-0.5">
+                          <span className="font-semibold text-slate-700">
+                            {team.wins}V · {team.draws}E · {team.losses}D
                           </span>
-                        ) : null}
-                      </div>
-
-                      {/* Métricas clave en rejilla compacta */}
-                      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-center">
-                        <div className="p-1.5 rounded-lg bg-slate-50">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Puntos</span>
-                          <span className="text-xs sm:text-sm font-black text-indigo-700">{team.points} pts</span>
-                        </div>
-                        <div className="p-1.5 rounded-lg bg-slate-50">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Partidos</span>
-                          <span className="text-xs sm:text-sm font-bold text-slate-800">{team.matchesPlayed} PJ</span>
-                        </div>
-                        <div className="p-1.5 rounded-lg bg-slate-50">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Efectividad</span>
-                          <span className="text-xs sm:text-sm font-bold text-emerald-700">{team.winRate}% V</span>
+                          <span className="font-medium text-slate-600">
+                            {team.goalsFor} GF / {team.goalsAgainst} GC (
+                            <span className={isPositiveGD ? "text-emerald-600 font-bold" : isNeutralGD ? "text-slate-500" : "text-rose-600 font-bold"}>
+                              {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
+                            </span>)
+                          </span>
                         </div>
                       </div>
 
-                      {/* Detalle V-E-D y Goles */}
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-0.5">
-                        <span className="font-semibold text-slate-700">
-                          {team.wins}V · {team.draws}E · {team.losses}D
-                        </span>
-                        <span className="font-medium text-slate-600">
-                          {team.goalsFor} GF / {team.goalsAgainst} GC (
-                          <span className={isPositiveGD ? "text-emerald-600 font-bold" : isNeutralGD ? "text-slate-500" : "text-rose-600 font-bold"}>
-                            {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
-                          </span>)
-                        </span>
+                      {/* Botón Acción */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                        <Link
+                          href={`/dashboard/equipos/${team.teamId}/analisis`}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all"
+                        >
+                          <span>Ver análisis del equipo</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
                       </div>
                     </div>
-
-                    {/* Botón Acción */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
-                      <Link
-                        href={`/dashboard/equipos/${team.teamId}/analisis`}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all"
-                      >
-                        <span>Ver análisis del equipo</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </section>

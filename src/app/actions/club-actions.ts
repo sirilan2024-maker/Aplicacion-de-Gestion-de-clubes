@@ -1034,7 +1034,8 @@ export async function getExecutiveDashboardAction(): Promise<{
     });
 
     yellowPerPlayer.forEach(y => {
-      if (y >= 4) apercibidosCount++;
+      // Apercibido: a 1 tarjeta amarilla de cumplir ciclo y sanción (ej. 4, 9, 14...)
+      if ((y % 5) === 4) apercibidosCount++;
     });
 
     const playerList = Array.from(playerAggMap.values());

@@ -92,22 +92,18 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         events = data || []
       }
       
-      const eventIds = (events || []).map(e => e.id);
       let attendance: any[] = []
-      if (eventIds.length > 0) {
-        let page = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data: pageAtt, error } = await supabase
-            .from('attendance')
-            .select('status, event_id, player_id')
-            .in('event_id', eventIds)
-            .range(page * pageSize, (page + 1) * pageSize - 1);
-          if (error || !pageAtt || pageAtt.length === 0) break;
-          attendance = attendance.concat(pageAtt);
-          if (pageAtt.length < pageSize) break;
-          page++;
-        }
+      let attPage = 0;
+      const attPageSize = 1000;
+      while (true) {
+        const { data: pageAtt, error } = await supabase
+          .from('attendance')
+          .select('status, event_id, player_id')
+          .range(attPage * attPageSize, (attPage + 1) * attPageSize - 1);
+        if (error || !pageAtt || pageAtt.length === 0) break;
+        attendance = attendance.concat(pageAtt);
+        if (pageAtt.length < attPageSize) break;
+        attPage++;
       }
 
       // 4. Fetch Metrics Definitions
@@ -115,22 +111,19 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       const metricMap = new Map();
       clubMetrics?.forEach(m => metricMap.set(m.id, m.name.toLowerCase()));
 
-      // 5. Fetch Performance Data (Trainings)
+      // 5. Fetch Performance Data (Trainings & Evaluations across all pages)
       let perf: any[] = []
-      if (eventIds.length > 0) {
-        let page = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data: pagePerf, error } = await supabase
-            .from('player_training_metrics')
-            .select('metric_id, value_number, player_id, event_id')
-            .in('event_id', eventIds)
-            .range(page * pageSize, (page + 1) * pageSize - 1);
-          if (error || !pagePerf || pagePerf.length === 0) break;
-          perf = perf.concat(pagePerf);
-          if (pagePerf.length < pageSize) break;
-          page++;
-        }
+      let ptmPage = 0;
+      const ptmPageSize = 1000;
+      while (true) {
+        const { data: pagePerf, error } = await supabase
+          .from('player_training_metrics')
+          .select('metric_id, value_number, player_id, event_id')
+          .range(ptmPage * ptmPageSize, (ptmPage + 1) * ptmPageSize - 1);
+        if (error || !pagePerf || pagePerf.length === 0) break;
+        perf = perf.concat(pagePerf);
+        if (pagePerf.length < ptmPageSize) break;
+        ptmPage++;
       }
 
       // 6. Fetch Match Data (From partidos, convocatorias and match_events)
@@ -242,8 +235,8 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       eventTypeMap.set(e.id, e.event_type);
     });
 
-    // Filter attendance
-    const filteredAttendance = attendance.filter(a => filterByTeam(eventTeamMap.get(a.event_id)));
+    // Filter attendance by player's team or event team
+    const filteredAttendance = attendance.filter(a => filterByTeam(playerTeamMap.get(a.player_id) || eventTeamMap.get(a.event_id)));
     
     // Map players for performance filtering
     const playerTeamMap = new Map();
@@ -799,39 +792,60 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
           {/* Top Disciplina */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="bg-red-50 py-3 px-4 border-b border-red-100 flex items-center gap-2">
-              <AlertTriangle size={16} className="text-red-600" />
-              <h3 className="font-bold text-red-800 text-sm">Más Tarjetas</h3>
+            <div className="bg-red-50 py-3 px-4 border-b border-red-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-red-600" />
+                <h3 className="font-bold text-red-800 text-sm">Más Tarjetas</h3>
+              </div>
+              <span className="text-[10px] font-bold text-red-600 bg-red-100/80 px-2 py-0.5 rounded-full">
+                Ciclo: 5 🟡
+              </span>
             </div>
-            <div className="p-4 flex-1 flex flex-col gap-3">
+            <div className="p-3 flex-1 flex flex-col gap-2.5">
               {stats.topDisciplina.length > 0 ? stats.topDisciplina.map((p: any, i: number) => {
                 const cyclesComp = Math.floor((p.amarillas || 0) / 5);
                 const currentCycleCardCount = (p.amarillas || 0) % 5;
+                const isApercibido = currentCycleCardCount === 4;
                 return (
-                  <div key={p.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
-                      <div className="overflow-hidden">
-                        <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                  <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 hover:bg-slate-100/80 border border-slate-100 transition-colors">
+                    <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+                      <span className={`font-black text-xs w-5 h-5 flex items-center justify-center rounded-full shrink-0 ${
+                        i === 0 ? 'bg-amber-100 text-amber-800' : 
+                        i === 1 ? 'bg-slate-200 text-slate-700' : 
+                        'bg-amber-50 text-amber-700'
+                      }`}>
+                        {i + 1}
+                      </span>
+                      <div className="overflow-hidden min-w-0">
+                        <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase truncate">{p.teamName}</span>
                           {cyclesComp > 0 && (
-                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.2 rounded">
                               {cyclesComp} {cyclesComp === 1 ? 'ciclo cumplido' : 'ciclos cumplidos'}
+                            </span>
+                          )}
+                          {isApercibido && (
+                            <span className="text-[9px] font-extrabold text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.2 rounded uppercase">
+                              Apercibido
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {p.amarillas > 0 && (
                         <div className="flex flex-col items-end">
-                          <span className="font-bold text-yellow-800 bg-yellow-100 px-2 py-0.5 rounded text-xs" title={`Ciclo #${cyclesComp + 1}: ${currentCycleCardCount}/5`}>
+                          <span className="font-extrabold text-yellow-900 bg-yellow-300 border border-yellow-400 px-2 py-0.5 rounded-lg text-xs" title={`Ciclo actual: ${currentCycleCardCount}/5`}>
                             {p.amarillas} 🟡
                           </span>
                         </div>
                       )}
-                      {p.rojas > 0 && <span className="font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded text-xs">{p.rojas} 🔴</span>}
+                      {p.rojas > 0 && (
+                        <span className="font-extrabold text-white bg-red-600 px-1.5 py-0.5 rounded-lg text-xs">
+                          {p.rojas} 🔴
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

@@ -28,9 +28,11 @@ export function PlayerStatsGrid({ rawData, teamId }: { rawData: RawData; teamId:
 
     return playersInTeam.map(player => {
       // Attendance
-      const playerAttendance = rawData.attendance.filter(a => a.player_id === player.id && teamEventIds.includes(a.event_id));
-      const attendedCount = playerAttendance.filter(a => a.status === 'presente' || a.status === 'retraso').length;
-      const attendance_percentage = totalTeamEvents > 0 ? Math.round((attendedCount / totalTeamEvents) * 100) : 0;
+      const playerAttendance = rawData.attendance.filter(a => a.player_id === player.id);
+      const attendedCount = playerAttendance.filter(a => a.status === 'presente' || a.status === 'retraso' || a.status === 'present').length;
+      const attendance_percentage = playerAttendance.length > 0 
+        ? Math.round((attendedCount / playerAttendance.length) * 100) 
+        : (totalTeamEvents > 0 ? Math.round((attendedCount / totalTeamEvents) * 100) : 0);
 
       // Match Stats
       const playerMatches = rawData.matchStats.filter(m => m.player_id === player.id && (m.team_id === teamId || teamId === 'todos'));
@@ -42,7 +44,7 @@ export function PlayerStatsGrid({ rawData, teamId }: { rawData: RawData; teamId:
 
       // Performance (RPE / Evaluación en Entrenamientos)
       const playerPerf = rawData.perf.filter(p => {
-        if (p.player_id !== player.id || !teamEventIds.includes(p.event_id)) return false;
+        if (p.player_id !== player.id) return false;
         const mName = rawData.metricMap.get(p.metric_id) || '';
         return mName.includes('rpe') || mName.includes('rendimiento') || mName === 'actitud';
       });

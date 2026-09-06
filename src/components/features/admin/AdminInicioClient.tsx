@@ -323,7 +323,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                       <span className="text-base shrink-0 select-none mt-0.5" role="img" aria-label="Alerta tarjetas">⚠️</span>
                       <div className="min-w-0">
                         <p className="font-bold text-rose-950 text-xs sm:text-sm">
-                          {alerts.apercibidosCount} {alerts.apercibidosCount === 1 ? "jugador apercibido" : "jugadores apercibidos"} con 4 amarillas
+                          {alerts.apercibidosCount} {alerts.apercibidosCount === 1 ? "jugador apercibido" : "jugadores apercibidos"} (a 1 amarilla de sanción)
                         </p>
                         <p className="text-[11px] text-rose-800/80 mt-0.5">
                           Riesgo de sanción federativa en la próxima jornada

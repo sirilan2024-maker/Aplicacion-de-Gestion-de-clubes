@@ -342,6 +342,33 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       }
     });
 
+    // Complementar con índice de rendimiento por partidos y regularidad si no tienen evaluaciones directas
+    filteredPlayers.forEach(p => {
+      const pStats = playerStatsMap.get(p.id);
+      if (pStats && pStats.countRen === 0) {
+        const playerMatches = filteredMatchStats.filter(m => m.player_id === p.id && (m.minutes_played > 0 || m.goals > 0));
+        if (playerMatches.length > 0) {
+          const avgMin = pStats.minutos / playerMatches.length;
+          let matchScore = 7.0;
+          if (avgMin >= 75) matchScore += 0.6;
+          else if (avgMin >= 45) matchScore += 0.3;
+
+          if (pStats.goles >= 5) matchScore += 0.6;
+          else if (pStats.goles >= 2) matchScore += 0.3;
+          else if (pStats.goles >= 1) matchScore += 0.1;
+
+          if (pStats.rojas > 0) matchScore -= 0.3 * pStats.rojas;
+          if (pStats.amarillas >= 5) matchScore -= 0.2;
+
+          matchScore = Math.min(9.5, Math.max(6.0, Number(matchScore.toFixed(1))));
+          pStats.sumRen = matchScore * playerMatches.length;
+          pStats.countRen = playerMatches.length;
+          sumRen += pStats.sumRen;
+          countRen += pStats.countRen;
+        }
+      }
+    });
+
     const avgRPE = countRPE > 0 ? (sumRPE / countRPE).toFixed(1) : 0;
     const avgRendimiento = countRen > 0 ? (sumRen / countRen).toFixed(1) : 0;
     
@@ -357,7 +384,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       .slice(0, 3);
     const topRendimiento = [...playersStatsArray]
       .filter(p => p.countRen > 0 && p.avgRendimiento > 0)
-      .sort((a, b) => b.avgRendimiento - a.avgRendimiento || b.countRen - a.countRen)
+      .sort((a, b) => b.avgRendimiento - a.avgRendimiento || b.countRen - a.countRen || b.minutos - a.minutos)
       .slice(0, 3);
     const topMinutos = [...playersStatsArray]
       .filter(p => p.minutos > 0)

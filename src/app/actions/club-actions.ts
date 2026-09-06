@@ -877,6 +877,29 @@ export async function getExecutiveDashboardAction(): Promise<{
       });
     }
 
+    // Equipos no federados del club (ej. INFANTIL C)
+    const nonFederatedTeams = teams.filter(t => !t.ffcv_group_id);
+    for (const team of nonFederatedTeams) {
+      teamStats.push({
+        teamId: team.id,
+        teamName: team.name,
+        teamCategory: 'No federado',
+        competitionName: 'No federado',
+        groupName: '',
+        currentPosition: undefined,
+        totalTeamsInGroup: undefined,
+        matchesPlayed: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDiff: 0,
+        points: 0,
+        winRate: 0,
+      });
+    }
+
     const teamHierarchy: Record<string, number> = {
       'senior': 1,
       'juvenil a': 2,
@@ -899,6 +922,10 @@ export async function getExecutiveDashboardAction(): Promise<{
     };
 
     teamStats.sort((a, b) => {
+      const isFedA = a.competitionName !== 'No federado';
+      const isFedB = b.competitionName !== 'No federado';
+      if (isFedA && !isFedB) return -1;
+      if (!isFedA && isFedB) return 1;
       const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99;
       const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99;
       return rankA - rankB;

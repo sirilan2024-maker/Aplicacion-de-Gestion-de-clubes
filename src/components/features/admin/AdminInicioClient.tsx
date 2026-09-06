@@ -638,16 +638,20 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                 <span className="font-black text-slate-900 text-xs sm:text-sm group-hover:text-indigo-600 transition-colors">
                                   {team.teamName}
                                 </span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase shrink-0">
-                                  {team.teamCategory}
-                                </span>
+                                {team.teamCategory === 'No federado' || team.competitionName === 'No federado' ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase shrink-0">
+                                    No federado
+                                  </span>
+                                ) : null}
                               </div>
                             </td>
 
                             {/* 2. Competición / Grupo */}
                             <td className="py-3 px-3.5 sm:px-4">
                               <span className="text-xs text-slate-600 font-medium truncate block max-w-[220px]">
-                                {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición Oficial"}
+                                {team.competitionName && team.competitionName !== 'No federado'
+                                  ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
+                                  : "No federado"}
                               </span>
                             </td>
 
@@ -827,12 +831,16 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                 <h4 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
                                   {team.teamName}
                                 </h4>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase shrink-0">
-                                  {team.teamCategory}
-                                </span>
+                                {team.teamCategory === 'No federado' || team.competitionName === 'No federado' ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase shrink-0">
+                                    No federado
+                                  </span>
+                                ) : null}
                               </div>
                               <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                                {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición FFCV"}
+                                {team.competitionName && team.competitionName !== 'No federado'
+                                  ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
+                                  : "No federado"}
                               </p>
                             </div>
                             {team.currentPosition ? (
@@ -914,12 +922,16 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                         <h4 className="text-base font-black text-slate-900 tracking-tight">
                           {team.teamName}
                         </h4>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                          {team.teamCategory}
-                        </span>
+                        {team.teamCategory === 'No federado' || team.competitionName === 'No federado' ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 uppercase">
+                            No federado
+                          </span>
+                        ) : null}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                        {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición Oficial FFCV"}
+                        {team.competitionName && team.competitionName !== 'No federado'
+                          ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
+                          : "No federado"}
                       </p>
                     </div>
 

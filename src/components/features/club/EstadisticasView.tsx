@@ -68,6 +68,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           .in('team_id', teamIds)
           .eq('season_id', activeSeason.id)
           .neq('status', 'inactive')
+          .limit(5000)
           
         if (data) {
           players = data.map((h: any) => ({
@@ -80,21 +81,21 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       // 2. Fetch Staff
       let staff: any[] = []
       if (teamIds.length > 0) {
-        const { data } = await supabase.from('team_coaches').select('id, team_id').in('team_id', teamIds)
+        const { data } = await supabase.from('team_coaches').select('id, team_id').in('team_id', teamIds).limit(1000)
         staff = data || []
       }
 
       // 3. Fetch Events & Attendance
       let events: any[] = []
       if (teamIds.length > 0) {
-        const { data } = await supabase.from('team_events').select('id, team_id, event_type').in('team_id', teamIds)
+        const { data } = await supabase.from('team_events').select('id, team_id, event_type').in('team_id', teamIds).limit(5000)
         events = data || []
       }
       
       const eventIds = (events || []).map(e => e.id);
       let attendance: any[] = []
       if (eventIds.length > 0) {
-        const { data } = await supabase.from('attendance').select('status, event_id').in('event_id', eventIds)
+        const { data } = await supabase.from('attendance').select('status, event_id').in('event_id', eventIds).limit(10000)
         attendance = data || []
       }
 
@@ -106,7 +107,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       // 5. Fetch Performance Data (Trainings)
       let perf: any[] = []
       if (eventIds.length > 0) {
-        const { data } = await supabase.from('player_training_metrics').select('metric_id, value_number, player_id, event_id').in('event_id', eventIds)
+        const { data } = await supabase.from('player_training_metrics').select('metric_id, value_number, player_id, event_id').in('event_id', eventIds).limit(10000)
         perf = data || []
       }
 
@@ -117,7 +118,8 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           .from('partidos')
           .select('id, equipo_id')
           .in('equipo_id', teamIds)
-          .eq('estado', 'Finalizado');
+          .eq('estado', 'Finalizado')
+          .limit(5000);
 
         const matchIds = (teamMatches || []).map(m => m.id);
         
@@ -125,40 +127,21 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           const { data: convocatoriasData } = await supabase
             .from('convocatorias')
             .select('player_id, goals, yellow_cards, red_cards, minutes_played, partido_id')
-            .in('partido_id', matchIds);
-
-          const { data: eventsData } = await supabase
-            .from('match_events')
-            .select('player_id, tipo_evento, partido_id')
             .in('partido_id', matchIds)
-            .not('player_id', 'is', null);
+            .limit(10000);
 
           // Map match ID to team ID
           const matchTeamMap = new Map();
           teamMatches?.forEach(m => matchTeamMap.set(m.id, m.equipo_id));
 
-          // Aggregate from match_events and convocatorias
-          const playerStatsAgg = new Map<string, { goals: number; yellow_cards: number; red_cards: number; minutes_played: number; team_id: string; matches_count: number }>();
-
-          // Process convocatorias (contains exact goals, cards and minutes parsed from actas for our players)
-          convocatoriasData?.forEach((c: any) => {
-            const team_id = matchTeamMap.get(c.partido_id);
-            const cur = playerStatsAgg.get(c.player_id) || { goals: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, team_id, matches_count: 0 };
-            cur.goals += (c.goals || 0);
-            cur.yellow_cards += (c.yellow_cards || 0);
-            cur.red_cards += (c.red_cards || 0);
-            cur.minutes_played += (c.minutes_played || 0);
-            cur.matches_count += 1;
-            playerStatsAgg.set(c.player_id, cur);
-          });
-
-          matchStats = Array.from(playerStatsAgg.entries()).map(([player_id, s]) => ({
-            player_id,
-            goals: s.goals,
-            yellow_cards: s.yellow_cards,
-            red_cards: s.red_cards,
-            minutes_played: s.minutes_played,
-            team_id: s.team_id
+          // Retain all match entries per player and team
+          matchStats = (convocatoriasData || []).map((c: any) => ({
+            player_id: c.player_id,
+            goals: c.goals || 0,
+            yellow_cards: c.yellow_cards || 0,
+            red_cards: c.red_cards || 0,
+            minutes_played: c.minutes_played || 0,
+            team_id: matchTeamMap.get(c.partido_id) || null
           }));
         }
       }
@@ -418,7 +401,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             }`}
           >
             <BarChart3 size={16} />
-            Vista Global del Equipo
+            Vista Global del Club
           </button>
           <button
             onClick={() => setViewMode('individual')}
@@ -436,7 +419,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             }`}
           >
             <Shield size={16} />
-            Rendimiento del equipo
+            Rendimiento del Club
           </button>
         </div>
 
@@ -631,7 +614,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             className="self-start sm:self-auto text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5"
           >
             <Shield className="w-3.5 h-3.5" />
-            <span>Ver Rendimiento del equipo</span>
+            <span>Ver Rendimiento del Club</span>
           </button>
         </div>
 

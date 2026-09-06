@@ -91,6 +91,7 @@ function MinutosPageContent() {
           .in('team_id', teamIds)
           .eq('season_id', activeSeason.id)
           .neq('status', 'inactive')
+          .limit(5000)
           
         if (data) {
           players = data.map((h: any) => ({
@@ -104,7 +105,7 @@ function MinutosPageContent() {
       // 4. Fetch team events for active season to filter perf
       let events: any[] = []
       if (teamIds.length > 0) {
-        const { data } = await supabase.from('team_events').select('id, event_type').in('team_id', teamIds)
+        const { data } = await supabase.from('team_events').select('id, event_type').in('team_id', teamIds).limit(5000)
         events = data || []
       }
       const eventIds = (events || []).map(e => e.id)
@@ -117,6 +118,7 @@ function MinutosPageContent() {
           .select('event_id, value_number, player_id')
           .in('metric_id', minIds)
           .in('event_id', eventIds)
+          .limit(10000)
         perf = data || []
       }
 
@@ -134,7 +136,8 @@ function MinutosPageContent() {
           .from('convocatorias')
           .select('player_id, minutes_played, partidos!inner(equipo_id, estado)')
           .in('partidos.equipo_id', teamIds)
-          .eq('partidos.estado', 'Finalizado');
+          .eq('partidos.estado', 'Finalizado')
+          .limit(10000);
         if (convs) matchMinutes = convs;
       }
 

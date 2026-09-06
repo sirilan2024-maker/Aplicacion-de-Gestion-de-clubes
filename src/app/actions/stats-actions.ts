@@ -164,24 +164,36 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
       ffcvMatches = fData || []
     }
 
-    // Filtrar exclusivamente los partidos donde participa el Sporting Saladar
-    const processedMatchKeys = new Set<string>()
+function normalizeTeamMatchName(str: string): string {
+  if (!str) return ''
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
 
-    for (const team of (teamsFfcvData || [])) {
+    // Filtrar exclusivamente los partidos donde participa el Sporting Saladar
+    const federatedTeams = (teamsFfcvData || []).filter(t => Boolean(t.ffcv_group_id))
+
+    for (const team of federatedTeams) {
       if (!team.ffcv_group_id) continue
-      const tMatches = ffcvMatches.filter(m => {
-        if (m.ffcv_group_id !== team.ffcv_group_id) return false
-        const isTeamId = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || String(m.away_team_ffcv_id) === String(team.ffcv_team_id)
-        const isName = (m.home_team_name || '').toLowerCase().includes('saladar') || (m.away_team_name || '').toLowerCase().includes('saladar')
-        return isTeamId || isName
+      const { data: gMatches } = await supabase
+        .from('ffcv_matches')
+        .select('*')
+        .eq('ffcv_group_id', team.ffcv_group_id)
+        .not('home_score', 'is', null)
+
+      const tMatches = (gMatches || []).filter(m => {
+        const isId = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || String(m.away_team_ffcv_id) === String(team.ffcv_team_id)
+        const isName = normalizeTeamMatchName(m.home_team_name).includes('saladar') || normalizeTeamMatchName(m.away_team_name).includes('saladar')
+        return isId || isName
       })
 
+      const processedMatchKeys = new Set<string>()
+
       tMatches.forEach(m => {
-        const uniqueKey = m.codacta || m.id || `${team.id}_${m.matchday}_${m.match_date}`
+        const uniqueKey = m.codacta ? `acta_${m.codacta}` : `group_${team.ffcv_group_id}_m_${m.matchday}_${m.match_date}_${m.home_team_ffcv_id}_${m.away_team_ffcv_id}`
         if (processedMatchKeys.has(uniqueKey)) return
         processedMatchKeys.add(uniqueKey)
 
-        const isHome = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || (m.home_team_name || '').toLowerCase().includes('saladar')
+        const isHome = String(m.home_team_ffcv_id) === String(team.ffcv_team_id) || normalizeTeamMatchName(m.home_team_name).includes('saladar')
         const gf = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0)
         const ga = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0)
 
@@ -211,7 +223,35 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
       })
     }
 
-    const teamStats = Array.from(teamStatsMap.values()).sort((a, b) => b.matchesPlayed - a.matchesPlayed)
+    // Equipos no federados (ej. INFANTIL C)
+    const nonFederatedTeams = (teamsFfcvData || []).filter(t => !t.ffcv_group_id)
+    for (const team of nonFederatedTeams) {
+      const tStat = teamStatsMap.get(team.id)
+      if (tStat) {
+        tStat.teamCategory = 'No federado'
+      }
+    }
+
+    const teamHierarchy: Record<string, number> = {
+      'senior': 1,
+      'juvenil a': 2,
+      'juvenil b': 3,
+      'cadete a': 4,
+      'cadete b': 5,
+      'infantil a': 6,
+      'infantil b': 7,
+      'infantil c': 8,
+    }
+
+    const teamStats = Array.from(teamStatsMap.values()).sort((a, b) => {
+      const isFedA = a.teamCategory !== 'No federado'
+      const isFedB = b.teamCategory !== 'No federado'
+      if (isFedA && !isFedB) return -1
+      if (!isFedA && isFedB) return 1
+      const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99
+      const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99
+      return rankA - rankB
+    })
 
     // 5. Estadísticas de Jugadores desde convocatorias
     let matchQuery = supabase

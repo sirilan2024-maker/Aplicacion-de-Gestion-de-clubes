@@ -9,7 +9,7 @@ import {
   RefreshCw, MapPin, BarChart3, ClipboardCheck,
   Building2, ChevronRight, Activity, ArrowUpRight, CheckCircle2,
   MessageSquare, Sparkles, TrendingUp, Radio, AlertCircle,
-  Copy, Check, LayoutGrid, Table as TableIcon
+  LayoutGrid, Table as TableIcon
 } from "lucide-react";
 import {
   getExecutiveDashboardAction,
@@ -32,15 +32,6 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [agendaTab, setAgendaTab] = useState<"partidos" | "entrenamientos">("partidos");
   const [teamViewMode, setTeamViewMode] = useState<"table" | "cards">("table");
-  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null);
-
-  const handleCopyId = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedTeamId(id);
-    toast.success("ID del equipo copiado al portapapeles");
-    setTimeout(() => setCopiedTeamId(null), 2000);
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -612,26 +603,28 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
             <div className="hidden md:block">
               {teamViewMode === "table" ? (
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
-                  <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[800px]">
+                  <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[960px]">
                     <thead>
                       <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
                         <th className="py-3 px-3.5 sm:px-4 text-left">Equipo</th>
-                        <th className="py-3 px-3 text-left">ID</th>
                         <th className="py-3 px-3.5 sm:px-4 text-left">Competición / Grupo</th>
-                        <th className="py-3 px-2.5 text-center">Pos</th>
-                        <th className="py-3 px-2.5 text-center">PJ</th>
-                        <th className="py-3 px-3 text-center">V-E-D</th>
-                        <th className="py-3 px-3 text-center">GF-GC (DG)</th>
-                        <th className="py-3 px-3 text-center">Puntos</th>
-                        <th className="py-3 px-3 text-center">Win Rate</th>
-                        <th className="py-3 px-3.5 text-right">Acción</th>
+                        <th className="py-3 px-2 text-center">Posición</th>
+                        <th className="py-3 px-2 text-center">Partidos</th>
+                        <th className="py-3 px-2 text-center">Victorias</th>
+                        <th className="py-3 px-2 text-center">Empates</th>
+                        <th className="py-3 px-2 text-center">Derrotas</th>
+                        <th className="py-3 px-2.5 text-center">Goles a favor</th>
+                        <th className="py-3 px-2.5 text-center">Goles en contra</th>
+                        <th className="py-3 px-2 text-center">Diferencia</th>
+                        <th className="py-3 px-2.5 text-center">Puntos</th>
+                        <th className="py-3 px-2.5 text-center">% Victorias</th>
+                        <th className="py-3 px-3.5 text-right">Ver equipo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {sports.teamStats.map((team) => {
                         const isPositiveGD = team.goalDiff > 0;
                         const isNeutralGD = team.goalDiff === 0;
-                        const isCopied = copiedTeamId === team.teamId;
 
                         return (
                           <tr
@@ -640,7 +633,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                             className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
                           >
                             {/* 1. Equipo */}
-                            <td className="py-3 px-3.5 sm:px-4">
+                            <td className="py-3 px-3.5 sm:px-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <span className="font-black text-slate-900 text-xs sm:text-sm group-hover:text-indigo-600 transition-colors">
                                   {team.teamName}
@@ -651,38 +644,15 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                               </div>
                             </td>
 
-                            {/* 2. ID */}
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-1.5">
-                                <code
-                                  title={`UUID completo: ${team.teamId}`}
-                                  className="text-[11px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 select-all"
-                                >
-                                  {team.teamId.slice(0, 8)}...
-                                </code>
-                                <button
-                                  onClick={(e) => handleCopyId(e, team.teamId)}
-                                  title="Copiar ID completo"
-                                  className="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-100 transition-colors"
-                                >
-                                  {isCopied ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3 h-3" />
-                                  )}
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* 3. Competición / Grupo */}
+                            {/* 2. Competición / Grupo */}
                             <td className="py-3 px-3.5 sm:px-4">
                               <span className="text-xs text-slate-600 font-medium truncate block max-w-[220px]">
                                 {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición Oficial"}
                               </span>
                             </td>
 
-                            {/* 4. Posición */}
-                            <td className="py-3 px-2.5 text-center">
+                            {/* 3. Posición */}
+                            <td className="py-3 px-2 text-center">
                               {team.currentPosition ? (
                                 <span
                                   className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-black border ${
@@ -700,21 +670,40 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                               )}
                             </td>
 
-                            {/* 5. PJ */}
-                            <td className="py-3 px-2.5 text-center font-bold text-slate-800">
+                            {/* 4. Partidos */}
+                            <td className="py-3 px-2 text-center font-bold text-slate-800">
                               {team.matchesPlayed}
                             </td>
 
-                            {/* 6. V-E-D */}
-                            <td className="py-3 px-3 text-center text-xs font-semibold text-slate-700">
-                              {team.wins}-{team.draws}-{team.losses}
+                            {/* 5. Victorias */}
+                            <td className="py-3 px-2 text-center font-bold text-emerald-700">
+                              {team.wins}
                             </td>
 
-                            {/* 7. GF-GC (DG) */}
-                            <td className="py-3 px-3 text-center text-xs text-slate-600">
-                              <span>{team.goalsFor}-{team.goalsAgainst}</span>{" "}
+                            {/* 6. Empates */}
+                            <td className="py-3 px-2 text-center font-semibold text-slate-600">
+                              {team.draws}
+                            </td>
+
+                            {/* 7. Derrotas */}
+                            <td className="py-3 px-2 text-center font-semibold text-rose-700">
+                              {team.losses}
+                            </td>
+
+                            {/* 8. Goles a favor */}
+                            <td className="py-3 px-2.5 text-center font-bold text-blue-700">
+                              {team.goalsFor}
+                            </td>
+
+                            {/* 9. Goles en contra */}
+                            <td className="py-3 px-2.5 text-center font-bold text-rose-600">
+                              {team.goalsAgainst}
+                            </td>
+
+                            {/* 10. Diferencia */}
+                            <td className="py-3 px-2 text-center">
                               <span
-                                className={`font-bold ${
+                                className={`font-black text-xs sm:text-sm ${
                                   isPositiveGD
                                     ? "text-emerald-600"
                                     : isNeutralGD
@@ -722,26 +711,26 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                     : "text-rose-600"
                                 }`}
                               >
-                                ({team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff})
+                                {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
                               </span>
                             </td>
 
-                            {/* 8. Puntos */}
-                            <td className="py-3 px-3 text-center">
+                            {/* 11. Puntos */}
+                            <td className="py-3 px-2.5 text-center">
                               <span className="font-black text-xs sm:text-sm text-indigo-700">
                                 {team.points} pts
                               </span>
                             </td>
 
-                            {/* 9. Win Rate */}
-                            <td className="py-3 px-3 text-center font-bold text-xs sm:text-sm text-slate-800">
+                            {/* 12. % Victorias */}
+                            <td className="py-3 px-2.5 text-center font-bold text-xs sm:text-sm text-slate-800">
                               {((team.wins / (team.matchesPlayed || 1)) * 100).toFixed(1).replace(".", ",")}%
                             </td>
 
-                            {/* 10. Acción */}
-                            <td className="py-3 px-3.5 text-right">
+                            {/* 13. Ver equipo */}
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
                               <span className="text-xs font-bold text-indigo-600 group-hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all">
-                                <span>Ver ficha</span>
+                                <span>Ver equipo</span>
                                 <ChevronRight className="w-3.5 h-3.5" />
                               </span>
                             </td>
@@ -753,7 +742,8 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     {/* FILA TOTAL CLUB (RECONCILIADA) */}
                     <tfoot>
                       <tr className="bg-slate-900 text-white font-bold border-t-2 border-slate-800 text-xs sm:text-sm">
-                        <td className="py-3.5 px-3.5 sm:px-4">
+                        {/* 1. Equipo */}
+                        <td className="py-3.5 px-3.5 sm:px-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="font-black tracking-tight text-white uppercase">
                               TOTAL CLUB
@@ -763,30 +753,50 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                             </span>
                           </div>
                         </td>
-                        <td className="py-3.5 px-3 text-slate-400 text-xs font-mono">—</td>
+                        {/* 2. Competición / Grupo */}
                         <td className="py-3.5 px-3.5 sm:px-4 text-slate-300 text-xs">—</td>
-                        <td className="py-3.5 px-2.5 text-center text-slate-400 text-xs">—</td>
-                        <td className="py-3.5 px-2.5 text-center font-black text-white text-sm">
+                        {/* 3. Posición */}
+                        <td className="py-3.5 px-2 text-center text-slate-400 text-xs">—</td>
+                        {/* 4. Partidos */}
+                        <td className="py-3.5 px-2 text-center font-black text-white text-sm">
                           {sports.totalPlayedMatches}
                         </td>
-                        <td className="py-3.5 px-3 text-center font-black text-slate-200">
-                          {sports.wins}-{sports.draws}-{sports.losses}
+                        {/* 5. Victorias */}
+                        <td className="py-3.5 px-2 text-center font-black text-emerald-400">
+                          {sports.wins}
                         </td>
-                        <td className="py-3.5 px-3 text-center font-bold text-slate-200">
-                          {sports.goalsFor}-{sports.goalsAgainst}{" "}
-                          <span className="text-rose-300 font-black">
-                            ({sports.goalsFor - sports.goalsAgainst > 0 ? `+${sports.goalsFor - sports.goalsAgainst}` : sports.goalsFor - sports.goalsAgainst})
-                          </span>
+                        {/* 6. Empates */}
+                        <td className="py-3.5 px-2 text-center font-black text-slate-200">
+                          {sports.draws}
                         </td>
-                        <td className="py-3.5 px-3 text-center">
+                        {/* 7. Derrotas */}
+                        <td className="py-3.5 px-2 text-center font-black text-rose-400">
+                          {sports.losses}
+                        </td>
+                        {/* 8. Goles a favor */}
+                        <td className="py-3.5 px-2.5 text-center font-black text-blue-400">
+                          {sports.goalsFor}
+                        </td>
+                        {/* 9. Goles en contra */}
+                        <td className="py-3.5 px-2.5 text-center font-black text-rose-400">
+                          {sports.goalsAgainst}
+                        </td>
+                        {/* 10. Diferencia */}
+                        <td className="py-3.5 px-2 text-center font-black text-rose-300">
+                          {sports.goalsFor - sports.goalsAgainst > 0 ? `+${sports.goalsFor - sports.goalsAgainst}` : sports.goalsFor - sports.goalsAgainst}
+                        </td>
+                        {/* 11. Puntos */}
+                        <td className="py-3.5 px-2.5 text-center">
                           <span className="font-black text-sm text-amber-400">
                             {sports.points} pts
                           </span>
                         </td>
-                        <td className="py-3.5 px-3 text-center font-black text-sm text-emerald-400">
+                        {/* 12. % Victorias */}
+                        <td className="py-3.5 px-2.5 text-center font-black text-sm text-emerald-400">
                           {typeof sports.globalWinRate === "number" ? sports.globalWinRate.toFixed(2).replace(".", ",") : "34,07"}%
                         </td>
-                        <td className="py-3.5 px-3.5 text-right">
+                        {/* 13. Ver equipo */}
+                        <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
                           <Link
                             href="/dashboard/club/estadisticas"
                             className="text-xs font-bold text-indigo-300 hover:text-white inline-flex items-center gap-1 transition-colors"
@@ -804,7 +814,6 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                   {sports.teamStats.map((team) => {
                     const isPositiveGD = team.goalDiff > 0;
                     const isNeutralGD = team.goalDiff === 0;
-                    const isCopied = copiedTeamId === team.teamId;
 
                     return (
                       <div
@@ -822,18 +831,9 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   {team.teamCategory}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <p className="text-[11px] text-slate-400 truncate">
-                                  {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición FFCV"}
-                                </p>
-                                <button
-                                  onClick={(e) => handleCopyId(e, team.teamId)}
-                                  title={`Copiar UUID: ${team.teamId}`}
-                                  className="text-slate-400 hover:text-indigo-600 p-0.5"
-                                >
-                                  {isCopied ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
-                                </button>
-                              </div>
+                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                {team.competitionName ? `${team.competitionName} · ${team.groupName || ''}` : "Competición FFCV"}
+                              </p>
                             </div>
                             {team.currentPosition ? (
                               <span className={`text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 border ${
@@ -855,10 +855,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                             </div>
                             <div className="p-1.5 rounded-lg bg-slate-50">
                               <span className="text-[9px] font-bold text-slate-400 uppercase block">Partidos</span>
-                              <span className="text-xs sm:text-sm font-bold text-slate-800">{team.matchesPlayed} PJ</span>
+                              <span className="text-xs sm:text-sm font-bold text-slate-800">{team.matchesPlayed}</span>
                             </div>
                             <div className="p-1.5 rounded-lg bg-slate-50">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase block">Efectividad</span>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase block">% Victorias</span>
                               <span className="text-xs sm:text-sm font-bold text-emerald-700">
                                 {((team.wins / (team.matchesPlayed || 1)) * 100).toFixed(1).replace(".", ",")}%
                               </span>
@@ -870,7 +870,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                               {team.wins}V · {team.draws}E · {team.losses}D
                             </span>
                             <span className="font-medium text-slate-600">
-                              {team.goalsFor} GF / {team.goalsAgainst} GC (
+                              {team.goalsFor} favor / {team.goalsAgainst} contra (
                               <span className={isPositiveGD ? "text-emerald-600 font-bold" : isNeutralGD ? "text-slate-500" : "text-rose-600 font-bold"}>
                                 {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
                               </span>)
@@ -883,7 +883,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                             href={`/dashboard/equipos/${team.teamId}/analisis`}
                             className="text-xs font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all"
                           >
-                            <span>Ver análisis del equipo</span>
+                            <span>Ver equipo</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </Link>
                         </div>

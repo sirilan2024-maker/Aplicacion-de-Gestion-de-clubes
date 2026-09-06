@@ -312,7 +312,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         }
       }
       else if (name.includes('rpe')) { sumRPE += val; countRPE++; }
-      else if (name === 'rendimiento') { sumRen += val; countRen++; }
+      if (name === 'rendimiento' || name.includes('rpe') || name === 'actitud') { sumRen += val; countRen++; }
       
       // Player totals
       const pStats = playerStatsMap.get(row.player_id);
@@ -326,7 +326,10 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             pStats.minutos += val;
           }
         }
-        else if (name === 'rendimiento') { pStats.sumRen += val; pStats.countRen++; }
+        if (name === 'rendimiento' || name.includes('rpe') || name === 'actitud') {
+          pStats.sumRen += val;
+          pStats.countRen++;
+        }
       }
     });
 

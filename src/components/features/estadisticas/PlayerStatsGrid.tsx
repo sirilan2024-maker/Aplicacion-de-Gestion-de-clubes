@@ -40,8 +40,12 @@ export function PlayerStatsGrid({ rawData, teamId }: { rawData: RawData; teamId:
       const yellow_cards = playerMatches.reduce((sum, m) => sum + (m.yellow_cards || 0), 0);
       const red_cards = playerMatches.reduce((sum, m) => sum + (m.red_cards || 0), 0);
 
-      // Performance
-      const playerPerf = rawData.perf.filter(p => p.player_id === player.id && teamEventIds.includes(p.event_id));
+      // Performance (RPE / Evaluación en Entrenamientos)
+      const playerPerf = rawData.perf.filter(p => {
+        if (p.player_id !== player.id || !teamEventIds.includes(p.event_id)) return false;
+        const mName = rawData.metricMap.get(p.metric_id) || '';
+        return mName.includes('rpe') || mName.includes('rendimiento') || mName === 'actitud';
+      });
       const average_performance = playerPerf.length > 0 
         ? Math.round((playerPerf.reduce((sum, p) => sum + (p.value_number || 0), 0) / playerPerf.length) * 10) / 10 
         : null;

@@ -235,12 +235,12 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       eventTypeMap.set(e.id, e.event_type);
     });
 
-    // Filter attendance by player's team or event team
-    const filteredAttendance = attendance.filter(a => filterByTeam(playerTeamMap.get(a.player_id) || eventTeamMap.get(a.event_id)));
-    
-    // Map players for performance filtering
+    // Map players for performance and attendance filtering
     const playerTeamMap = new Map();
     players.forEach(p => playerTeamMap.set(p.id, p.team_id));
+
+    // Filter attendance by player's team or event team
+    const filteredAttendance = attendance.filter(a => filterByTeam(playerTeamMap.get(a.player_id) || eventTeamMap.get(a.event_id)));
 
     // Filter performance
     const filteredPerf = perf.filter(p => filterByTeam(playerTeamMap.get(p.player_id)));

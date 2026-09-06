@@ -223,12 +223,13 @@ function normalizeTeamMatchName(str: string): string {
       })
     }
 
-    // Equipos no federados (ej. INFANTIL C)
+    // Equipos no federados / Liga Brave (ej. INFANTIL C)
     const nonFederatedTeams = (teamsFfcvData || []).filter(t => !t.ffcv_group_id)
     for (const team of nonFederatedTeams) {
       const tStat = teamStatsMap.get(team.id)
       if (tStat) {
-        tStat.teamCategory = 'No federado'
+        const isLigaBrave = team.name.toLowerCase().includes('infantil c') || team.category?.toLowerCase().includes('brave')
+        tStat.teamCategory = isLigaBrave ? 'Liga Brave' : 'No federado'
       }
     }
 
@@ -244,10 +245,10 @@ function normalizeTeamMatchName(str: string): string {
     }
 
     const teamStats = Array.from(teamStatsMap.values()).sort((a, b) => {
-      const isFedA = a.teamCategory !== 'No federado'
-      const isFedB = b.teamCategory !== 'No federado'
-      if (isFedA && !isFedB) return -1
-      if (!isFedA && isFedB) return 1
+      const isNonFedA = a.teamCategory === 'No federado' || a.teamCategory === 'Liga Brave'
+      const isNonFedB = b.teamCategory === 'No federado' || b.teamCategory === 'Liga Brave'
+      if (!isNonFedA && isNonFedB) return -1
+      if (isNonFedA && !isNonFedB) return 1
       const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99
       const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99
       return rankA - rankB

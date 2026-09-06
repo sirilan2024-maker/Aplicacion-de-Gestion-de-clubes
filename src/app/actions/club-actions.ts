@@ -753,7 +753,7 @@ export async function getExecutiveDashboardAction(): Promise<{
 
     const teams = rawTeams || [];
     const federatedTeams = teams.filter(t => Boolean(t.ffcv_group_id));
-    const activeTeamsCount = federatedTeams.length > 0 ? federatedTeams.length : teams.length;
+    const activeTeamsCount = teams.length;
 
     // 5. Pending inscriptions in Secretaría
     const { count: pendingInscriptionsCount } = await adminClient
@@ -899,14 +899,15 @@ export async function getExecutiveDashboardAction(): Promise<{
       });
     }
 
-    // Equipos no federados del club (ej. INFANTIL C)
+    // Equipos no federados / formativos del club (ej. INFANTIL C en Liga Brave)
     const nonFederatedTeams = teams.filter(t => !t.ffcv_group_id);
     for (const team of nonFederatedTeams) {
+      const isLigaBrave = team.name.toLowerCase().includes('infantil c') || team.category?.toLowerCase().includes('brave');
       teamStats.push({
         teamId: team.id,
         teamName: team.name,
-        teamCategory: 'No federado',
-        competitionName: 'No federado',
+        teamCategory: isLigaBrave ? 'Liga Brave' : 'No federado',
+        competitionName: isLigaBrave ? 'Liga Brave' : 'No federado',
         groupName: '',
         currentPosition: undefined,
         totalTeamsInGroup: undefined,
@@ -944,10 +945,10 @@ export async function getExecutiveDashboardAction(): Promise<{
     };
 
     teamStats.sort((a, b) => {
-      const isFedA = a.competitionName !== 'No federado';
-      const isFedB = b.competitionName !== 'No federado';
-      if (isFedA && !isFedB) return -1;
-      if (!isFedA && isFedB) return 1;
+      const isNonFedA = a.competitionName === 'No federado' || a.competitionName === 'Liga Brave' || a.teamCategory === 'Liga Brave' || a.teamCategory === 'No federado';
+      const isNonFedB = b.competitionName === 'No federado' || b.competitionName === 'Liga Brave' || b.teamCategory === 'Liga Brave' || b.teamCategory === 'No federado';
+      if (!isNonFedA && isNonFedB) return -1;
+      if (isNonFedA && !isNonFedB) return 1;
       const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99;
       const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99;
       return rankA - rankB;

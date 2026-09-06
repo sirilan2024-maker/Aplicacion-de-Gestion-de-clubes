@@ -132,13 +132,20 @@ function MinutosPageContent() {
       // 5b. Fetch match minutes from convocatorias
       let matchMinutes: any[] = []
       if (teamIds.length > 0) {
-        const { data: convs } = await supabase
-          .from('convocatorias')
-          .select('player_id, minutes_played, partidos!inner(equipo_id, estado)')
-          .in('partidos.equipo_id', teamIds)
-          .eq('partidos.estado', 'Finalizado')
-          .limit(10000);
-        if (convs) matchMinutes = convs;
+        let page = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data: convs, error } = await supabase
+            .from('convocatorias')
+            .select('player_id, minutes_played, partidos!inner(equipo_id, estado)')
+            .in('partidos.equipo_id', teamIds)
+            .eq('partidos.estado', 'Finalizado')
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+          if (error || !convs || convs.length === 0) break;
+          matchMinutes = matchMinutes.concat(convs);
+          if (convs.length < pageSize) break;
+          page++;
+        }
       }
 
       // 5c. Fetch team_events to know event types

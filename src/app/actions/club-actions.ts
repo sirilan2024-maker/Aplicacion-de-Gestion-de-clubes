@@ -613,6 +613,28 @@ export interface ExecutiveDashboardData {
   };
   injuries: {
     activeInjuriesCount: number;
+    activeInjuriesList: Array<{
+      id: string;
+      playerId: string;
+      playerName: string;
+      teamId?: string | null;
+      teamName?: string | null;
+      injuryType: string;
+      bodyRegion?: string | null;
+      bodyStructure?: string | null;
+      laterality?: string | null;
+      severity?: string | null;
+      injuryDate: string;
+      expectedReturnDate?: string | null;
+      estimatedMinDays?: number | null;
+      estimatedMaxDays?: number | null;
+      rtsPhase?: string | null;
+      status: string;
+      mechanismDetails?: string | null;
+      daysInjured?: number;
+      daysRemaining?: number | null;
+      formattedRecoveryTime?: string;
+    }>;
   };
   economy: {
     totalPaidAmount: number;
@@ -961,10 +983,22 @@ export async function getExecutiveDashboardAction(): Promise<{
     });
 
     const clubMatchIds = (clubPartidos || []).map(p => p.id);
-    const { data: convData } = await adminClient
-      .from('convocatorias')
-      .select('player_id, partido_id, goals, yellow_cards, red_cards, minutes_played')
-      .in('partido_id', clubMatchIds);
+    let convData: any[] = [];
+    if (clubMatchIds.length > 0) {
+      let page = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: pageData, error } = await adminClient
+          .from('convocatorias')
+          .select('player_id, partido_id, goals, yellow_cards, red_cards, minutes_played')
+          .in('partido_id', clubMatchIds)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+        if (error || !pageData || pageData.length === 0) break;
+        convData = convData.concat(pageData);
+        if (pageData.length < pageSize) break;
+        page++;
+      }
+    }
 
     const playerAggMap = new Map<string, {
       playerId: string;
@@ -1021,11 +1055,101 @@ export async function getExecutiveDashboardAction(): Promise<{
     } : null;
 
     // 9. Enfermería y Lesiones Activas
-    const { count: activeInjuriesCount } = await adminClient
+    const { data: rawInjuries, count: activeInjuriesCount } = await adminClient
       .from('player_injuries')
-      .select('id', { count: 'exact', head: true })
+      .select(`
+        id,
+        player_id,
+        injury_type,
+        body_region,
+        body_structure,
+        laterality,
+        severity,
+        injury_date,
+        expected_return_date,
+        estimated_min_days,
+        estimated_max_days,
+        rts_phase,
+        status,
+        mechanism_details,
+        players:player_id (
+          id,
+          first_name,
+          last_name,
+          team_id,
+          teams:team_id (
+            id,
+            name
+          )
+        )
+      `, { count: 'exact' })
       .eq('club_id', clubId)
-      .eq('status', 'activa');
+      .eq('status', 'activa')
+      .order('injury_date', { ascending: false });
+
+    const activeInjuriesList = (rawInjuries || []).map((inj: any) => {
+      const player = inj.players;
+      const playerName = player ? `${player.first_name || ''} ${player.last_name || ''}`.trim() : 'Jugador';
+      const teamName = player?.teams?.name || 'Sin equipo asignado';
+      const teamId = player?.team_id || null;
+
+      const now = new Date();
+      let daysRemaining: number | null = null;
+      let formattedRecoveryTime = 'En evaluación médica';
+
+      if (inj.expected_return_date) {
+        const returnDate = new Date(inj.expected_return_date);
+        const diffTime = returnDate.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        daysRemaining = diffDays;
+
+        const returnDateFormatted = returnDate.toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+
+        if (diffDays > 1) {
+          formattedRecoveryTime = `Previsto: ${returnDateFormatted} (~${diffDays} días)`;
+        } else if (diffDays === 1) {
+          formattedRecoveryTime = `Previsto: ${returnDateFormatted} (Mañana)`;
+        } else if (diffDays === 0) {
+          formattedRecoveryTime = `Previsto: ${returnDateFormatted} (Hoy)`;
+        } else {
+          formattedRecoveryTime = `Previsto: ${returnDateFormatted} (Fase de readaptación)`;
+        }
+      } else if (inj.estimated_min_days || inj.estimated_max_days) {
+        const min = inj.estimated_min_days || 0;
+        const max = inj.estimated_max_days || min;
+        formattedRecoveryTime = min === max ? `~${min} días estimados` : `${min} a ${max} días estimados`;
+      }
+
+      const injuryDate = inj.injury_date ? new Date(inj.injury_date) : new Date();
+      const daysInjured = Math.max(0, Math.floor((now.getTime() - injuryDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+      return {
+        id: inj.id,
+        playerId: inj.player_id,
+        playerName,
+        teamId,
+        teamName,
+        injuryType: inj.injury_type || 'Lesión física / articular',
+        bodyRegion: inj.body_region || null,
+        bodyStructure: inj.body_structure || null,
+        laterality: inj.laterality || null,
+        severity: inj.severity || 'Moderada',
+        injuryDate: inj.injury_date,
+        expectedReturnDate: inj.expected_return_date || null,
+        estimatedMinDays: inj.estimated_min_days || null,
+        estimatedMaxDays: inj.estimated_max_days || null,
+        rtsPhase: inj.rts_phase || null,
+        status: inj.status,
+        mechanismDetails: inj.mechanism_details || null,
+        daysInjured,
+        daysRemaining,
+        formattedRecoveryTime,
+      };
+    });
 
     // 10. Tasa de Asistencia
     const { data: attRows } = await adminClient
@@ -1173,7 +1297,8 @@ export async function getExecutiveDashboardAction(): Promise<{
           teamStats,
         },
         injuries: {
-          activeInjuriesCount: activeInjuriesCount || 0,
+          activeInjuriesCount: activeInjuriesCount || activeInjuriesList.length || 0,
+          activeInjuriesList: activeInjuriesList || [],
         },
         economy: {
           totalPaidAmount,

@@ -9,7 +9,8 @@ import {
   RefreshCw, MapPin, BarChart3, ClipboardCheck,
   Building2, ChevronRight, Activity, ArrowUpRight, CheckCircle2,
   MessageSquare, Sparkles, TrendingUp, Radio, AlertCircle,
-  LayoutGrid, Table as TableIcon
+  LayoutGrid, Table as TableIcon, X, ExternalLink, Calendar,
+  HeartPulse, Stethoscope
 } from "lucide-react";
 import {
   getExecutiveDashboardAction,
@@ -32,6 +33,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [agendaTab, setAgendaTab] = useState<"partidos" | "entrenamientos">("partidos");
   const [teamViewMode, setTeamViewMode] = useState<"table" | "cards">("table");
+  const [showInjuriesModal, setShowInjuriesModal] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -529,20 +531,29 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
           </div>
 
           {/* Estado de Enfermería */}
-          <div className="p-3 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setShowInjuriesModal(true)}
+            className="p-3 bg-slate-50/70 hover:bg-rose-50/40 border border-slate-100 hover:border-rose-200 rounded-xl flex items-center justify-between gap-3 text-left transition-all group cursor-pointer active:scale-[0.99] shadow-2xs hover:shadow-xs"
+          >
             <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estado de Enfermería</span>
-              <p className="text-xs font-black text-slate-900 truncate mt-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estado de Enfermería</span>
+                <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Ver bajas →
+                </span>
+              </div>
+              <p className="text-xs font-black text-slate-900 truncate mt-0.5 group-hover:text-rose-700 transition-colors">
                 {(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "Sin bajas activas" : `${data.injuries.activeInjuriesCount} en recuperación`}
               </p>
               <p className="text-[11px] text-slate-500">
-                {(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "Plantilla médica disponible al 100%" : "Seguimiento médico en curso"}
+                {(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "Plantilla médica disponible al 100%" : "Seguimiento médico en curso · Clic para ver"}
               </p>
             </div>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${(data.injuries?.activeInjuriesCount ?? 0) === 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white"}`}>
               <Activity className="w-4 h-4" />
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Sub-bloque: Situación por Equipos / Cuadrante Global */}
@@ -742,75 +753,6 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                         );
                       })}
                     </tbody>
-
-                    {/* FILA TOTAL CLUB (RECONCILIADA) */}
-                    <tfoot>
-                      <tr className="bg-slate-900 text-white font-bold border-t-2 border-slate-800 text-xs sm:text-sm">
-                        {/* 1. Equipo */}
-                        <td className="py-3.5 px-3.5 sm:px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className="font-black tracking-tight text-white uppercase">
-                              TOTAL CLUB
-                            </span>
-                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-600 text-white uppercase tracking-wider">
-                              Federado
-                            </span>
-                          </div>
-                        </td>
-                        {/* 2. Competición / Grupo */}
-                        <td className="py-3.5 px-3.5 sm:px-4 text-slate-300 text-xs">—</td>
-                        {/* 3. Posición */}
-                        <td className="py-3.5 px-2 text-center text-slate-400 text-xs">—</td>
-                        {/* 4. Partidos */}
-                        <td className="py-3.5 px-2 text-center font-black text-white text-sm">
-                          {sports.totalPlayedMatches}
-                        </td>
-                        {/* 5. Victorias */}
-                        <td className="py-3.5 px-2 text-center font-black text-emerald-400">
-                          {sports.wins}
-                        </td>
-                        {/* 6. Empates */}
-                        <td className="py-3.5 px-2 text-center font-black text-slate-200">
-                          {sports.draws}
-                        </td>
-                        {/* 7. Derrotas */}
-                        <td className="py-3.5 px-2 text-center font-black text-rose-400">
-                          {sports.losses}
-                        </td>
-                        {/* 8. Goles a favor */}
-                        <td className="py-3.5 px-2.5 text-center font-black text-blue-400">
-                          {sports.goalsFor}
-                        </td>
-                        {/* 9. Goles en contra */}
-                        <td className="py-3.5 px-2.5 text-center font-black text-rose-400">
-                          {sports.goalsAgainst}
-                        </td>
-                        {/* 10. Diferencia */}
-                        <td className="py-3.5 px-2 text-center font-black text-rose-300">
-                          {sports.goalsFor - sports.goalsAgainst > 0 ? `+${sports.goalsFor - sports.goalsAgainst}` : sports.goalsFor - sports.goalsAgainst}
-                        </td>
-                        {/* 11. Puntos */}
-                        <td className="py-3.5 px-2.5 text-center">
-                          <span className="font-black text-sm text-amber-400">
-                            {sports.points} pts
-                          </span>
-                        </td>
-                        {/* 12. % Victorias */}
-                        <td className="py-3.5 px-2.5 text-center font-black text-sm text-emerald-400">
-                          {typeof sports.globalWinRate === "number" ? sports.globalWinRate.toFixed(2).replace(".", ",") : "34,07"}%
-                        </td>
-                        {/* 13. Ver equipo */}
-                        <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
-                          <Link
-                            href="/dashboard/club/estadisticas"
-                            className="text-xs font-bold text-indigo-300 hover:text-white inline-flex items-center gap-1 transition-colors"
-                          >
-                            <span>Ver global</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </Link>
-                        </td>
-                      </tr>
-                    </tfoot>
                   </table>
                 </div>
               ) : (
@@ -1012,74 +954,6 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                   </div>
                 );
               })}
-
-              {/* TARJETA TOTAL CLUB MÓVIL (Diferenciada y Destacada) */}
-              <div className="bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-md p-4 sm:p-5 space-y-3.5">
-                <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base select-none">🏆</span>
-                    <h4 className="text-base font-black tracking-tight text-white uppercase">
-                      TOTAL CLUB
-                    </h4>
-                  </div>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-indigo-600 text-white uppercase tracking-wider">
-                    Federado Oficial
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Partidos jugados</span>
-                    <span className="font-black text-white text-sm">{sports.totalPlayedMatches}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Victorias</span>
-                    <span className="font-black text-emerald-400 text-sm">{sports.wins}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Empates</span>
-                    <span className="font-black text-slate-200 text-sm">{sports.draws}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Derrotas</span>
-                    <span className="font-black text-rose-400 text-sm">{sports.losses}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Goles a favor</span>
-                    <span className="font-black text-blue-400 text-sm">{sports.goalsFor}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Goles en contra</span>
-                    <span className="font-black text-rose-400 text-sm">{sports.goalsAgainst}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Diferencia de goles</span>
-                    <span className="font-black text-rose-300 text-sm">
-                      {sports.goalsFor - sports.goalsAgainst > 0 ? `+${sports.goalsFor - sports.goalsAgainst}` : sports.goalsFor - sports.goalsAgainst}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-800/80">
-                    <span className="text-slate-400">Puntos totales</span>
-                    <span className="font-black text-amber-400 text-sm">{sports.points} puntos</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-slate-400">% de victorias</span>
-                    <span className="font-black text-emerald-400 text-sm">
-                      {typeof sports.globalWinRate === "number" ? sports.globalWinRate.toFixed(2).replace(".", ",") : "34,07"}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <Link
-                    href="/dashboard/club/estadisticas"
-                    className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 border border-slate-700 shadow-xs"
-                  >
-                    <span>Ver estadísticas globales del club</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -1439,6 +1313,174 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
           })}
         </div>
       </section>
+
+      {/* ── MODAL: ESTADO DE ENFERMERÍA Y JUGADORES LESIONADOS ── */}
+      {showInjuriesModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowInjuriesModal(false);
+          }}
+        >
+          <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+            {/* Cabecera del Modal */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0 shadow-2xs">
+                  <HeartPulse className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>Estado de Enfermería</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                      {data.injuries?.activeInjuriesCount || 0} Bajas Activas
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Seguimiento clínico, tiempo de recuperación y evolución médica por jugador
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInjuriesModal(false)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Listado de Jugadores Lesionados */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 divide-y divide-slate-100">
+              {(!data.injuries?.activeInjuriesList || data.injuries.activeInjuriesList.length === 0) ? (
+                <div className="text-center py-10 space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">¡Plantilla 100% disponible!</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    No hay jugadores con bajas médicas o lesiones activas registradas en el club en este momento.
+                  </p>
+                </div>
+              ) : (
+                data.injuries.activeInjuriesList.map((inj) => {
+                  const sev = (inj.severity || "").toLowerCase();
+                  const sevBadge = sev.includes("grave")
+                    ? { label: "Grave", cls: "bg-rose-50 text-rose-700 border-rose-200" }
+                    : sev.includes("modera")
+                    ? { label: "Moderada", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                    : { label: "Leve", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+
+                  const rtsPhaseLabel = inj.rtsPhase?.toLowerCase().includes("aguda") || inj.rtsPhase?.includes("1")
+                    ? "Fase 1: Aguda / Tratamiento"
+                    : inj.rtsPhase?.toLowerCase().includes("readaptacion") || inj.rtsPhase?.includes("2")
+                    ? "Fase 2: Readaptación física"
+                    : inj.rtsPhase?.toLowerCase().includes("grupo") || inj.rtsPhase?.includes("3")
+                    ? "Fase 3: Vuelta parcial al grupo"
+                    : "Fase 1: En tratamiento";
+
+                  const injuryDateFormatted = inj.injuryDate
+                    ? new Date(inj.injuryDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })
+                    : null;
+
+                  return (
+                    <div key={inj.id} className="pt-4 first:pt-0 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        {/* Jugador y Equipo */}
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <Link
+                            href={`/dashboard/club/jugador/${inj.playerId}#seccion-lesiones`}
+                            className="font-black text-sm sm:text-base text-slate-900 hover:text-indigo-600 transition-colors flex items-center gap-1.5 group/link"
+                            title="Ir a la ficha y módulo de lesiones del jugador"
+                          >
+                            <span>{inj.playerName}</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover/link:text-indigo-600 transition-colors shrink-0" />
+                          </Link>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+                            {inj.teamName}
+                          </span>
+                        </div>
+
+                        {/* Gravedad */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${sevBadge.cls}`}>
+                            {sevBadge.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Detalles de la Lesión */}
+                      <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2 text-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                          <div className="text-slate-800 font-semibold flex items-center gap-1.5 flex-wrap">
+                            <span className="text-slate-500 font-normal">Diagnóstico:</span>
+                            <span className="font-bold text-slate-900">{inj.injuryType}</span>
+                            {(inj.bodyStructure || inj.bodyRegion) && (
+                              <span className="text-slate-600 font-medium">
+                                · {inj.bodyStructure || inj.bodyRegion}
+                              </span>
+                            )}
+                            {inj.laterality && (
+                              <span className="text-slate-400 capitalize">({inj.laterality})</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                            {rtsPhaseLabel}
+                          </span>
+                        </div>
+
+                        {/* Tiempos de Recuperación */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-200/60 text-[11px]">
+                          <div className="flex items-center gap-3 text-slate-500">
+                            {injuryDateFormatted && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Baja: {injuryDateFormatted} {typeof inj.daysInjured === "number" ? `(${inj.daysInjured} días)` : ""}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-lg border border-indigo-100">
+                            <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>{inj.formattedRecoveryTime}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botón de acceso directo al módulo de lesiones */}
+                      <div className="flex justify-end pt-0.5">
+                        <Link
+                          href={`/dashboard/club/jugador/${inj.playerId}#seccion-lesiones`}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 transition-all inline-flex items-center gap-1.5"
+                        >
+                          <span>Ver módulo de lesiones completo</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 shrink-0">
+              <p className="text-[11px] text-slate-400 text-center sm:text-left">
+                Haz clic en el nombre de cualquier jugador para abrir su módulo de lesiones y ficha médica completa.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowInjuriesModal(false)}
+                className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

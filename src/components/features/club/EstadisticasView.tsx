@@ -95,8 +95,19 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       const eventIds = (events || []).map(e => e.id);
       let attendance: any[] = []
       if (eventIds.length > 0) {
-        const { data } = await supabase.from('attendance').select('status, event_id').in('event_id', eventIds).limit(10000)
-        attendance = data || []
+        let page = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data: pageAtt, error } = await supabase
+            .from('attendance')
+            .select('status, event_id, player_id')
+            .in('event_id', eventIds)
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+          if (error || !pageAtt || pageAtt.length === 0) break;
+          attendance = attendance.concat(pageAtt);
+          if (pageAtt.length < pageSize) break;
+          page++;
+        }
       }
 
       // 4. Fetch Metrics Definitions
@@ -107,8 +118,19 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       // 5. Fetch Performance Data (Trainings)
       let perf: any[] = []
       if (eventIds.length > 0) {
-        const { data } = await supabase.from('player_training_metrics').select('metric_id, value_number, player_id, event_id').in('event_id', eventIds).limit(10000)
-        perf = data || []
+        let page = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data: pagePerf, error } = await supabase
+            .from('player_training_metrics')
+            .select('metric_id, value_number, player_id, event_id')
+            .in('event_id', eventIds)
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+          if (error || !pagePerf || pagePerf.length === 0) break;
+          perf = perf.concat(pagePerf);
+          if (pagePerf.length < pageSize) break;
+          page++;
+        }
       }
 
       // 6. Fetch Match Data (From partidos, convocatorias and match_events)
@@ -124,18 +146,27 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         const matchIds = (teamMatches || []).map(m => m.id);
         
         if (matchIds.length > 0) {
-          const { data: convocatoriasData } = await supabase
-            .from('convocatorias')
-            .select('player_id, goals, yellow_cards, red_cards, minutes_played, partido_id')
-            .in('partido_id', matchIds)
-            .limit(10000);
+          let allConvs: any[] = [];
+          let page = 0;
+          const pageSize = 1000;
+          while (true) {
+            const { data: convocatoriasData, error } = await supabase
+              .from('convocatorias')
+              .select('player_id, goals, yellow_cards, red_cards, minutes_played, partido_id')
+              .in('partido_id', matchIds)
+              .range(page * pageSize, (page + 1) * pageSize - 1);
+            if (error || !convocatoriasData || convocatoriasData.length === 0) break;
+            allConvs = allConvs.concat(convocatoriasData);
+            if (convocatoriasData.length < pageSize) break;
+            page++;
+          }
 
           // Map match ID to team ID
           const matchTeamMap = new Map();
           teamMatches?.forEach(m => matchTeamMap.set(m.id, m.equipo_id));
 
           // Retain all match entries per player and team
-          matchStats = (convocatoriasData || []).map((c: any) => ({
+          matchStats = allConvs.map((c: any) => ({
             player_id: c.player_id,
             goals: c.goals || 0,
             yellow_cards: c.yellow_cards || 0,
@@ -324,10 +355,22 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       return p;
     });
 
-    const topGoles = [...playersStatsArray].sort((a, b) => b.goles - a.goles).slice(0, 3);
-    const topRendimiento = [...playersStatsArray].sort((a, b) => b.avgRendimiento - a.avgRendimiento).slice(0, 3);
-    const topMinutos = [...playersStatsArray].sort((a, b) => b.minutos - a.minutos).slice(0, 3);
-    const topDisciplina = [...playersStatsArray].sort((a, b) => b.disciplinaPuntos - a.disciplinaPuntos).slice(0, 3);
+    const topGoles = [...playersStatsArray]
+      .filter(p => p.goles > 0)
+      .sort((a, b) => b.goles - a.goles || b.minutos - a.minutos)
+      .slice(0, 3);
+    const topRendimiento = [...playersStatsArray]
+      .filter(p => p.countRen > 0 && p.avgRendimiento > 0)
+      .sort((a, b) => b.avgRendimiento - a.avgRendimiento || b.countRen - a.countRen)
+      .slice(0, 3);
+    const topMinutos = [...playersStatsArray]
+      .filter(p => p.minutos > 0)
+      .sort((a, b) => b.minutos - a.minutos || b.goles - a.goles)
+      .slice(0, 3);
+    const topDisciplina = [...playersStatsArray]
+      .filter(p => p.disciplinaPuntos > 0)
+      .sort((a, b) => b.disciplinaPuntos - a.disciplinaPuntos || b.amarillas - a.amarillas)
+      .slice(0, 3);
 
     return {
       totalJugadores: countJugadores,

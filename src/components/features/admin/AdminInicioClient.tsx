@@ -616,23 +616,53 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                ══════════════════════════════════════════════════════════════════ */}
             <div className="hidden md:block">
               {teamViewMode === "table" ? (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
-                  <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[960px]">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
-                        <th className="py-3 px-3.5 sm:px-4 text-left">Equipo</th>
-                        <th className="py-3 px-3.5 sm:px-4 text-left">Competición / Grupo</th>
-                        <th className="py-3 px-2 text-center">Posición</th>
-                        <th className="py-3 px-2 text-center">Partidos</th>
-                        <th className="py-3 px-2 text-center">Victorias</th>
-                        <th className="py-3 px-2 text-center">Empates</th>
-                        <th className="py-3 px-2 text-center">Derrotas</th>
-                        <th className="py-3 px-2.5 text-center">Goles a favor</th>
-                        <th className="py-3 px-2.5 text-center">Goles en contra</th>
-                        <th className="py-3 px-2 text-center">Diferencia</th>
-                        <th className="py-3 px-2.5 text-center">Puntos</th>
-                        <th className="py-3 px-2.5 text-center">% Victorias</th>
-                        <th className="py-3 px-3.5 text-right">Ver equipo</th>
+                      <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">
+                        <th className="py-3 px-2 sm:px-3 text-left">Equipo</th>
+                        <th className="py-3 px-2 text-left">Competición / Grupo</th>
+                        <th className="py-3 px-1 text-center" title="Posición en la tabla">
+                          <span className="hidden xl:inline">Posición</span>
+                          <span className="xl:hidden">Pos.</span>
+                        </th>
+                        <th className="py-3 px-1 text-center" title="Partidos Jugados">
+                          <span className="hidden xl:inline">Partidos</span>
+                          <span className="xl:hidden">PJ</span>
+                        </th>
+                        <th className="py-3 px-1 text-center text-emerald-800" title="Victorias">
+                          <span className="hidden xl:inline">Victorias</span>
+                          <span className="xl:hidden">V</span>
+                        </th>
+                        <th className="py-3 px-1 text-center" title="Empates">
+                          <span className="hidden xl:inline">Empates</span>
+                          <span className="xl:hidden">E</span>
+                        </th>
+                        <th className="py-3 px-1 text-center text-rose-800" title="Derrotas">
+                          <span className="hidden xl:inline">Derrotas</span>
+                          <span className="xl:hidden">D</span>
+                        </th>
+                        <th className="py-3 px-1 text-center text-blue-800" title="Goles a favor">
+                          <span className="hidden xl:inline">G. Favor</span>
+                          <span className="xl:hidden">GF</span>
+                        </th>
+                        <th className="py-3 px-1 text-center text-rose-700" title="Goles en contra">
+                          <span className="hidden xl:inline">G. Contra</span>
+                          <span className="xl:hidden">GC</span>
+                        </th>
+                        <th className="py-3 px-1 text-center" title="Diferencia de goles">
+                          <span className="hidden xl:inline">Diferencia</span>
+                          <span className="xl:hidden">Dif.</span>
+                        </th>
+                        <th className="py-3 px-1.5 text-center text-indigo-900" title="Puntos">
+                          <span className="hidden xl:inline">Puntos</span>
+                          <span className="xl:hidden">Pts</span>
+                        </th>
+                        <th className="py-3 px-1.5 text-center" title="Porcentaje de Victorias">
+                          <span className="hidden xl:inline">% Victorias</span>
+                          <span className="xl:hidden">% Vic.</span>
+                        </th>
+                        <th className="py-3 px-2 sm:px-3 text-right">Ver</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -644,18 +674,18 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                           <tr
                             key={team.teamId}
                             onClick={() => router.push(`/dashboard/equipos/${team.teamId}/analisis`)}
-                            className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
+                            className="hover:bg-indigo-50/40 transition-colors cursor-pointer group text-xs"
                           >
                             {/* 1. Equipo */}
-                            <td className="py-3 px-3.5 sm:px-4 whitespace-nowrap">
-                              <span className="font-black text-slate-900 text-xs sm:text-sm group-hover:text-indigo-600 transition-colors">
+                            <td className="py-2.5 px-2 sm:px-3 whitespace-nowrap">
+                              <span className="font-black text-slate-900 text-xs sm:text-[13px] group-hover:text-indigo-600 transition-colors">
                                 {team.teamName}
                               </span>
                             </td>
 
                             {/* 2. Competición / Grupo */}
-                            <td className="py-3 px-3.5 sm:px-4">
-                              <span className="text-xs text-slate-600 font-medium truncate block max-w-[220px]">
+                            <td className="py-2.5 px-2">
+                              <span className="text-[11px] sm:text-xs text-slate-600 font-medium truncate block max-w-[150px] xl:max-w-[200px]" title={team.competitionName && team.competitionName !== 'No federado' ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}` : "Liga Brave"}>
                                 {team.competitionName && team.competitionName !== 'No federado'
                                   ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
                                   : "Liga Brave"}
@@ -663,10 +693,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                             </td>
 
                             {/* 3. Posición */}
-                            <td className="py-3 px-2 text-center">
+                            <td className="py-2.5 px-1 text-center whitespace-nowrap">
                               {team.currentPosition ? (
                                 <span
-                                  className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-black border ${
+                                  className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[11px] font-black border ${
                                     team.currentPosition <= 3
                                       ? "bg-amber-50 text-amber-800 border-amber-200"
                                       : team.currentPosition <= 8
@@ -677,44 +707,44 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   {team.currentPosition}º
                                 </span>
                               ) : (
-                                <span className="text-slate-400">—</span>
+                                <span className="text-slate-400 text-xs">—</span>
                               )}
                             </td>
 
                             {/* 4. Partidos */}
-                            <td className="py-3 px-2 text-center font-bold text-slate-800">
+                            <td className="py-2.5 px-1 text-center font-bold text-slate-800 text-xs">
                               {team.matchesPlayed}
                             </td>
 
                             {/* 5. Victorias */}
-                            <td className="py-3 px-2 text-center font-bold text-emerald-700">
+                            <td className="py-2.5 px-1 text-center font-bold text-emerald-700 text-xs">
                               {team.wins}
                             </td>
 
                             {/* 6. Empates */}
-                            <td className="py-3 px-2 text-center font-semibold text-slate-600">
+                            <td className="py-2.5 px-1 text-center font-semibold text-slate-600 text-xs">
                               {team.draws}
                             </td>
 
                             {/* 7. Derrotas */}
-                            <td className="py-3 px-2 text-center font-semibold text-rose-700">
+                            <td className="py-2.5 px-1 text-center font-semibold text-rose-700 text-xs">
                               {team.losses}
                             </td>
 
                             {/* 8. Goles a favor */}
-                            <td className="py-3 px-2.5 text-center font-bold text-blue-700">
+                            <td className="py-2.5 px-1 text-center font-bold text-blue-700 text-xs">
                               {team.goalsFor}
                             </td>
 
                             {/* 9. Goles en contra */}
-                            <td className="py-3 px-2.5 text-center font-bold text-rose-600">
+                            <td className="py-2.5 px-1 text-center font-bold text-rose-600 text-xs">
                               {team.goalsAgainst}
                             </td>
 
                             {/* 10. Diferencia */}
-                            <td className="py-3 px-2 text-center">
+                            <td className="py-2.5 px-1 text-center">
                               <span
-                                className={`font-black text-xs sm:text-sm ${
+                                className={`font-black text-xs ${
                                   isPositiveGD
                                     ? "text-emerald-600"
                                     : isNeutralGD
@@ -727,21 +757,22 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                             </td>
 
                             {/* 11. Puntos */}
-                            <td className="py-3 px-2.5 text-center">
-                              <span className="font-black text-xs sm:text-sm text-indigo-700">
-                                {team.points} pts
+                            <td className="py-2.5 px-1.5 text-center whitespace-nowrap">
+                              <span className="font-black text-xs text-indigo-700">
+                                {team.points} <span className="hidden xl:inline text-[10px]">pts</span>
                               </span>
                             </td>
 
                             {/* 12. % Victorias */}
-                            <td className="py-3 px-2.5 text-center font-bold text-xs sm:text-sm text-slate-800">
+                            <td className="py-2.5 px-1.5 text-center font-bold text-xs text-slate-800 whitespace-nowrap">
                               {((team.wins / (team.matchesPlayed || 1)) * 100).toFixed(1).replace(".", ",")}%
                             </td>
 
                             {/* 13. Ver equipo */}
-                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                              <span className="text-xs font-bold text-indigo-600 group-hover:text-indigo-800 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition-all">
-                                <span>Ver equipo</span>
+                            <td className="py-2.5 px-2 sm:px-3 text-right whitespace-nowrap">
+                              <span className="text-xs font-bold text-indigo-600 group-hover:text-indigo-800 inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-all">
+                                <span className="hidden xl:inline">Ver equipo</span>
+                                <span className="xl:hidden">Ver</span>
                                 <ChevronRight className="w-3.5 h-3.5" />
                               </span>
                             </td>

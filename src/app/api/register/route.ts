@@ -17,13 +17,15 @@ export async function POST(request: Request) {
     // Usamos admin client para ignorar RLS ya que es un endpoint público
     const supabaseAdmin = await createAdminClient();
 
-    // 1. Obtener el club_id base
-    const { data: clubData } = await supabaseAdmin.from('clubs').select('id').eq('slug', 'club-sporting-saladar').single();
+    // 1. Obtener el club_id base y su configuración bancaria
+    const { data: clubData } = await supabaseAdmin.from('clubs').select('id, sepa_iban, name').eq('slug', 'club-sporting-saladar').maybeSingle();
     let clubId = clubData?.id;
+    let clubIban = clubData?.sepa_iban || null;
     
     if (!clubId) {
-      const { data: fallbackClub } = await supabaseAdmin.from('clubs').select('id').limit(1).single();
+      const { data: fallbackClub } = await supabaseAdmin.from('clubs').select('id, sepa_iban, name').limit(1).maybeSingle();
       clubId = fallbackClub?.id;
+      clubIban = fallbackClub?.sepa_iban || null;
     }
 
     if (!clubId) {
@@ -405,43 +407,73 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Crear Stripe PaymentIntent si eligió Stripe (Omitir si es Senior)
+    // 2. Localizar la cuota exacta a cobrar y generar referencia única
     let clientSecret = null;
     let stripeIntentId = null;
+    let targetFeeId = null;
+    const currentYear = new Date().getFullYear();
+    const paymentReference = player ? `PAY-${currentYear}-${player.id.substring(0, 8).toUpperCase()}` : `PAY-${currentYear}-${Date.now()}`;
 
-    if (paymentMethod === 'Stripe' && player && !isSenior) {
-      const isFraccionado = paymentPlan === 'Fraccionado';
-      const isRenewal = formData.wasInClub;
-      const isReserved = formData.paidReservation;
-      
-      let baseAmount = isRenewal ? 195 : 250;
-      let firstFraction = isFraccionado ? Math.round(baseAmount / 2) : baseAmount;
-      if (isReserved) {
-        firstFraction = firstFraction - 50;
-      }
-      
-      const chargeAmount = firstFraction * 100;
+    if (player && !isSenior) {
+      const { data: targetFee } = await supabaseAdmin
+        .from('fees')
+        .select('id, amount_cents, club_id, stripe_payment_intent_id')
+        .eq('player_id', player.id)
+        .eq('estado', 'pendiente')
+        .order('creado_en', { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
-      if (process.env.STRIPE_SECRET_KEY) {
-        const intent = await stripe.paymentIntents.create({
-          amount: chargeAmount,
-          currency: 'eur',
-          setup_future_usage: isFraccionado ? 'off_session' : undefined,
-          metadata: {
-            player_id: player.id,
-            player: `${formData.playerFirstName} ${formData.playerLastName}`,
-            type: isFraccionado ? 'inscripcion_fraccionada_1' : 'inscripcion_total',
-          },
-        });
-        stripeIntentId = intent.id;
-        clientSecret = intent.client_secret;
-      } else {
-        stripeIntentId = `pi_mock_${Date.now()}`;
-        clientSecret = `${stripeIntentId}_secret_mock`;
+      if (targetFee) {
+        targetFeeId = targetFee.id;
+
+        // Actualizar referencia única de pago en la cuota
+        await supabaseAdmin
+          .from('fees')
+          .update({ payment_reference: paymentReference })
+          .eq('id', targetFee.id);
+
+        // 3. Crear Stripe PaymentIntent si eligió Stripe
+        if (paymentMethod === 'Stripe') {
+          const isFraccionado = paymentPlan === 'Fraccionado';
+          const chargeAmount = targetFee.amount_cents;
+
+          if (process.env.STRIPE_SECRET_KEY) {
+            const intent = await stripe.paymentIntents.create({
+              amount: chargeAmount,
+              currency: 'eur',
+              automatic_payment_methods: {
+                enabled: true,
+              },
+              setup_future_usage: isFraccionado ? 'off_session' : undefined,
+              metadata: {
+                player_id: player.id,
+                fee_id: targetFee.id,
+                club_id: targetFee.club_id || clubId,
+                payment_reference: paymentReference,
+                player: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim(),
+                type: isFraccionado ? 'inscripcion_fraccionada_1' : 'inscripcion_total',
+              },
+            });
+            stripeIntentId = intent.id;
+            clientSecret = intent.client_secret;
+          } else {
+            stripeIntentId = `pi_mock_${Date.now()}`;
+            clientSecret = `${stripeIntentId}_secret_mock`;
+          }
+
+          // Guardar el stripe_payment_intent_id en la cuota
+          if (stripeIntentId) {
+            await supabaseAdmin
+              .from('fees')
+              .update({ stripe_payment_intent_id: stripeIntentId })
+              .eq('id', targetFee.id);
+          }
+        }
       }
     }
 
-    // 3. Enviar correo electrónico de confirmación / bienvenida automático
+    // 4. Enviar correo electrónico de confirmación / bienvenida automático
     if (email && player) {
       try {
         const emailHtml = getPlayerRegistrationEmailHtml({
@@ -461,15 +493,25 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Revalidar cachés para que Secretaría y Tesorería se actualicen al instante
+    // 5. Revalidar cachés para que Centro de Control, Secretaría y Tesorería se actualicen al instante
+    revalidatePath('/admin/inicio');
+    revalidatePath('/admin');
     revalidatePath('/dashboard/inscripciones');
     revalidatePath('/dashboard/treasury');
     revalidatePath('/dashboard/equipos');
 
+    const finalPlayerName = `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() || `${formData.tutor1Name || ''} ${formData.tutor1LastName || ''}`.trim() || 'Jugador';
+
     return NextResponse.json({
       success: true,
       playerId: player?.id,
+      playerFirstName: formData.playerFirstName || '',
+      playerLastName: formData.playerLastName || '',
+      playerName: finalPlayerName,
+      clubIban: clubIban,
+      feeId: targetFeeId,
       clientSecret: clientSecret,
+      paymentReference: paymentReference,
       message: 'Inscripción guardada y formalizada correctamente.',
     });
   } catch (err: any) {

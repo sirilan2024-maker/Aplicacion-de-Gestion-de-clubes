@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createAdminClient } from '@/lib/supabase/server';
-import { addPartialPaymentAction } from '@/app/actions/treasury-actions';
+import {
+  recordStripePaymentWebhook,
+  recordStripePaymentProcessing,
+  recordStripeFailure,
+  recordStripeRefund,
+} from '@/lib/payments/stripe-payment-service';
 
 export const runtime = 'nodejs';
 
-// Configurar Stripe y webhooks
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy_key_for_build', {
   apiVersion: '2023-10-16' as any,
 });
@@ -18,78 +21,73 @@ export async function POST(req: Request) {
     const signature = req.headers.get('stripe-signature');
     let event: Stripe.Event;
 
-    // Validate the Stripe signature strictly
+    // Validar firma estricta de Stripe
     if (!webhookSecret || !signature) {
+      console.warn('[webhook/stripe] Webhook secret o firma ausente');
       return NextResponse.json({ error: 'Firma de webhook ausente o no configurada' }, { status: 400 });
     }
 
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err: any) {
-      console.error(`⚠️  Webhook signature verification failed:`, err.message);
+      console.error('⚠️ Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 });
     }
 
-    const supabaseAdmin = await createAdminClient();
-
-
     // ────────────────────────────────────────────────────────────────────────
-    // FLUJO A: Pagos de Registro (Payment Intent)
+    // PROCESAMIENTO DE EVENTOS STRIPE (Desacoplado de cookies / sesión)
     // ────────────────────────────────────────────────────────────────────────
-    if (event.type === 'payment_intent.succeeded') {
-      const intent = event.data.object as Stripe.PaymentIntent;
-      const playerId = intent.metadata?.player_id;
-      const amountCents = intent.amount;
+    switch (event.type) {
+      case 'payment_intent.succeeded': {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        await recordStripePaymentWebhook(intent);
+        break;
+      }
 
-      if (playerId) {
-        // Asegurar que el estado esté formalizado (aunque ya lo debería estar por defecto)
-        await supabaseAdmin
-          .from('players')
-          .update({ registration_status: 'formalized' })
-          .eq('id', playerId);
+      case 'payment_intent.processing': {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        await recordStripePaymentProcessing(intent);
+        break;
+      }
 
-        // Buscar la primera cuota (de inscripción) del jugador
-        const { data: firstFee } = await supabaseAdmin
-          .from('fees')
-          .select('id')
-          .eq('player_id', playerId)
-          .order('creado_en', { ascending: true })
-          .limit(1)
-          .single();
+      case 'payment_intent.payment_failed':
+      case 'payment_intent.canceled': {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        await recordStripeFailure(intent);
+        break;
+      }
 
-        if (firstFee) {
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        await recordStripeRefund(charge);
+        break;
+      }
+
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.payment_intent && typeof session.payment_intent === 'string') {
           try {
-            await addPartialPaymentAction(firstFee.id, amountCents, 'Stripe');
+            const intent = await stripe.paymentIntents.retrieve(session.payment_intent);
+            await recordStripePaymentWebhook(intent);
           } catch (err) {
-            console.error("Error al inyectar pago Stripe en la cuota:", err);
+            console.error('[webhook/stripe] Error retrieving payment intent for checkout session:', err);
           }
         }
+        break;
       }
-    }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // FLUJO B: Pagos desde el Dashboard de Familia (Checkout Session)
-    // ────────────────────────────────────────────────────────────────────────
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const feeId = session.metadata?.fee_id;
-      const amountCents = session.amount_total || 0;
-
-      if (feeId) {
-        try {
-          await addPartialPaymentAction(feeId, amountCents, 'Stripe');
-        } catch (err) {
-          console.error("Error al inyectar pago Stripe manual en la cuota:", err);
-        }
-      }
+      default:
+        // Otros eventos no relevantes para conciliación económica se ignoran
+        break;
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (err: any) {
-    console.error('Error handling webhook:', err);
+    console.error('Error handling stripe webhook:', err);
     return NextResponse.json(
-      { error: 'Webhook handler failed' },
+      { error: 'Webhook handler failed: ' + (err.message || 'Desconocido') },
       { status: 500 }
     );
   }
 }
+

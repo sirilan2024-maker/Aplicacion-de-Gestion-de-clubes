@@ -567,6 +567,8 @@ export interface ExecutiveDashboardData {
     apercibidosCount?: number;
     unreportedMatchesCount?: number;
     activeInjuriesCount?: number;
+    unassignedFormalizedPlayersCount?: number;
+    singleUnassignedPlayerId?: string | null;
   };
   sports: {
     totalPlayedMatches: number;
@@ -760,7 +762,27 @@ export async function getExecutiveDashboardAction(): Promise<{
       .from('players')
       .select('id', { count: 'exact', head: true })
       .eq('club_id', clubId)
-      .in('registration_status', ['pendiente_documentacion', 'pendiente_validacion', 'pendiente_firma', 'pdte_verif']);
+      .in('registration_status', [
+        'pending_revision',
+        'pending_payment',
+        'request_correction',
+        'pendiente_documentacion',
+        'pendiente_validacion',
+        'pendiente_firma',
+        'pdte_verif'
+      ]);
+
+    // 5.b Jugadores formalizados sin equipo asignado
+    const { data: unassignedFormalizedPlayers } = await adminClient
+      .from('players')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('registration_status', 'formalized')
+      .is('team_id', null);
+
+    const unassignedFormalizedList = unassignedFormalizedPlayers || [];
+    const unassignedFormalizedPlayersCount = unassignedFormalizedList.length;
+    const singleUnassignedPlayerId = unassignedFormalizedPlayersCount === 1 ? unassignedFormalizedList[0].id : null;
 
     // 6. Fees in Tesorería (pendientes y cobradas)
     const { data: pendingFees } = await adminClient
@@ -1281,6 +1303,8 @@ export async function getExecutiveDashboardAction(): Promise<{
           apercibidosCount,
           unreportedMatchesCount,
           activeInjuriesCount: activeInjuriesCount || 0,
+          unassignedFormalizedPlayersCount,
+          singleUnassignedPlayerId,
         },
         sports: {
           totalPlayedMatches,

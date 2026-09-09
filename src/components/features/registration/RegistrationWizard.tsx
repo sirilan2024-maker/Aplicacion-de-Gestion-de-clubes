@@ -13,6 +13,7 @@ import { Step2Documents } from "./steps/Step2Documents";
 import { Step3Fees } from "./steps/Step3Fees";
 import { Step4Apparel } from "./steps/Step4Apparel";
 import { Step5Consent } from "./steps/Step5Consent";
+import { StripePaymentModal } from "./StripePaymentModal";
 import toast from "react-hot-toast";
 
 const STEPS = [
@@ -26,11 +27,13 @@ const STEPS = [
 export function RegistrationWizard({ 
   isInternalForm = false,
   initialData = {},
-  isSeniorTeam = false
+  isSeniorTeam = false,
+  clubIban = null,
 }: { 
   isInternalForm?: boolean;
   initialData?: Partial<RegistrationFormData>;
   isSeniorTeam?: boolean;
+  clubIban?: string | null;
 }) {
   const searchParams = useSearchParams();
   const teamIdParam = searchParams?.get('team') || null;
@@ -40,6 +43,11 @@ export function RegistrationWizard({
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "done">("idle");
   const [submittedData, setSubmittedData] = useState<RegistrationFormData | null>(null);
+  const [submittedPlayerName, setSubmittedPlayerName] = useState<string>('');
+  const [submittedClubIban, setSubmittedClubIban] = useState<string | null>(clubIban || null);
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
+  const [stripeModalOpen, setStripeModalOpen] = useState(false);
+  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
 
   const methods = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema) as any,
@@ -72,6 +80,21 @@ export function RegistrationWizard({
   }, [isSeniorTeam, methods]);
 
   const birthDateValue = useWatch({ control: methods.control, name: 'birthDate' });
+  const wasInClub = useWatch({ control: methods.control, name: 'wasInClub' });
+  const paidReservation = useWatch({ control: methods.control, name: 'paidReservation' });
+  const paymentPlan = useWatch({ control: methods.control, name: 'paymentPlan' });
+  const playerFirstName = useWatch({ control: methods.control, name: 'playerFirstName' });
+  const playerLastName = useWatch({ control: methods.control, name: 'playerLastName' });
+
+  // Calculate estimated amount to charge on the modal
+  let baseFee = wasInClub ? 195 : 250;
+  if (paidReservation) baseFee -= 50;
+  let chargeAmount = baseFee;
+  if (paymentPlan === "Fraccionado") {
+    chargeAmount = Math.round((baseFee / 3) * 100) / 100;
+  }
+  const formattedChargeAmount = `${chargeAmount.toFixed(2)} €`;
+
   // Consider adult if playing for senior team or born in 2007 or earlier
   const isAdult = isSeniorTeam || (birthDateValue ? new Date(birthDateValue).getFullYear() <= 2007 : false);
 
@@ -127,14 +150,7 @@ export function RegistrationWizard({
         }
       }
 
-      // 1. Si elige tarjeta, simulamos el delay visual para el usuario
-      if (dataToSubmit.paymentMethod === "Stripe") {
-        setPaymentStatus("processing");
-        // Dejamos un pequeño delay visual simulado
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      // 2. Enviar la inscripción real a nuestra nueva API (/api/register)
+      // 1. Enviar la inscripción real a nuestra API (/api/register)
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
@@ -154,14 +170,31 @@ export function RegistrationWizard({
       const result = await response.json();
       console.log('Inscripción guardada correctamente:', result);
       
-      if (data.paymentMethod === "Stripe") {
-        setPaymentStatus("done");
+      const mergedData = { ...data, ...dataToSubmit };
+      setSubmittedData(mergedData as any);
+
+      const nameFromForm = `${dataToSubmit.playerFirstName || data.playerFirstName || ''} ${dataToSubmit.playerLastName || data.playerLastName || ''}`.trim() || `${dataToSubmit.tutor1Name || data.tutor1Name || ''} ${dataToSubmit.tutor1LastName || data.tutor1LastName || ''}`.trim();
+      setSubmittedPlayerName(result.playerName || nameFromForm || 'Jugador');
+
+      if (result.clubIban) {
+        setSubmittedClubIban(result.clubIban);
+      } else if (clubIban) {
+        setSubmittedClubIban(clubIban);
       }
 
-      // 3. Mostrar pantalla final
-      setSubmittedData(data);
-      setIsSuccess(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (result.paymentReference) {
+        setPaymentRef(result.paymentReference);
+      }
+
+      // 2. Si eligió tarjeta y el servidor devolvió clientSecret, abrir la pasarela real de Stripe
+      if (data.paymentMethod === "Stripe" && result.clientSecret) {
+        setStripeClientSecret(result.clientSecret);
+        setStripeModalOpen(true);
+      } else {
+        // Transferencia, Contado o Senior: mostrar pantalla de confirmación directa
+        setIsSuccess(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch (error: any) {
       console.error('Error enviando formulario:', error);
       alert(error.message || "Ocurrió un error al enviar el formulario al servidor.");
@@ -220,42 +253,72 @@ export function RegistrationWizard({
             )}
 
             {submittedData.paymentMethod === "Stripe" && (
-              <div className="bg-green-50 text-green-800 p-6 rounded-xl border border-green-200 flex flex-col items-center gap-3 mt-6">
-                <CreditCard className="w-10 h-10 text-green-600" />
+              <div className={`${paymentStatus === "done" ? "bg-green-50 text-green-800 border-green-200" : "bg-blue-50 text-blue-800 border-blue-200"} p-6 rounded-xl border flex flex-col items-center gap-3 mt-6`}>
+                <CreditCard className={`w-10 h-10 ${paymentStatus === "done" ? "text-green-600" : "text-blue-600"}`} />
                 <div>
-                  <p className="font-bold text-lg">Pago completado con éxito mediante tarjeta.</p>
-                  <p className="text-sm mt-1">Hemos recibido tu primer pago correctamente. ¡Bienvenido al equipo!</p>
+                  <p className="font-bold text-lg">
+                    {paymentStatus === "done" ? "Pago completado con éxito mediante tarjeta." : "Inscripción registrada."}
+                  </p>
+                  <p className="text-sm mt-1">
+                    {paymentStatus === "done" 
+                      ? "Hemos recibido tu primer pago correctamente. ¡Bienvenido al equipo!" 
+                      : "Tu solicitud ha sido guardada. Podrás abonar la cuota pendiente desde tu Portal Familiar o en Secretaría."}
+                  </p>
+                  {paymentRef && (
+                    <p className="text-xs font-mono font-semibold mt-2 text-gray-600">
+                      Referencia de pago: {paymentRef}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
 
-            {(submittedData.paymentMethod === "Transferencia" || submittedData.paymentMethod === "Contado") && (
-              <div className="bg-blue-50 text-left p-6 md:p-8 rounded-xl border border-blue-100 mt-6 shadow-inner">
-                <h3 className="text-blue-900 text-xl font-bold mb-4 flex items-center gap-2">
-                  <HeartPulse className="w-6 h-6 text-blue-600" /> Instrucciones para el Pago
-                </h3>
-                {submittedData.paymentMethod === "Transferencia" ? (
-                  <div className="space-y-4 text-sm text-blue-800">
-                    <p className="text-base">Por favor, realiza la transferencia bancaria a la siguiente cuenta:</p>
-                    <div className="bg-white p-4 rounded-lg border border-blue-200 text-center font-mono text-lg font-bold shadow-sm">
-                      ESXX XXXX XXXX XXXX XXXX
+            {(() => {
+              const effectivePlayerName = submittedPlayerName || `${submittedData.playerFirstName || ''} ${submittedData.playerLastName || ''}`.trim() || 'Jugador';
+              const effectiveClubIban = submittedClubIban || clubIban || null;
+
+              return (
+                <>
+                  {(submittedData.paymentMethod === "Transferencia" || submittedData.paymentMethod === "Contado") && (
+                    <div className="bg-blue-50 text-left p-6 md:p-8 rounded-xl border border-blue-100 mt-6 shadow-inner">
+                      <h3 className="text-blue-900 text-xl font-bold mb-4 flex items-center gap-2">
+                        <HeartPulse className="w-6 h-6 text-blue-600" /> Instrucciones para el Pago
+                      </h3>
+                      {submittedData.paymentMethod === "Transferencia" ? (
+                        <div className="space-y-4 text-sm text-blue-800">
+                          <p className="text-base">Por favor, realiza la transferencia bancaria utilizando los siguientes datos oficiales:</p>
+                          {paymentRef && (
+                            <div className="bg-white p-4 rounded-lg border border-blue-200 text-center shadow-sm">
+                              <span className="text-xs uppercase font-semibold text-gray-500 block">Referencia Oficial de Pago</span>
+                              <span className="font-mono text-xl font-extrabold text-blue-900">{paymentRef}</span>
+                            </div>
+                          )}
+                          {effectiveClubIban && (
+                            <div className="bg-white p-3 rounded-lg border border-blue-200 text-center shadow-sm">
+                              <span className="text-xs uppercase font-semibold text-gray-500 block">IBAN del club</span>
+                              <span className="font-mono text-lg font-bold text-blue-950">{effectiveClubIban}</span>
+                            </div>
+                          )}
+                          <ul className="list-disc pl-5 space-y-2 mt-4">
+                            <li><strong>Concepto obligatorio:</strong> <span className="font-mono font-bold text-blue-950">{paymentRef ? `${paymentRef} - ` : ""}INSCRIPCION {effectivePlayerName}</span></li>
+                            <li><strong>Jugador:</strong> {effectivePlayerName}</li>
+                            <li>Envía el justificante bancario por email a <strong>secretaria@sportingsaladar.com</strong> indicando la referencia anterior.</li>
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 text-sm text-blue-800">
+                          <p className="text-base">Por favor, acude a las oficinas del club para realizar el pago en efectivo.</p>
+                          <ul className="list-disc pl-5 space-y-2 mt-4">
+                            <li><strong>Horario de Secretaría:</strong> Lunes a Jueves de 17:30 a 20:00.</li>
+                            <li>Indica el nombre del jugador ({effectivePlayerName}){paymentRef ? ` y la referencia ${paymentRef}` : ""} al realizar el pago.</li>
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                    <ul className="list-disc pl-5 space-y-2 mt-4">
-                      <li><strong>Concepto:</strong> INSCRIPCION {submittedData.playerFirstName} {submittedData.playerLastName}</li>
-                      <li>Envía el justificante a <strong>secretaria@sportingsaladar.com</strong></li>
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="space-y-4 text-sm text-blue-800">
-                    <p className="text-base">Por favor, acude a las oficinas del club para realizar el pago en efectivo.</p>
-                    <ul className="list-disc pl-5 space-y-2 mt-4">
-                      <li><strong>Horario de Secretaría:</strong> Lunes a Jueves de 17:30 a 20:00.</li>
-                      <li>Indica el nombre del jugador ({submittedData.playerFirstName} {submittedData.playerLastName}) al realizar el pago.</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
           <CardFooter className="bg-gray-50 p-6 border-t flex justify-center">
             <Button className="bg-blue-600 hover:bg-blue-700 font-bold px-8" onClick={() => window.location.href = '/login'}>
@@ -305,7 +368,7 @@ export function RegistrationWizard({
                   <Step2Documents />
                 </div>
                 <div style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-                  <Step3Fees />
+                  <Step3Fees clubIban={clubIban} />
                 </div>
                 <div style={{ display: currentStep === 4 ? 'block' : 'none' }}>
                   <Step4Apparel />
@@ -371,6 +434,29 @@ export function RegistrationWizard({
             ))}
           </ul>
         </div>
+      )}
+
+      {/* Modal pasarela Stripe real */}
+      {stripeClientSecret && (
+        <StripePaymentModal
+          isOpen={stripeModalOpen}
+          onClose={() => {
+            setStripeModalOpen(false);
+            setPaymentStatus("idle");
+            setIsSuccess(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          clientSecret={stripeClientSecret}
+          amountFormatted={formattedChargeAmount}
+          playerName={`${playerFirstName || ''} ${playerLastName || ''}`.trim() || 'Jugador'}
+          paymentReference={paymentRef || undefined}
+          onSuccess={() => {
+            setStripeModalOpen(false);
+            setPaymentStatus("done");
+            setIsSuccess(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
       )}
     </div>
   );

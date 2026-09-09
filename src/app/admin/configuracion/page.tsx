@@ -169,16 +169,16 @@ export default function ConfiguracionClubPage() {
         </div>
       </div>
 
-      {/* Configuración Bancaria y Mandato SEPA (Acreedor) */}
+      {/* Configuración Bancaria e IBAN del Club (Pagos por Transferencia y Remesas) */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
               <Landmark size={22} className="text-blue-600" />
-              Configuración Bancaria SEPA (Acreedor)
+              Configuración Bancaria e IBAN del Club (Transferencias y Remesas)
             </h2>
             <p className="text-gray-500 text-sm">
-              Datos del club requeridos para la emisión y cobro de remesas bancarias SEPA.
+              Define la cuenta bancaria oficial del club para recibir transferencias de inscripciones y emitir remesas SEPA.
             </p>
           </div>
         </div>
@@ -186,6 +186,22 @@ export default function ConfiguracionClubPage() {
         <div className="p-6 bg-gray-50/50">
           <form onSubmit={handleSaveClubSepa} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  IBAN del club para pagos por transferencia
+                </label>
+                <input
+                  type="text"
+                  value={sepaIban}
+                  onChange={e => setSepaIban(e.target.value)}
+                  placeholder="ES00 0000 0000 0000 0000 0000"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono text-sm bg-white"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Cuenta bancaria oficial receptora de transferencias (se mostrará en las instrucciones de pago).
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Identificador acreedor SEPA
@@ -198,23 +214,7 @@ export default function ConfiguracionClubPage() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono text-sm bg-white"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Identificador asignado por el banco para adeudos SEPA (AT-02).
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  IBAN del Club
-                </label>
-                <input
-                  type="text"
-                  value={sepaIban}
-                  onChange={e => setSepaIban(e.target.value)}
-                  placeholder="ES00 0000 0000 0000 0000 0000"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono text-sm bg-white"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Cuenta bancaria receptora de las cuotas del club.
+                  Identificador asignado por el banco para adeudos directos SEPA (AT-02).
                 </p>
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function ConfiguracionClubPage() {
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 shadow-sm"
               >
                 {savingSepa ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                Guardar Configuración SEPA
+                Guardar Configuración Bancaria
               </button>
             </div>
           </form>

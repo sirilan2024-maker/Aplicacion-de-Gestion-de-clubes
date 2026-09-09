@@ -199,12 +199,13 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
       {/* ── 1. BLOQUE: REQUIERE ATENCIÓN (Prioridad Máxima) ── */}
       {(() => {
         const hasInscriptions = alerts.pendingInscriptionsCount > 0;
+        const hasUnassignedFormalized = (alerts.unassignedFormalizedPlayersCount ?? 0) > 0;
         const hasFees = alerts.pendingFeesCount > 0;
         const hasMatches = upcomingMatches.length > 0;
         const hasApercibidos = (alerts.apercibidosCount ?? 0) > 0;
         const hasUnreported = (alerts.unreportedMatchesCount ?? 0) > 0;
         const hasInjuries = (alerts.activeInjuriesCount ?? 0) > 0;
-        const hasPendingItems = hasInscriptions || hasFees || hasMatches || hasApercibidos || hasUnreported || hasInjuries;
+        const hasPendingItems = hasInscriptions || hasUnassignedFormalized || hasFees || hasMatches || hasApercibidos || hasUnreported || hasInjuries;
 
         return (
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4">
@@ -252,12 +253,52 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     </div>
                     <div className="flex items-center gap-2 self-end">
                       <Link
-                        href="/dashboard/inscripciones"
+                        href="/dashboard/inscripciones?status=pending_revision"
                         className="text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
                       >
-                        <span>Ver Secretaría</span>
+                        <span>Ir a secretaría</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </Link>
+                    </div>
+                  </div>
+                )}
+
+                {/* Alerta: Jugadores validados sin equipo asignado */}
+                {hasUnassignedFormalized && (
+                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-300 flex flex-col justify-between gap-3 shadow-xs">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-base shrink-0 select-none mt-0.5" role="img" aria-label="Alerta sin equipo">⚠️</span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-amber-950 text-xs sm:text-sm">
+                          {alerts.unassignedFormalizedPlayersCount === 1
+                            ? "Jugador validado sin equipo asignado"
+                            : `${alerts.unassignedFormalizedPlayersCount} jugadores validados sin equipo asignado`}
+                        </p>
+                        <p className="text-[11px] text-amber-800/80 mt-0.5">
+                          {alerts.unassignedFormalizedPlayersCount === 1
+                            ? "Inscripción formalizada pendiente de asignación de plantilla"
+                            : "Inscripciones formalizadas pendientes de asignación de plantilla"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-end">
+                      {alerts.unassignedFormalizedPlayersCount === 1 && alerts.singleUnassignedPlayerId ? (
+                        <Link
+                          href={`/dashboard/club/jugador/${alerts.singleUnassignedPlayerId}`}
+                          className="text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
+                        >
+                          <span>Ver jugador / Asignar equipo</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/dashboard/club/miembros?team=unassigned"
+                          className="text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
+                        >
+                          <span>Ver jugadores sin equipo</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}

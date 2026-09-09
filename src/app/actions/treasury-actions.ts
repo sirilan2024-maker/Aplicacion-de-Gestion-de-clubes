@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import Stripe from "stripe";
 import {
   getAuthenticatedContext,
   canUserAccessFamily,
@@ -1469,17 +1470,7 @@ export async function getMemberBalancesAction() {
   const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
   if (!profile?.club_id) throw new Error("Club no encontrado");
 
-  // 1. Fetch players with teams
-  const { data: players, error: playersError } = await adminSupabase
-    .from("players")
-    .select("id, first_name, last_name, team_id, teams(id, name)")
-    .eq("club_id", profile.club_id)
-    .neq("status", "inactive")
-    .order("first_name", { ascending: true });
-
-  if (playersError) throw new Error(playersError.message);
-
-  // 2. Fetch fees with payments for the club
+  // 1. Fetch fees with payments for the club
   const { data: fees, error: feesError } = await adminSupabase
     .from("fees")
     .select("id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en, fee_payments(id, amount_cents, payment_method, created_at)")
@@ -1496,7 +1487,23 @@ export async function getMemberBalancesAction() {
     }
   });
 
-  const memberBalances = (players || []).map((p: any) => {
+  // 2. Fetch players with teams
+  const { data: players, error: playersError } = await adminSupabase
+    .from("players")
+    .select("id, first_name, last_name, team_id, status, teams(id, name)")
+    .eq("club_id", profile.club_id)
+    .order("first_name", { ascending: true });
+
+  if (playersError) throw new Error(playersError.message);
+
+  // Filter players: include all club players who are not inactive OR who have existing fees in the club
+  const eligiblePlayers = (players || []).filter((p: any) => {
+    const hasFees = Boolean(feesByPlayer[p.id] && feesByPlayer[p.id].length > 0);
+    const notInactive = p.status !== "inactive";
+    return notInactive || hasFees;
+  });
+
+  const memberBalances = eligiblePlayers.map((p: any) => {
     const playerFees = feesByPlayer[p.id] || [];
     
     let totalChargedCents = 0;
@@ -2463,6 +2470,147 @@ export async function generateSepaRemittanceAction(params?: {
     };
   }
 }
+
+function getStripeInstance() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("La pasarela de pago (Stripe) no está configurada aún en este entorno.");
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2023-10-16" as any,
+  });
+}
+
+/**
+ * Server Action segura para crear/obtener el PaymentIntent de una deuda existente.
+ * Valida permisos, pertenencia multi-tenant y calcula el saldo pendiente real en servidor.
+ */
+export async function createPaymentIntentForFeeAction(feeId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
+  const adminSupabase = await createAdminClient();
+
+  // Validar permisos sobre la cuota (aislamiento de club y relación familiar/admin)
+  const access = await canUserAccessFee(adminSupabase, context, feeId);
+  if (!access.allowed || !access.fee) {
+    return { success: false, error: access.reason || "No autorizado para acceder a esta cuota" };
+  }
+
+  // 1. Obtener la cuota con los datos del jugador y club
+  const { data: fee, error: feeErr } = await adminSupabase
+    .from("fees")
+    .select("id, amount_cents, amount_paid_cents, estado, club_id, player_id, concept, payment_reference, stripe_payment_intent_id, currency, players(id, first_name, last_name, club_id)")
+    .eq("id", feeId)
+    .single();
+
+  if (feeErr || !fee) {
+    return { success: false, error: "Cuota no encontrada" };
+  }
+
+  // Multi-tenant check estricto
+  if (fee.club_id !== context.profile.club_id) {
+    return { success: false, error: "La cuota no pertenece a tu club" };
+  }
+
+  const playerObj = Array.isArray(fee.players) ? fee.players[0] : fee.players;
+  if (playerObj && playerObj.club_id !== fee.club_id) {
+    return { success: false, error: "Inconsistencia multi-tenant entre jugador y club" };
+  }
+
+  // 2. Calcular saldo pendiente real en servidor (NUNCA confiar en el cliente)
+  const paidCents = fee.amount_paid_cents || 0;
+  const remainingAmountCents = fee.amount_cents - paidCents;
+
+  if (remainingAmountCents <= 0 || fee.estado === "pagado") {
+    return { success: false, error: "Esta cuota ya está completamente pagada" };
+  }
+
+  // 3. Obtener IBAN oficial del club
+  const { data: club } = await adminSupabase
+    .from("clubs")
+    .select("id, name, sepa_iban")
+    .eq("id", fee.club_id)
+    .maybeSingle();
+
+  // 4. Garantizar payment_reference
+  const currentYear = new Date().getFullYear();
+  const paymentRef = fee.payment_reference || `PAY-${currentYear}-${(fee.player_id || fee.id).substring(0, 8).toUpperCase()}`;
+  if (!fee.payment_reference) {
+    await adminSupabase.from("fees").update({ payment_reference: paymentRef }).eq("id", fee.id);
+  }
+
+  const playerName = playerObj ? `${playerObj.first_name || ""} ${playerObj.last_name || ""}`.trim() : "Jugador";
+
+  // 5. Crear o reutilizar Stripe PaymentIntent
+  let clientSecret: string | null = null;
+  let stripeIntentId: string | null = null;
+
+  if (process.env.STRIPE_SECRET_KEY) {
+    const stripe = getStripeInstance();
+
+    // Idempotencia: si ya tiene un stripe_payment_intent_id pendiente por el mismo importe, verificar si se puede reutilizar
+    if (fee.stripe_payment_intent_id && !fee.stripe_payment_intent_id.startsWith("pi_mock_")) {
+      try {
+        const existingIntent = await stripe.paymentIntents.retrieve(fee.stripe_payment_intent_id);
+        if (
+          existingIntent.amount === remainingAmountCents &&
+          (existingIntent.status === "requires_payment_method" ||
+            existingIntent.status === "requires_action" ||
+            existingIntent.status === "requires_confirmation")
+        ) {
+          clientSecret = existingIntent.client_secret;
+          stripeIntentId = existingIntent.id;
+        }
+      } catch (retrieveErr) {
+        console.warn("No se pudo reutilizar intent previo, creando uno nuevo:", retrieveErr);
+      }
+    }
+
+    if (!clientSecret) {
+      const intent = await stripe.paymentIntents.create({
+        amount: remainingAmountCents,
+        currency: (fee.currency || "eur").toLowerCase(),
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: {
+          fee_id: fee.id,
+          player_id: fee.player_id || "",
+          club_id: fee.club_id,
+          payment_reference: paymentRef,
+          player: playerName,
+          concept: fee.concept || "Pago de cuota",
+          type: "pago_deuda",
+        },
+      });
+      clientSecret = intent.client_secret;
+      stripeIntentId = intent.id;
+
+      await adminSupabase
+        .from("fees")
+        .update({ stripe_payment_intent_id: stripeIntentId })
+        .eq("id", fee.id);
+    }
+  } else {
+    stripeIntentId = `pi_mock_${Date.now()}`;
+    clientSecret = `${stripeIntentId}_secret_mock`;
+  }
+
+  return {
+    success: true,
+    clientSecret,
+    amountCents: remainingAmountCents,
+    amountFormatted: `${(remainingAmountCents / 100).toFixed(2)} €`,
+    playerName,
+    concept: fee.concept,
+    paymentReference: paymentRef,
+    clubIban: club?.sepa_iban || null,
+    clubName: club?.name || "Club Deportivo",
+  };
+}
+
 
 
 

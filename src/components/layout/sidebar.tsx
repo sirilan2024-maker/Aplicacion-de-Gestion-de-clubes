@@ -38,7 +38,8 @@ import {
   LineChart,
   ClipboardList,
   Building2,
-  Sliders
+  Sliders,
+  Landmark
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -298,6 +299,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
           { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
           { name: "Expedientes (Doc)", href: "/admin/secretaria", icon: FolderOpen },
+          { name: "Configuración del Club", href: "/admin/configuracion", icon: Landmark },
           { name: "Configuracion de roles", href: "/admin/configuracion/roles", icon: Shield },
           { name: "Temporadas", href: "/admin/temporadas", icon: Timer },
           { name: "Archivo Histórico", href: "/dashboard/archivo", icon: Database },

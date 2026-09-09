@@ -1,13 +1,14 @@
 // src/components/features/treasury/Subscriptions.tsx
 "use client";
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Download, CreditCard, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useRouter } from "next/navigation";
 import { createCheckoutSession } from "@/actions/stripeActions";
 import { getFamilyFeesAction, getPlayerFeesAction, getReceiptSignedUrlAction, downloadPaymentReceiptAction, downloadFeeReceiptAction } from "@/app/actions/treasury-actions";
+import { PayFeeModal } from "@/components/features/treasury/PayFeeModal";
 
 function EstadoBadge({ estado }: { estado: string }) {
   const colors: Record<string, string> = {
@@ -43,6 +44,7 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedFeeForPayment, setSelectedFeeForPayment] = useState<any | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -52,30 +54,31 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
     }
   }, []);
 
-  useEffect(() => {
-    const fetchFees = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
+  const fetchFees = useCallback(async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    try {
+      let data;
+      if (playerId) {
+        data = await getPlayerFeesAction(playerId);
+      } else {
+        data = await getFamilyFeesAction(user.id);
       }
-      try {
-        let data;
-        if (playerId) {
-          data = await getPlayerFeesAction(playerId);
-        } else {
-          data = await getFamilyFeesAction(user.id);
-        }
-        setFees(data || []);
-      } catch (err) {
-        console.error("Error cargando cuotas:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFees();
+      setFees(data || []);
+    } catch (err) {
+      console.error("Error cargando cuotas:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [playerId]);
+
+  useEffect(() => {
+    fetchFees();
+  }, [fetchFees]);
 
   const handlePayNow = async (feeId: string) => {
     try {
@@ -324,11 +327,11 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
                   <div className="flex items-center justify-end gap-2 pt-1 flex-wrap">
                     {fee.estado === "pendiente" && (
                       <button
-                        onClick={() => handlePayNow(fee.id)}
+                        onClick={() => setSelectedFeeForPayment(fee)}
                         className="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 active:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
                       >
                         <CreditCard size={14} />
-                        Pagar ahora con Tarjeta
+                        Pagar ahora
                       </button>
                     )}
                     {(fee.estado === "pagado" || (fee.amount_paid_cents && fee.amount_paid_cents > 0)) && (
@@ -391,7 +394,7 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
                       <td className="px-4 py-3 text-sm text-right flex items-center justify-end gap-2">
                         {fee.estado === 'pendiente' && (
                           <button
-                            onClick={() => handlePayNow(fee.id)}
+                            onClick={() => setSelectedFeeForPayment(fee)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
                           >
                             <CreditCard size={13} />
@@ -452,6 +455,17 @@ export default function Subscriptions({ playerId }: { playerId?: string } = {}) 
       )}
         </div>
       )}
+
+      {/* Modal Unificado de Pago de Cuota (Tarjeta / Transferencia / Presencial) */}
+      <PayFeeModal
+        isOpen={!!selectedFeeForPayment}
+        onClose={() => setSelectedFeeForPayment(null)}
+        fee={selectedFeeForPayment}
+        onPaymentSuccess={() => {
+          setSelectedFeeForPayment(null);
+          fetchFees();
+        }}
+      />
     </div>
   );
 }

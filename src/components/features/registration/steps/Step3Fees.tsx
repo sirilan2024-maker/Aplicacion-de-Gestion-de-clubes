@@ -4,7 +4,7 @@ import { HeartPulse, CreditCard, Banknote, Building } from "lucide-react";
 import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export function Step3Fees() {
+export function Step3Fees({ clubIban }: { clubIban?: string | null }) {
   const { register, control, setValue, formState: { errors } } = useFormContext<RegistrationFormData>();
   
   const wasInClub = useWatch({ control, name: "wasInClub" });
@@ -19,6 +19,10 @@ export function Step3Fees() {
   if (paidReservation) {
     feeTotal -= 50;
   }
+
+  const playerFirstName = useWatch({ control, name: "playerFirstName" });
+  const playerLastName = useWatch({ control, name: "playerLastName" });
+  const fullPlayerName = `${playerFirstName || ''} ${playerLastName || ''}`.trim() || 'el jugador';
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -116,7 +120,7 @@ export function Step3Fees() {
               <input type="radio" value="Stripe" {...register("paymentMethod")} className="w-4 h-4 text-blue-600" />
               <div className="ml-3 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-gray-600" />
-                <span className="block text-sm font-bold text-gray-900">Tarjeta de Crédito (Online)</span>
+                <span className="block text-sm font-bold text-gray-900">Tarjeta / Bizum / PayPal (Stripe Online)</span>
               </div>
             </label>
             <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'Transferencia' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'}`}>
@@ -138,43 +142,34 @@ export function Step3Fees() {
       </div>
 
       {paymentMethod === 'Transferencia' && (
-        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mt-6 text-sm text-yellow-800">
-          <strong>Datos para transferencia:</strong><br />
-          Concepto: [Nombre del Jugador] - Cuota<br />
-          IBAN Club Sporting Saladar: ESXX XXXX XXXX XXXX XXXX XXXX<br />
-          <em>* Tu inscripción no será validada hasta que la administración confirme la recepción de la transferencia.</em>
+        <div className="bg-blue-50/80 p-5 rounded-xl border border-blue-200 mt-6 text-sm text-blue-900 space-y-2">
+          <div className="font-bold flex items-center gap-2 text-base">
+            <Building className="w-5 h-5 text-blue-600" />
+            Instrucciones para Pago por Transferencia
+          </div>
+          {clubIban ? (
+            <div className="bg-white p-3 rounded-lg border border-blue-200 my-2">
+              <span className="text-xs text-gray-500 font-semibold uppercase block">IBAN Oficial del Club:</span>
+              <span className="font-mono text-base font-extrabold text-blue-950">{clubIban}</span>
+            </div>
+          ) : null}
+          <p className="text-xs text-blue-800 leading-relaxed">
+            Al finalizar la inscripción en el Paso 5, el sistema generará una <strong>Referencia Única de Pago</strong> para <strong>{fullPlayerName}</strong> y mostrará las instrucciones detalladas para realizar la transferencia y remitir el justificante a Secretaría.
+          </p>
         </div>
       )}
 
       {paymentMethod === 'Stripe' && (
-        <div className="bg-white p-6 rounded-xl border border-blue-200 mt-6 shadow-sm animate-in slide-in-from-top-2">
-          <div className="flex justify-between items-start mb-4">
-            <h4 className="font-bold text-gray-900 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-blue-600" /> Pago Seguro con Tarjeta
-            </h4>
-            <div className="bg-blue-50 text-blue-800 text-xs font-bold px-2 py-1 rounded">Modo Simulación</div>
-          </div>
-          <div className="space-y-4 max-w-md">
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Número de Tarjeta</label>
-              <div className="flex h-10 w-full items-center rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
-                <CreditCard className="w-4 h-4 mr-2" />
-                <span>4242  4242  4242  4242</span>
-                <div className="ml-auto flex gap-2">
-                  <span>12/34</span>
-                  <span>123</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-700">Nombre en la tarjeta</label>
-              <div className="flex h-10 w-full items-center rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
-                Titular Simulado
-              </div>
-            </div>
-            <div className="pt-2 text-xs text-gray-500 flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              El cobro de {paymentPlan === 'Fraccionado' ? (feeTotal/2).toFixed(2) : feeTotal}€ se procesará automáticamente al finalizar la inscripción.
+        <div className="bg-blue-50/70 p-5 rounded-xl border border-blue-200 mt-6 shadow-sm animate-in slide-in-from-top-2">
+          <div className="flex items-start gap-3">
+            <CreditCard className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-gray-900 text-sm">
+                Pasarela Segura con Tarjeta (Stripe)
+              </h4>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                Al enviar el formulario en el Paso 5, se abrirá la pasarela bancaria oficial para introducir los datos de tu tarjeta y autorizar el abono seguro de <strong>{paymentPlan === 'Fraccionado' ? (feeTotal/2).toFixed(2) : feeTotal}€</strong> con autenticación 3D Secure (SCA).
+              </p>
             </div>
           </div>
         </div>

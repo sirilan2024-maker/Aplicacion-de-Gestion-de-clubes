@@ -10,6 +10,7 @@ import {
 import toast from "react-hot-toast"
 import { approveInscriptionAction, rejectInscriptionAction } from "@/app/actions/inscriptions-actions"
 import { createAdminFeeForPlayerAction } from "@/app/actions/treasury-actions"
+import { useSearchParams } from "next/navigation"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -299,11 +300,30 @@ function ExpedienteModal({
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function SecretariaInscripciones() {
+  const searchParams = useSearchParams()
+  const rawStatus = searchParams?.get("status") || searchParams?.get("tab")
+
+  const getInitialStatus = (param: string | null | undefined): string => {
+    if (!param) return "pending_revision"
+    const p = param.toLowerCase()
+    if (p.includes("pend") || p === "pending_revision") return "pending_revision"
+    if (p.includes("aprob") || p === "approved" || p === "formalized") return "approved"
+    if (p.includes("rech") || p === "rejected") return "rejected"
+    if (p === "all" || p === "todos") return "all"
+    return "pending_revision"
+  }
+
   const [requests, setRequests] = useState<PlayerRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("approved")
+  const [statusFilter, setStatusFilter] = useState<string>(() => getInitialStatus(rawStatus))
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRequest | null>(null)
+
+  useEffect(() => {
+    if (rawStatus) {
+      setStatusFilter(getInitialStatus(rawStatus))
+    }
+  }, [rawStatus])
 
   const fetchRequests = useCallback(async () => {
     setLoading(true)

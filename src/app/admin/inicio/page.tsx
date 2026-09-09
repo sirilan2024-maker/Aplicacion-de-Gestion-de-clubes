@@ -2,6 +2,7 @@ import { getExecutiveDashboardAction } from "@/app/actions/club-actions";
 import { AdminInicioClient } from "@/components/features/admin/AdminInicioClient";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminInicioPage() {
   const result = await getExecutiveDashboardAction();

@@ -175,12 +175,19 @@ export default function MemberBalances() {
         setSummary(res.summary);
 
         const teamMap = new Map<string, string>();
+        let hasNoneTeam = false;
         res.members.forEach((m) => {
-          if (m.team_id !== "none" && m.team_name) {
+          if (m.team_id === "none" || !m.team_id) {
+            hasNoneTeam = true;
+          } else if (m.team_name) {
             teamMap.set(m.team_id, m.team_name);
           }
         });
-        setTeams(Array.from(teamMap.entries()).map(([id, name]) => ({ id, name })));
+        const teamList = Array.from(teamMap.entries()).map(([id, name]) => ({ id, name }));
+        if (hasNoneTeam) {
+          teamList.unshift({ id: "none", name: "Sin equipo" });
+        }
+        setTeams(teamList);
       }
     } catch (err: any) {
       toast.error("Error al cargar saldos de socios: " + err.message);

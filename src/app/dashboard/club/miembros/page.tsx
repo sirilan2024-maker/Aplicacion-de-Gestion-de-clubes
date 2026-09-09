@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Users, Search, Loader2, Mail, Shield, User as UserIcon, Archive } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
@@ -778,14 +778,22 @@ interface Member {
   avatar_url?: string | null
 }
 
-export default function GlobalMembersPage() {
+function GlobalMembersContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
-  const [teamFilter, setTeamFilter] = useState("all")
+  const [teamFilter, setTeamFilter] = useState(searchParams?.get("team") === "unassigned" ? "unassigned" : "all")
   const [archivingId, setArchivingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const teamParam = searchParams?.get("team")
+    if (teamParam === "unassigned") {
+      setTeamFilter("unassigned")
+    }
+  }, [searchParams])
   
   // Stats
   const [stats, setStats] = useState({ total: 0, staff: 0, players: 0 })
@@ -1485,5 +1493,19 @@ export default function GlobalMembersPage() {
       <AltaAsistidaModal open={showAltaAsistida} onClose={() => { setShowAltaAsistida(false); fetchMembers(); }} clubId={clubId} />
       <ManageStaffModal open={!!managingMember} onClose={() => setManagingMember(null)} member={managingMember} teams={allTeams} onSuccess={fetchMembers} />
     </div>
+  )
+}
+
+export default function GlobalMembersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center p-12">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+      }
+    >
+      <GlobalMembersContent />
+    </Suspense>
   )
 }

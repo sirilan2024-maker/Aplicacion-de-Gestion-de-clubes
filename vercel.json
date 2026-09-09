@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/ffcv/cron",
-      "schedule": "0 * * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }

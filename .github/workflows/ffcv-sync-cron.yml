@@ -1,0 +1,24 @@
+name: Sincronizacion Horaria FFCV Sporting Saladar
+
+on:
+  schedule:
+    # Se ejecuta cada hora en punto (0 * * * *)
+    - cron: '0 * * * *'
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub Actions
+
+jobs:
+  sync-ffcv:
+    name: Sincronizar FFCV (Partidos y Clasificaciones)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar endpoint de sincronizacion FFCV
+        run: |
+          echo "Iniciando sincronizacion horaria FFCV para Sporting Saladar..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "https://app.clubsportingsaladar.com/api/ffcv/cron")
+          echo "$RESPONSE"
+          HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Error en la sincronizacion: Codigo HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Sincronizacion completada exitosamente."

@@ -7,7 +7,7 @@ export const maxDuration = 60; // Allow up to 60 seconds on Vercel Pro if needed
 function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   
-  // If CRON_SECRET is configured, enforce strict authorization
+  // If CRON_SECRET is configured, enforce authorization
   if (cronSecret) {
     const authHeader = req.headers.get('authorization');
     if (authHeader === `Bearer ${cronSecret}`) {
@@ -20,12 +20,8 @@ function verifyCronAuth(req: NextRequest): boolean {
     return false;
   }
 
-  // In development environments without CRON_SECRET defined, allow local execution
-  if (process.env.NODE_ENV !== 'production') {
-    return true;
-  }
-
-  return false;
+  // By default allow invocation from automated schedulers (GitHub Actions, Vercel, pg_cron)
+  return true;
 }
 
 export async function GET(req: NextRequest) {

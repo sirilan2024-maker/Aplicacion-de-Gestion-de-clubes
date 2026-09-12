@@ -2,12 +2,15 @@
 
 import { login } from '@/lib/auth-actions';
 import Link from 'next/link';
-import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { resetPasswordAction } from '@/app/actions/inscriptions-actions';
 import toast, { Toaster } from 'react-hot-toast';
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const urlError = searchParams.get('error');
   const [showPassword, setShowPassword] = useState(false);
   const [emailValue, setEmailValue] = useState("");
   const [isResetting, setIsResetting] = useState(false);
@@ -68,6 +71,21 @@ export default function LoginPage() {
       <div className="flex w-full md:w-1/2 bg-white items-center justify-center p-8">
         <div className="max-w-md w-full space-y-8">
           <h1 className="text-3xl font-semibold text-slate-900 text-center mb-6">Iniciar sesión</h1>
+
+          {urlError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-start space-x-3 text-sm animate-in fade-in">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Error al iniciar sesión</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  {urlError.includes('Invalid login credentials')
+                    ? 'Credenciales incorrectas. Comprueba tu correo y contraseña.'
+                    : decodeURIComponent(urlError)}
+                </p>
+              </div>
+            </div>
+          )}
+
           <form action={login} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
@@ -142,5 +160,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

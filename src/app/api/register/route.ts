@@ -5,13 +5,16 @@ import { createAdminFeeForPlayerAction } from '@/app/actions/treasury-actions';
 import { sendEmail, getPlayerRegistrationEmailHtml } from '@/lib/email-service';
 import { getOrCreateStripeCustomer } from '@/lib/payments/stripe-customer-service';
 import { ADMIN_ROLES, STAFF_ROLES } from '@/lib/auth-helpers';
+import { isAuthorizedE2ETestRequest, getE2EDeliveryEmailRecipient } from '@/lib/e2e-safety';
 
-// Inicializar Stripe solo si existe la clave (para evitar fallos si no está configurada)
 import Stripe from 'stripe';
-const stripeKey = process.env.STRIPE_SECRET_KEY || 'sk_test_mock_123';
-const stripe = new Stripe(stripeKey, {
-  apiVersion: '2023-10-16' as any,
-});
+
+function getStripeClient(): Stripe {
+  const stripeKey = process.env.STRIPE_SECRET_KEY || 'sk_test_mock_123';
+  return new Stripe(stripeKey, {
+    apiVersion: '2023-10-16' as any,
+  });
+}
 
 export async function POST(request: Request) {
   try {
@@ -176,6 +179,7 @@ export async function POST(request: Request) {
     // El DNI del tutor va a families.tutor_1_dni_url
     // ──────────────────────────────────────────────────────────────────────────
     let familyId: string | null = null;
+    let existingProfile: any = null;
     if (authUserId) {
       const { data: existingFamily } = await supabaseAdmin
         .from('families')
@@ -204,11 +208,13 @@ export async function POST(request: Request) {
       }
 
       // Consultar el perfil actual para proteger roles administrativos y de staff de degradación o modificación accidental
-      const { data: existingProfile } = await supabaseAdmin
+      const { data: profileData } = await supabaseAdmin
         .from('profiles')
         .select('id, role, rol, roles, first_name, last_name, club_id')
         .eq('id', authUserId)
         .maybeSingle();
+
+      existingProfile = profileData;
 
       const isStaffOrAdmin = existingProfile && (
         (existingProfile.role && (ADMIN_ROLES.includes(existingProfile.role) || STAFF_ROLES.includes(existingProfile.role))) ||
@@ -421,10 +427,32 @@ export async function POST(request: Request) {
     // FASE 6: Generación de Cuotas y Stripe PaymentIntent
     // ──────────────────────────────────────────────────────────────────────────
     
+    // Validar autorización estricta para modo de prueba E2E (1,00 €) mediante ticket de sesión o cabecera
+    const incomingE2ETicket = request.headers.get('x-e2e-ticket') || data.e2eTicket || data.e2e_ticket || null;
+    const isE2EAuthorized = await isAuthorizedE2ETestRequest(request, email, existingProfile, incomingE2ETicket, supabaseAdmin);
+
     // 1. Crear las cuotas contables automáticamente (Omitir si es Senior)
     if (player && !isSenior) {
       try {
-        await createAdminFeeForPlayerAction(player.id, formData.wasInClub || false);
+        if (isE2EAuthorized) {
+          // En modo E2E autorizado: crear exactamente UNA única cuota de prueba de 1,00 € (100 céntimos)
+          const currentYear = new Date().getFullYear();
+          const e2ePaymentRef = `PAY-${currentYear}-${player.id.substring(0, 8).toUpperCase()}`;
+          await supabaseAdmin.from('fees').insert({
+            player_id: player.id,
+            profile_id: authUserId || null,
+            club_id: clubId,
+            concept: `Cuota Temporada (E2E Test) – 1.00 €`,
+            amount_cents: 100,
+            amount_paid_cents: 0,
+            currency: 'eur',
+            estado: 'pendiente',
+            tipo_cargo: 'one_time',
+            payment_reference: e2ePaymentRef,
+          });
+        } else {
+          await createAdminFeeForPlayerAction(player.id, formData.wasInClub || false);
+        }
       } catch (err) {
         console.error("Error generando cuotas:", err);
       }
@@ -459,62 +487,82 @@ export async function POST(request: Request) {
         // 3. Crear Stripe PaymentIntent si eligió Stripe
         if (paymentMethod === 'Stripe') {
           const isFraccionado = paymentPlan === 'Fraccionado';
-          const chargeAmount = targetFee.amount_cents;
+          const chargeAmount = isE2EAuthorized ? 100 : targetFee.amount_cents;
           let stripeCustomerId: string | undefined = undefined;
 
-          if (process.env.STRIPE_SECRET_KEY) {
-            // Obtener o crear Stripe Customer para el tutor garantizando aislamiento por club
-            try {
-              const customerEmail = formData.tutor1Email || email;
-              const customerName = formData.tutor1Name
-                ? `${formData.tutor1Name} ${formData.tutor1LastName || ''}`.trim()
-                : `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim();
-
-              const customerRes = await getOrCreateStripeCustomer({
-                email: customerEmail,
-                name: customerName,
-                clubId: targetFee.club_id || clubId,
-                profileId: authUserId || undefined,
-                phone: formData.tutor1Phone || undefined,
-              });
-              stripeCustomerId = customerRes.customerId;
-            } catch (custErr) {
-              console.error('[register/route] Error resolving Stripe customer:', custErr);
-            }
-
-            const intent = await stripe.paymentIntents.create({
-              amount: chargeAmount,
-              currency: 'eur',
-              customer: stripeCustomerId,
-              description: 'CUOTA INSCRIPCIÓN TEMPORADA 26/27 - CLUB SPORTING SALADAR',
-              payment_method_types: ['card'],
-              setup_future_usage: isFraccionado ? 'off_session' : undefined,
-              metadata: {
-                player_id: player.id,
-                fee_id: targetFee.id,
-                club_id: targetFee.club_id || clubId,
-                customer_id: stripeCustomerId || '',
-                payment_reference: paymentReference,
-                player: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim(),
-                type: isFraccionado ? 'inscripcion_fraccionada_1' : 'inscripcion_total',
-              },
-            });
-            stripeIntentId = intent.id;
-            clientSecret = intent.client_secret;
-          } else {
-            stripeIntentId = `pi_mock_${Date.now()}`;
-            clientSecret = `${stripeIntentId}_secret_mock`;
+          if (!process.env.STRIPE_SECRET_KEY) {
+            console.error('[register/route] STRIPE_SECRET_KEY no configurada en el servidor');
+            return NextResponse.json({
+              error: 'La pasarela de pago seguro Stripe no está disponible en el servidor en este momento. Por favor, contacta con el club.',
+            }, { status: 500 });
           }
 
-          // Guardar el stripe_payment_intent_id y stripe_customer_id en la cuota
+          const stripe = getStripeClient();
+          // Obtener o crear Stripe Customer para el tutor garantizando aislamiento por club
+          try {
+            const customerEmail = formData.tutor1Email || email;
+            const customerName = formData.tutor1Name
+              ? `${formData.tutor1Name} ${formData.tutor1LastName || ''}`.trim()
+              : `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim();
+
+            const customerRes = await getOrCreateStripeCustomer({
+              email: customerEmail,
+              name: customerName,
+              clubId: targetFee.club_id || clubId,
+              profileId: authUserId || undefined,
+              phone: formData.tutor1Phone || undefined,
+            });
+            stripeCustomerId = customerRes.customerId;
+          } catch (custErr) {
+            console.error('[register/route] Error resolving Stripe customer:', custErr);
+          }
+
+          const intentMetadata: Record<string, string> = {
+            player_id: player.id,
+            fee_id: targetFee.id,
+            club_id: targetFee.club_id || clubId,
+            customer_id: stripeCustomerId || '',
+            payment_reference: paymentReference,
+            player: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim(),
+            type: isE2EAuthorized
+              ? 'e2e_test_registration'
+              : (isFraccionado ? 'inscripcion_fraccionada_1' : 'inscripcion_total'),
+          };
+
+          if (isE2EAuthorized) {
+            intentMetadata.e2e_test = 'true';
+          }
+
+          const deliveryEmailRecipient = isE2EAuthorized
+            ? getE2EDeliveryEmailRecipient()
+            : (email && !email.includes('@example.invalid') ? email : null);
+
+          const intent = await stripe.paymentIntents.create({
+            amount: chargeAmount,
+            currency: 'eur',
+            customer: stripeCustomerId,
+            description: isE2EAuthorized
+              ? 'CUOTA INSCRIPCIÓN E2E TEST (1.00 €) - CLUB SPORTING SALADAR'
+              : 'CUOTA INSCRIPCIÓN TEMPORADA 26/27 - CLUB SPORTING SALADAR',
+            payment_method_types: ['card'],
+            setup_future_usage: isFraccionado && !isE2EAuthorized ? 'off_session' : undefined,
+            metadata: intentMetadata,
+            receipt_email: deliveryEmailRecipient || undefined,
+          });
+          stripeIntentId = intent.id;
+          clientSecret = intent.client_secret;
+
+          if (!clientSecret) {
+            return NextResponse.json({
+              error: 'Error generando la pasarela de pago seguro en Stripe.',
+            }, { status: 500 });
+          }
+
+          // Guardar el stripe_payment_intent_id en la cuota
           if (stripeIntentId) {
-            const feeUpdate: Record<string, any> = { stripe_payment_intent_id: stripeIntentId };
-            if (stripeCustomerId) {
-              feeUpdate.stripe_customer_id = stripeCustomerId;
-            }
             await supabaseAdmin
               .from('fees')
-              .update(feeUpdate)
+              .update({ stripe_payment_intent_id: stripeIntentId })
               .eq('id', targetFee.id);
           }
         }
@@ -567,11 +615,20 @@ export async function POST(request: Request) {
           paymentSummary,
         });
 
-        await sendEmail({
-          to: email,
-          subject: `⚽ Inscripción Registrada: ${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() + ' - Sporting Saladar',
-          html: emailHtml,
-        });
+        // En modo E2E, si existe E2E_EMAIL_RECIPIENT en el servidor, se envía el correo al destinatario real
+        // sin alterar la identidad del usuario en BD ni sus registros. Si es @example.invalid sin destinatario, se omite de forma segura.
+        const targetEmail = isE2EAuthorized
+          ? getE2EDeliveryEmailRecipient()
+          : (!email.includes('@example.invalid') ? email : null);
+
+        if (targetEmail) {
+          await sendEmail({
+            to: targetEmail,
+            subject: `⚽ Inscripción Registrada: ${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() + ' - Sporting Saladar',
+            html: emailHtml,
+            replyTo: 'csportingsaladar@gmail.com',
+          });
+        }
       } catch (emailErr) {
         console.error('Error disparando email automático de bienvenida:', emailErr);
       }
@@ -599,7 +656,9 @@ export async function POST(request: Request) {
       clubIban: clubIban,
       feeId: targetFeeId,
       clientSecret: clientSecret,
+      paymentIntentId: stripeIntentId,
       paymentReference: paymentReference,
+      amountFormatted: isE2EAuthorized ? '1,00 €' : undefined,
       message: 'Inscripción guardada y formalizada correctamente.',
     });
   } catch (err: any) {

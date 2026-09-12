@@ -156,14 +156,7 @@ export function StripePaymentModal({
     e.preventDefault();
 
     if (isMock) {
-      setIsProcessing(true);
-      setTimeout(() => {
-        setIsProcessing(false);
-        setIsCompleted(true);
-        setTimeout(() => {
-          onSuccess();
-        }, 1200);
-      }, 1200);
+      setErrorMessage('La pasarela de pago seguro Stripe no está disponible en este entorno. Por favor, contacta con el club.');
       return;
     }
 

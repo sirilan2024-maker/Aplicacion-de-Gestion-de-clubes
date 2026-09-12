@@ -37,6 +37,7 @@ export function RegistrationWizard({
 }) {
   const searchParams = useSearchParams();
   const teamIdParam = searchParams?.get('team') || null;
+  const e2eTicketParam = searchParams?.get('e2e_ticket') || searchParams?.get('ticket') || null;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +49,7 @@ export function RegistrationWizard({
   const [paymentRef, setPaymentRef] = useState<string | null>(null);
   const [stripeModalOpen, setStripeModalOpen] = useState(false);
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
+  const [stripeAmountFormatted, setStripeAmountFormatted] = useState<string | null>(null);
 
   const methods = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema) as any,
@@ -158,7 +160,8 @@ export function RegistrationWizard({
         },
         body: JSON.stringify({
           ...dataToSubmit,
-          teamId: teamIdParam || undefined
+          teamId: teamIdParam || undefined,
+          e2eTicket: e2eTicketParam || undefined,
         }),
       });
 
@@ -188,6 +191,9 @@ export function RegistrationWizard({
 
       // 2. Si eligió tarjeta y el servidor devolvió clientSecret, abrir la pasarela real de Stripe
       if (data.paymentMethod === "Stripe" && result.clientSecret) {
+        if (result.amountFormatted) {
+          setStripeAmountFormatted(result.amountFormatted);
+        }
         setStripeClientSecret(result.clientSecret);
         setStripeModalOpen(true);
       } else {
@@ -450,7 +456,7 @@ export function RegistrationWizard({
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           clientSecret={stripeClientSecret}
-          amountFormatted={formattedChargeAmount}
+          amountFormatted={stripeAmountFormatted || formattedChargeAmount}
           playerName={`${playerFirstName || ''} ${playerLastName || ''}`.trim() || 'Jugador'}
           concept="CUOTA INSCRIPCIÓN TEMPORADA 26/27"
           paymentReference={paymentRef || undefined}

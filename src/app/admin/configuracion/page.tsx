@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Settings, Plus, Save, Trash2, CheckCircle2, Landmark, Loader2 } from "lucide-react";
+import { Settings, Plus, Save, Trash2, CheckCircle2, Landmark, Loader2, Shield, Bell } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { getClubSepaAction, updateClubSepaAction } from "@/app/actions/club-actions";
 
@@ -159,7 +160,7 @@ export default function ConfiguracionClubPage() {
     <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="bottom-right" />
       
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-3 mb-6">
         <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
           <Settings size={28} />
         </div>
@@ -167,6 +168,31 @@ export default function ConfiguracionClubPage() {
           <h1 className="text-3xl font-bold text-gray-900">Configuración del Club</h1>
           <p className="text-gray-500">Administra los parámetros y preferencias globales de tu club.</p>
         </div>
+      </div>
+
+      {/* Subnavigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 mb-8">
+        <Link
+          href="/admin/configuracion"
+          className="px-4 py-2.5 text-xs md:text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors flex items-center gap-2"
+        >
+          <Landmark className="w-4 h-4" />
+          <span>Métricas y SEPA</span>
+        </Link>
+        <Link
+          href="/admin/configuracion/roles"
+          className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
+        >
+          <Shield className="w-4 h-4" />
+          <span>Roles y Permisos</span>
+        </Link>
+        <Link
+          href="/admin/configuracion/notificaciones"
+          className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
+        >
+          <Bell className="w-4 h-4" />
+          <span>Canales y Políticas de Notificación</span>
+        </Link>
       </div>
 
       {/* Configuración Bancaria e IBAN del Club (Pagos por Transferencia y Remesas) */}

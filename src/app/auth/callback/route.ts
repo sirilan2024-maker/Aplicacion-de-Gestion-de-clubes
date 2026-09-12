@@ -43,23 +43,34 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Sesión creada correctamente → marcar email verificado y redirigir
+    // Sesión creada correctamente
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const adminSupabase = await createAdminClient()
       
-      // FASE 6: Asegurar que el usuario adquiera el rol 'family' por defecto si acaba de validar su identidad.
-      // También se actualiza la validación legal 'email_verified: true' como Firma Electrónica inequívoca.
-      await adminSupabase.from('profiles').update({ 
-        email_verified: true,
-        role: 'family',
-        rol: 'familia' 
-      }).eq('id', user.id)
+      // Asegurar que email_verified esté marcado como true sin sobreescribir roles existentes
+      const { data: existingProfile } = await adminSupabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const profileUpdate: Record<string, any> = { email_verified: true };
+      if (!existingProfile?.role) {
+        profileUpdate.role = 'family';
+        profileUpdate.rol = 'familia';
+      }
+
+      await adminSupabase.from('profiles').update(profileUpdate).eq('id', user.id);
     }
 
-    return NextResponse.redirect(
-      `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`
-    )
+    // Redirigir a next (ej. /actualizar-password o /dashboard)
+    const isPasswordRecovery = next.includes('actualizar-password');
+    const redirectUrl = isPasswordRecovery
+      ? `${origin}${next}`
+      : `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`;
+
+    return NextResponse.redirect(redirectUrl);
   }
 
   // Sin código en la URL — situación inesperada

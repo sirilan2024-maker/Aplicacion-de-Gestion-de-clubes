@@ -1,0 +1,26 @@
+name: Recordatorios 24h Sporting Saladar (Cron)
+
+on:
+  schedule:
+    # Se ejecuta cada 10 minutos (*/10 * * * *)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Permite ejecución manual desde GitHub Actions
+
+jobs:
+  send-reminders:
+    name: Despachar Recordatorios 24h (Entrenamientos, Eventos y Partidos)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar endpoint de recordatorios de calendario
+        run: |
+          echo "Iniciando despacho de recordatorios para Sporting Saladar..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://app.clubsportingsaladar.com/api/events/send-reminders" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "$RESPONSE"
+          HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Aviso / Error en el cron: Codigo HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Recordatorios procesados exitosamente."

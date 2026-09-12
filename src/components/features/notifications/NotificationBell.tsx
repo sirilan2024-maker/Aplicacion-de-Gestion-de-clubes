@@ -65,6 +65,9 @@ export function NotificationBell() {
   const unreadCount = notifications.length
 
   const getNavigationUrl = (notification: any): string => {
+    if (notification.link) {
+      return notification.link
+    }
     const type = notification.type
     const isFamilyRole = ['family', 'familia', 'tutor'].includes(userRole)
 
@@ -192,7 +195,7 @@ export function NotificationBell() {
                           {notif.title}
                         </p>
                       </div>
-                      <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{notif.content}</p>
+                      <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{notif.content || notif.message || ''}</p>
                       <p className="text-[10px] text-slate-400 mt-1 font-medium">
                         📅 {new Date(notif.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </p>

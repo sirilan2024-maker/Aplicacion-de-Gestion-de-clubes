@@ -16,7 +16,7 @@ export async function updateRoleNavigationAction(role: string, navIds: string[])
     .eq("id", user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'admin' && profile?.role !== 'superadmin') {
     return { success: false, error: 'No tienes permisos para realizar esta acción' }
   }
 

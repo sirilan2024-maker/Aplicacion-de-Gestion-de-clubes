@@ -251,8 +251,14 @@ export async function updateRegistrationEmailAction(registrationId: string, newE
 
 
 export async function resetPasswordAction(email: string) {
-  const supabase = await createAdminClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
-  if (error) return { success: false, error: error.message };
+  const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.clubsportingsaladar.com';
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${siteUrl}/auth/callback?next=/actualizar-password`,
+  });
+  if (error) {
+    console.error('[resetPasswordAction] Error:', error.message);
+    return { success: false, error: error.message };
+  }
   return { success: true };
 }

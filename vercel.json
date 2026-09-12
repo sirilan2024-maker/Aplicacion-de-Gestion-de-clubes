@@ -3,6 +3,14 @@
     {
       "path": "/api/ffcv/cron",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/events/send-reminders",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/process-due-fees",
+      "schedule": "0 9 * * *"
     }
   ]
 }

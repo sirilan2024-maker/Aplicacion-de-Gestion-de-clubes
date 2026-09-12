@@ -1175,7 +1175,6 @@ export default function MemberBalances() {
                 >
                   <option value="Contado">💵 Contado / Efectivo</option>
                   <option value="Transferencia">🏦 Transferencia Bancaria</option>
-                  <option value="Bizum">📱 Bizum</option>
                   <option value="Tarjeta">💳 Tarjeta / TPV</option>
                   <option value="Stripe">🌐 Stripe Online</option>
                 </select>

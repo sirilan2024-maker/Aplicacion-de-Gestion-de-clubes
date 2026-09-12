@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthenticatedContext, canUserAccessMatch, canUserAccessPlayer } from '@/lib/auth-helpers'
+import { NotificationService } from '@/lib/notifications/notification-service'
 
 export async function POST(
   request: Request,
@@ -47,7 +48,7 @@ export async function POST(
     }
 
 
-    // --- Notificar a los entrenadores del equipo ---
+    // --- Notificar a los entrenadores del equipo vía NotificationService ---
     try {
       // 1. Obtener detalles del partido y del jugador
       const { data: matchData } = await adminClient
@@ -58,11 +59,20 @@ export async function POST(
         
       const { data: playerData } = await adminClient
         .from('players')
-        .select('first_name, last_name')
+        .select('first_name, last_name, club_id')
         .eq('id', playerId)
         .single()
 
       if (matchData && matchData.equipo_id && playerData) {
+        // Resolver club_id seguro desde equipo o jugador
+        let targetClubId = playerData.club_id || context.profile.club_id
+        const { data: teamData } = await adminClient
+          .from('teams')
+          .select('club_id')
+          .eq('id', matchData.equipo_id)
+          .single()
+        if (teamData?.club_id) targetClubId = teamData.club_id
+
         // 2. Obtener los entrenadores de este equipo
         const { data: coaches } = await adminClient
           .from('team_coaches')
@@ -74,16 +84,19 @@ export async function POST(
           const matchName = matchData.rival_nombre ? `vs ${matchData.rival_nombre}` : 'el próximo partido'
           const actionText = status ? 'ha confirmado su asistencia al' : 'ha indicado que NO asistirá al'
           
-          // 3. Crear las notificaciones
-          const notificationsToInsert = coaches.map((c: { profile_id: string }) => ({
-            profile_id: c.profile_id,
-            title: `Respuesta de Convocatoria`,
+          // 3. Despachar notificaciones canónicas mediante NotificationService
+          const notifications = coaches.map((c: { profile_id: string }) => ({
+            userId: c.profile_id,
+            clubId: targetClubId,
+            type: 'MATCH_RSVP_COACH_UPDATE' as const,
+            title: 'Respuesta de Convocatoria',
             content: `${playerName} ${actionText} partido ${matchName}.`,
-            is_read: false,
-            type: 'partido',
+            link: `/dashboard/equipos/${matchData.equipo_id}/partidos/${matchId}`,
+            channels: ['IN_APP', 'EMAIL', 'PUSH'] as ('IN_APP' | 'EMAIL' | 'PUSH')[],
+            idempotencyKey: `match_rsvp:${matchId}:${playerId}:${status}:${c.profile_id}`,
           }))
 
-          await adminClient.from('notifications').insert(notificationsToInsert)
+          await NotificationService.dispatchBatch({ notifications })
         }
       }
     } catch (notifErr) {

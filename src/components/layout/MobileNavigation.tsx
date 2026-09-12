@@ -32,7 +32,9 @@ import {
   X,
   FolderOpen,
   Radio,
-  UserPlus
+  UserPlus,
+  Bell,
+  Landmark
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -179,7 +181,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     ]
   } else {
     // Si no estamos en equipo, usamos las rutas generales
-    if (userRole === 'admin') {
+    if (userRole === 'admin' || userRole === 'superadmin') {
       bottomLinks = [
         { name: "Equipos", href: "/dashboard/equipos", icon: Shield },
         { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
@@ -214,7 +216,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       { name: "Disciplina", href: `/dashboard/equipos/${activeTeamId}/partidos?view=disciplina`, icon: AlertTriangle },
       { name: "Estadísticas", href: `/dashboard/equipos/${activeTeamId}/estadisticas`, icon: BarChart3 },
       { name: "Mensajes", href: `/dashboard/equipos/${activeTeamId}/mensajes`, icon: MessageSquare },
-      { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+      { name: "Ajustes de Perfil", href: "/dashboard/mi-perfil", icon: Settings },
     ]
   } else if (activeFamilyPlayerId) {
     secondaryLinks = [
@@ -232,7 +234,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     // Todos los de la DB que NO estén ya en el bottom bar
     const bottomHrefs = bottomLinks.map(b => b.href);
     
-    if (userRole === 'admin') {
+    if (userRole === 'admin' || userRole === 'superadmin') {
       // Hardcode admin secondary links since they are not in DB usually
       secondaryLinks = [
         { name: "CENTRO DE CONTROL", href: "/admin/inicio", icon: LayoutDashboard },
@@ -247,11 +249,14 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
         { name: "Expedientes", href: "/admin/secretaria", icon: FolderOpen },
         { name: "Metodologia", href: "/admin/metodologia", icon: Brain },
-        { name: "Roles", href: "/admin/configuracion/roles", icon: Shield },
+        { name: "Configuración del Club", href: "/admin/configuracion", icon: Landmark },
+        { name: "Políticas Notificaciones", href: "/admin/configuracion/notificaciones", icon: Bell },
+        { name: "Roles y Permisos", href: "/admin/configuracion/roles", icon: Shield },
         { name: "Temporadas", href: "/admin/temporadas", icon: Timer },
         { name: "Calendario FFCV", href: "/admin/calendario-ffcv", icon: Database },
         { name: "Informes IA", href: "/admin/informes-ia", icon: Brain },
         { name: "FFCV/NOVANET", href: "/admin/ffcv-api", icon: Globe },
+        { name: "Ajustes de Perfil", href: "/dashboard/mi-perfil", icon: Settings },
       ].filter(item => !bottomHrefs.includes(item.href));
     } else {
       const bottomNames = bottomLinks.map(b => b.name.toLowerCase());
@@ -282,9 +287,9 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       {/* Top Header */}
       <header className="h-22 min-h-[88px] py-2 bg-slate-900 text-white flex items-center justify-between px-4 fixed top-0 w-full z-40 shadow-md">
         <div 
-          className={`flex items-center gap-3 font-bold min-w-0 flex-1 mr-2 ${userRole === 'admin' ? 'cursor-pointer' : ''}`}
+          className={`flex items-center gap-3 font-bold min-w-0 flex-1 mr-2 ${userRole === 'admin' || userRole === 'superadmin' ? 'cursor-pointer' : ''}`}
           onClick={() => {
-            if (clubInfo && userRole === 'admin') setShowEditClub(true);
+            if (clubInfo && (userRole === 'admin' || userRole === 'superadmin')) setShowEditClub(true);
           }}
         >
           <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden p-0.5 shadow-sm border border-slate-200">

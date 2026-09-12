@@ -74,18 +74,14 @@ export async function resolveStripePaymentMethod(
     methodType = intent.payment_method_types[0];
   }
 
-  // Map to friendly application terminology
+  // Map to friendly application terminology (Exclusively Tarjeta / SEPA)
   switch (methodType?.toLowerCase()) {
-    case 'bizum':
-      return 'Bizum';
-    case 'paypal':
-      return 'PayPal';
     case 'card':
       return 'Tarjeta';
     case 'sepa_debit':
       return 'SEPA';
     default:
-      return 'Stripe';
+      return 'Tarjeta';
   }
 }
 
@@ -163,6 +159,15 @@ export async function recordStripePaymentWebhook(intent: Stripe.PaymentIntent) {
   // 3. Resolve effective payment method (Tarjeta, Bizum, PayPal, etc.)
   const resolvedMethod = await resolveStripePaymentMethod(intent);
 
+  // Extract Customer and PaymentMethod IDs for future off_session processing
+  const stripeCustomerId = typeof intent.customer === 'string'
+    ? intent.customer
+    : (intent.customer as any)?.id || intent.metadata?.customer_id || null;
+
+  const stripePaymentMethodId = typeof intent.payment_method === 'string'
+    ? intent.payment_method
+    : (intent.payment_method as any)?.id || null;
+
   // 4. Insert or update into fee_payments with provider idempotency
   let insertedPayment: any = null;
   if (existingPayment) {
@@ -176,6 +181,8 @@ export async function recordStripePaymentWebhook(intent: Stripe.PaymentIntent) {
         currency: intentCurrency,
         metadata: {
           stripe_payment_intent_id: intent.id,
+          stripe_customer_id: stripeCustomerId,
+          stripe_payment_method_id: stripePaymentMethodId,
           payment_method_type: resolvedMethod,
           created: intent.created,
         },
@@ -205,6 +212,8 @@ export async function recordStripePaymentWebhook(intent: Stripe.PaymentIntent) {
         currency: intentCurrency,
         metadata: {
           stripe_payment_intent_id: intent.id,
+          stripe_customer_id: stripeCustomerId,
+          stripe_payment_method_id: stripePaymentMethodId,
           payment_method_type: resolvedMethod,
           created: intent.created,
         },
@@ -235,17 +244,30 @@ export async function recordStripePaymentWebhook(intent: Stripe.PaymentIntent) {
   const boundedPaidCents = Math.min(totalPaidCents, fee.amount_cents);
   const isFullyPaid = totalPaidCents >= fee.amount_cents;
 
+  const feeUpdates: Record<string, any> = {
+    amount_paid_cents: boundedPaidCents,
+    estado: isFullyPaid ? 'pagado' : 'pendiente',
+    fecha_pago: new Date().toISOString(),
+    payment_method: resolvedMethod,
+    stripe_payment_intent_id: intent.id,
+    actualizado_en: new Date().toISOString(),
+  };
+
+  if (stripeCustomerId) feeUpdates.stripe_customer_id = stripeCustomerId;
+  if (stripePaymentMethodId) feeUpdates.stripe_payment_method_id = stripePaymentMethodId;
+
   await supabaseAdmin
     .from('fees')
-    .update({
-      amount_paid_cents: boundedPaidCents,
-      estado: isFullyPaid ? 'pagado' : 'pendiente',
-      fecha_pago: new Date().toISOString(),
-      payment_method: resolvedMethod,
-      stripe_payment_intent_id: intent.id,
-      actualizado_en: new Date().toISOString(),
-    })
+    .update(feeUpdates)
     .eq('id', fee.id);
+
+  // Also update player / profile customer reference if not set
+  if (stripeCustomerId && fee.player_id) {
+    await supabaseAdmin
+      .from('players')
+      .update({ stripe_customer_id: stripeCustomerId })
+      .eq('id', fee.player_id);
+  }
 
   // 6. Generate official receipt (with built-in deduplication)
   try {

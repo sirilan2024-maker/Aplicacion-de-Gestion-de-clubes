@@ -31,12 +31,12 @@ export async function markNotificationAsReadAction(notificationId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "No autenticado" }
 
-    // Use admin client to ensure delete works regardless of RLS
     const adminClient = await createAdminClient()
     const { error } = await adminClient
       .from('notifications')
-      .delete()
+      .update({ is_read: true, read: true })
       .eq('id', notificationId)
+      .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
 
     if (error) throw error
 
@@ -52,13 +52,13 @@ export async function markAllNotificationsAsReadAction() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: "No autenticado" }
 
-    // Delete all unread notifications for this user
+    // Update all unread notifications for this user to read
     const adminClient = await createAdminClient()
     const { error } = await adminClient
       .from('notifications')
-      .delete()
+      .update({ is_read: true, read: true })
       .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
-      .eq('is_read', false)
+      .or('is_read.eq.false,read.eq.false')
 
     if (error) throw error
 

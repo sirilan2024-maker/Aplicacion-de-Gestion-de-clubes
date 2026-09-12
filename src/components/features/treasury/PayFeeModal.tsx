@@ -184,13 +184,13 @@ export function PayFeeModal({ isOpen, onClose, fee, onPaymentSuccess }: PayFeeMo
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-slate-900">Tarjeta / Bizum / PayPal (Online)</span>
+                        <span className="font-bold text-sm text-slate-900">Tarjeta / Apple Pay / Google Pay (Online)</span>
                         <span className="text-[11px] font-bold text-blue-600 bg-blue-100/80 px-2 py-0.5 rounded-full">
                           Instantáneo
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Pago seguro online con tarjeta bancaria, Bizum o PayPal mediante Stripe. La cuota queda saldada de inmediato y se emite tu recibo oficial.
+                        Pago seguro online con tarjeta bancaria, Apple Pay o Google Pay mediante Stripe. La cuota queda saldada de inmediato y se emite tu recibo oficial.
                       </p>
                       {selectedMethod === "card" && (
                         <div className="mt-3 pt-3 border-t border-blue-200/60 flex justify-end">
@@ -354,6 +354,7 @@ export function PayFeeModal({ isOpen, onClose, fee, onPaymentSuccess }: PayFeeMo
           clientSecret={stripeClientSecret}
           amountFormatted={stripeAmountFormatted || pendingFormatted}
           playerName={stripePlayerName}
+          concept={fee.concept}
           paymentReference={stripePaymentRef}
           onSuccess={handleStripeSuccess}
         />

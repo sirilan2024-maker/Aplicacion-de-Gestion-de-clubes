@@ -91,7 +91,7 @@ export function RegistrationWizard({
   if (paidReservation) baseFee -= 50;
   let chargeAmount = baseFee;
   if (paymentPlan === "Fraccionado") {
-    chargeAmount = Math.round((baseFee / 3) * 100) / 100;
+    chargeAmount = Math.round((baseFee / 2) * 100) / 100;
   }
   const formattedChargeAmount = `${chargeAmount.toFixed(2)} €`;
 
@@ -242,36 +242,39 @@ export function RegistrationWizard({
             <h2 className="text-3xl font-bold mb-2">¡Inscripción Completada!</h2>
           </div>
           <CardContent className="p-8 space-y-6 bg-white text-center">
-            { (submittedData.isSeniorTeam === true || submittedData.isSeniorSelection === "senior") ? (
-              <p className="text-lg text-gray-700 font-medium">
-                La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar ya puedes entrar en tu cuenta pero hasta que no se verifique por el administrador no tendras acceso total a tu cuenta de usuario.
-              </p>
-            ) : (
-              <p className="text-lg text-gray-700 font-medium">
-                La solicitud esta en tramite y ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario realizar el primer pago de la cuota. Dicho pago permitirá confirmar la plaza del jugador, tramitar la licencia federativa y realizar el pedido de la equipación
-              </p>
-            )}
+            <div className="flex justify-center mb-2">
+              <img
+                src="/images/sporting-saladar-shield.jpg"
+                alt="Club Sporting Saladar"
+                className="w-24 h-auto object-contain drop-shadow-sm"
+              />
+            </div>
 
-            {submittedData.paymentMethod === "Stripe" && (
-              <div className={`${paymentStatus === "done" ? "bg-green-50 text-green-800 border-green-200" : "bg-blue-50 text-blue-800 border-blue-200"} p-6 rounded-xl border flex flex-col items-center gap-3 mt-6`}>
-                <CreditCard className={`w-10 h-10 ${paymentStatus === "done" ? "text-green-600" : "text-blue-600"}`} />
-                <div>
-                  <p className="font-bold text-lg">
-                    {paymentStatus === "done" ? "Pago completado con éxito mediante tarjeta." : "Inscripción registrada."}
+            <div className="space-y-4 text-left bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm sm:text-base text-gray-800 leading-relaxed">
+              <p className="font-semibold text-gray-900">
+                La solicitud está en tramite y ha sido aceptada por el Club Sporting Saladar. Para formalizar definitivamente la inscripción será necesario verificar por parte del club el pago de la cuota.
+              </p>
+              <p className="text-gray-700">
+                Después de revisar dicho pago y si todo está correcto se confirmará la plaza del jugador, se tramitará la licencia federativa y se realizará el pedido de la equipación, si hubiera algún problema el club se pondrá en contacto con usted, un saludo y gracias por unirse a nuestro club.
+              </p>
+            </div>
+
+            <div className="bg-emerald-50 text-emerald-900 border border-emerald-200 p-6 rounded-2xl flex flex-col items-center gap-3 text-center">
+              <CheckCircle className="w-10 h-10 text-emerald-600" />
+              <div>
+                <p className="font-bold text-lg text-emerald-950">
+                  Inscripción registrada.
+                </p>
+                <p className="text-sm text-emerald-800 mt-2 leading-relaxed">
+                  Tu solicitud ha sido guardada. Si has elegido la opción de pago en dos cuotas, automáticamente recibirás el cargo en tu tarjeta de la siguiente cuota, desde tu Portal Familiar podras ver el estado de pago y descargar el recibo o en Secretaría del club.
+                </p>
+                {paymentRef && (
+                  <p className="text-xs font-mono font-semibold mt-3 text-emerald-700 bg-emerald-100/70 py-1 px-3 rounded-full inline-block">
+                    Referencia de pago: {paymentRef}
                   </p>
-                  <p className="text-sm mt-1">
-                    {paymentStatus === "done" 
-                      ? "Hemos recibido tu primer pago correctamente. ¡Bienvenido al equipo!" 
-                      : "Tu solicitud ha sido guardada. Podrás abonar la cuota pendiente desde tu Portal Familiar o en Secretaría."}
-                  </p>
-                  {paymentRef && (
-                    <p className="text-xs font-mono font-semibold mt-2 text-gray-600">
-                      Referencia de pago: {paymentRef}
-                    </p>
-                  )}
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             {(() => {
               const effectivePlayerName = submittedPlayerName || `${submittedData.playerFirstName || ''} ${submittedData.playerLastName || ''}`.trim() || 'Jugador';
@@ -449,6 +452,7 @@ export function RegistrationWizard({
           clientSecret={stripeClientSecret}
           amountFormatted={formattedChargeAmount}
           playerName={`${playerFirstName || ''} ${playerLastName || ''}`.trim() || 'Jugador'}
+          concept="CUOTA INSCRIPCIÓN TEMPORADA 26/27"
           paymentReference={paymentRef || undefined}
           onSuccess={() => {
             setStripeModalOpen(false);

@@ -12,9 +12,15 @@ interface MatchdayCardProps {
 
 export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps) {
   const supabase = createClient()
+  const [isMounted, setIsMounted] = useState(false)
   const [events, setEvents] = useState<any[]>(match.match_events || [])
   const [showModal, setShowModal] = useState(false)
   const [elapsedString, setElapsedString] = useState("00:00")
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
 
   const isFinished = match.estado === 'Finalizado'
   const isDescanso = !isFinished && (match.estado === 'Descanso' || 
@@ -227,11 +233,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     )
   }
 
-  const [isMounted, setIsMounted] = useState(false)
 
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   const matchTime = isMounted ? new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '--:--'
   const matchDate = isMounted ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) : '...'

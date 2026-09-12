@@ -1,8 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { Shield, Loader2, Save } from "lucide-react"
+import { Shield, Loader2, Save, Landmark, Bell } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
 import { updateRoleNavigationAction } from "@/app/actions/roles-actions"
 
@@ -113,6 +114,31 @@ export default function ConfigRolesPage() {
           {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
           <span>Guardar Cambios</span>
         </button>
+      </div>
+
+      {/* Subnavigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200">
+        <Link
+          href="/admin/configuracion"
+          className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
+        >
+          <Landmark className="w-4 h-4" />
+          <span>Métricas y SEPA</span>
+        </Link>
+        <Link
+          href="/admin/configuracion/roles"
+          className="px-4 py-2.5 text-xs md:text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors flex items-center gap-2"
+        >
+          <Shield className="w-4 h-4" />
+          <span>Roles y Permisos</span>
+        </Link>
+        <Link
+          href="/admin/configuracion/notificaciones"
+          className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
+        >
+          <Bell className="w-4 h-4" />
+          <span>Canales y Políticas de Notificación</span>
+        </Link>
       </div>
 
       {/* Desktop Table View */}

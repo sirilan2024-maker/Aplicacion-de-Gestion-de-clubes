@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { createAdminFeeForPlayerAction } from '@/app/actions/treasury-actions';
 import { sendEmail, getPlayerRegistrationEmailHtml } from '@/lib/email-service';
+import { getOrCreateStripeCustomer } from '@/lib/payments/stripe-customer-service';
 
 // Inicializar Stripe solo si existe la clave (para evitar fallos si no está configurada)
 import Stripe from 'stripe';
@@ -437,19 +438,40 @@ export async function POST(request: Request) {
         if (paymentMethod === 'Stripe') {
           const isFraccionado = paymentPlan === 'Fraccionado';
           const chargeAmount = targetFee.amount_cents;
+          let stripeCustomerId: string | undefined = undefined;
 
           if (process.env.STRIPE_SECRET_KEY) {
+            // Obtener o crear Stripe Customer para el tutor garantizando aislamiento por club
+            try {
+              const customerEmail = formData.tutor1Email || email;
+              const customerName = formData.tutor1Name
+                ? `${formData.tutor1Name} ${formData.tutor1LastName || ''}`.trim()
+                : `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim();
+
+              const customerRes = await getOrCreateStripeCustomer({
+                email: customerEmail,
+                name: customerName,
+                clubId: targetFee.club_id || clubId,
+                profileId: authUserId || undefined,
+                phone: formData.tutor1Phone || undefined,
+              });
+              stripeCustomerId = customerRes.customerId;
+            } catch (custErr) {
+              console.error('[register/route] Error resolving Stripe customer:', custErr);
+            }
+
             const intent = await stripe.paymentIntents.create({
               amount: chargeAmount,
               currency: 'eur',
-              automatic_payment_methods: {
-                enabled: true,
-              },
+              customer: stripeCustomerId,
+              description: 'CUOTA INSCRIPCIÓN TEMPORADA 26/27 - CLUB SPORTING SALADAR',
+              payment_method_types: ['card'],
               setup_future_usage: isFraccionado ? 'off_session' : undefined,
               metadata: {
                 player_id: player.id,
                 fee_id: targetFee.id,
                 club_id: targetFee.club_id || clubId,
+                customer_id: stripeCustomerId || '',
                 payment_reference: paymentReference,
                 player: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim(),
                 type: isFraccionado ? 'inscripcion_fraccionada_1' : 'inscripcion_total',
@@ -462,30 +484,70 @@ export async function POST(request: Request) {
             clientSecret = `${stripeIntentId}_secret_mock`;
           }
 
-          // Guardar el stripe_payment_intent_id en la cuota
+          // Guardar el stripe_payment_intent_id y stripe_customer_id en la cuota
           if (stripeIntentId) {
+            const feeUpdate: Record<string, any> = { stripe_payment_intent_id: stripeIntentId };
+            if (stripeCustomerId) {
+              feeUpdate.stripe_customer_id = stripeCustomerId;
+            }
             await supabaseAdmin
               .from('fees')
-              .update({ stripe_payment_intent_id: stripeIntentId })
+              .update(feeUpdate)
               .eq('id', targetFee.id);
           }
         }
       }
     }
 
-    // 4. Enviar correo electrónico de confirmación / bienvenida automático
+    // 4. Enviar correo electrónico de confirmación / bienvenida automático con estado económico real
     if (email && player) {
       try {
+        // Consultar las cuotas reales generadas para este jugador en la BD
+        const { data: dbFees } = await supabaseAdmin
+          .from('fees')
+          .select('id, concept, amount_cents, amount_paid_cents, estado, fecha_pago, payment_method, payment_reference')
+          .eq('player_id', player.id)
+          .order('creado_en', { ascending: true });
+
+        const rawFees = dbFees || [];
+        const feeItems = rawFees.map((f: any, idx: number) => ({
+          id: f.id,
+          concept: f.concept,
+          amountCents: f.amount_cents || 0,
+          amountPaidCents: f.amount_paid_cents || 0,
+          status: f.estado || 'pendiente',
+          dueDate: f.fecha_pago || null,
+          installmentNumber: idx + 1,
+          totalInstallments: rawFees.length,
+        }));
+
+        const totalAmountCents = feeItems.reduce((acc, f) => acc + f.amountCents, 0);
+        const totalPaidCents = feeItems.reduce((acc, f) => acc + f.amountPaidCents, 0);
+        const totalPendingCents = Math.max(0, totalAmountCents - totalPaidCents);
+
+        const paymentSummary = {
+          totalAmountCents,
+          totalPaidCents,
+          totalPendingCents,
+          paymentMethod: paymentMethod === 'Stripe' ? 'Tarjeta' : (paymentMethod || 'No especificado'),
+          paymentPlan: paymentPlan || (feeItems.length > 1 ? 'Fraccionado' : 'Pago Único'),
+          fees: feeItems,
+          paymentReference: paymentReference,
+          clubIban: clubIban || null,
+        };
+
         const emailHtml = getPlayerRegistrationEmailHtml({
-          playerName: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`,
+          playerName: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() || 'Jugador/a',
           tutorName: formData.tutor1Name ? `${formData.tutor1Name} ${formData.tutor1LastName || ''}`.trim() : undefined,
           category: (formData as any).category || undefined,
           dorsal: (formData as any).dorsal || undefined,
+          loginUrl: process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/login` : 'https://app.clubsportingsaladar.com/login',
+          paymentSummary,
         });
 
         await sendEmail({
           to: email,
-          subject: `⚽ Inscripción Confirmada: ${formData.playerFirstName} ${formData.playerLastName} - Sporting Saladar`,
+          subject: `⚽ Inscripción Registrada: ${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() + ' - Sporting Saladar',
           html: emailHtml,
         });
       } catch (emailErr) {
@@ -494,11 +556,15 @@ export async function POST(request: Request) {
     }
 
     // 5. Revalidar cachés para que Centro de Control, Secretaría y Tesorería se actualicen al instante
-    revalidatePath('/admin/inicio');
-    revalidatePath('/admin');
-    revalidatePath('/dashboard/inscripciones');
-    revalidatePath('/dashboard/treasury');
-    revalidatePath('/dashboard/equipos');
+    try {
+      revalidatePath('/admin/inicio');
+      revalidatePath('/admin');
+      revalidatePath('/dashboard/inscripciones');
+      revalidatePath('/dashboard/treasury');
+      revalidatePath('/dashboard/equipos');
+    } catch (revalErr) {
+      // Ignorar si se ejecuta fuera de contexto estático
+    }
 
     const finalPlayerName = `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() || `${formData.tutor1Name || ''} ${formData.tutor1LastName || ''}`.trim() || 'Jugador';
 

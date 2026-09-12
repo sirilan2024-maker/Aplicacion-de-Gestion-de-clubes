@@ -1350,6 +1350,12 @@ export async function addPartialPaymentAction(feeId: string, amountCents: number
     throw new Error("El importe entregado no puede ser mayor a la cantidad pendiente");
   }
 
+  const normalizedMethod = (method || '').trim();
+  const ALLOWED_PAYMENT_METHODS = ['Tarjeta', 'Apple Pay', 'Google Pay', 'Transferencia', 'Contado', 'Stripe', 'SEPA'];
+  if (!ALLOWED_PAYMENT_METHODS.some(m => m.toLowerCase() === normalizedMethod.toLowerCase())) {
+    throw new Error(`Método de pago "${method}" no permitido. Métodos admitidos: Tarjeta, Apple Pay, Google Pay, Transferencia, Contado.`);
+  }
+
   // 2. Insert payment
   const { data: payment, error: paymentError } = await adminSupabase
     .from("fee_payments")
@@ -2572,9 +2578,7 @@ export async function createPaymentIntentForFeeAction(feeId: string) {
       const intent = await stripe.paymentIntents.create({
         amount: remainingAmountCents,
         currency: (fee.currency || "eur").toLowerCase(),
-        automatic_payment_methods: {
-          enabled: true,
-        },
+        payment_method_types: ['card'],
         metadata: {
           fee_id: fee.id,
           player_id: fee.player_id || "",

@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { sendEmail, getTeamMessageEmailHtml } from "@/lib/email-service"
+import { getTeamMessageEmailHtml } from "@/lib/email-service"
+import { NotificationService } from "@/lib/notifications/notification-service"
 
 /**
  * Gets all chat channels for a user based on their club and role.
@@ -176,7 +177,7 @@ export async function sendMessageAction(channelId: string, content: string) {
     if (!user) return { success: false, error: "No autorizado" }
 
     const adminClient = await createAdminClient()
-    const { data: channel } = await adminClient.from('chat_channels').select('type, name, team_id').eq('id', channelId).single()
+    const { data: channel } = await adminClient.from('chat_channels').select('type, name, team_id, club_id').eq('id', channelId).single()
     
     if (channel?.type === 'global') {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -201,49 +202,87 @@ export async function sendMessageAction(channelId: string, content: string) {
     }, { onConflict: 'channel_id,user_id' })
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Envío automático de notificación por Email a las Familias / Jugadores
+    // Envío automático de notificaciones a las Familias / Jugadores vía NotificationService
     // ──────────────────────────────────────────────────────────────────────────
     try {
       const { data: senderProfile } = await adminClient.from('profiles').select('first_name, last_name, role').eq('id', user.id).single()
       const senderName = senderProfile ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() : 'Cuerpo Técnico'
       const senderRole = senderProfile?.role || 'Entrenador'
 
-      let recipientEmails: string[] = []
       let channelTitle = channel?.name || 'Canal de Comunicación'
+      let effectiveClubId = channel?.club_id || null
+      const recipientMap = new Map<string, { userId?: string; email?: string }>()
 
       if (channel?.team_id) {
-        // Obtener equipo y jugadores
-        const { data: teamObj } = await adminClient.from('teams').select('name').eq('id', channel.team_id).single()
+        // Obtener equipo y club_id si no vino en el canal
+        const { data: teamObj } = await adminClient.from('teams').select('name, club_id').eq('id', channel.team_id).single()
         if (teamObj?.name) channelTitle = teamObj.name
+        if (!effectiveClubId && teamObj?.club_id) effectiveClubId = teamObj.club_id
 
-        // Emails de tutores directos en tabla players
+        // Jugadores y tutores directos de la tabla players
         const { data: teamPlayers } = await adminClient
           .from('players')
-          .select('email, tutor_email, tutor:profiles!players_tutor_id_fkey(email)')
+          .select('user_auth_id, email, tutor_id, tutor_email, tutor:profiles!players_tutor_id_fkey(id, email)')
           .eq('team_id', channel.team_id)
 
         teamPlayers?.forEach(p => {
-          if (p.email) recipientEmails.push(p.email)
-          if (p.tutor_email) recipientEmails.push(p.tutor_email)
-          if (p.tutor && (p.tutor as any).email) recipientEmails.push((p.tutor as any).email)
+          if (p.user_auth_id) {
+            recipientMap.set(p.user_auth_id, { userId: p.user_auth_id, email: p.email || undefined })
+          } else if (p.email) {
+            recipientMap.set(`email:${p.email.toLowerCase()}`, { email: p.email.toLowerCase() })
+          }
+
+          if (p.tutor_id) {
+            recipientMap.set(p.tutor_id, { userId: p.tutor_id, email: p.tutor_email || (p.tutor as any)?.email || undefined })
+          } else if (p.tutor_email) {
+            recipientMap.set(`email:${p.tutor_email.toLowerCase()}`, { email: p.tutor_email.toLowerCase() })
+          }
         })
 
-        // Emails de tutores vinculados en player_tutors
+        // Tutores vinculados en player_tutors
         const { data: linkedTutors } = await adminClient
           .from('player_tutors')
-          .select('tutor:profiles(email), players!inner(team_id)')
+          .select('tutor_id, tutor:profiles(id, email), players!inner(team_id)')
           .eq('players.team_id', channel.team_id)
 
         linkedTutors?.forEach((lt: any) => {
-          if (lt.tutor?.email) recipientEmails.push(lt.tutor.email)
+          const tId = lt.tutor_id || lt.tutor?.id
+          if (tId) {
+            recipientMap.set(tId, { userId: tId, email: lt.tutor?.email || undefined })
+          } else if (lt.tutor?.email) {
+            recipientMap.set(`email:${lt.tutor.email.toLowerCase()}`, { email: lt.tutor.email.toLowerCase() })
+          }
         })
       }
 
-      // Eliminar duplicados y excluir al propio remitente
-      const uniqueEmails = Array.from(new Set(recipientEmails.map(e => e?.toLowerCase().trim()).filter(Boolean)))
-        .filter(e => e !== user.email?.toLowerCase().trim())
+      // Excluir al propio remitente
+      recipientMap.delete(user.id)
+      if (user.email) recipientMap.delete(`email:${user.email.toLowerCase()}`)
 
-      if (uniqueEmails.length > 0) {
+      // Resolver user_id para aquellos que solo tenían email
+      const pendingEmails = Array.from(recipientMap.entries())
+        .filter(([_, v]) => !v.userId && v.email)
+        .map(([_, v]) => v.email!)
+
+      if (pendingEmails.length > 0) {
+        const { data: matchedProfiles } = await adminClient
+          .from('profiles')
+          .select('id, email')
+          .in('email', pendingEmails)
+
+        matchedProfiles?.forEach((mp: any) => {
+          if (mp.email && mp.id) {
+            recipientMap.delete(`email:${mp.email.toLowerCase()}`)
+            if (mp.id !== user.id) {
+              recipientMap.set(mp.id, { userId: mp.id, email: mp.email })
+            }
+          }
+        })
+      }
+
+      const validRecipients = Array.from(recipientMap.values()).filter(r => r.userId)
+
+      if (validRecipients.length > 0) {
         const emailHtml = getTeamMessageEmailHtml({
           senderName: senderName || 'Cuerpo Técnico',
           senderRole: senderRole,
@@ -251,14 +290,24 @@ export async function sendMessageAction(channelId: string, content: string) {
           messageContent: content.trim(),
         })
 
-        await sendEmail({
-          to: uniqueEmails,
-          subject: `📢 [${channelTitle}] Nuevo mensaje de ${senderName}`,
-          html: emailHtml,
-        })
+        const notifications = validRecipients.map(r => ({
+          userId: r.userId!,
+          userEmail: r.email,
+          clubId: effectiveClubId,
+          type: 'TEAM_MESSAGE' as const,
+          title: `Mensaje en ${channelTitle}`,
+          content: `${senderName}: ${content.trim()}`,
+          link: `/dashboard/mensajes`,
+          channels: ['IN_APP', 'EMAIL', 'PUSH'] as ('IN_APP' | 'EMAIL' | 'PUSH')[],
+          idempotencyKey: `chat:${data.id}:${r.userId}`,
+          emailSubject: `📢 [${channelTitle}] Nuevo mensaje de ${senderName}`,
+          emailHtml,
+        }))
+
+        await NotificationService.dispatchBatch({ notifications })
       }
-    } catch (emailErr) {
-      console.error('Error enviando notificación por email del mensaje:', emailErr)
+    } catch (notifErr) {
+      console.error('Error despachando notificaciones del mensaje con NotificationService:', notifErr)
     }
 
     return { success: true, data }
@@ -385,33 +434,34 @@ export async function sendDisciplineAlertAction(playerId: string, teamId: string
     const staffTargets = Array.from(new Set([...coachIds, ...adminCoordIds])).filter(id => id !== user.id)
     const familyTargets = Array.from(familyUserIds)
 
-    // 5a. Notify staff (coaches/admins)
+    // 5a. Notify staff (coaches/admins) via NotificationService
     if (staffTargets.length > 0) {
       const staffNotifications = staffTargets.map(targetId => ({
-        club_id: profile.club_id,
-        user_id: targetId,
-        type: 'disciplina',
+        userId: targetId,
+        clubId: profile.club_id,
+        type: 'DISCIPLINE_ALERT' as const,
         title: 'Jugador Apercibido',
         content: `El jugador ${playerName} (${teamName}) está apercibido.`,
-        is_read: false
+        link: `/dashboard/matches?view=disciplina`,
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as ('IN_APP' | 'EMAIL' | 'PUSH')[],
+        idempotencyKey: `discipline:staff:${playerId}:${message?.id || Date.now()}:${targetId}`,
       }))
-      const { error: notifError } = await adminClient.from('notifications').insert(staffNotifications)
-      if (notifError) console.error("Error inserting staff notifications:", notifError)
+      await NotificationService.dispatchBatch({ notifications: staffNotifications })
     }
 
-    // 5b. Notify family directly with a family-appropriate message
+    // 5b. Notify family directly with a family-appropriate message via NotificationService
     if (familyTargets.length > 0) {
       const familyNotifications = familyTargets.map(targetId => ({
-        club_id: profile.club_id,
-        user_id: targetId,
-        profile_id: targetId,
-        type: 'disciplina',
+        userId: targetId,
+        clubId: profile.club_id,
+        type: 'DISCIPLINE_ALERT' as const,
         title: '⚠️ Aviso Disciplinario',
         content: `Tu jugador ${playerName} ha acumulado tarjetas amarillas y está apercibido. La próxima tarjeta amarilla podría conllevar una sanción de partido.`,
-        is_read: false
+        link: `/dashboard`,
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as ('IN_APP' | 'EMAIL' | 'PUSH')[],
+        idempotencyKey: `discipline:family:${playerId}:${message?.id || Date.now()}:${targetId}`,
       }))
-      const { error: familyNotifError } = await adminClient.from('notifications').insert(familyNotifications)
-      if (familyNotifError) console.error("Error inserting family notifications:", familyNotifError)
+      await NotificationService.dispatchBatch({ notifications: familyNotifications })
     }
 
     return { success: true, channelId: channel.id }

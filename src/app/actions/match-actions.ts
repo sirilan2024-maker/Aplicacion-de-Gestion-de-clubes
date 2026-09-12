@@ -3,6 +3,8 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessMatch, canUserAccessPlayer } from "@/lib/auth-helpers"
+import { NotificationService } from "@/lib/notifications/notification-service"
+import { getConvocationEmailHtml } from "@/lib/email-service"
 
 export async function updateConvocatoria(matchId: string, playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | null) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -110,51 +112,110 @@ export async function updateConvocatoriaBatch(matchId: string, updates: { player
 
 
 export async function sendConvocatoriaAlerts(matchId: string, teamId: string, playerIds: string[]) {
-  const supabase = await createClient()
+  const adminSupabase = await createAdminClient()
 
-  // 1. Get tutor_ids for the players
-  const { data: players } = await supabase
+  // 1. Get match details
+  const { data: match } = await adminSupabase
+    .from('partidos')
+    .select('id, rival_nombre, fecha_hora, lugar, notas, club_id, equipo:teams(name)')
+    .eq('id', matchId)
+    .single()
+
+  const matchTitle = match ? `Partido vs ${match.rival_nombre}` : 'Nuevo Partido'
+  const teamRel = match?.equipo as unknown
+  const teamName = Array.isArray(teamRel) ? (teamRel[0] as { name?: string })?.name || 'Equipo' : (teamRel as { name?: string })?.name || 'Equipo'
+  const matchDate = match?.fecha_hora ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Próximamente'
+  const matchTime = match?.fecha_hora ? new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : 'Por confirmar'
+
+  // 2. Get players with tutor_id and contact emails
+  const { data: players } = await adminSupabase
     .from('players')
-    .select('id, first_name, last_name, tutor_id')
+    .select('id, first_name, last_name, tutor_id, user_auth_id, email, tutor_email, parent1_email, parent2_email, tutor:profiles!players_tutor_id_fkey(email)')
     .in('id', playerIds)
-    .not('tutor_id', 'is', null)
 
   if (!players || players.length === 0) {
     return { success: true, message: 'No se encontraron tutores para enviar alertas.' }
   }
 
-  // 2. Get match details
-  const { data: match } = await supabase
-    .from('partidos')
-    .select('rival_nombre, fecha_hora')
-    .eq('id', matchId)
-    .single()
+  // Also query player_tutors to include linked guardians
+  const { data: linkedTutors } = await adminSupabase
+    .from('player_tutors')
+    .select('player_id, tutor_id, tutor:profiles(email)')
+    .in('player_id', playerIds)
 
-  const matchTitle = match ? `Partido vs ${match.rival_nombre}` : 'Nuevo Partido'
+  const linkedTutorsByPlayer = new Map<string, Array<{ tutorId: string, email?: string }>>()
+  linkedTutors?.forEach((lt: any) => {
+    if (lt.player_id && lt.tutor_id) {
+      const arr = linkedTutorsByPlayer.get(lt.player_id) || []
+      arr.push({ tutorId: lt.tutor_id, email: lt.tutor?.email })
+      linkedTutorsByPlayer.set(lt.player_id, arr)
+    }
+  })
 
-  // 3. Create notifications for each tutor
-  const notificationsToInsert = players.map(p => ({
-    profile_id: p.tutor_id,
-    title: `Convocatoria: ${matchTitle}`,
-    content: `${p.first_name} ha sido convocado para el próximo partido. Por favor, confirma su asistencia.`,
-    read: false,
-    match_id: matchId,
-    // Add player_id if needed in the notification payload for the frontend to know who it is for
-    // payload: { player_id: p.id } -> Assuming schema allows JSON payloads, otherwise we just use match_id
-  }))
+  // 3. Build notification dispatch list
+  const dispatchItems: any[] = []
 
-  const { error } = await supabase
-    .from('notifications')
-    .insert(notificationsToInsert)
+  for (const p of players) {
+    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim()
+    const targetUserId = p.tutor_id || p.user_auth_id
+    const targetEmail = (p.tutor as any)?.email || p.tutor_email || p.parent1_email || p.email
 
-  if (error) {
-    console.error('[sendConvocatoriaAlerts] Error inserting notifications:', error)
-    return { success: false, message: 'Error enviando alertas.' }
+    const emailHtml = getConvocationEmailHtml({
+      playerName: fullName,
+      teamName,
+      rivalName: match?.rival_nombre || 'Rival',
+      date: matchDate,
+      time: matchTime,
+      location: match?.lugar || 'Campo Oficial',
+      notes: match?.notas || undefined,
+      viewUrl: `https://app-gestiondeclubes.vercel.app/dashboard/family/e/${p.id}/partidos`,
+    })
+
+    if (targetUserId) {
+      dispatchItems.push({
+        userId: targetUserId,
+        userEmail: targetEmail,
+        clubId: match?.club_id,
+        type: 'NEW_CONVOCATION' as const,
+        title: `⚽ Convocatoria: ${matchTitle}`,
+        content: `${p.first_name} ha sido convocado/a para el partido vs ${match?.rival_nombre || 'Rival'} el ${matchDate} a las ${matchTime}.`,
+        link: `/dashboard/family/e/${p.id}/partidos`,
+        channels: ['IN_APP' as const, 'EMAIL' as const],
+        idempotencyKey: `convocation:${matchId}:${p.id}:${targetUserId}:published`,
+        emailSubject: `⚽ Convocatoria Oficial: ${teamName} vs ${match?.rival_nombre}`,
+        emailHtml,
+        metadata: { matchId, playerId: p.id },
+      })
+    }
+
+    // Also dispatch to linked tutors if distinct
+    const extraTutors = linkedTutorsByPlayer.get(p.id) || []
+    for (const et of extraTutors) {
+      if (et.tutorId && et.tutorId !== targetUserId) {
+        dispatchItems.push({
+          userId: et.tutorId,
+          userEmail: et.email,
+          clubId: match?.club_id,
+          type: 'NEW_CONVOCATION' as const,
+          title: `⚽ Convocatoria: ${matchTitle}`,
+          content: `${p.first_name} ha sido convocado/a para el partido vs ${match?.rival_nombre || 'Rival'}.`,
+          link: `/dashboard/family/e/${p.id}/partidos`,
+          channels: ['IN_APP' as const, 'EMAIL' as const],
+          idempotencyKey: `convocation:${matchId}:${p.id}:${et.tutorId}:published`,
+          emailSubject: `⚽ Convocatoria Oficial: ${teamName} vs ${match?.rival_nombre}`,
+          emailHtml,
+          metadata: { matchId, playerId: p.id },
+        })
+      }
+    }
   }
 
-  console.log(`[ALERTA ENVIADA] Partido ${matchId}: Se ha notificado a ${playerIds.length} jugadores.`)
-  
-  return { success: true, message: `Alertas enviadas a ${notificationsToInsert.length} familias.` }
+  if (dispatchItems.length > 0) {
+    await NotificationService.dispatchBatch({ notifications: dispatchItems })
+  }
+
+  console.log(`[ALERTA CONVOCATORIA ENVIADA] Partido ${matchId}: ${dispatchItems.length} alertas despachadas.`)
+  return { success: true, message: `Alertas enviadas a ${dispatchItems.length} destinatarios.` }
 }
 
 export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null }) {
@@ -222,7 +283,7 @@ export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summ
     // 3. Buscar coordinadores y administradores del club
     const { data: coordinators } = await adminSupabase
       .from('profiles')
-      .select('id, phone')
+      .select('id, email, phone')
       .eq('club_id', partido.club_id)
       .or('role.eq.coordinador,role.eq.admin,role.eq.superadmin')
 
@@ -230,20 +291,24 @@ export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summ
       return { success: false, error: "No se encontraron coordinadores o administradores en el club." }
     }
 
-    // 4. Crear notificaciones internas para los coordinadores
+    // 4. Despachar notificaciones centralizadas para los coordinadores
     const title = `📋 Valoración del Partido: ${teamName} vs ${partido.rival_nombre} ${matchScore}`
     const fullMessage = `El entrenador ${coachName} ha enviado la valoración general del partido ${teamName} vs ${partido.rival_nombre}:\n\n"${summaryText}"`
 
-    const notifications = coordinators.map(coord => ({
-      user_id: coord.id,
+    const dispatchList = coordinators.map(coord => ({
+      userId: coord.id,
+      userEmail: coord.email,
+      clubId: partido.club_id,
+      type: 'GENERAL_ALERT' as const,
       title: title,
-      message: fullMessage,
+      content: fullMessage,
       link: `/dashboard/matches/${matchId}`,
-      is_read: false
+      channels: ['IN_APP' as const],
+      idempotencyKey: `match_summary:${matchId}:${coord.id}`,
+      metadata: { matchId },
     }))
 
-    const { error: notifError } = await adminSupabase.from('notifications').insert(notifications)
-    if (notifError) console.error("Error enviando notificaciones a coordinadores:", notifError)
+    await NotificationService.dispatchBatch({ notifications: dispatchList })
 
     // Obtener teléfonos de los coordinadores para la opción de WhatsApp
     const coordinatorPhones = coordinators

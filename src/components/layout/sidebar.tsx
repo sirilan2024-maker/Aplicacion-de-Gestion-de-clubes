@@ -39,7 +39,8 @@ import {
   ClipboardList,
   Building2,
   Sliders,
-  Landmark
+  Landmark,
+  Bell
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -98,7 +99,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
   const supabase = createClient()
 
   // SÓLO los administradores ven el fondo oscuro y el menú especial
-  const isAdmin = userRole === "admin";
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
 
   // Detect active team context from URL (/dashboard/e/[teamId] or /dashboard/equipos/[teamId])
   const match = pathname.match(/^\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
@@ -249,8 +250,12 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
     }
   }, [activeFamilyPlayerId, linkedPlayers, supabase]);
 
-  const isActive = (href: string) =>
-    href === "/dashboard" ? pathname === href : pathname.startsWith(href)
+  const isActive = (href: string) => {
+    if (href === "/dashboard" || href === "/admin/configuracion" || href === "#") {
+      return pathname === href
+    }
+    return pathname === href || pathname.startsWith(href + "/")
+  }
 
   let navGroups: NavGroup[] = []
 
@@ -300,6 +305,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
           { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
           { name: "Expedientes (Doc)", href: "/admin/secretaria", icon: FolderOpen },
           { name: "Configuración del Club", href: "/admin/configuracion", icon: Landmark },
+          { name: "Políticas Notificaciones", href: "/admin/configuracion/notificaciones", icon: Bell },
           { name: "Configuracion de roles", href: "/admin/configuracion/roles", icon: Shield },
           { name: "Temporadas", href: "/admin/temporadas", icon: Timer },
           { name: "Archivo Histórico", href: "/dashboard/archivo", icon: Database },
@@ -316,7 +322,7 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
       {
         label: "SISTEMA",
         items: [
-          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+          { name: "Ajustes de Perfil", href: "/dashboard/mi-perfil", icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
         ]
       }

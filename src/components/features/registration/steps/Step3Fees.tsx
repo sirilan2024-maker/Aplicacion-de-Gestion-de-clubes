@@ -120,7 +120,7 @@ export function Step3Fees({ clubIban }: { clubIban?: string | null }) {
               <input type="radio" value="Stripe" {...register("paymentMethod")} className="w-4 h-4 text-blue-600" />
               <div className="ml-3 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-gray-600" />
-                <span className="block text-sm font-bold text-gray-900">Tarjeta / Bizum / PayPal (Stripe Online)</span>
+                <span className="block text-sm font-bold text-gray-900">Tarjeta / Apple Pay / Google Pay (Stripe Online)</span>
               </div>
             </label>
             <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'Transferencia' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'}`}>

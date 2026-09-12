@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2, Settings, Mail, Lock, ShieldCheck, AlertCircle } from "lucide-react"
 import toast from "react-hot-toast"
+import { NotificationPreferencesCard } from "@/components/features/profile/NotificationPreferencesCard"
 
 export default function MiPerfilPage() {
   const router = useRouter()
@@ -174,6 +175,9 @@ export default function MiPerfilPage() {
           </form>
         </div>
       </div>
+
+      {/* NOTIFICATION PREFERENCES */}
+      <NotificationPreferencesCard />
     </div>
   )
 }

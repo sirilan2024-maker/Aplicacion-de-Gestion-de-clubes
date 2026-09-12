@@ -462,7 +462,6 @@ export default function OfficialReceiptsList() {
                     className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white font-medium"
                   >
                     <option value="Contado">Contado / Efectivo</option>
-                    <option value="Bizum">Bizum</option>
                     <option value="Transferencia">Transferencia</option>
                     <option value="Tarjeta">Tarjeta / TPV</option>
                   </select>

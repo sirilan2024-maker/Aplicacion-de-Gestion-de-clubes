@@ -17,14 +17,15 @@ export default async function AdminLayout({
     redirect("/login")
   }
 
-  // Security Check: Only Admin and Metodologo can access the ERP
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single()
 
-  if (profile?.role !== "admin" && profile?.role !== "metodologo") {
+  // Security Check: Only Admin and Superadmin can access the ERP
+  const allowedRoles = ["admin", "superadmin"]
+  if (!allowedRoles.includes(profile?.role || "")) {
     redirect("/dashboard")
   }
 

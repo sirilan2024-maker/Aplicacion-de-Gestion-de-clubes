@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { createAdminFeeForPlayerAction } from '@/app/actions/treasury-actions';
 import { sendEmail, getPlayerRegistrationEmailHtml } from '@/lib/email-service';
 import { getOrCreateStripeCustomer } from '@/lib/payments/stripe-customer-service';
+import { ADMIN_ROLES, STAFF_ROLES } from '@/lib/auth-helpers';
 
 // Inicializar Stripe solo si existe la clave (para evitar fallos si no está configurada)
 import Stripe from 'stripe';
@@ -202,17 +203,38 @@ export async function POST(request: Request) {
         if (newFamily) familyId = newFamily.id;
       }
 
-      // Actualizar el perfil del tutor
-      const profileUpdates: any = { club_id: clubId, role: 'familia' };
-      if (formData.tutor1Name) profileUpdates.first_name = formData.tutor1Name;
-      if (formData.tutor1LastName) profileUpdates.last_name = formData.tutor1LastName;
-      if (formData.tutor1Email) profileUpdates.email = formData.tutor1Email;
-      
-      // Intentar actualizar el teléfono en profiles por si existe la columna
-      try {
-        await supabaseAdmin.from('profiles').update({ ...profileUpdates, phone: formData.tutor1Phone }).eq('id', authUserId);
-      } catch (e) {
-        await supabaseAdmin.from('profiles').update(profileUpdates).eq('id', authUserId);
+      // Consultar el perfil actual para proteger roles administrativos y de staff de degradación o modificación accidental
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, role, rol, roles, first_name, last_name, club_id')
+        .eq('id', authUserId)
+        .maybeSingle();
+
+      const isStaffOrAdmin = existingProfile && (
+        (existingProfile.role && (ADMIN_ROLES.includes(existingProfile.role) || STAFF_ROLES.includes(existingProfile.role))) ||
+        (existingProfile.rol && (ADMIN_ROLES.includes(existingProfile.rol) || STAFF_ROLES.includes(existingProfile.rol))) ||
+        (Array.isArray(existingProfile.roles) && existingProfile.roles.some((r: string) => ADMIN_ROLES.includes(r) || STAFF_ROLES.includes(r)))
+      );
+
+      // Si no es staff ni admin, actualizar datos del perfil de familia/tutor con normalidad
+      if (!isStaffOrAdmin) {
+        const profileUpdates: any = {
+          club_id: clubId || existingProfile?.club_id,
+          role: 'familia',
+          rol: 'familia',
+        };
+        if (formData.tutor1Name) profileUpdates.first_name = formData.tutor1Name;
+        if (formData.tutor1LastName) profileUpdates.last_name = formData.tutor1LastName;
+        if (formData.tutor1Email) profileUpdates.email = formData.tutor1Email;
+        if (formData.tutor1Phone) profileUpdates.phone = formData.tutor1Phone;
+        
+        // Intentar actualizar en profiles
+        try {
+          await supabaseAdmin.from('profiles').update(profileUpdates).eq('id', authUserId);
+        } catch (e) {
+          const { phone, ...updatesWithoutPhone } = profileUpdates;
+          await supabaseAdmin.from('profiles').update(updatesWithoutPhone).eq('id', authUserId);
+        }
       }
 
       // IMPORTANTE: Actualizar el DNI y Teléfono del tutor en todos sus jugadores existentes

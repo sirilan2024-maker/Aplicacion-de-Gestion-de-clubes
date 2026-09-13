@@ -102,6 +102,9 @@ export default function PlayerProfilePage() {
   const router = useRouter();
   const playerId = typeof params.playerId === 'string' ? params.playerId : '';
 
+  const [player, setPlayer] = useState<PlayerData | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const searchParams = useSearchParams();
   const tabParam = searchParams?.get('tab') as any;
   const validTabs = ['info', 'medico', 'stats', 'asistencia', 'disciplina', 'documentos', 'utileria'];

@@ -368,13 +368,13 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
           ${paymentDetailsHtml}
         </div>
 
-        <!-- Bloque 3: Acceso al Portal de Familias -->
+        <!-- Bloque 3: Acceso a la App y Recibos -->
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px 20px; margin: 18px 0;">
           <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">
-            📱 Acceso al Portal de Familias:
+            📱 Acceso a la App del Club:
           </div>
           <p style="font-size: 13.5px; line-height: 1.5; color: #475569; margin: 0 0 10px 0;">
-            Ya puedes acceder al portal para consultar el calendario de entrenamientos, convocatorias de partidos, recibos de cuotas y comunicados del equipo.
+            El recibo de pago lo tienes disponible desde tu perfil de jugador. También podrás consultar el calendario de entrenamientos, convocatorias de partidos y comunicados del club.
           </p>
           <div style="font-size: 12.5px; color: #64748b; background: #ffffff; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
             Accede con tu <strong>correo electrónico</strong> y la <strong>contraseña</strong> elegida durante el registro.
@@ -382,7 +382,7 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
         </div>
 
         <div class="button-container">
-          <a href="${loginUrl}" class="button" target="_blank">Acceder al Portal de Familias ⚽</a>
+          <a href="${loginUrl}" class="button" target="_blank">Acceder a la app del club ⚽</a>
         </div>
       </div>
       <div class="footer">

@@ -582,7 +582,7 @@ export async function POST(request: Request) {
             currency: 'eur',
             customer: stripeCustomerId,
             description: intentDescription,
-            payment_method_types: ['card'],
+            automatic_payment_methods: { enabled: true },
             setup_future_usage: isFraccionado ? 'off_session' : undefined,
             metadata: intentMetadata,
             receipt_email: deliveryEmailRecipient || undefined,

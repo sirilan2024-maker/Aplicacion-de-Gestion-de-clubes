@@ -2578,7 +2578,7 @@ export async function createPaymentIntentForFeeAction(feeId: string) {
       const intent = await stripe.paymentIntents.create({
         amount: remainingAmountCents,
         currency: (fee.currency || "eur").toLowerCase(),
-        payment_method_types: ['card'],
+        automatic_payment_methods: { enabled: true },
         metadata: {
           fee_id: fee.id,
           player_id: fee.player_id || "",

@@ -169,30 +169,34 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
 
   if (!paymentSummary || !hasFees) {
     paymentDetailsHtml = `
-      <div class="row">
-        <span class="label">Modalidad:</span>
-        <span class="value">Inscripción sin cuota inicial / Gestión directa con el club</span>
-      </div>
+      <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13.5px; border-collapse: collapse;">
+        <tr>
+          <td style="color: #64748b; font-weight: 600;">Modalidad:</td>
+          <td align="right" style="color: #0f172a; font-weight: 800;">Inscripción sin cuota inicial / Gestión directa con el club</td>
+        </tr>
+      </table>
     `;
   } else {
     // 1. Resumen de totales
     paymentDetailsHtml += `
-      <div class="row">
-        <span class="label">Total Inscripción:</span>
-        <span class="value">${formatCentsToEur(paymentSummary.totalAmountCents)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Abonado:</span>
-        <span class="value" style="color: ${paymentSummary.totalPaidCents > 0 ? '#059669' : '#64748b'};">${formatCentsToEur(paymentSummary.totalPaidCents)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Pendiente:</span>
-        <span class="value" style="color: ${paymentSummary.totalPendingCents > 0 ? '#d97706' : '#059669'};">${formatCentsToEur(paymentSummary.totalPendingCents)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Modalidad elegida:</span>
-        <span class="value">${paymentSummary.paymentPlan || (isFractional ? 'Fraccionado' : 'Pago Único')} (${paymentSummary.paymentMethod})</span>
-      </div>
+      <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13.5px; border-collapse: collapse;">
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Total Inscripción:</td>
+          <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${formatCentsToEur(paymentSummary.totalAmountCents)}</td>
+        </tr>
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Abonado:</td>
+          <td align="right" style="color: ${paymentSummary.totalPaidCents > 0 ? '#059669' : '#64748b'}; font-weight: 800; padding: 6px 0;">${formatCentsToEur(paymentSummary.totalPaidCents)}</td>
+        </tr>
+        <tr style="border-bottom: 1px dashed #e2e8f0;">
+          <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Pendiente:</td>
+          <td align="right" style="color: ${paymentSummary.totalPendingCents > 0 ? '#d97706' : '#059669'}; font-weight: 800; padding: 6px 0;">${formatCentsToEur(paymentSummary.totalPendingCents)}</td>
+        </tr>
+        <tr>
+          <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Modalidad elegida:</td>
+          <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${paymentSummary.paymentPlan || (isFractional ? 'Fraccionado' : 'Pago Único')} ${paymentSummary.paymentMethod ? `(${paymentSummary.paymentMethod})` : ''}</td>
+        </tr>
+      </table>
     `;
 
     // 2. Desglose de cuotas individuales
@@ -208,23 +212,30 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
         const isPaid = fee.status === 'pagado' || (fee.amountPaidCents >= fee.amountCents && fee.amountCents > 0);
         const statusLabel = isPaid ? 'PAGADA' : (fee.status === 'pdte_verif' ? 'PDTE. VERIFICACIÓN' : 'PENDIENTE');
         const statusColor = isPaid ? '#059669' : (fee.status === 'pdte_verif' ? '#2563eb' : '#d97706');
+        const statusBg = isPaid ? '#ecfdf5' : (fee.status === 'pdte_verif' ? '#eff6ff' : '#fffbeb');
         const cuotaNumber = fee.installmentNumber || idx + 1;
         const totalNum = fee.totalInstallments || paymentSummary.fees.length;
 
         paymentDetailsHtml += `
           <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-              <span style="font-weight: 700; color: #0f172a;">
-                ${totalNum > 1 ? `Cuota ${cuotaNumber} de ${totalNum}` : 'Cuota Única'}
-              </span>
-              <span style="font-weight: 800; color: ${statusColor}; font-size: 11px; padding: 2px 8px; background: ${isPaid ? '#ecfdf5' : '#fffbeb'}; border-radius: 6px; border: 1px solid ${statusColor}40;">
-                ${statusLabel}
-              </span>
-            </div>
-            <div style="display: flex; justify-content: space-between; color: #64748b; font-size: 12px;">
-              <span>Importe: <strong style="color: #0f172a;">${formatCentsToEur(fee.amountCents)}</strong></span>
-              ${fee.dueDate ? `<span>Vencimiento: ${formatFeeDate(fee.dueDate)}</span>` : ''}
-            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px;">
+              <tr>
+                <td style="font-weight: 700; color: #0f172a; font-size: 13px;">
+                  ${totalNum > 1 ? `Cuota ${cuotaNumber} de ${totalNum}` : 'Cuota Única'}
+                </td>
+                <td align="right">
+                  <span style="display: inline-block; font-weight: 800; color: ${statusColor}; font-size: 11px; padding: 2px 8px; background: ${statusBg}; border-radius: 6px; border: 1px solid ${statusColor}40;">
+                    ${statusLabel}
+                  </span>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="color: #64748b; font-size: 12px;">
+              <tr>
+                <td>Importe: <strong style="color: #0f172a;">${formatCentsToEur(fee.amountCents)}</strong></td>
+                ${fee.dueDate ? `<td align="right">Vencimiento: <strong style="color: #475569;">${formatFeeDate(fee.dueDate)}</strong></td>` : ''}
+              </tr>
+            </table>
           </div>
         `;
       });
@@ -273,20 +284,18 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
   <html>
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inscripción Registrada - Sporting Saladar</title>
     <style>
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
       .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
-      .header { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #ffffff; padding: 36px 30px; text-align: center; }
+      .header { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #ffffff; padding: 32px 24px 28px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; border: 1px solid rgba(52, 211, 153, 0.3); }
-      .content { padding: 32px 30px; }
+      .content { padding: 30px 24px; }
       .salutation { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
-      .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px 20px; margin: 18px 0; }
-      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13.5px; }
-      .row:last-child { border-bottom: none; }
-      .label { color: #64748b; font-weight: 600; }
-      .value { color: #0f172a; font-weight: 800; text-align: right; }
+      .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 18px; margin: 16px 0; }
       .button-container { text-align: center; margin: 28px 0 14px; }
       .button { display: inline-block; background: #059669; color: #ffffff !important; text-decoration: none; font-weight: 800; font-size: 15px; padding: 14px 32px; border-radius: 14px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3); }
       .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
@@ -295,6 +304,7 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">Inscripción Registrada Correctamente</span>
         <h1>Club Sporting Saladar</h1>
       </div>
@@ -309,24 +319,26 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
           <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #059669; margin-bottom: 10px;">
             📋 Datos de la Ficha:
           </div>
-          <div class="row">
-            <span class="label">Jugador/a:</span>
-            <span class="value">${playerName}</span>
-          </div>
-          ${category ? `
-          <div class="row">
-            <span class="label">Categoría:</span>
-            <span class="value">${category}</span>
-          </div>` : ''}
-          ${dorsal ? `
-          <div class="row">
-            <span class="label">Dorsal Asignado:</span>
-            <span class="value">#${dorsal}</span>
-          </div>` : ''}
-          <div class="row">
-            <span class="label">Estado de la Ficha:</span>
-            <span class="value" style="color: #059669;">Registrada / En trámite administrativo</span>
-          </div>
+          <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13.5px; border-collapse: collapse;">
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Jugador/a:</td>
+              <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${playerName}</td>
+            </tr>
+            ${category ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Categoría:</td>
+              <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${category}</td>
+            </tr>` : ''}
+            ${dorsal ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Dorsal Asignado:</td>
+              <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">#${dorsal}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Estado de la Ficha:</td>
+              <td align="right" style="color: #059669; font-weight: 800; padding: 6px 0;">Registrada / En trámite administrativo</td>
+            </tr>
+          </table>
         </div>
 
         <!-- Bloque 2: Estado del Pago y Cuotas -->

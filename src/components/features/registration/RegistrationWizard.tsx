@@ -217,7 +217,7 @@ export function RegistrationWizard({
       2: ['docsUploaded', 'escolarizacion'],
       3: isSeniorTeam ? [] : ['paymentMethod', 'paymentPlan', 'wasInClub', 'paidReservation'],
       4: ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo', 'sizeMedias', 'sizeMochila'],
-      5: !isAdult ? ['consentRgpd', 'consentTutela', 'consentMedical', 'password', 'confirmPassword'] : ['consentRgpd', 'consentMedical', 'password', 'confirmPassword']
+      5: !isAdult ? ['consentRgpd', 'consentTutela', 'consentMedical', 'consentImage', 'password', 'confirmPassword'] : ['consentRgpd', 'consentMedical', 'consentImage', 'password', 'confirmPassword']
     };
 
     const errorFields = Object.keys(errors);

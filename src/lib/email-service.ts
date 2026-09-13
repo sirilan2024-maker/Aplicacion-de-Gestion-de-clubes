@@ -131,6 +131,23 @@ export interface PlayerRegistrationEmailParams {
   paymentSummary?: RegistrationPaymentSummary;
 }
 
+/**
+ * Limpia y normaliza la categoría para mostrar únicamente la categoría base (Infantil, Cadete, etc.)
+ * sin letras ni nombres de equipo hasta su asignación oficial.
+ */
+export function formatBaseCategory(category?: string): string {
+  if (!category) return 'Pendiente de asignación';
+  const clean = category.trim();
+  const match = clean.match(/^(querub[ií]n|prebenjam[ií]n|benjam[ií]n|alev[ií]n|infantil|cadete|juvenil|senior|veteranos|f[uú]tbol base)/i);
+  if (match) {
+    const raw = match[0].toLowerCase();
+    // Capitalizar primera letra respetando tildes
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  // Si contiene una letra de equipo al final (ej: "Infantil B"), se elimina
+  return clean.replace(/\s+[a-z]$/i, '').trim();
+}
+
 function formatCentsToEur(cents: number): string {
   const eur = (cents || 0) / 100;
   return eur.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -161,6 +178,7 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
     paymentSummary,
   } = params;
 
+  const displayCategory = formatBaseCategory(category);
   const hasFees = paymentSummary && Array.isArray(paymentSummary.fees) && paymentSummary.fees.length > 0;
   const isTransfer = paymentSummary?.paymentMethod?.toLowerCase().includes('transferencia');
   const isFractional = paymentSummary?.paymentPlan === 'Fraccionado' || (paymentSummary?.fees && paymentSummary.fees.length > 1);
@@ -325,10 +343,10 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
               <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Jugador/a:</td>
               <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${playerName}</td>
             </tr>
-            ${category ? `
+            ${displayCategory ? `
             <tr style="border-bottom: 1px dashed #e2e8f0;">
               <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Categoría:</td>
-              <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${category}</td>
+              <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${displayCategory}</td>
             </tr>` : ''}
             ${dorsal ? `
             <tr style="border-bottom: 1px dashed #e2e8f0;">

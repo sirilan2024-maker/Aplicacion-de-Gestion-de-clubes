@@ -665,7 +665,7 @@ export async function POST(request: Request) {
             fromName: 'SPORTING SALADAR',
             subject: `⚽ Inscripción Registrada: ${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() + ' - Sporting Saladar',
             html: emailHtml,
-            replyTo: 'csportingsaladar@gmail.com',
+            replyTo: 'info@clubsportingsaladar.com',
           });
         }
       } catch (emailErr) {

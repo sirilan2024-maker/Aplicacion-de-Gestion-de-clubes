@@ -354,9 +354,9 @@ export function Step2Documents() {
                   </h5>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <FileUploadField label="Pasaporte" description="En vigor" />
-                    <FileUploadField label="DNI/NIE" />
-                    <FileUploadField label="Libro de familia" />
-                    <FileUploadField label="Certificado de nacimiento" />
+                    <FileUploadField label="DNI/NIE" description="Documento de identidad o NIE" />
+                    <FileUploadField label="Libro de familia" description="Libro familiar o equivalente" />
+                    <FileUploadField label="Certificado de nacimiento" description="Original y con traducción jurada al español si procede" />
                   </div>
                 </div>
 
@@ -421,7 +421,7 @@ export function Step2Documents() {
                 <Home className="w-4 h-4 text-orange-500" /> D) Residencia
               </h5>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <FileUploadField label="Empadronamiento" description="Histórico y familiar" />
+                <FileUploadField label="Empadronamiento" description="Histórico colectivo actualizado con menos de 3 meses" />
                 <FileUploadField label="Contrato de alquiler" description="Si existe" />
                 <FileUploadField label="Documento acreditativo del domicilio" description="Recibos, escrituras, etc." />
               </div>
@@ -438,23 +438,30 @@ export function Step2Documents() {
               </div>
             </div>
 
-            {/* Bloque 6: Carta Explicativa */}
+            {/* Bloque 6: Carta Explicativa y Declaración CTI */}
             <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
               <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-rose-500" /> F) Carta Explicativa
+                <FileText className="w-4 h-4 text-rose-500" /> F) Carta Explicativa y Declaraciones Oficiales
               </h5>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <div className="text-sm text-gray-600 space-y-2">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                <div className="lg:col-span-6 text-sm text-gray-600 space-y-2">
                   <p>La familia deberá adjuntar un escrito <strong>firmado</strong> explicando detalladamente:</p>
                   <ul className="list-disc pl-5 space-y-1 text-xs">
-                    <li>Situación familiar.</li>
-                    <li>Motivo por el que reside en España.</li>
-                    <li>Situación laboral.</li>
-                    <li>Situación escolar.</li>
-                    <li>Cualquier otra circunstancia relevante para la tramitación federativa.</li>
+                    <li>Situación familiar y motivo de residencia en España.</li>
+                    <li>Situación laboral y escolar de la familia.</li>
+                    <li>Circunstancias relevantes para la autorización de la FIFA/RFEF.</li>
                   </ul>
                 </div>
-                <FileUploadField label="Carta Explicativa Firmada" />
+                <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FileUploadField 
+                    label="Carta Explicativa Firmada" 
+                    description="Escrito firmado de la familia" 
+                  />
+                  <FileUploadField 
+                    label="Declaración Jurada / Impreso CTI" 
+                    description="Declaración jurada de los padres / Formulario oficial CTI RFEF (si tiene entre 10 y 18 años)" 
+                  />
+                </div>
               </div>
             </div>
             </>

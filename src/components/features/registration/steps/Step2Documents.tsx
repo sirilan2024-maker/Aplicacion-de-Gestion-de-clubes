@@ -38,6 +38,11 @@ export function Step2Documents() {
     return (bytes / 1024 / 1024).toFixed(2) + " MB";
   };
 
+  React.useEffect(() => {
+    register("uploadedFiles");
+    register("docsUploaded");
+  }, [register]);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, label: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -68,23 +73,22 @@ export function Step2Documents() {
         reader.onloadend = () => {
           const base64data = reader.result as string;
           
-          // Update the array of uploaded files
-          const currentFiles = getValues("uploadedFiles") || [];
-          // Replace if label already exists, else push
+          // Update the array of uploaded files immutably
+          const currentFiles = [...(getValues("uploadedFiles") || [])];
           const existingIndex = currentFiles.findIndex(f => f.label === label);
           if (existingIndex >= 0) {
             currentFiles[existingIndex] = { label, base64: base64data };
           } else {
             currentFiles.push({ label, base64: base64data });
           }
-          setValue("uploadedFiles", currentFiles);
-          setValue("docsUploaded", true);
+          setValue("uploadedFiles", currentFiles, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+          setValue("docsUploaded", true, { shouldValidate: true, shouldDirty: true });
           
           // Mantener los campos originales para retrocompatibilidad
           if (label.includes("DNI") || label.includes("NIE") || label.includes("Pasaporte") || label.includes("Libro")) {
-             setValue("dniFileBase64", base64data);
+             setValue("dniFileBase64", base64data, { shouldDirty: true });
           } else if (label.includes("Foto Carnet")) {
-             setValue("photoFileBase64", base64data);
+             setValue("photoFileBase64", base64data, { shouldDirty: true });
           }
         };
       } catch (error) {
@@ -99,15 +103,15 @@ export function Step2Documents() {
       reader.onloadend = () => {
         const base64data = reader.result as string;
         
-        const currentFiles = getValues("uploadedFiles") || [];
+        const currentFiles = [...(getValues("uploadedFiles") || [])];
         const existingIndex = currentFiles.findIndex(f => f.label === label);
         if (existingIndex >= 0) {
           currentFiles[existingIndex] = { label, base64: base64data };
         } else {
           currentFiles.push({ label, base64: base64data });
         }
-        setValue("uploadedFiles", currentFiles);
-        setValue("docsUploaded", true);
+        setValue("uploadedFiles", currentFiles, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        setValue("docsUploaded", true, { shouldValidate: true, shouldDirty: true });
       };
       reader.onerror = () => {
         console.error("Error leyendo el archivo:", file.name);
@@ -118,9 +122,9 @@ export function Step2Documents() {
   const removeUploadedFile = (label: string) => {
     const currentFiles = getValues("uploadedFiles") || [];
     const updatedFiles = currentFiles.filter(f => f.label !== label);
-    setValue("uploadedFiles", updatedFiles);
+    setValue("uploadedFiles", updatedFiles, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
     if (updatedFiles.length === 0) {
-      setValue("docsUploaded", false);
+      setValue("docsUploaded", false, { shouldValidate: true, shouldDirty: true });
     }
   };
 

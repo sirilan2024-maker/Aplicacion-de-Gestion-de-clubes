@@ -439,13 +439,13 @@ export async function POST(request: Request) {
           const e2ePaymentRef = `PAY-${currentYear}-${player.id.substring(0, 8).toUpperCase()}`;
 
           if (paymentPlan === 'Fraccionado') {
-            // Plazo 1/2 (Inscripción inmediata - 1.00 €)
+            // Plazo 1/2 (Inscripción inmediata - 0.50 €)
             await supabaseAdmin.from('fees').insert({
               player_id: player.id,
               profile_id: authUserId || null,
               club_id: clubId,
-              concept: `Cuota Temporada Fraccionada 1/2 (E2E Test) – 1.00 €`,
-              amount_cents: 100,
+              concept: `Cuota Temporada (1/2) (E2E Test) – 0.50 €`,
+              amount_cents: 50,
               amount_paid_cents: 0,
               currency: 'eur',
               estado: 'pendiente',
@@ -454,20 +454,20 @@ export async function POST(request: Request) {
               fecha_pago: new Date().toISOString(),
             });
 
-            // Plazo 2/2 (Segundo plazo diferido - 1.00 €)
-            const dueIn60Days = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+            // Plazo 2/2 (Segundo plazo diferido a 30 días - 0.50 €)
+            const dueIn30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
             await supabaseAdmin.from('fees').insert({
               player_id: player.id,
               profile_id: authUserId || null,
               club_id: clubId,
-              concept: `Cuota Temporada Fraccionada 2/2 (E2E Test) – 1.00 €`,
-              amount_cents: 100,
+              concept: `Cuota Temporada (2/2) (E2E Test) – 0.50 €`,
+              amount_cents: 50,
               amount_paid_cents: 0,
               currency: 'eur',
               estado: 'pendiente',
               tipo_cargo: 'one_time',
               payment_reference: `${e2ePaymentRef}-2`,
-              fecha_pago: dueIn60Days,
+              fecha_pago: dueIn30Days,
             });
           } else {
             // Pago único E2E (1.00 €)
@@ -521,7 +521,7 @@ export async function POST(request: Request) {
         // 3. Crear Stripe PaymentIntent si eligió Stripe
         if (paymentMethod === 'Stripe') {
           const isFraccionado = paymentPlan === 'Fraccionado';
-          const chargeAmount = isE2EAuthorized ? 100 : targetFee.amount_cents;
+          const chargeAmount = isE2EAuthorized ? (isFraccionado ? 50 : 100) : targetFee.amount_cents;
           let stripeCustomerId: string | undefined = undefined;
 
           if (!process.env.STRIPE_SECRET_KEY) {
@@ -559,7 +559,7 @@ export async function POST(request: Request) {
             payment_reference: paymentReference,
             player: `${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim(),
             type: isE2EAuthorized
-              ? 'e2e_test_registration'
+              ? (isFraccionado ? 'e2e_test_fraccionado_1' : 'e2e_test_registration')
               : (isFraccionado ? 'inscripcion_fraccionada_1' : 'inscripcion_total'),
           };
 
@@ -571,13 +571,17 @@ export async function POST(request: Request) {
             ? getE2EDeliveryEmailRecipient()
             : (email && !email.includes('@example.invalid') ? email : null);
 
+          const intentDescription = isE2EAuthorized
+            ? (isFraccionado
+                ? 'CUOTA INSCRIPCIÓN (PLAZO 1/2 - 0.50 €) - CLUB SPORTING SALADAR (E2E TEST)'
+                : 'CUOTA INSCRIPCIÓN E2E TEST (1.00 €) - CLUB SPORTING SALADAR')
+            : 'CUOTA INSCRIPCIÓN TEMPORADA 26/27 - CLUB SPORTING SALADAR';
+
           const intent = await stripe.paymentIntents.create({
             amount: chargeAmount,
             currency: 'eur',
             customer: stripeCustomerId,
-            description: isE2EAuthorized
-              ? 'CUOTA INSCRIPCIÓN E2E TEST (1.00 €) - CLUB SPORTING SALADAR'
-              : 'CUOTA INSCRIPCIÓN TEMPORADA 26/27 - CLUB SPORTING SALADAR',
+            description: intentDescription,
             payment_method_types: ['card'],
             setup_future_usage: isFraccionado ? 'off_session' : undefined,
             metadata: intentMetadata,
@@ -692,7 +696,7 @@ export async function POST(request: Request) {
       clientSecret: clientSecret,
       paymentIntentId: stripeIntentId,
       paymentReference: paymentReference,
-      amountFormatted: isE2EAuthorized ? '1,00 €' : undefined,
+      amountFormatted: isE2EAuthorized ? (paymentPlan === 'Fraccionado' ? '0,50 €' : '1,00 €') : undefined,
       message: 'Inscripción guardada y formalizada correctamente.',
     });
   } catch (err: any) {

@@ -4,14 +4,16 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   Download, FileText, Loader2, AlertCircle, Image as ImageIcon,
   CheckCircle2, XCircle, Clock, Eye, RefreshCw, Shield, ShieldCheck, ShieldX,
-  PackageOpen, CreditCard
+  PackageOpen, CreditCard, Plus, UploadCloud
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   getPlayerExpedienteAction,
   updateDocumentStatusAction,
-  updatePlayerSepaAction
+  updatePlayerSepaAction,
+  uploadPlayerDocumentAction
 } from "@/app/actions/secretaria-actions";
+import imageCompression from "browser-image-compression";
 import toast from "react-hot-toast";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -353,9 +355,65 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
   // SEPA state
   const [sepaData, setSepaData] = useState<{ iban: string | null; sepa_mandate_id: string | null; sepa_mandate_date: string | null } | null>(null);
   const [payerInfo, setPayerInfo] = useState<{ type: string; name: string | null; dni: string | null } | null>(null);
-  const [isEditingSepa, setIsEditingSepa] = useState(false);
   const [sepaForm, setSepaForm] = useState({ iban: '', sepaMandateId: '', sepaMandateDate: '' });
   const [savingSepa, setSavingSepa] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadDocType, setUploadDocType] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const handleUploadFileAdmin = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadDocType) return;
+
+    try {
+      setUploadingDoc(true);
+      let base64ToSend = "";
+
+      if (file.type.startsWith("image/")) {
+        const options = {
+          maxSizeMB: 0.2,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        };
+        const compressedFile = await imageCompression(file, options);
+        base64ToSend = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(compressedFile);
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        });
+      } else {
+        base64ToSend = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        });
+      }
+
+      const res = await uploadPlayerDocumentAction({
+        playerId,
+        documentType: uploadDocType,
+        fileBase64: base64ToSend,
+        fileName: file.name,
+      });
+
+      if (res.success) {
+        toast.success(`Documento "${uploadDocType}" subido al expediente`);
+        setShowUploadModal(false);
+        setUploadDocType("");
+        await fetchDocuments();
+      } else {
+        toast.error(res.error || "Error al subir el archivo");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Error al procesar el archivo");
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = "";
+    }
+  };
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -545,6 +603,16 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
             )}
           </div>
 
+          {/* UPLOAD DOCUMENT BUTTON */}
+          <button
+            onClick={() => setShowUploadModal(!showUploadModal)}
+            title="Subir o subsanar un documento"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Subir Documento
+          </button>
+
           {/* DOWNLOAD ALL BUTTON */}
           {availableForDownload > 0 && (
             <button
@@ -571,6 +639,57 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
           </button>
         </div>
       </div>
+
+      {/* Modal / Selector de Subida Rápida para Secretaría */}
+      {showUploadModal && (
+        <div className="bg-emerald-50/80 border border-emerald-200 p-4 rounded-xl space-y-3 animate-in fade-in">
+          <div className="flex justify-between items-center border-b border-emerald-200 pb-2">
+            <h4 className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+              <UploadCloud className="w-4 h-4 text-emerald-600" /> Añadir Documento al Expediente de {playerName}
+            </h4>
+            <button onClick={() => setShowUploadModal(false)} className="text-gray-400 hover:text-gray-700 text-xs">✕</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="font-semibold text-gray-700 block mb-1">Tipo de Documento:</label>
+              <select
+                value={uploadDocType}
+                onChange={(e) => setUploadDocType(e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-lg p-2 text-xs font-medium"
+              >
+                <option value="">-- Selecciona el tipo --</option>
+                <option value="DNI/NIE del Jugador (Anverso)">DNI/NIE del Jugador (Anverso)</option>
+                <option value="DNI/NIE del Jugador (Reverso)">DNI/NIE del Jugador (Reverso)</option>
+                <option value="Foto Carnet">Foto Carnet</option>
+                <option value="DNI/NIE del Tutor (Anverso)">DNI/NIE del Tutor (Anverso)</option>
+                <option value="DNI/NIE del Tutor (Reverso)">DNI/NIE del Tutor (Reverso)</option>
+                <option value="Libro de Familia">Libro de Familia</option>
+                <option value="Certificado de Empadronamiento">Certificado de Empadronamiento</option>
+                <option value="Certificado Escolar">Certificado Escolar</option>
+                <option value="Contrato Laboral de los Padres">Contrato Laboral de los Padres</option>
+                <option value="Impreso Oficial CTI Menores RFEF">Impreso Oficial CTI Menores RFEF</option>
+                <option value="Carta Explicativa Firmada">Carta Explicativa Firmada</option>
+                <option value="Certificado Médico">Certificado Médico</option>
+              </select>
+            </div>
+            {uploadDocType && (
+              <div className="flex items-end">
+                <label className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 rounded-lg text-center cursor-pointer shadow-xs transition-colors flex items-center justify-center gap-1.5">
+                  {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                  Seleccionar y Subir Archivo
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf"
+                    onChange={handleUploadFileAdmin}
+                    disabled={uploadingDoc}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DNI del Tutor (viene de families.tutor_1_dni_url) */}
       {tutorDniUrl && (

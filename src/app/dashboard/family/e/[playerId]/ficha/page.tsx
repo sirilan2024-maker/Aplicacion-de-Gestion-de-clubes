@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
@@ -9,7 +9,7 @@ import {
   Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Trash2
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import { differenceInDays, parseISO } from "date-fns";
+import { FamilyDocumentUploader } from "@/components/features/family/FamilyDocumentUploader";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
 import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
@@ -102,9 +102,12 @@ export default function PlayerProfilePage() {
   const router = useRouter();
   const playerId = typeof params.playerId === 'string' ? params.playerId : '';
 
-  const [player, setPlayer] = useState<PlayerData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>('info');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get('tab') as any;
+  const validTabs = ['info', 'medico', 'stats', 'asistencia', 'disciplina', 'documentos', 'utileria'];
+  const [activeTab, setActiveTab] = useState<'info' | 'medico' | 'stats' | 'asistencia' | 'disciplina' | 'documentos' | 'utileria'>(
+    validTabs.includes(tabParam) ? tabParam : 'info'
+  );
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -697,6 +700,14 @@ export default function PlayerProfilePage() {
                 }`}
               >
                 <FolderOpen size={18} /> Utilería
+              </button>
+              <button 
+                onClick={() => setActiveTab('documentos')}
+                className={`pb-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'documentos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <FileText size={18} /> Documentación
               </button>
             </>
           )}
@@ -1586,6 +1597,15 @@ export default function PlayerProfilePage() {
         {/* PESTAÑA: UTILERIA */}
         {activeTab === 'utileria' && (
           <UtileriaTab playerId={player.id} />
+        )}
+
+        {/* PESTAÑA: DOCUMENTACIÓN */}
+        {activeTab === 'documentos' && (
+          <FamilyDocumentUploader 
+            playerId={player.id} 
+            playerName={`${player.first_name} ${player.last_name}`} 
+            isSenior={player.is_senior} 
+          />
         )}
 
       </div>

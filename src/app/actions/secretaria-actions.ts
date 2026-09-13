@@ -614,5 +614,163 @@ export async function updatePlayerSepaAction(playerId: string, {
   }
 }
 
+/**
+ * Subir o subsanar un documento de un jugador
+ * Disponible para la familia (Portal Familiar) y para Secretaría/Admin
+ */
+export async function uploadPlayerDocumentAction({
+  playerId,
+  documentType,
+  fileBase64,
+  fileName,
+}: {
+  playerId: string;
+  documentType: string;
+  fileBase64: string;
+  fileName?: string;
+}) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
 
+    const supabaseAdmin = await createAdminClient();
 
+    // Comprobar acceso al jugador
+    const access = await canUserAccessPlayer(supabaseAdmin, context, playerId);
+    if (!access.allowed || !access.player || access.player.club_id !== context.profile.club_id) {
+      return { success: false, error: access.reason || "No tienes permisos para modificar este expediente" };
+    }
+
+    // Procesar Base64
+    const matches = fileBase64.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return { success: false, error: "Formato de archivo no válido (debe ser base64)" };
+    }
+
+    const mimeType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const ext = mimeType.split('/')[1]?.replace('jpeg', 'jpg').replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx') || 'jpg';
+
+    const normalizedDocType = documentType.toLowerCase().replace(/[\s/()]+/g, '_').replace(/_+$/, '');
+    const storagePath = `${playerId}/${normalizedDocType}_${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('expedientes-doc')
+      .upload(storagePath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("[uploadPlayerDocumentAction] Storage error:", uploadError);
+      return { success: false, error: "Error al guardar el archivo en el servidor" };
+    }
+
+    // 1. Comprobar si ya existe un documento de este tipo para este jugador
+    const { data: existingDocs } = await supabaseAdmin
+      .from('player_documents')
+      .select('id')
+      .eq('player_id', playerId)
+      .eq('document_type', documentType);
+
+    if (existingDocs && existingDocs.length > 0) {
+      // Actualizar el documento existente pasando su estado a 'recibido' y limpiando el motivo de rechazo
+      const { error: updateError } = await supabaseAdmin
+        .from('player_documents')
+        .update({
+          file_url: storagePath,
+          status: 'recibido',
+          rejection_reason: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingDocs[0].id);
+
+      if (updateError) {
+        console.error("[uploadPlayerDocumentAction] Update error:", updateError);
+        return { success: false, error: "Error al actualizar el registro del documento" };
+      }
+    } else {
+      // Insertar nuevo documento con estado 'recibido'
+      const { error: insertError } = await supabaseAdmin
+        .from('player_documents')
+        .insert({
+          player_id: playerId,
+          document_type: documentType,
+          file_url: storagePath,
+          status: 'recibido',
+          rejection_reason: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        console.error("[uploadPlayerDocumentAction] Insert error:", insertError);
+        return { success: false, error: "Error al insertar el documento en el expediente" };
+      }
+    }
+
+    // Si es foto carnet, sincronizar con avatar_url del jugador
+    if (documentType.toLowerCase().includes('foto') && documentType.toLowerCase().includes('carnet')) {
+      const { data: signedData } = await supabaseAdmin.storage
+        .from('expedientes-doc')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+      if (signedData?.signedUrl) {
+        await supabaseAdmin.from('players').update({ avatar_url: signedData.signedUrl }).eq('id', playerId);
+      }
+    }
+
+    revalidatePath(`/dashboard/family/e/${playerId}/ficha`);
+    revalidatePath(`/dashboard/family/e/${playerId}/perfil`);
+    revalidatePath(`/dashboard/club/jugador/${playerId}`);
+    revalidatePath(`/admin/secretaria`);
+
+    return { success: true, fileUrl: storagePath };
+  } catch (error: any) {
+    console.error('[uploadPlayerDocumentAction] Exception:', error);
+    return { success: false, error: error.message || "Error al procesar el archivo" };
+  }
+}
+
+/**
+ * Eliminar un documento del expediente
+ */
+export async function deletePlayerDocumentAction(docId: string) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    const supabaseAdmin = await createAdminClient();
+
+    const { data: doc } = await supabaseAdmin
+      .from('player_documents')
+      .select('id, player_id, file_url, players(club_id)')
+      .eq('id', docId)
+      .single();
+
+    if (!doc) return { success: false, error: "Documento no encontrado" };
+
+    const docClubId = (doc?.players as any)?.club_id;
+    if (docClubId !== context.profile.club_id) {
+      return { success: false, error: "No autorizado para eliminar este documento" };
+    }
+
+    if (doc.file_url) {
+      await supabaseAdmin.storage.from('expedientes-doc').remove([doc.file_url]);
+    }
+
+    const { error } = await supabaseAdmin.from('player_documents').delete().eq('id', docId);
+    if (error) throw error;
+
+    revalidatePath(`/dashboard/family/e/${doc.player_id}/ficha`);
+    revalidatePath(`/dashboard/club/jugador/${doc.player_id}`);
+    revalidatePath(`/admin/secretaria`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[deletePlayerDocumentAction]', error);
+    return { success: false, error: error.message };
+  }
+}

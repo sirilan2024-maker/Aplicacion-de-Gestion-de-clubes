@@ -470,7 +470,14 @@ export default function PlayerDashboardPage() {
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row justify-center md:justify-end shrink-0 w-full md:w-auto px-4 sm:px-0">
+        <div className="flex flex-col sm:flex-row justify-center md:justify-end shrink-0 w-full md:w-auto px-4 sm:px-0 gap-2">
+          <button 
+            onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha?tab=documentos`)}
+            className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors shadow-xs"
+          >
+            <ShieldAlert size={18} className="text-blue-600" />
+            DOCUMENTACIÓN
+          </button>
           <button 
             onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha`)}
             className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-sm"

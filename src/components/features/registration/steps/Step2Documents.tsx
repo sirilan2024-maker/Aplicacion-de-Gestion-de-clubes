@@ -283,106 +283,131 @@ export function Step2Documents() {
         </div>
       </div>
 
-      {/* 2. EXPEDIENTE ESPECIAL FFCV */}
+      {/* 2. EXPEDIENTE ESPECIAL JUGADORES EXTRANJEROS (FFCV / FIFA ART. 19) */}
       <div className="space-y-4 bg-blue-50/50 p-5 rounded-xl border border-blue-100">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-1">
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold">2</span>
-          <h4 className="font-bold text-blue-900 text-base">Expediente Especial FFCV</h4>
+          <h4 className="font-bold text-blue-900 text-base">Expediente Especial Jugadores Extranjeros (FFCV / FIFA)</h4>
         </div>
-        <p className="text-sm text-blue-800 mb-3">La Federación exige documentación extra en ciertos casos. Marca si cumples alguna condición:</p>
+        <p className="text-sm text-blue-800">
+          La Federación exige documentación extra si el jugador es extranjero.
+        </p>
         
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-blue-100">
-            <Checkbox id="isForeign" checked={isForeign} onCheckedChange={(val) => register("isForeign").onChange({ target: { value: val, name: "isForeign" } })} />
-            <label htmlFor="isForeign" className="text-sm font-medium text-gray-700 cursor-pointer">
-              El jugador tiene nacionalidad Extranjera
-            </label>
-          </div>
-          <div className="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-blue-100">
-            <Checkbox id="neverFederated" checked={neverFederated} onCheckedChange={(val) => register("neverFederated").onChange({ target: { value: val, name: "neverFederated" } })} />
-            <label htmlFor="neverFederated" className="text-sm font-medium text-gray-700 cursor-pointer">
-              El jugador nunca ha estado federado
+        <div className="flex flex-col gap-3 pt-1">
+          <div className="flex items-center space-x-2 bg-white p-3 rounded-lg border border-blue-100 shadow-xs">
+            <Checkbox 
+              id="isForeign" 
+              checked={isForeign} 
+              onCheckedChange={(val) => {
+                register("isForeign").onChange({ target: { value: val, name: "isForeign" } });
+                setValue("isForeign", !!val);
+              }} 
+            />
+            <label htmlFor="isForeign" className="text-sm font-semibold text-gray-800 cursor-pointer">
+              El jugador tiene nacionalidad Extranjera (Comunitaria o Extracomunitaria)
             </label>
           </div>
         </div>
       </div>
 
-      {/* Documentación Extra Dinámica (FFCV) */}
-      {(isForeign || neverFederated) && (
-        <div className="space-y-8 animate-in fade-in zoom-in duration-300 bg-orange-50/30 p-6 rounded-xl border border-orange-100 shadow-sm">
-          <div className="border-b border-orange-200 pb-2">
-            <h4 className="font-semibold text-orange-900 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-              Documentación Extra Requerida (Expediente FFCV)
-            </h4>
-            <p className="text-sm text-orange-700 mt-1">
-              Al cumplir alguna de las condiciones, la Federación requiere adjuntar los siguientes bloques de documentación para tramitar la ficha correctamente.
+      {/* Documentación Extra Dinámica (Expediente Extranjeros FFCV / FIFA) */}
+      {isForeign && (
+        <div className="space-y-8 animate-in fade-in zoom-in duration-300 bg-orange-50/30 p-6 rounded-xl border border-orange-200 shadow-sm">
+          
+          {/* Banner Informativo Normativa FIFA Art. 19 */}
+          <div className="bg-white p-5 rounded-xl border border-orange-200 space-y-3">
+            <div className="flex items-center gap-2 text-orange-900 font-bold text-base border-b border-orange-100 pb-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+              Normativa FIFA Art. 19 (Protección de Menores) & Tramitación FFCV
+            </div>
+            <p className="text-xs text-gray-700 leading-relaxed">
+              Para los jugadores menores de edad de nacionalidad extranjera (tanto comunitarios de la UE como extracomunitarios), la tramitación a través de la FFCV exige justificar que el traslado a España no obedece a motivos deportivos:
             </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+              <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-200 space-y-1">
+                <span className="font-bold text-blue-900 block">🔹 Caso A: Menores de 10 años</span>
+                <p className="text-blue-800 text-[11px]">
+                  Inscripción directa demostrando arraigo continuado en España, escolarización y residencia de los progenitores por motivos no futbolísticos.
+                </p>
+              </div>
+              <div className="bg-amber-50/70 p-3 rounded-lg border border-amber-200 space-y-1">
+                <span className="font-bold text-amber-900 block">🔸 Caso B: Menores de 10 a 18 años (CTI)</span>
+                <p className="text-amber-800 text-[11px]">
+                  Requiere expediente completo de Certificado de Transferencia Internacional (CTI) y autorización formal de la Subcomisión de la FIFA a través de la RFEF.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 text-[11px] text-gray-600">
+              <strong>Nota sobre Comunitarios vs Extracomunitarios:</strong> Los trámites del Art. 19 aplican a todos los menores. Los comunitarios (UE/EEE) obtienen ficha directa tras el visto bueno de la FIFA sin restricción de cupo, mientras que los extracomunitarios deben contar adicionalmente con sus permisos de residencia legal en vigor.
+            </div>
           </div>
 
           <div className="space-y-8">
             
-            {neverFederated && !isForeign && (
-              <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <UserCircle className="w-4 h-4 text-blue-500" /> Documentación por primera vez
+            {/* Bloque 1: Identificación y Filiación */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              <div className="border-b pb-2">
+                <h5 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                  <UserCircle className="w-5 h-5 text-blue-600" /> A) Identificación y Filiación (Menor y Progenitores)
                 </h5>
-                <p className="text-xs text-gray-500 mb-4">Obligatorio al no haber estado federado nunca antes.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {isSenior || (birthDate && new Date().getFullYear() - new Date(birthDate).getFullYear() >= 14) ? (
-                    <>
-                      <FileUploadField label="DNI/NIE del Jugador (Anverso)" description="Obligatorio al tener 14 años o más" />
-                      <FileUploadField label="DNI/NIE del Jugador (Reverso)" description="Obligatorio al tener 14 años o más" />
-                    </>
-                  ) : (
-                    <>
-                      <FileUploadField label="Libro de Familia" description="Si no tiene DNI" />
-                      <FileUploadField label="Certificado de nacimiento" description="Alternativa al Libro de Familia" />
-                    </>
-                  )}
-                  <FileUploadField label="Foto Carnet (Reciente)" description="Importante: tiene que ser actual" />
-                </div>
+                <p className="text-xs text-gray-500 mt-0.5">Pasaportes completos en vigor y certificados oficiales de filiación.</p>
               </div>
-            )}
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <FileUploadField 
+                  label="Pasaporte Completo del Menor" 
+                  description="En vigor (todas las páginas relevantes)" 
+                />
+                <FileUploadField 
+                  label="Pasaporte del Padre" 
+                  description="En vigor, documento completo" 
+                />
+                <FileUploadField 
+                  label="Pasaporte de la Madre" 
+                  description="En vigor, documento completo" 
+                />
+                <FileUploadField 
+                  label="DNI/NIE del Jugador" 
+                  description="NIE o tarjeta de residencia si dispone" 
+                />
+                <FileUploadField 
+                  label="Libro de Familia Extranjero" 
+                  description="Libro de familia oficial o equivalente" 
+                />
+                <FileUploadField 
+                  label="Certificado de Nacimiento del Menor" 
+                  description="Original y con traducción jurada al español si procede" 
+                />
+              </div>
+            </div>
 
-            {isForeign && (
-              <>
-                {/* Bloque 1: Jugador */}
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <UserCircle className="w-4 h-4 text-blue-500" /> A) Jugador Extranjero
+            {/* Bloque 2: Escolarización en España */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2">
+                <div>
+                  <h5 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                    <GraduationCap className="w-5 h-5 text-purple-600" /> B) Historial y Certificados de Escolarización
                   </h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <FileUploadField label="Pasaporte" description="En vigor" />
-                    <FileUploadField label="DNI/NIE" description="Documento de identidad o NIE" />
-                    <FileUploadField label="Libro de familia" description="Libro familiar o equivalente" />
-                    <FileUploadField label="Certificado de nacimiento" description="Original y con traducción jurada al español si procede" />
-                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Acredita los años escolarizado en España (vital si supera 5 años continuados).</p>
                 </div>
-
-            {/* Bloque 2: Escolarización */}
-            <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h5 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-purple-500" /> B) Escolarización
-                </h5>
-                <p className="text-xs text-gray-500">Desde que comenzó su escolarización</p>
               </div>
               
               <div className="space-y-4">
                 {escolarizacionFields.map((field, index) => (
-                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start bg-gray-50 p-3 rounded border border-gray-200 relative">
+                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start bg-gray-50 p-3 rounded-lg border border-gray-200 relative">
                     <div className="md:col-span-5 space-y-1">
-                      <label className="text-xs font-semibold text-gray-600">Centro educativo</label>
-                      <Input placeholder="Ej: CEIP Manuel de Falla" {...register(`escolarizacion.${index}.centro`)} />
+                      <label className="text-xs font-semibold text-gray-700">Centro Educativo en España</label>
+                      <Input placeholder="Ej: CEIP / IES Manuel de Falla" {...register(`escolarizacion.${index}.centro`)} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
-                      <label className="text-xs font-semibold text-gray-600">Curso académico</label>
-                      <Input placeholder="Ej: 2022-2023" {...register(`escolarizacion.${index}.curso`)} />
+                      <label className="text-xs font-semibold text-gray-700">Curso Académico</label>
+                      <Input placeholder="Ej: 2023-2024" {...register(`escolarizacion.${index}.curso`)} />
                     </div>
                     <div className="md:col-span-3">
-                      <label className="text-xs font-semibold text-gray-600 mb-1 block">Certificado</label>
-                      <FileUploadField label="Subir Certificado" className="!p-2 !bg-white" />
+                      <label className="text-xs font-semibold text-gray-700 mb-1 block">Certificado Escolar</label>
+                      <FileUploadField label={`Certificado Escolar (${index + 1})`} className="!p-2 !bg-white" />
                     </div>
                     <div className="md:col-span-1 flex justify-end md:mt-6">
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeEscolarizacion(index)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
@@ -398,74 +423,112 @@ export function Step2Documents() {
                   onClick={() => appendEscolarizacion({ centro: "", curso: "" })}
                   className="w-full border-dashed border-2 text-blue-600 hover:bg-blue-50"
                 >
-                  <Plus className="w-4 h-4 mr-2" /> Añadir curso académico
+                  <Plus className="w-4 h-4 mr-2" /> Añadir año / curso académico
                 </Button>
+
+                <div className="pt-2">
+                  <FileUploadField 
+                    label="Certificado de Matrícula y Asistencia Actual" 
+                    description="Certificado del colegio/instituto acreditando matrícula y asistencia regular en el curso actual" 
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Bloque 3: Progenitores */}
-            <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-              <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <UserCircle className="w-4 h-4 text-green-500" /> C) Padre, madre o tutor
-              </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <FileUploadField label="Pasaporte" description="En vigor" />
-                <FileUploadField label="DNI/NIE" />
-                <FileUploadField label="Documento de tutela" description="En su caso" />
+            {/* Bloque 3: Acreditación de Residencia y Arraigo */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              <div className="border-b pb-2">
+                <h5 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                  <Home className="w-5 h-5 text-orange-600" /> C) Acreditación de Residencia y Arraigo
+                </h5>
+                <p className="text-xs text-gray-500 mt-0.5">Demuestra el domicilio efectivo y continuado de la unidad familiar en España.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <FileUploadField 
+                  label="Empadronamiento Histórico Colectivo" 
+                  description="Actualizado con menos de 3 meses de emisión, donde conste residencia ininterrumpida" 
+                />
+                <FileUploadField 
+                  label="Contrato de Alquiler o Escritura" 
+                  description="Contrato de arrendamiento en vigor o escritura de propiedad" 
+                />
+                <FileUploadField 
+                  label="Justificante del Domicilio Familiar" 
+                  description="Recibos de suministros (luz, agua, gas, etc.)" 
+                />
+                <FileUploadField 
+                  label="Prueba de Arraigo / Distancia Geográfica" 
+                  description="Certificado de distancia o arraigo (si aplica proximidad geográfica o excepción)" 
+                  isOptional={true}
+                />
+                <FileUploadField 
+                  label="Documento de Tutela Legal" 
+                  description="Resolución judicial o administrativa de tutela (si no convive con ambos padres)" 
+                  isOptional={true}
+                />
               </div>
             </div>
 
-            {/* Bloque 4: Residencia */}
-            <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-              <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Home className="w-4 h-4 text-orange-500" /> D) Residencia
-              </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <FileUploadField label="Empadronamiento" description="Histórico colectivo actualizado con menos de 3 meses" />
-                <FileUploadField label="Contrato de alquiler" description="Si existe" />
-                <FileUploadField label="Documento acreditativo del domicilio" description="Recibos, escrituras, etc." />
+            {/* Bloque 4: Situación Laboral y Legal de los Padres */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              <div className="border-b pb-2">
+                <h5 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                  <Briefcase className="w-5 h-5 text-teal-600" /> D) Situación Laboral y Legal de los Progenitores
+                </h5>
+                <p className="text-xs text-gray-500 mt-0.5">Acredita que el traslado familiar se debe a motivos laborales o legales ajenos al fútbol.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FileUploadField 
+                  label="Contrato de Trabajo de los Padres" 
+                  description="Contrato de trabajo en España de padre, madre o tutor legal" 
+                />
+                <FileUploadField 
+                  label="Justificante Laboral / Permiso de Residencia" 
+                  description="Nóminas, Informe de Vida Laboral, Alta en Seguridad Social o Permiso de Residencia" 
+                />
               </div>
             </div>
 
-            {/* Bloque 5: Situación Laboral */}
-            <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-              <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-teal-500" /> E) Situación Laboral
-              </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <FileUploadField label="Contrato de trabajo" description="De los progenitores (cuando exista)" />
-                <FileUploadField label="Otra documentación" description="Justificativa (Nóminas, alta SS, etc.)" />
+            {/* Bloque 5: Cartas Explicativas, Declaraciones y Formularios CTI RFEF */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+              <div className="border-b pb-2">
+                <h5 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                  <FileText className="w-5 h-5 text-rose-600" /> E) Declaraciones Juradas, Carta Explicativa y CTI
+                </h5>
+                <p className="text-xs text-gray-500 mt-0.5">Documentos firmados exigidos por la Comisión de Menores de la FIFA y la RFEF.</p>
               </div>
-            </div>
-
-            {/* Bloque 6: Carta Explicativa y Declaración CTI */}
-            <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-              <h5 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-rose-500" /> F) Carta Explicativa y Declaraciones Oficiales
-              </h5>
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                <div className="lg:col-span-6 text-sm text-gray-600 space-y-2">
-                  <p>La familia deberá adjuntar un escrito <strong>firmado</strong> explicando detalladamente:</p>
-                  <ul className="list-disc pl-5 space-y-1 text-xs">
-                    <li>Situación familiar y motivo de residencia en España.</li>
-                    <li>Situación laboral y escolar de la familia.</li>
-                    <li>Circunstancias relevantes para la autorización de la FIFA/RFEF.</li>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="lg:col-span-5 text-xs text-gray-600 space-y-2.5 bg-rose-50/40 p-3.5 rounded-lg border border-rose-100">
+                  <p className="font-semibold text-rose-950">La familia deberá aportar los documentos firmados indicando:</p>
+                  <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                    <li>Situación familiar y motivo exacto del traslado a España.</li>
+                    <li>Declaración expresa de que el cambio no guarda relación con motivos deportivos.</li>
+                    <li>Situación laboral y escolar de todos los miembros.</li>
                   </ul>
                 </div>
-                <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FileUploadField 
                     label="Carta Explicativa Firmada" 
-                    description="Escrito firmado de la familia" 
+                    description="Escrito firmado detallado por la familia" 
                   />
                   <FileUploadField 
-                    label="Declaración Jurada / Impreso CTI" 
-                    description="Declaración jurada de los padres / Formulario oficial CTI RFEF (si tiene entre 10 y 18 años)" 
+                    label="Declaración Jurada de los Padres" 
+                    description="Declaración formal sobre el motivo de cambio de residencia" 
+                  />
+                  <FileUploadField 
+                    label="Impreso Oficial CTI Menores RFEF" 
+                    description="Formulario oficial de CTI RFEF/FFCV (menores de 10 a 18 años)" 
+                  />
+                  <FileUploadField 
+                    label="Declaración de Contactos del Club" 
+                    description="Documento del club sobre los primeros contactos (si ya dispone de él)" 
+                    isOptional={true}
                   />
                 </div>
               </div>
             </div>
-            </>
-            )}
 
           </div>
         </div>

@@ -66,6 +66,7 @@ export function RegistrationWizard({
       sizeCamisetaPaseo: "",
       sizePantalonPaseo: "",
       sizeMedias: "",
+      sizeMochila: "",
       isSeniorTeam: isSeniorTeam,
       isSeniorSelection: isSeniorTeam ? "senior" : "minor",
       ...initialData,

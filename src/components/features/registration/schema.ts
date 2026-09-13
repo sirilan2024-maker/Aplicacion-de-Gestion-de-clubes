@@ -97,6 +97,7 @@ export const registrationSchema = z.object({
   sizeCamisetaPaseo: z.string().optional(),
   sizePantalonPaseo: z.string().optional(),
   sizeMedias: z.string().optional(),
+  sizeMochila: z.string().optional(),
 
   // STEP 5: Colaboración & RGPD
   volunteerInterest: z.string().optional(),

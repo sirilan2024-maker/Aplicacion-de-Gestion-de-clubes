@@ -26,9 +26,16 @@ const APPAREL_FIELDS = [
 
 export function Step4Apparel() {
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
-  const { register, formState: { errors }, control } = useFormContext<RegistrationFormData>();
+  const { register, formState: { errors }, control, setValue } = useFormContext<RegistrationFormData>();
   
   const wasInClub = useWatch({ control, name: "wasInClub" });
+  const sizeMochila = useWatch({ control, name: "sizeMochila" });
+
+  React.useEffect(() => {
+    if (!wasInClub) {
+      setValue("sizeMochila", "Talla Única");
+    }
+  }, [wasInClub, setValue]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -43,7 +50,7 @@ export function Step4Apparel() {
           </p>
           {wasInClub && (
             <div className="bg-white/10 p-3 rounded-lg border border-white/20 mt-4 text-sm font-medium">
-              Al haber estado el año pasado en el club solo se te entregara la ropa de juego y de entrenamiento, si necesitas alguna prenda mas por cambio de talla o por deterioro marcala pero tendras que pagarla a la entrega
+              Al haber estado el año pasado en el club solo se te entregará la ropa de juego y de entrenamiento. Si necesitas alguna prenda más o mochila por cambio de talla o deterioro márcala (se abonará a la entrega).
             </div>
           )}
         </div>
@@ -82,6 +89,33 @@ export function Step4Apparel() {
             </div>
           );
         })}
+
+        {/* Campo Mochila Oficial */}
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-gray-800 flex items-center justify-between">
+            <span>Mochila Oficial</span>
+            {wasInClub ? (
+              <span className="text-gray-500 text-xs font-normal">(Opcional)</span>
+            ) : (
+              <span className="text-blue-700 bg-blue-100 text-[10px] font-bold px-1.5 py-0.5 rounded">Incluida</span>
+            )}
+          </label>
+          <select 
+            {...register("sizeMochila")}
+            className="flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 shadow-sm transition-colors border-gray-300 hover:border-blue-400"
+          >
+            {wasInClub ? (
+              <>
+                <option value="">No necesito mochila (conservo la anterior)</option>
+                <option value="Talla Única">Sí, solicitar Mochila Oficial (Talla Única)</option>
+              </>
+            ) : (
+              <>
+                <option value="Talla Única">Talla Única (Incluida en la inscripción)</option>
+              </>
+            )}
+          </select>
+        </div>
       </div>
     </div>
   );

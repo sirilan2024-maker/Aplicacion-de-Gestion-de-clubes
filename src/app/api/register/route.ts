@@ -408,6 +408,7 @@ export async function POST(request: Request) {
         { item: 'Camiseta de paseo', size: formData.sizeCamisetaPaseo },
         { item: 'Pantalón de paseo', size: formData.sizePantalonPaseo },
         { item: 'Medias', size: formData.sizeMedias },
+        { item: 'Mochila Oficial', size: formData.sizeMochila },
       ];
 
       for (const { item, size } of apparelItems) {

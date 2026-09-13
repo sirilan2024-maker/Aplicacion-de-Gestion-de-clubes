@@ -662,6 +662,7 @@ export async function POST(request: Request) {
         if (targetEmail) {
           await sendEmail({
             to: targetEmail,
+            fromName: 'SPORTING SALADAR',
             subject: `⚽ Inscripción Registrada: ${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() + ' - Sporting Saladar',
             html: emailHtml,
             replyTo: 'csportingsaladar@gmail.com',

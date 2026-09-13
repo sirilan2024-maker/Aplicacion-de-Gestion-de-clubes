@@ -6,6 +6,7 @@ export interface SendEmailParams {
   subject: string;
   html: string;
   replyTo?: string;
+  fromName?: string;
 }
 
 /**
@@ -35,7 +36,7 @@ function getSmtpTransporter() {
 /**
  * Función centralizada para enviar emails transaccionales
  */
-export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams) {
+export async function sendEmail({ to, subject, html, replyTo, fromName: customFromName }: SendEmailParams) {
   try {
     const recipients = Array.isArray(to) ? to.filter(Boolean) : [to];
     if (recipients.length === 0) {
@@ -44,18 +45,18 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
     }
 
     const defaultReplyTo = process.env.EMAIL_REPLY_TO?.trim();
+    const effectiveFromName = customFromName || process.env.EMAIL_FROM_NAME || 'SPORTING SALADAR';
 
     // 1. Intentar envío prioritario por SMTP / Gmail del Club si está configurado
     const smtpTransporter = getSmtpTransporter();
     const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
 
     if (smtpTransporter && smtpUser) {
-      console.log(`[Email SMTP] Enviando vía SMTP (${smtpUser}) a: ${recipients.join(', ')}`);
-      const fromName = process.env.EMAIL_FROM_NAME || 'Sporting Saladar';
+      console.log(`[Email SMTP] Enviando vía SMTP (${smtpUser}) a: ${recipients.join(', ')} con emisor: "${effectiveFromName}"`);
       const effectiveReplyTo = replyTo || defaultReplyTo || smtpUser.trim();
 
       const info = await smtpTransporter.sendMail({
-        from: `"${fromName}" <${smtpUser.trim()}>`,
+        from: `"${effectiveFromName}" <${smtpUser.trim()}>`,
         to: recipients.join(', '),
         subject,
         html,
@@ -70,10 +71,10 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
     const resendApiKey = process.env.RESEND_API_KEY?.trim();
     if (resendApiKey) {
       const resend = new Resend(resendApiKey);
-      const fromAddress = process.env.EMAIL_FROM || 'Sporting Saladar <onboarding@resend.dev>';
+      const fromAddress = process.env.EMAIL_FROM || `"${effectiveFromName}" <onboarding@resend.dev>`;
       const effectiveReplyTo = replyTo || defaultReplyTo;
 
-      console.log(`[Email Resend] Enviando vía Resend a: ${recipients.join(', ')}`);
+      console.log(`[Email Resend] Enviando vía Resend (${fromAddress}) a: ${recipients.join(', ')}`);
       const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: recipients,

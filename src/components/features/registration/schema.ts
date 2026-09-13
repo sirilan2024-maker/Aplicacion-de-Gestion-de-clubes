@@ -139,8 +139,7 @@ export const registrationSchema = z.object({
   consentRgpd: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar la política de privacidad"),
   consentTutela: z.any().transform(v => v === true || v === "true" || v === "on").optional(),
   consentMedical: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar el tratamiento de datos médicos"),
-  // Firmas opcionales
-  consentImage: z.any().transform(v => v === true || v === "true" || v === "on").default(false),
+  consentImage: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar la cesión de derechos de imagen"),
 
   // Autenticación (Opcional en el esquema para permitir reutilizar el form desde dentro)
   password: z.string().optional(),

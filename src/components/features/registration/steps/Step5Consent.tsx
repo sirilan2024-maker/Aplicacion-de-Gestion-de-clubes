@@ -45,7 +45,7 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
     )
   },
   imagen: {
-    title: "Cesión de Derechos de Imagen (Opcional)",
+    title: "Cesión de Derechos de Imagen",
     content: (
       <div className="space-y-4 text-sm">
         <p>De acuerdo con la Ley Orgánica 1/1982 sobre protección del derecho al honor, a la intimidad personal y familiar y a la propia imagen, <strong>autorizo</strong> al Club a la captación de fotografías y vídeos del jugador durante la actividad deportiva oficial (entrenamientos, partidos, torneos).</p>
@@ -165,7 +165,7 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
           {renderConsentBox('rgpd', 'Política de Privacidad', 'Tratamiento de datos personales (RGPD)', errors.consentRgpd?.message)}
           {!isAdult && renderConsentBox('tutela', 'Declaración de Tutela', 'Mayoría de edad y normativas', errors.consentTutela?.message)}
           {renderConsentBox('medical', 'Tratamiento Médico Especial', 'Alergias y traslados de urgencia', errors.consentMedical?.message)}
-          {renderConsentBox('imagen', 'Derechos de Imagen', 'Consentimiento opcional para fotos', errors.consentImage?.message, true)}
+          {renderConsentBox('imagen', 'Derechos de Imagen', 'Consentimiento para fotos y actividades oficiales', errors.consentImage?.message)}
         </div>
       </div>
 

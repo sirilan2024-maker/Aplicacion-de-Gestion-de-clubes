@@ -105,11 +105,11 @@ export const registrationSchema = z.object({
   sponsorContactName: z.string().optional(),
   sponsorPhone: z.string().optional(),
   // Firmas legales obligatorias
-  consentRgpd: z.boolean().refine(val => val === true, "Debes aceptar la política de privacidad"),
-  consentTutela: z.boolean().optional(), // Validado en superRefine para menores
-  consentMedical: z.boolean().refine(val => val === true, "Debes aceptar el tratamiento de datos médicos"),
+  consentRgpd: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar la política de privacidad"),
+  consentTutela: z.any().transform(v => v === true || v === "true" || v === "on").optional(),
+  consentMedical: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar el tratamiento de datos médicos"),
   // Firmas opcionales
-  consentImage: z.boolean().default(false),
+  consentImage: z.any().transform(v => v === true || v === "true" || v === "on").default(false),
 
   // Autenticación (Opcional en el esquema para permitir reutilizar el form desde dentro)
   password: z.string().optional(),
@@ -126,7 +126,7 @@ export const registrationSchema = z.object({
 
   if (!isAdult) {
       if (!data.consentTutela) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes firmar la declaración de tutela", path: ["consentTutela"] });
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes leer y aceptar la declaración de tutela", path: ["consentTutela"] });
       }
   }
 
@@ -141,7 +141,7 @@ export const registrationSchema = z.object({
   }
 
   // Validación de contraseñas
-  if (data.password) {
+  if (data.password !== undefined && data.password !== null && data.password !== "") {
     if (data.password.length < 6) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -92,37 +92,56 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
     }
   };
 
+  React.useEffect(() => {
+    register("consentRgpd");
+    register("consentTutela");
+    register("consentMedical");
+    register("consentImage");
+  }, [register]);
+
   const renderConsentBox = (id: LegalItem, title: string, subtitle: string, error?: string, optional = false) => {
     const fieldName = getFieldId(id) as keyof RegistrationFormData;
     const isChecked = watch(fieldName) === true;
     
     return (
-      <div className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${isChecked ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'} ${error ? 'border-red-500 ring-1 ring-red-500' : ''}`}>
-        <div className="mt-1">
+      <div 
+        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
+          isChecked 
+            ? 'bg-green-50/60 border-green-300 shadow-xs' 
+            : 'bg-white border-gray-200 hover:border-blue-300'
+        } ${error ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : ''}`}
+      >
+        <div className="mt-0.5">
           <Checkbox 
+            id={fieldName}
             checked={isChecked}
             onCheckedChange={(checked) => {
               if (legalRead[id]) {
-                setValue(fieldName, checked === true, { shouldValidate: true });
+                setValue(fieldName, checked === true, { shouldValidate: true, shouldDirty: true });
+              } else {
+                setActiveLegalModal(id);
               }
             }}
-            disabled={!legalRead[id]}
-            className="checked:bg-green-600 checked:border-green-600 disabled:opacity-50 cursor-pointer" 
+            className="checked:bg-green-600 checked:border-green-600 cursor-pointer" 
           />
-          {/* Hidden inputs to register with RHF */}
-          <input type="hidden" {...register(fieldName)} />
         </div>
         <div className="space-y-1 w-full">
-          <p className="text-sm font-bold text-gray-900 flex flex-wrap items-center gap-2">
-            <span>{title} {!optional && <span className="text-red-500">*</span>}</span>
+          <div className="text-sm font-bold text-gray-900 flex flex-wrap items-center justify-between gap-2">
+            <label htmlFor={fieldName} className="cursor-pointer">
+              {title} {!optional && <span className="text-red-500">*</span>}
+            </label>
             {!legalRead[id] && (
-              <button type="button" onClick={() => setActiveLegalModal(id)} className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors">
-                Leer documento
+              <button 
+                type="button" 
+                onClick={() => setActiveLegalModal(id)} 
+                className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors"
+              >
+                📖 Leer y Aceptar
               </button>
             )}
-          </p>
+          </div>
           <p className="text-xs text-gray-500">{subtitle}</p>
-          {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+          {error && <p className="text-xs text-red-600 font-semibold mt-1">{error}</p>}
         </div>
       </div>
     );

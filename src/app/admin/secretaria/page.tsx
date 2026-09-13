@@ -38,21 +38,27 @@ export default function DocumentManagementPage() {
   const fetchPlayersAndTeams = async () => {
     const supabase = createClient();
     try {
-      const { data, error } = await supabase
-        .from('players')
-        .select(`
-          id, 
-          first_name, 
-          last_name, 
-          status,
-          teams (id, name)
-        `)
-        .neq('status', 'inactive')
-        .order('first_name', { ascending: true });
+      const [playersRes, teamsRes] = await Promise.all([
+        supabase
+          .from('players')
+          .select(`
+            id, 
+            first_name, 
+            last_name, 
+            status,
+            teams (id, name)
+          `)
+          .neq('status', 'inactive')
+          .order('first_name', { ascending: true }),
+        supabase
+          .from('teams')
+          .select('id, name')
+          .order('name', { ascending: true })
+      ]);
 
-      if (error) throw error;
+      if (playersRes.error) throw playersRes.error;
       
-      const parsedPlayers = (data || []).map(p => {
+      const parsedPlayers = (playersRes.data || []).map(p => {
         const teamObj = Array.isArray(p.teams) ? p.teams[0] : p.teams;
         return {
           ...p,
@@ -64,13 +70,17 @@ export default function DocumentManagementPage() {
 
       setPlayers(parsedPlayers);
 
-      const uniqueTeams = new Map<string, string>();
-      parsedPlayers.forEach(p => {
-        if (p.team_id !== 'none' && p.team_name) {
-          uniqueTeams.set(p.team_id, p.team_name);
-        }
-      });
-      setTeams(Array.from(uniqueTeams.entries()).map(([id, name]) => ({ id, name })));
+      if (teamsRes.data && teamsRes.data.length > 0) {
+        setTeams(teamsRes.data);
+      } else {
+        const uniqueTeams = new Map<string, string>();
+        parsedPlayers.forEach(p => {
+          if (p.team_id !== 'none' && p.team_name) {
+            uniqueTeams.set(p.team_id, p.team_name);
+          }
+        });
+        setTeams(Array.from(uniqueTeams.entries()).map(([id, name]) => ({ id, name })));
+      }
 
     } catch (error) {
       console.error(error);
@@ -277,10 +287,47 @@ export default function DocumentManagementPage() {
         `}>
           {selectedPlayer ? (
             <Card className="w-full max-w-4xl h-full max-h-[90vh] lg:max-h-full shadow-2xl lg:shadow-sm border border-gray-200 flex flex-col overflow-hidden animate-in zoom-in-95 lg:animate-none">
-              <div className="p-4 md:p-6 border-b flex justify-between items-center bg-white shrink-0">
-                <div className="overflow-hidden pr-4">
+              <div className="p-4 md:p-6 border-b flex flex-wrap justify-between items-center gap-3 bg-white shrink-0">
+                <div className="overflow-hidden pr-2">
                   <h2 className="text-xl font-bold text-gray-900 truncate">{selectedPlayer.first_name} {selectedPlayer.last_name}</h2>
-                  <p className="text-sm text-gray-500 truncate">{selectedPlayer.team_name}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-semibold text-slate-500">Equipo asignado:</span>
+                    <select
+                      value={selectedPlayer.team_id && selectedPlayer.team_id !== 'none' ? selectedPlayer.team_id : ''}
+                      onChange={async (e) => {
+                        const newTeamId = e.target.value;
+                        const newTeamName = teams.find(t => t.id === newTeamId)?.name || 'Sin equipo';
+                        const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
+                        const toastId = toast.loading("Asignando equipo...");
+                        const res = await assignPlayerToTeamAction(selectedPlayer.id, newTeamId);
+                        if (res.success) {
+                          toast.success("Equipo asignado correctamente", { id: toastId });
+                          setSelectedPlayer({
+                            ...selectedPlayer,
+                            team_id: newTeamId || 'none',
+                            team_name: newTeamName
+                          });
+                          setPlayers(prev => prev.map(p => p.id === selectedPlayer.id ? {
+                            ...p,
+                            team_id: newTeamId || 'none',
+                            team_name: newTeamName
+                          } : p));
+                        } else {
+                          toast.error("Error al asignar equipo", { id: toastId });
+                        }
+                      }}
+                      className={`text-xs border rounded-lg px-2.5 py-1 font-semibold outline-none transition-colors shadow-sm cursor-pointer ${
+                        selectedPlayer.team_id && selectedPlayer.team_id !== 'none'
+                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                          : 'bg-red-50 border-red-200 text-red-700'
+                      }`}
+                    >
+                      <option value="">⚠️ Sin equipo (Asignar...)</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>⚽ {t.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setSelectedPlayer(null)} className="shrink-0 rounded-full w-10 h-10 p-0 flex items-center justify-center">
                   <X className="w-5 h-5" />

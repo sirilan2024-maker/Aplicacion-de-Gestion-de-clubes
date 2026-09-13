@@ -36,8 +36,9 @@ interface PlayerRequest {
   created_at: string
   is_foreign: boolean
   never_federated: boolean
+  team_id?: string | null
   player_documents: DocumentInfo[]
-  teams: { name: string; category: string } | null
+  teams: { id?: string; name: string; category?: string } | null
 }
 
 // Documentos obligatorios mínimos para tramitar la ficha
@@ -318,6 +319,7 @@ export function SecretariaInscripciones() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>(() => getInitialStatus(rawStatus))
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRequest | null>(null)
+  const [allTeams, setAllTeams] = useState<{ id: string; name: string; category?: string }[]>([])
 
   useEffect(() => {
     if (rawStatus) {
@@ -335,24 +337,35 @@ export function SecretariaInscripciones() {
     const { data: profile } = await supabase.from("profiles").select("role, club_id").eq("id", authData.user.id).single()
     if (!profile || !["admin", "secretaria"].includes(profile.role)) { setLoading(false); return }
 
-    const { data, error } = await supabase
-      .from("players")
-      .select(`
-        id, first_name, last_name, birth_date, dni, posicion_principal,
-        parent1_name, parent1_phone, parent1_email, payment_method, payment_plan,
-        registration_status, created_at, is_foreign, never_federated,
-        player_documents(document_type, file_url, status),
-        teams(name, category)
-      `)
-      .eq("club_id", profile.club_id)
-      .in("registration_status", ["pending_revision", "pending_payment", "formalized", "rejected"])
-      .order("created_at", { ascending: false })
+    const [playersRes, teamsRes] = await Promise.all([
+      supabase
+        .from("players")
+        .select(`
+          id, first_name, last_name, team_id, birth_date, dni, posicion_principal,
+          parent1_name, parent1_phone, parent1_email, payment_method, payment_plan,
+          registration_status, created_at, is_foreign, never_federated,
+          player_documents(document_type, file_url, status),
+          teams(id, name, category)
+        `)
+        .eq("club_id", profile.club_id)
+        .in("registration_status", ["pending_revision", "pending_payment", "formalized", "rejected"])
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("teams")
+        .select("id, name, category")
+        .eq("club_id", profile.club_id)
+        .order("name", { ascending: true })
+    ])
 
-    if (error) {
-      console.error("Error fetching inscriptions:", error)
+    if (teamsRes.data) {
+      setAllTeams(teamsRes.data)
+    }
+
+    if (playersRes.error) {
+      console.error("Error fetching inscriptions:", playersRes.error)
       toast.error("Error al cargar inscripciones")
-    } else if (data) {
-      setRequests(data as any)
+    } else if (playersRes.data) {
+      setRequests(playersRes.data as any)
     }
     setLoading(false)
   }, [])
@@ -500,9 +513,35 @@ export function SecretariaInscripciones() {
                       <div className="text-xs text-slate-400 mt-0.5">{req.parent1_phone || req.parent1_email || "–"}</div>
                     </td>
                     <td className="px-4 py-3">
-                      {req.teams
-                        ? <span className="text-xs font-semibold text-slate-700">{req.teams.name} <span className="text-slate-400">({req.teams.category})</span></span>
-                        : <span className="text-xs text-slate-400">Sin equipo</span>}
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        value={req.team_id || (req.teams as any)?.id || ""}
+                        onChange={async (e) => {
+                          e.stopPropagation()
+                          const newTeamId = e.target.value
+                          const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions")
+                          const toastId = toast.loading("Asignando equipo...")
+                          const res = await assignPlayerToTeamAction(req.id, newTeamId)
+                          if (res.success) {
+                            toast.success("Equipo asignado", { id: toastId })
+                            fetchRequests()
+                          } else {
+                            toast.error("Error al asignar equipo", { id: toastId })
+                          }
+                        }}
+                        className={`text-xs border rounded-lg px-2.5 py-1.5 font-medium outline-none transition-colors shadow-sm cursor-pointer ${
+                          req.teams || req.team_id 
+                            ? "bg-blue-50/80 border-blue-200 text-blue-800 font-semibold hover:bg-blue-100" 
+                            : "bg-red-50 border-red-200 text-red-700 font-bold hover:bg-red-100"
+                        }`}
+                      >
+                        <option value="">⚠️ Sin equipo (Asignar...)</option>
+                        {allTeams.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            ⚽ {t.name} {t.category ? `(${t.category})` : ""}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3">
                       <DocTrafficLight docs={req.player_documents} />

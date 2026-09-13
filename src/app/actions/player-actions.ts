@@ -577,6 +577,8 @@ export async function assignPlayerToTeamAction(playerId: string, teamId: string)
     }
 
     revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/admin/secretaria');
+    revalidatePath('/admin');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: { message: err.message } };

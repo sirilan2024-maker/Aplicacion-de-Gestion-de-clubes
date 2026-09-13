@@ -435,21 +435,55 @@ export async function POST(request: Request) {
     if (player && !isSenior) {
       try {
         if (isE2EAuthorized) {
-          // En modo E2E autorizado: crear exactamente UNA única cuota de prueba de 1,00 € (100 céntimos)
           const currentYear = new Date().getFullYear();
           const e2ePaymentRef = `PAY-${currentYear}-${player.id.substring(0, 8).toUpperCase()}`;
-          await supabaseAdmin.from('fees').insert({
-            player_id: player.id,
-            profile_id: authUserId || null,
-            club_id: clubId,
-            concept: `Cuota Temporada (E2E Test) – 1.00 €`,
-            amount_cents: 100,
-            amount_paid_cents: 0,
-            currency: 'eur',
-            estado: 'pendiente',
-            tipo_cargo: 'one_time',
-            payment_reference: e2ePaymentRef,
-          });
+
+          if (paymentPlan === 'Fraccionado') {
+            // Plazo 1/2 (Inscripción inmediata - 1.00 €)
+            await supabaseAdmin.from('fees').insert({
+              player_id: player.id,
+              profile_id: authUserId || null,
+              club_id: clubId,
+              concept: `Cuota Temporada Fraccionada 1/2 (E2E Test) – 1.00 €`,
+              amount_cents: 100,
+              amount_paid_cents: 0,
+              currency: 'eur',
+              estado: 'pendiente',
+              tipo_cargo: 'one_time',
+              payment_reference: `${e2ePaymentRef}-1`,
+              fecha_pago: new Date().toISOString(),
+            });
+
+            // Plazo 2/2 (Segundo plazo diferido - 1.00 €)
+            const dueIn60Days = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+            await supabaseAdmin.from('fees').insert({
+              player_id: player.id,
+              profile_id: authUserId || null,
+              club_id: clubId,
+              concept: `Cuota Temporada Fraccionada 2/2 (E2E Test) – 1.00 €`,
+              amount_cents: 100,
+              amount_paid_cents: 0,
+              currency: 'eur',
+              estado: 'pendiente',
+              tipo_cargo: 'one_time',
+              payment_reference: `${e2ePaymentRef}-2`,
+              fecha_pago: dueIn60Days,
+            });
+          } else {
+            // Pago único E2E (1.00 €)
+            await supabaseAdmin.from('fees').insert({
+              player_id: player.id,
+              profile_id: authUserId || null,
+              club_id: clubId,
+              concept: `Cuota Temporada (E2E Test) – 1.00 €`,
+              amount_cents: 100,
+              amount_paid_cents: 0,
+              currency: 'eur',
+              estado: 'pendiente',
+              tipo_cargo: 'one_time',
+              payment_reference: e2ePaymentRef,
+            });
+          }
         } else {
           await createAdminFeeForPlayerAction(player.id, formData.wasInClub || false);
         }
@@ -545,7 +579,7 @@ export async function POST(request: Request) {
               ? 'CUOTA INSCRIPCIÓN E2E TEST (1.00 €) - CLUB SPORTING SALADAR'
               : 'CUOTA INSCRIPCIÓN TEMPORADA 26/27 - CLUB SPORTING SALADAR',
             payment_method_types: ['card'],
-            setup_future_usage: isFraccionado && !isE2EAuthorized ? 'off_session' : undefined,
+            setup_future_usage: isFraccionado ? 'off_session' : undefined,
             metadata: intentMetadata,
             receipt_email: deliveryEmailRecipient || undefined,
           });

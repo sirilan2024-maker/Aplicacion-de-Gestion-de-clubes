@@ -1,5 +1,36 @@
 import * as z from "zod";
 
+// Configuración global de Zod en Español para eliminar cualquier mensaje genérico 'Invalid input'
+z.setErrorMap((issue, ctx) => {
+  if (issue.code === z.ZodIssueCode.invalid_type) {
+    if (issue.received === 'undefined' || issue.received === 'null') {
+      return { message: 'Este campo es obligatorio' };
+    }
+    return { message: 'Por favor, introduce un dato válido' };
+  }
+  if (issue.code === z.ZodIssueCode.custom) {
+    if (!issue.message || issue.message === 'Invalid input') {
+      return { message: 'Por favor, completa este campo obligatorio' };
+    }
+    return { message: issue.message };
+  }
+  if (issue.code === z.ZodIssueCode.invalid_string) {
+    if (issue.validation === 'email') return { message: 'Introduce un correo electrónico válido' };
+    if (issue.validation === 'url') return { message: 'Introduce una URL válida' };
+    return { message: 'Formato no válido' };
+  }
+  if (issue.code === z.ZodIssueCode.too_small) {
+    return { message: `Debe tener al menos ${issue.minimum} caracteres` };
+  }
+  if (issue.code === z.ZodIssueCode.too_big) {
+    return { message: `Debe tener como máximo ${issue.maximum} caracteres` };
+  }
+  if (ctx.defaultError === 'Invalid input') {
+    return { message: 'Por favor, completa este campo obligatorio' };
+  }
+  return { message: ctx.defaultError };
+});
+
 const isValidDniNie = (value: string) => {
   if (!value) return true; // Si es opcional o vacío, no validar aquí (se encarga el required)
   const dniNie = value.toUpperCase().replace(/[-_ ]/g, '');

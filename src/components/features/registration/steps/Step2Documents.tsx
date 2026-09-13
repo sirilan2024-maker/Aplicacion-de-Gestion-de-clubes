@@ -113,34 +113,72 @@ export function Step2Documents() {
     }
   };
 
+  const removeUploadedFile = (label: string) => {
+    const currentFiles = getValues("uploadedFiles") || [];
+    const updatedFiles = currentFiles.filter(f => f.label !== label);
+    setValue("uploadedFiles", updatedFiles);
+    if (updatedFiles.length === 0) {
+      setValue("docsUploaded", false);
+    }
+  };
+
   const FileUploadField = ({ label, description, className = "", isOptional = false }: { label: string, description?: string, className?: string, isOptional?: boolean }) => {
     const isUploaded = uploadedFiles.some(f => f.label === label);
 
     return (
-      <div className={`border ${isUploaded ? 'border-green-400 bg-green-50/30' : 'border-dashed border-gray-300 bg-gray-50'} rounded-lg p-4 flex flex-col items-center justify-center transition-colors relative group overflow-hidden ${className}`}>
+      <div className={`border-2 transition-all rounded-xl p-4 flex flex-col items-center justify-center relative group overflow-hidden ${
+        isUploaded 
+          ? 'border-emerald-500 bg-emerald-50/50 shadow-sm' 
+          : 'border-dashed border-gray-300 bg-gray-50/80 hover:bg-gray-50 hover:border-blue-400'
+      } ${className}`}>
+        
+        {/* Leyenda y Badge de Archivo Ya Subido */}
         {isUploaded && (
-          <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-300">
-            <CheckCircle className="w-3 h-3 text-green-600" />
-            Cargado
+          <div className="w-full bg-emerald-100/80 text-emerald-800 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-emerald-300 mb-2 flex items-center justify-between shadow-xs animate-in fade-in">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Archivo ya subido</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => removeUploadedFile(label)}
+              className="text-emerald-700 hover:text-red-600 hover:bg-white/80 p-0.5 rounded transition-colors"
+              title="Eliminar archivo"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
           </div>
         )}
+
         {isCompressing ? (
-          <div className="text-blue-500 font-semibold text-sm flex flex-col items-center gap-2">
-            <span className="animate-pulse">Comprimiendo...</span>
+          <div className="text-blue-500 font-semibold text-sm flex flex-col items-center gap-2 py-4">
+            <span className="animate-pulse">Comprimiendo y procesando...</span>
           </div>
         ) : (
           <>
-            <UploadCloud className={`w-8 h-8 ${isUploaded ? 'text-green-500' : 'text-blue-400'} mb-2 group-hover:scale-110 transition-transform`} />
-            <div className="flex items-center gap-1.5 justify-center">
-              <span className="text-sm font-semibold text-gray-700 text-center leading-tight">{label}</span>
+            <UploadCloud className={`w-8 h-8 ${isUploaded ? 'text-emerald-600' : 'text-blue-500'} mb-1.5 group-hover:scale-105 transition-transform`} />
+            <div className="flex items-center gap-1.5 justify-center flex-wrap text-center">
+              <span className={`text-sm font-bold leading-tight ${isUploaded ? 'text-emerald-950' : 'text-gray-800'}`}>{label}</span>
               {isOptional && (
-                <span className="text-[10px] bg-gray-200 text-gray-600 font-medium px-1.5 py-0.2 rounded">Opcional</span>
+                <span className="text-[10px] bg-gray-200 text-gray-700 font-medium px-1.5 py-0.5 rounded">Opcional</span>
               )}
             </div>
-            {description && <span className="text-xs text-gray-500 text-center mt-1 mb-2 leading-tight">{description}</span>}
-            <div className="flex gap-2 mt-4 w-full">
-              <div className="relative flex-1 bg-white border border-gray-300 rounded-md text-center py-2 text-xs font-semibold hover:bg-gray-100 cursor-pointer shadow-sm overflow-hidden">
-                📁 Archivo
+            
+            {description && (
+              <span className="text-xs text-gray-500 text-center mt-1 mb-2 leading-tight">
+                {description}
+              </span>
+            )}
+
+            {isUploaded && (
+              <span className="text-[11px] text-emerald-700 font-medium text-center mb-2">
+                Documento listo. Puedes cambiarlo pulsando abajo si te equivocaste:
+              </span>
+            )}
+
+            <div className="flex gap-2 mt-2 w-full">
+              <div className={`relative flex-1 ${isUploaded ? 'bg-white text-gray-700 border-emerald-300 hover:bg-emerald-50' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'} border rounded-lg text-center py-2 text-xs font-semibold cursor-pointer shadow-xs transition-colors overflow-hidden`}>
+                {isUploaded ? '📁 Cambiar archivo' : '📁 Subir Archivo'}
                 <input 
                   type="file" 
                   onChange={(e) => handleFileChange(e, label)}
@@ -148,8 +186,8 @@ export function Step2Documents() {
                   accept="image/*,.pdf" 
                 />
               </div>
-              <div className="relative flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-center py-2 text-xs font-semibold hover:bg-blue-100 cursor-pointer shadow-sm overflow-hidden">
-                📷 Foto
+              <div className={`relative flex-1 ${isUploaded ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'} border rounded-lg text-center py-2 text-xs font-semibold cursor-pointer shadow-xs transition-colors overflow-hidden`}>
+                {isUploaded ? '📷 Repetir foto' : '📷 Hacer Foto'}
                 <input 
                   type="file" 
                   onChange={(e) => handleFileChange(e, label)}

@@ -221,12 +221,19 @@ export function StripePaymentModal({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-        onClick={() => !isProcessing && onClose()}
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isProcessing && !isLoading) {
+            onClose();
+          }
+        }}
         aria-hidden="true"
       />
 
       {/* Modal Container con diseño 2 columnas estilo Stripe Checkout */}
-      <div className="relative z-50 w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 my-auto">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-50 w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 my-auto"
+      >
         
         {/* Botón cerrar flotante */}
         <button

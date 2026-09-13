@@ -288,6 +288,26 @@ export function RegistrationWizard({
 
               return (
                 <>
+                  {submittedData.paymentMethod === "Stripe" && paymentStatus !== "done" && stripeClientSecret && (
+                    <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl text-left space-y-3 mt-6 shadow-sm">
+                      <div className="flex items-center gap-2 text-blue-900 font-bold text-base">
+                        <CreditCard className="w-5 h-5 text-blue-600" />
+                        Abono de Cuota con Tarjeta / Apple Pay / Google Pay
+                      </div>
+                      <p className="text-sm text-blue-800">
+                        La inscripción ha sido registrada. Puedes completar el abono seguro de la cuota ({stripeAmountFormatted || formattedChargeAmount}) ahora mismo pulsando en el botón siguiente:
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => setStripeModalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-2 w-full sm:w-auto shadow-md"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Pagar Cuota Online ({stripeAmountFormatted || formattedChargeAmount})
+                      </Button>
+                    </div>
+                  )}
+
                   {(submittedData.paymentMethod === "Transferencia" || submittedData.paymentMethod === "Contado") && (
                     <div className="bg-blue-50 text-left p-6 md:p-8 rounded-xl border border-blue-100 mt-6 shadow-inner">
                       <h3 className="text-blue-900 text-xl font-bold mb-4 flex items-center gap-2">

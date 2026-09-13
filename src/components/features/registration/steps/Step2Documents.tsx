@@ -13,6 +13,7 @@ export function Step2Documents() {
   const isForeign = useWatch({ control, name: "isForeign" });
   const neverFederated = useWatch({ control, name: "neverFederated" });
   const birthDate = useWatch({ control, name: "birthDate" });
+  const uploadedFiles = useWatch({ control, name: "uploadedFiles" }) || [];
   
   const isSenior = birthDate ? new Date(birthDate).getFullYear() <= 2007 : false;
 
@@ -112,42 +113,57 @@ export function Step2Documents() {
     }
   };
 
-  const FileUploadField = ({ label, description, className = "" }: { label: string, description?: string, className?: string }) => (
-    <div className={`border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center bg-gray-50 transition-colors relative group overflow-hidden ${className}`}>
-      {isCompressing ? (
-        <div className="text-blue-500 font-semibold text-sm flex flex-col items-center gap-2">
-          <span className="animate-pulse">Comprimiendo...</span>
-        </div>
-      ) : (
-        <>
-          <UploadCloud className="w-8 h-8 text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
-          <span className="text-sm font-semibold text-gray-700 text-center leading-tight">{label}</span>
-          {description && <span className="text-xs text-gray-500 text-center mt-1 mb-2 leading-tight">{description}</span>}
-          <div className="flex gap-2 mt-4 w-full">
-            <div className="relative flex-1 bg-white border border-gray-300 rounded-md text-center py-2 text-xs font-semibold hover:bg-gray-100 cursor-pointer shadow-sm overflow-hidden">
-              📁 Archivo
-              <input 
-                type="file" 
-                onChange={(e) => handleFileChange(e, label)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                accept="image/*,.pdf" 
-              />
-            </div>
-            <div className="relative flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-center py-2 text-xs font-semibold hover:bg-blue-100 cursor-pointer shadow-sm overflow-hidden">
-              📷 Foto
-              <input 
-                type="file" 
-                onChange={(e) => handleFileChange(e, label)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                accept="image/*" 
-                capture="environment" 
-              />
-            </div>
+  const FileUploadField = ({ label, description, className = "", isOptional = false }: { label: string, description?: string, className?: string, isOptional?: boolean }) => {
+    const isUploaded = uploadedFiles.some(f => f.label === label);
+
+    return (
+      <div className={`border ${isUploaded ? 'border-green-400 bg-green-50/30' : 'border-dashed border-gray-300 bg-gray-50'} rounded-lg p-4 flex flex-col items-center justify-center transition-colors relative group overflow-hidden ${className}`}>
+        {isUploaded && (
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-300">
+            <CheckCircle className="w-3 h-3 text-green-600" />
+            Cargado
           </div>
-        </>
-      )}
-    </div>
-  );
+        )}
+        {isCompressing ? (
+          <div className="text-blue-500 font-semibold text-sm flex flex-col items-center gap-2">
+            <span className="animate-pulse">Comprimiendo...</span>
+          </div>
+        ) : (
+          <>
+            <UploadCloud className={`w-8 h-8 ${isUploaded ? 'text-green-500' : 'text-blue-400'} mb-2 group-hover:scale-110 transition-transform`} />
+            <div className="flex items-center gap-1.5 justify-center">
+              <span className="text-sm font-semibold text-gray-700 text-center leading-tight">{label}</span>
+              {isOptional && (
+                <span className="text-[10px] bg-gray-200 text-gray-600 font-medium px-1.5 py-0.2 rounded">Opcional</span>
+              )}
+            </div>
+            {description && <span className="text-xs text-gray-500 text-center mt-1 mb-2 leading-tight">{description}</span>}
+            <div className="flex gap-2 mt-4 w-full">
+              <div className="relative flex-1 bg-white border border-gray-300 rounded-md text-center py-2 text-xs font-semibold hover:bg-gray-100 cursor-pointer shadow-sm overflow-hidden">
+                📁 Archivo
+                <input 
+                  type="file" 
+                  onChange={(e) => handleFileChange(e, label)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                  accept="image/*,.pdf" 
+                />
+              </div>
+              <div className="relative flex-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-center py-2 text-xs font-semibold hover:bg-blue-100 cursor-pointer shadow-sm overflow-hidden">
+                📷 Foto
+                <input 
+                  type="file" 
+                  onChange={(e) => handleFileChange(e, label)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                  accept="image/*" 
+                  capture="environment" 
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -202,10 +218,16 @@ export function Step2Documents() {
         </div>
       )}
 
-      {/* Identificación */}
+      {/* 1. DOCUMENTACIÓN OBLIGATORIA */}
       <div className="space-y-4">
-        <h4 className="font-semibold text-gray-800 border-b pb-2">1. Identidad</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="border-b pb-2 flex items-center justify-between">
+          <h4 className="font-bold text-gray-900 flex items-center gap-2 text-base">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+            Documentación Obligatoria
+          </h4>
+          <span className="text-xs text-red-500 font-semibold">* Requerido para tramitar la ficha</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <FileUploadField label="DNI/NIE del Jugador (Anverso)" />
           <FileUploadField label="DNI/NIE del Jugador (Reverso)" />
           {!isSenior && (
@@ -214,33 +236,31 @@ export function Step2Documents() {
               <FileUploadField label="DNI/NIE del Tutor (Reverso)" />
             </>
           )}
+          <FileUploadField label="Foto Carnet" description="Fondo blanco, tipo carnet" />
+          <FileUploadField 
+            label="Libro de Familia" 
+            description="Si el menor no tiene DNI" 
+            className="border-amber-200 bg-amber-50/20"
+          />
         </div>
       </div>
 
-      {/* Fotografías (Obligatorias según instrucciones) */}
-      <div className="space-y-4">
-        <h4 className="font-semibold text-gray-800 border-b pb-2">2. Fotografías Deportivas</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <FileUploadField label="Foto Carnet" description="Fondo blanco" />
-          <FileUploadField label="Foto Medio Cuerpo" description="Con equipación o ropa deportiva" />
-          <FileUploadField label="Foto Cuerpo Entero" description="De pie, actitud deportiva" />
-          <FileUploadField label="Foto Horizontal Alta Calidad" description="Para grafismos y RRSS" />
-        </div>
-      </div>
-
-      {/* Condiciones FFCV */}
+      {/* 2. EXPEDIENTE ESPECIAL FFCV */}
       <div className="space-y-4 bg-blue-50/50 p-5 rounded-xl border border-blue-100">
-        <h4 className="font-semibold text-blue-900 mb-3">Expediente Especial FFCV</h4>
-        <p className="text-sm text-blue-800 mb-4">La Federación exige documentación extra en ciertos casos. Marca si cumples alguna condición:</p>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold">2</span>
+          <h4 className="font-bold text-blue-900 text-base">Expediente Especial FFCV</h4>
+        </div>
+        <p className="text-sm text-blue-800 mb-3">La Federación exige documentación extra en ciertos casos. Marca si cumples alguna condición:</p>
         
         <div className="flex flex-col gap-3">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-blue-100">
             <Checkbox id="isForeign" checked={isForeign} onCheckedChange={(val) => register("isForeign").onChange({ target: { value: val, name: "isForeign" } })} />
             <label htmlFor="isForeign" className="text-sm font-medium text-gray-700 cursor-pointer">
               El jugador tiene nacionalidad Extranjera
             </label>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-blue-100">
             <Checkbox id="neverFederated" checked={neverFederated} onCheckedChange={(val) => register("neverFederated").onChange({ target: { value: val, name: "neverFederated" } })} />
             <label htmlFor="neverFederated" className="text-sm font-medium text-gray-700 cursor-pointer">
               El jugador nunca ha estado federado
@@ -405,6 +425,34 @@ export function Step2Documents() {
           </div>
         </div>
       )}
+
+      {/* 3. DOCUMENTACIÓN OPCIONAL */}
+      <div className="space-y-4">
+        <div className="border-b pb-2 flex items-center justify-between">
+          <h4 className="font-bold text-gray-900 flex items-center gap-2 text-base">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-600 text-white text-xs font-bold">3</span>
+            Documentación Opcional
+          </h4>
+          <span className="text-xs text-gray-500">Puedes adjuntarla ahora o aportarla más adelante</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <FileUploadField 
+            label="Foto Medio Cuerpo" 
+            description="Con equipación o ropa deportiva" 
+            isOptional={true} 
+          />
+          <FileUploadField 
+            label="Certificado de Empadronamiento" 
+            description="Histórico / familiar o volante de residencia" 
+            isOptional={true} 
+          />
+          <FileUploadField 
+            label="Pasaporte" 
+            description="Pasaporte en vigor (jugador/tutor)" 
+            isOptional={true} 
+          />
+        </div>
+      </div>
     </div>
   );
 }

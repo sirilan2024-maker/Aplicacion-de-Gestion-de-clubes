@@ -719,17 +719,24 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                           >
                             {/* 1. Equipo */}
                             <td className="py-2.5 px-2 sm:px-3 whitespace-nowrap">
-                              <span className="font-black text-slate-900 text-xs sm:text-[13px] group-hover:text-indigo-600 transition-colors">
-                                {team.teamName}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-black text-slate-900 text-xs sm:text-[13px] group-hover:text-indigo-600 transition-colors">
+                                  {team.teamName}
+                                </span>
+                                {team.teamCategory && team.teamCategory !== 'General' && team.teamCategory !== 'Federado' && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                    {team.teamCategory}
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
                             {/* 2. Competición / Grupo */}
                             <td className="py-2.5 px-2">
-                              <span className="text-[11px] sm:text-xs text-slate-600 font-medium truncate block max-w-[150px] xl:max-w-[200px]" title={team.competitionName && team.competitionName !== 'No federado' ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}` : "Liga Brave"}>
+                              <span className="text-[11px] sm:text-xs text-slate-600 font-medium truncate block max-w-[150px] xl:max-w-[200px]" title={team.competitionName && team.competitionName !== 'No federado' ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}` : (team.groupName ? `Liga Brave · ${team.groupName}` : "Liga Brave")}>
                                 {team.competitionName && team.competitionName !== 'No federado'
                                   ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
-                                  : "Liga Brave"}
+                                  : (team.groupName ? `Liga Brave · ${team.groupName}` : "Liga Brave")}
                               </span>
                             </td>
 
@@ -837,13 +844,20 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                         <div>
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <h4 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
-                                {team.teamName}
-                              </h4>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="font-black text-slate-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
+                                  {team.teamName}
+                                </h4>
+                                {team.teamCategory && team.teamCategory !== 'General' && team.teamCategory !== 'Federado' && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                    {team.teamCategory}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
                                 {team.competitionName && team.competitionName !== 'No federado'
                                   ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
-                                  : "Liga Brave"}
+                                  : (team.groupName ? `Liga Brave · ${team.groupName}` : "Liga Brave")}
                               </p>
                             </div>
                             {team.currentPosition ? (
@@ -925,11 +939,16 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                         <h4 className="text-base font-black text-slate-900 tracking-tight">
                           {team.teamName}
                         </h4>
+                        {team.teamCategory && team.teamCategory !== 'General' && team.teamCategory !== 'Federado' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                            {team.teamCategory}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5 font-medium">
                         {team.competitionName && team.competitionName !== 'No federado'
                           ? `${team.competitionName}${team.groupName ? ` · ${team.groupName}` : ''}`
-                          : "Liga Brave"}
+                          : (team.groupName ? `Liga Brave · ${team.groupName}` : "Liga Brave")}
                       </p>
                     </div>
 

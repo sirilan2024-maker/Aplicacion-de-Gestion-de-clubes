@@ -928,9 +928,9 @@ export async function getExecutiveDashboardAction(): Promise<{
       teamStats.push({
         teamId: team.id,
         teamName: team.name,
-        teamCategory: isLigaBrave ? 'Liga Brave' : 'No federado',
+        teamCategory: team.category || (isLigaBrave ? 'Infantil' : 'No federado'),
         competitionName: isLigaBrave ? 'Liga Brave' : 'No federado',
-        groupName: '',
+        groupName: isLigaBrave ? 'Grupo Formativo' : '',
         currentPosition: undefined,
         totalTeamsInGroup: undefined,
         matchesPlayed: 0,

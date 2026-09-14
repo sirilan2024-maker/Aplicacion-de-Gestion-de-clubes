@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle, Trash2, Unlock, Users } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { closeSeason, reopenSeason } from "@/app/actions/season-actions";
+import { closeSeason, reopenSeason, startNewSeason } from "@/app/actions/season-actions";
 
 interface Season {
   id: string;
@@ -24,10 +24,19 @@ export default function TemporadasPage() {
 
   // Modal de creación
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newStart, setNewStart] = useState("");
-  const [newEnd, setNewEnd] = useState("");
+  const [newName, setNewName] = useState("TEMPORADA 26/27");
+  const [newStart, setNewStart] = useState("2026-08-01");
+  const [newEnd, setNewEnd] = useState("2027-06-30");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const openCreateModal = () => {
+    setNewName("TEMPORADA 26/27");
+    setNewStart("2026-08-01");
+    setNewEnd("2027-06-30");
+    setFormError(null);
+    setShowCreate(true);
+  };
 
   useEffect(() => {
     fetchData();
@@ -64,33 +73,39 @@ export default function TemporadasPage() {
 
   const handleCreateSeason = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clubId || !newName || !newStart || !newEnd) return;
+    if (!newName.trim() || !newStart || !newEnd) return;
+
+    const confirmMsg =
+      `¿Confirmas la creación de "${newName.trim()}"?\n\n` +
+      `• La temporada actual quedará archivada.\n` +
+      `• "${newName.trim()}" pasará a ser la nueva temporada activa.\n` +
+      `• Empezará limpia, sin equipos ni jugadores asignados.`;
+
+    if (!confirm(confirmMsg)) return;
+
     setIsSubmitting(true);
-    
-    const supabase = createClient();
-    
-    // Si es la primera temporada que se crea, la ponemos como activa por defecto
-    const isActive = seasons.length === 0;
+    setFormError(null);
 
-    const { error } = await supabase.from('seasons').insert({
-      club_id: clubId,
-      name: newName,
-      start_date: newStart,
-      end_date: newEnd,
-      is_active: isActive
-    });
+    try {
+      await startNewSeason({
+        name: newName.trim(),
+        start_date: newStart,
+        end_date: newEnd,
+      });
 
-    if (error) {
-      toast.error("Error al crear temporada: " + error.message);
-    } else {
       toast.success("Temporada creada exitosamente");
       setShowCreate(false);
-      setNewName("");
-      setNewStart("");
-      setNewEnd("");
+      setNewName("TEMPORADA 26/27");
+      setNewStart("2026-08-01");
+      setNewEnd("2027-06-30");
       fetchData();
+    } catch (err: any) {
+      const msg = err?.message || "Error al crear la temporada";
+      setFormError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleCloseSeason = async (season: Season) => {
@@ -172,7 +187,7 @@ export default function TemporadasPage() {
             <span className="sm:hidden">Asistente</span>
           </button>
           <button 
-            onClick={() => router.push('/admin/temporadas/nueva')}
+            onClick={openCreateModal}
             className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors shadow-sm shadow-green-600/20"
           >
             <Plus size={16} />
@@ -195,7 +210,7 @@ export default function TemporadasPage() {
             Crea tu primera temporada para empezar a organizar los equipos y jugadores por año deportivo.
           </p>
           <button
-            onClick={() => setShowCreate(true)}
+            onClick={openCreateModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
           >
             <Plus size={18} />
@@ -335,13 +350,23 @@ export default function TemporadasPage() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3 mt-2">
+              {formError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg flex items-start gap-2">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-500" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex items-start gap-3 mt-2">
                 <div className="text-blue-600 mt-0.5">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
-                <p className="text-sm text-blue-800">
-                  Una vez creada la temporada, podrás asignar los equipos y jugadores que formarán parte de este año deportivo.
-                </p>
+                <div className="text-xs text-blue-900 space-y-1">
+                  <p className="font-semibold text-blue-950">Al crear la nueva temporada:</p>
+                  <p>• La temporada actual quedará archivada.</p>
+                  <p>• Esta será la nueva temporada activa del club.</p>
+                  <p>• Empezará sin equipos ni jugadores asignados (los datos anteriores no se modifican).</p>
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-3">

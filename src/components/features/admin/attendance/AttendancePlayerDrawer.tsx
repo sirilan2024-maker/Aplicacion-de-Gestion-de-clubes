@@ -6,15 +6,16 @@ import { AttendanceRecordDTO, getGlobalAttendanceAction } from "@/app/actions/at
 
 interface AttendancePlayerDrawerProps {
   playerId: string | null
+  seasonId?: string
   onClose: () => void
   records: AttendanceRecordDTO[]
 }
 
-export function AttendancePlayerDrawer({ playerId, onClose, records }: AttendancePlayerDrawerProps) {
+export function AttendancePlayerDrawer({ playerId, seasonId, onClose, records }: AttendancePlayerDrawerProps) {
   const [fullHistory, setFullHistory] = useState<AttendanceRecordDTO[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
 
-  // Cargar todo el histórico real del jugador independientemente del filtro de período activo
+  // Cargar todo el histórico real del jugador para la temporada seleccionada
   useEffect(() => {
     if (!playerId) {
       setFullHistory(null)
@@ -22,7 +23,7 @@ export function AttendancePlayerDrawer({ playerId, onClose, records }: Attendanc
     }
     let isMounted = true
     setLoadingHistory(true)
-    getGlobalAttendanceAction({ playerId })
+    getGlobalAttendanceAction({ playerId, seasonId })
       .then((res) => {
         if (isMounted && res.success && res.records) {
           setFullHistory(res.records)
@@ -34,7 +35,7 @@ export function AttendancePlayerDrawer({ playerId, onClose, records }: Attendanc
     return () => {
       isMounted = false
     }
-  }, [playerId])
+  }, [playerId, seasonId])
 
   // Filtrar registros reales de este jugador (priorizando el histórico completo del servidor)
   const playerRecords = useMemo(() => {

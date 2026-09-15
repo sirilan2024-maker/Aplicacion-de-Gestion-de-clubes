@@ -740,21 +740,26 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
 
     const { data: activeSeasonRow } = await seasonQuery.maybeSingle();
 
+    const resolvedSeasonId = targetSeasonId || activeSeasonRow?.id || '';
+
     const activeSeason = {
-      id: activeSeasonRow?.id || '',
+      id: resolvedSeasonId,
       name: activeSeasonRow?.name || 'Temporada 2026/27',
       isActive: activeSeasonRow?.is_active ?? true,
     };
 
-    // 3. Total active players (federados / activos en la temporada elegida)
-    let activePlayersCount = 0;
-    if (activeSeason.id) {
-      const { count: pshCount } = await adminClient
+    // Obtenemos los player_id pertenecientes a la temporada consultada
+    let seasonalPlayerIds: string[] = [];
+    if (resolvedSeasonId) {
+      const { data: pshRows } = await adminClient
         .from('player_season_history')
-        .select('id', { count: 'exact', head: true })
-        .eq('season_id', activeSeason.id);
-      activePlayersCount = pshCount || 0;
+        .select('player_id')
+        .eq('season_id', resolvedSeasonId);
+      seasonalPlayerIds = (pshRows || []).map(r => r.player_id).filter(Boolean);
     }
+
+    // 3. Total active players (federados / activos en la temporada elegida)
+    const activePlayersCount = seasonalPlayerIds.length;
 
     // 4. Equipos del club asignados a esta temporada
     let teamsQuery = adminClient
@@ -771,14 +776,18 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const federatedTeams = teams.filter(t => Boolean(t.ffcv_group_id));
     const activeTeamsCount = teams.filter(t => t.season_id === activeSeason.id).length;
 
-    // 5. Pending inscriptions in Secretaría (jugadores en estado de inscripción vinculados o creados en el marco de la temporada)
-    const { count: pendingInscCount } = await adminClient
-      .from('players')
-      .select('id', { count: 'exact', head: true })
-      .eq('club_id', clubId)
-      .in('registration_status', ['pending_revision', 'request_correction']);
+    // 5. Pending inscriptions in Secretaría (jugadores en estado de inscripción vinculados a la temporada)
+    let pendingInscriptionsCount = 0;
+    if (seasonalPlayerIds.length > 0) {
+      const { count: pendingInscCount } = await adminClient
+        .from('players')
+        .select('id', { count: 'exact', head: true })
+        .eq('club_id', clubId)
+        .in('id', seasonalPlayerIds)
+        .in('registration_status', ['pending_revision', 'request_correction']);
+      pendingInscriptionsCount = pendingInscCount || 0;
+    }
 
-    const pendingInscriptionsCount = pendingInscCount || 0;
     const unassignedFormalizedPlayersCount = 0;
     const singleUnassignedPlayerId = null;
 
@@ -999,29 +1008,55 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const topMinutes = null;
     const apercibidosCount = 0;
 
-    // 9. Enfermería y Lesiones Activas (Consulta real de jugadores activos con lesión)
-    const { data: rawInjuries } = await adminClient
-      .from('players')
-      .select('id, first_name, last_name, injury_description, team_id, teams:team_id(name)')
-      .eq('club_id', clubId)
-      .not('injury_description', 'is', null);
+    // 9. Enfermería y Lesiones Activas (filtradas por jugadores de la temporada consultada)
+    let activeInjuriesList: Array<{
+      id: string;
+      playerId: string;
+      playerName: string;
+      teamId: string | null;
+      teamName: string;
+      injuryType: string;
+      injuryDate: string;
+      status: 'active';
+    }> = [];
 
-    const activeInjuriesList = (rawInjuries || [])
-      .filter(p => Boolean(p.injury_description && p.injury_description.trim().length > 0))
-      .map(p => ({
-        id: p.id,
-        playerId: p.id,
-        playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-        teamId: p.team_id,
-        teamName: (p.teams as any)?.name || 'Equipo',
-        injuryType: p.injury_description || 'Molestia física',
-        injuryDate: new Date().toISOString(),
-        status: 'active' as const,
-      }));
+    if (seasonalPlayerIds.length > 0) {
+      const { data: rawInjuries } = await adminClient
+        .from('players')
+        .select('id, first_name, last_name, injury_description, team_id, teams:team_id(name)')
+        .eq('club_id', clubId)
+        .in('id', seasonalPlayerIds)
+        .not('injury_description', 'is', null);
+
+      activeInjuriesList = (rawInjuries || [])
+        .filter(p => Boolean(p.injury_description && p.injury_description.trim().length > 0))
+        .map(p => ({
+          id: p.id,
+          playerId: p.id,
+          playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+          teamId: p.team_id,
+          teamName: (p.teams as any)?.name || 'Equipo',
+          injuryType: p.injury_description || 'Molestia física',
+          injuryDate: new Date().toISOString(),
+          status: 'active' as const,
+        }));
+    }
     const activeInjuriesCount = activeInjuriesList.length;
 
-    // 10. Tasa de Asistencia
-    const attendanceRate = 85;
+    // 10. Tasa de Asistencia Dinámica por Temporada
+    let attendanceRate = 0;
+    if (seasonalPlayerIds.length > 0) {
+      const { data: attRows } = await adminClient
+        .from('attendance')
+        .select('status')
+        .in('player_id', seasonalPlayerIds);
+
+      const totalAtt = attRows?.length || 0;
+      if (totalAtt > 0) {
+        const presentes = attRows!.filter(r => (r.status || '').toLowerCase().trim() === 'presente' || (r.status || '').toLowerCase().trim() === 'present').length;
+        attendanceRate = Math.round((presentes / totalAtt) * 100);
+      }
+    }
 
     // 11. Upcoming matches (Agenda filtrada por equipos de la temporada consultada)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

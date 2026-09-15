@@ -102,14 +102,74 @@ export async function getGlobalAttendanceAction(
       name: t.name,
       category: t.category,
     }))
+
+    // Si se especificó una temporada y no tiene equipos, devolvemos 0 registros e indicadores inmediatamente
+    if (params?.seasonId && teams.length === 0) {
+      return {
+        success: true,
+        records: [],
+        teams: [],
+        kpis: {
+          totalRecords: 0,
+          uniquePlayers: 0,
+          totalTeams: 0,
+          presentes: 0,
+          ausentes: 0,
+          justificados: 0,
+          lesionados: 0,
+          retrasos: 0,
+          attendanceRate: 0,
+        },
+        isTruncated: false,
+        totalMatched: 0,
+      }
+    }
+
     const teamMap = new Map<string, { name: string; category: string }>()
     teams.forEach(t => teamMap.set(t.id, { name: t.name, category: t.category }))
 
-    // 2. Obtener jugadores del club
-    const { data: playersData, error: playersError } = await supabase
+    // 2. Obtener jugadores del club (filtrados por player_season_history si se especifica seasonId)
+    let seasonalPlayerIds: string[] | null = null
+    if (params?.seasonId) {
+      const { data: pshRows } = await supabase
+        .from('player_season_history')
+        .select('player_id')
+        .eq('season_id', params.seasonId)
+
+      seasonalPlayerIds = (pshRows || []).map(r => r.player_id).filter(Boolean)
+
+      if (seasonalPlayerIds.length === 0) {
+        return {
+          success: true,
+          records: [],
+          teams,
+          kpis: {
+            totalRecords: 0,
+            uniquePlayers: 0,
+            totalTeams: teams.length,
+            presentes: 0,
+            ausentes: 0,
+            justificados: 0,
+            lesionados: 0,
+            retrasos: 0,
+            attendanceRate: 0,
+          },
+          isTruncated: false,
+          totalMatched: 0,
+        }
+      }
+    }
+
+    let playersQuery = supabase
       .from('players')
       .select('id, first_name, last_name, dorsal, avatar_url, team_id')
       .eq('club_id', clubId)
+
+    if (seasonalPlayerIds && seasonalPlayerIds.length > 0) {
+      playersQuery = playersQuery.in('id', seasonalPlayerIds)
+    }
+
+    const { data: playersData, error: playersError } = await playersQuery
 
     if (playersError) {
       return { success: false, error: playersError.message }

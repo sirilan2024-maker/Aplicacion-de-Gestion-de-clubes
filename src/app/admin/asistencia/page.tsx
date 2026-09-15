@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertCircle
 } from "lucide-react"
+import { useSeason } from "@/components/providers/SeasonProvider"
 import {
   getGlobalAttendanceAction,
   AttendanceRecordDTO,
@@ -29,6 +30,7 @@ import { AttendanceSessionModal } from "@/components/features/admin/attendance/A
 type ViewMode = "days" | "matrix" | "teams" | "records"
 
 export default function AdminAsistenciaPage() {
+  const { selectedSeasonId } = useSeason()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [records, setRecords] = useState<AttendanceRecordDTO[]>([])
@@ -114,6 +116,7 @@ export default function AdminAsistenciaPage() {
     try {
       const dateRange = getDateRangeForPeriod(period, viewMode, matrixMonth)
       const res = await getGlobalAttendanceAction({
+        seasonId: selectedSeasonId || undefined,
         teamId: selectedTeam !== "todos" ? selectedTeam : undefined,
         startDate: dateRange.start,
         endDate: dateRange.end,
@@ -131,7 +134,7 @@ export default function AdminAsistenciaPage() {
     } finally {
       setLoading(false)
     }
-  }, [period, viewMode, matrixMonth, selectedTeam, activityType, getDateRangeForPeriod])
+  }, [selectedSeasonId, period, viewMode, matrixMonth, selectedTeam, activityType, getDateRangeForPeriod])
 
   // Cargar datos al montar y cuando cambien los filtros de servidor
   useEffect(() => {
@@ -400,6 +403,7 @@ export default function AdminAsistenciaPage() {
       {/* 6. FICHA INDIVIDUAL DEL JUGADOR (DRAWER / SHEET RESPONSIVE) */}
       <AttendancePlayerDrawer
         playerId={selectedPlayerId}
+        seasonId={selectedSeasonId || undefined}
         onClose={() => setSelectedPlayerId(null)}
         records={records}
       />

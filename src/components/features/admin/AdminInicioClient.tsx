@@ -37,9 +37,13 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   const [teamViewMode, setTeamViewMode] = useState<"table" | "cards">("table");
   const [showInjuriesModal, setShowInjuriesModal] = useState(false);
 
+  const isSeasonMismatch = Boolean(selectedSeasonId && data?.activeSeason?.id && selectedSeasonId !== data.activeSeason.id);
+
   React.useEffect(() => {
     if (selectedSeasonId) {
-      handleRefresh(selectedSeasonId);
+      if (!data || data.activeSeason?.id !== selectedSeasonId) {
+        handleRefresh(selectedSeasonId);
+      }
     }
   }, [selectedSeasonId]);
 
@@ -60,6 +64,15 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
       setRefreshing(false);
     }
   };
+
+  if (isSeasonMismatch && refreshing) {
+    return (
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="text-sm font-bold text-slate-600">Cargando información de la temporada seleccionada...</p>
+      </div>
+    );
+  }
 
   if (error || !data) {
     return (
@@ -497,8 +510,9 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
               {(() => {
-                const ffcvCount = sports.teamStats.filter(t => t.competitionName && t.competitionName !== 'No federado' && t.competitionName !== 'Liga Brave').length;
-                const braveCount = sports.teamStats.filter(t => t.competitionName === 'Liga Brave' || t.teamCategory === 'Liga Brave').length;
+                const stats = sports?.teamStats || [];
+                const ffcvCount = stats.filter(t => t.competitionName && t.competitionName !== 'No federado' && t.competitionName !== 'Liga Brave').length;
+                const braveCount = stats.filter(t => t.competitionName === 'Liga Brave' || t.teamCategory === 'Liga Brave').length;
                 return `${ffcvCount} FFCV Oficiales · ${braveCount} Liga Brave`;
               })()}
             </p>

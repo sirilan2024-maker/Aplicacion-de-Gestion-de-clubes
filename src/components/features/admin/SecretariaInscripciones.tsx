@@ -11,6 +11,7 @@ import toast from "react-hot-toast"
 import { approveInscriptionAction, rejectInscriptionAction } from "@/app/actions/inscriptions-actions"
 import { createAdminFeeForPlayerAction } from "@/app/actions/treasury-actions"
 import { useSearchParams } from "next/navigation"
+import { useSeason } from "@/components/providers/SeasonProvider"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -302,6 +303,7 @@ function ExpedienteModal({
 
 export function SecretariaInscripciones() {
   const searchParams = useSearchParams()
+  const { selectedSeasonId } = useSeason()
   const rawStatus = searchParams?.get("status") || searchParams?.get("tab")
 
   const getInitialStatus = (param: string | null | undefined): string => {
@@ -337,25 +339,55 @@ export function SecretariaInscripciones() {
     const { data: profile } = await supabase.from("profiles").select("role, club_id").eq("id", authData.user.id).single()
     if (!profile || !["admin", "secretaria"].includes(profile.role)) { setLoading(false); return }
 
-    const [playersRes, teamsRes] = await Promise.all([
-      supabase
-        .from("players")
-        .select(`
-          id, first_name, last_name, team_id, birth_date, dni, posicion_principal,
-          parent1_name, parent1_phone, parent1_email, payment_method, payment_plan,
-          registration_status, created_at, is_foreign, never_federated,
-          player_documents(document_type, file_url, status),
-          teams(id, name, category)
-        `)
-        .eq("club_id", profile.club_id)
-        .in("registration_status", ["pending_revision", "pending_payment", "formalized", "rejected"])
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("teams")
-        .select("id, name, category")
-        .eq("club_id", profile.club_id)
-        .order("name", { ascending: true })
-    ])
+    // Obtener la temporada consultada o activa para obtener sus límites o PSH
+    let targetSeasonId = selectedSeasonId
+    if (!targetSeasonId) {
+      const { data: activeS } = await supabase.from("seasons").select("id").eq("club_id", profile.club_id).eq("is_active", true).maybeSingle()
+      targetSeasonId = activeS?.id
+    }
+
+    let seasonPlayerIds: string[] = []
+    let seasonRow: { start_date: string; end_date: string } | null = null
+
+    if (targetSeasonId) {
+      const [pshRes, seasonRes] = await Promise.all([
+        supabase.from("player_season_history").select("player_id").eq("season_id", targetSeasonId),
+        supabase.from("seasons").select("start_date, end_date").eq("id", targetSeasonId).maybeSingle()
+      ])
+      seasonPlayerIds = (pshRes.data || []).map(p => p.player_id).filter(Boolean)
+      seasonRow = seasonRes.data
+    }
+
+    let playersQuery = supabase
+      .from("players")
+      .select(`
+        id, first_name, last_name, team_id, birth_date, dni, posicion_principal,
+        parent1_name, parent1_phone, parent1_email, payment_method, payment_plan,
+        registration_status, created_at, is_foreign, never_federated,
+        player_documents(document_type, file_url, status),
+        teams(id, name, category)
+      `)
+      .eq("club_id", profile.club_id)
+      .in("registration_status", ["pending_revision", "pending_payment", "formalized", "rejected"])
+      .order("created_at", { ascending: false })
+
+    if (seasonPlayerIds.length > 0) {
+      playersQuery = playersQuery.in("id", seasonPlayerIds)
+    } else if (seasonRow?.start_date && seasonRow?.end_date) {
+      playersQuery = playersQuery.gte("created_at", `${seasonRow.start_date}T00:00:00.000Z`).lte("created_at", `${seasonRow.end_date}T23:59:59.999Z`)
+    }
+
+    let teamsQuery = supabase
+      .from("teams")
+      .select("id, name, category")
+      .eq("club_id", profile.club_id)
+      .order("name", { ascending: true })
+
+    if (targetSeasonId) {
+      teamsQuery = teamsQuery.eq("season_id", targetSeasonId)
+    }
+
+    const [playersRes, teamsRes] = await Promise.all([playersQuery, teamsQuery])
 
     if (teamsRes.data) {
       setAllTeams(teamsRes.data)
@@ -368,7 +400,7 @@ export function SecretariaInscripciones() {
       setRequests(playersRes.data as any)
     }
     setLoading(false)
-  }, [])
+  }, [selectedSeasonId])
 
   useEffect(() => { fetchRequests() }, [fetchRequests])
 

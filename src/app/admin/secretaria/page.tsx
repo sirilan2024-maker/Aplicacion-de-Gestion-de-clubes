@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
 import toast from "react-hot-toast";
+import { useSeason } from "@/components/providers/SeasonProvider";
 
 interface PlayerBrief {
   id: string;
@@ -20,6 +21,7 @@ interface PlayerBrief {
 }
 
 export default function DocumentManagementPage() {
+  const { selectedSeasonId } = useSeason();
   const [players, setPlayers] = useState<PlayerBrief[]>([]);
   const [teams, setTeams] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,38 +35,79 @@ export default function DocumentManagementPage() {
 
   useEffect(() => {
     fetchPlayersAndTeams();
-  }, []);
+  }, [selectedSeasonId]);
 
   const fetchPlayersAndTeams = async () => {
+    setLoading(true);
     const supabase = createClient();
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
+      if (!profile?.club_id) return;
+
+      let targetSeasonId = selectedSeasonId;
+      if (!targetSeasonId) {
+        const { data: activeSeason } = await supabase
+          .from('seasons')
+          .select('id')
+          .eq('club_id', profile.club_id)
+          .eq('is_active', true)
+          .single();
+        targetSeasonId = activeSeason?.id;
+      }
+
+      let playerTeamMap = new Map<string, { id: string; name: string }>();
+      let seasonPlayerIds: string[] = [];
+
+      if (targetSeasonId) {
+        const { data: pshData } = await supabase
+          .from('player_season_history')
+          .select('player_id, team_id, teams(id, name)')
+          .eq('season_id', targetSeasonId);
+
+        if (pshData) {
+          pshData.forEach((h: any) => {
+            seasonPlayerIds.push(h.player_id);
+            const teamObj = Array.isArray(h.teams) ? h.teams[0] : h.teams;
+            if (teamObj) {
+              playerTeamMap.set(h.player_id, { id: teamObj.id, name: teamObj.name });
+            }
+          });
+        }
+      }
+
+      if (seasonPlayerIds.length === 0) {
+        setPlayers([]);
+        setTeams([]);
+        setLoading(false);
+        return;
+      }
+
       const [playersRes, teamsRes] = await Promise.all([
         supabase
           .from('players')
-          .select(`
-            id, 
-            first_name, 
-            last_name, 
-            status,
-            teams (id, name)
-          `)
+          .select('id, first_name, last_name, status')
+          .in('id', seasonPlayerIds)
           .neq('status', 'inactive')
           .order('first_name', { ascending: true }),
         supabase
           .from('teams')
           .select('id, name')
+          .eq('club_id', profile.club_id)
+          .eq('season_id', targetSeasonId)
           .order('name', { ascending: true })
       ]);
 
       if (playersRes.error) throw playersRes.error;
-      
+
       const parsedPlayers = (playersRes.data || []).map(p => {
-        const teamObj = Array.isArray(p.teams) ? p.teams[0] : p.teams;
+        const tInfo = playerTeamMap.get(p.id);
         return {
           ...p,
           category: p.status === 'pending_revision' ? 'Inscripción Pdte' : 'Jugador Oficial',
-          team_name: (teamObj as any)?.name || 'Sin equipo',
-          team_id: (teamObj as any)?.id || 'none'
+          team_name: tInfo?.name || 'Sin equipo',
+          team_id: tInfo?.id || 'none'
         };
       });
 
@@ -102,9 +145,11 @@ export default function DocumentManagementPage() {
     const toastId = toast.loading(`Generando ZIP de ${scope}... Esto puede tardar unos segundos.`);
 
     try {
-      const url = massDownloadTeam === "all"
-        ? "/api/admin/export-documents"
-        : `/api/admin/export-documents?team_id=${massDownloadTeam}`;
+      const queryParams = new URLSearchParams();
+      if (selectedSeasonId) queryParams.set("season_id", selectedSeasonId);
+      if (massDownloadTeam !== "all") queryParams.set("team_id", massDownloadTeam);
+
+      const url = `/api/admin/export-documents?${queryParams.toString()}`;
 
       const res = await fetch(url);
 

@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { getAuthenticatedContext, ADMIN_ROLES, COACH_ROLES, canUserAccessMatch } from "@/lib/auth-helpers"
+import { isSeasonEditable } from "@/lib/season-utils"
 
 async function checkLiveMatchAccess(matchId: string) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -15,6 +16,14 @@ async function checkLiveMatchAccess(matchId: string) {
   if (!access.allowed || !access.match) {
     return { allowed: false, error: access.reason || "No tienes acceso a este partido" };
   }
+
+  if (access.match.season_id) {
+    const editable = await isSeasonEditable(access.match.season_id, context.profile.club_id);
+    if (!editable) {
+      return { allowed: false, error: "No se pueden modificar partidos de una temporada cerrada." };
+    }
+  }
+
   return { allowed: true, client: adminClient };
 }
 

@@ -145,7 +145,7 @@ export default function TreasuryDashboard() {
             }`}
           >
             <Users className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">Saldos Socios</span>
+            <span className="truncate">Saldo Jugadores</span>
           </button>
           <button
             onClick={() => setActiveTab("ingresos")}

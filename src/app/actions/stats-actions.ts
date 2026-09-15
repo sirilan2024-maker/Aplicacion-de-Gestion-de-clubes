@@ -84,11 +84,17 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
       isActive: !!s.is_active
     }))
 
-    // 2. Obtener equipos del club
-    const { data: teamsData, error: teamsError } = await supabase
+    // 2. Obtener equipos del club (filtrado por temporada si se especifica)
+    let teamsQuery = supabase
       .from('teams')
       .select('id, name, category')
       .eq('club_id', clubId)
+
+    if (seasonFilterId && seasonFilterId !== 'todas') {
+      teamsQuery = teamsQuery.eq('season_id', seasonFilterId)
+    }
+
+    const { data: teamsData, error: teamsError } = await teamsQuery
 
     if (teamsError) {
       return { success: false, error: teamsError.message }
@@ -118,10 +124,17 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
 
     // 4. Obtener partidos legítimos del club (FFCV oficiales o partidos internos donde juega el club)
     // Obtenemos los grupos y equipos FFCV del club para consolidar el Partido Deportivo Único
-    const { data: teamsFfcvData } = await supabase
+    // Aplicamos el mismo filtro de temporada para no mezclar datos de temporadas anteriores
+    let teamsFfcvQuery = supabase
       .from('teams')
       .select('id, name, category, ffcv_group_id, ffcv_team_id')
       .eq('club_id', clubId)
+
+    if (seasonFilterId && seasonFilterId !== 'todas') {
+      teamsFfcvQuery = teamsFfcvQuery.eq('season_id', seasonFilterId)
+    }
+
+    const { data: teamsFfcvData } = await teamsFfcvQuery
 
     const teamFfcvMap = new Map<string, any>()
     teamsFfcvData?.forEach(t => teamFfcvMap.set(t.id, t))

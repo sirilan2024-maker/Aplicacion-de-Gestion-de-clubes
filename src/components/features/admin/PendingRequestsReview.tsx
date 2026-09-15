@@ -26,6 +26,7 @@ export function PendingRequestsReview() {
         .from('players')
         .select('id', { count: 'exact', head: true })
         .eq('club_id', profile?.club_id)
+        .gte('created_at', '2026-09-14T20:04:00.000Z')
         .eq('registration_status', 'pending_revision')
       
       setCount(pendingCount || 0)

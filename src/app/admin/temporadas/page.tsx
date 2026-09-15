@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Plus, Check, Clock, Calendar as CalendarIcon, ArrowRight, Save, Lock, AlertTriangle, Trash2, Unlock, Users } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { closeSeason, reopenSeason, startNewSeason } from "@/app/actions/season-actions";
+import { SeasonSelector } from "@/components/season/SeasonSelector";
 
 interface Season {
   id: string;
@@ -98,7 +99,7 @@ export default function TemporadasPage() {
       setNewName("TEMPORADA 26/27");
       setNewStart("2026-08-01");
       setNewEnd("2027-06-30");
-      fetchData();
+      router.refresh();
     } catch (err: any) {
       const msg = err?.message || "Error al crear la temporada";
       setFormError(msg);
@@ -194,6 +195,21 @@ export default function TemporadasPage() {
             <span className="hidden sm:inline">Nueva Temporada</span>
             <span className="sm:hidden">Nueva</span>
           </button>
+        </div>
+      </div>
+
+      <div className="bg-slate-900 text-white rounded-2xl p-5 mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold">
+            <CalendarIcon size={20} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">Temporada Activa / Visualizada</h2>
+            <p className="text-xs text-slate-400">Selecciona la temporada que deseas explorar activamente en la plataforma.</p>
+          </div>
+        </div>
+        <div className="bg-slate-800 p-2 rounded-xl border border-slate-700">
+          <SeasonSelector />
         </div>
       </div>
 

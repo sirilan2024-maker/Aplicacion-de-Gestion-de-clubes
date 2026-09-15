@@ -17,6 +17,7 @@ import {
   ExecutiveDashboardData,
 } from "@/app/actions/club-actions";
 import toast from "react-hot-toast";
+import { useSeason } from "@/components/providers/SeasonProvider";
 
 interface AdminInicioClientProps {
   initialResult: {
@@ -28,6 +29,7 @@ interface AdminInicioClientProps {
 
 export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   const router = useRouter();
+  const { selectedSeasonId } = useSeason();
   const [data, setData] = useState<ExecutiveDashboardData | null>(initialResult.data || null);
   const [error, setError] = useState<string | null>(initialResult.error || (initialResult.success ? null : "Error de acceso"));
   const [refreshing, setRefreshing] = useState(false);
@@ -35,17 +37,22 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   const [teamViewMode, setTeamViewMode] = useState<"table" | "cards">("table");
   const [showInjuriesModal, setShowInjuriesModal] = useState(false);
 
-  const handleRefresh = async () => {
+  React.useEffect(() => {
+    if (selectedSeasonId) {
+      handleRefresh(selectedSeasonId);
+    }
+  }, [selectedSeasonId]);
+
+  const handleRefresh = async (overrideSeasonId?: string | React.SyntheticEvent) => {
     setRefreshing(true);
     try {
-      const res = await getExecutiveDashboardAction();
+      const targetId = typeof overrideSeasonId === "string" ? overrideSeasonId : selectedSeasonId || undefined;
+      const res = await getExecutiveDashboardAction(targetId);
       if (res.success && res.data) {
         setData(res.data);
         setError(null);
-        toast.success("Métricas actualizadas");
       } else {
         setError(res.error || "No se pudieron actualizar los datos");
-        toast.error(res.error || "Error al actualizar");
       }
     } catch {
       toast.error("Error de conexión");
@@ -489,7 +496,11 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
               <span className="text-[11px] font-medium text-slate-400">en competición</span>
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-              7 FFCV Oficiales · 1 Liga Brave
+              {(() => {
+                const ffcvCount = sports.teamStats.filter(t => t.competitionName && t.competitionName !== 'No federado' && t.competitionName !== 'Liga Brave').length;
+                const braveCount = sports.teamStats.filter(t => t.competitionName === 'Liga Brave' || t.teamCategory === 'Liga Brave').length;
+                return `${ffcvCount} FFCV Oficiales · ${braveCount} Liga Brave`;
+              })()}
             </p>
             <Link
               href="/dashboard/equipos"
@@ -620,7 +631,11 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
               {/* Selector de vista (en Desktop/Tablet) */}
               <div className="hidden md:flex items-center gap-2">
                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
-                  {sports.teamStats.length} Equipos (7 FFCV · 1 Liga Brave)
+                  {sports.teamStats.length} Equipos ({(() => {
+                    const ffcvCount = sports.teamStats.filter(t => t.competitionName && t.competitionName !== 'No federado' && t.competitionName !== 'Liga Brave').length;
+                    const braveCount = sports.teamStats.filter(t => t.competitionName === 'Liga Brave' || t.teamCategory === 'Liga Brave').length;
+                    return `${ffcvCount} FFCV · ${braveCount} Liga Brave`;
+                  })()})
                 </span>
 
                 <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">

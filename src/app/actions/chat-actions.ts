@@ -67,7 +67,13 @@ export async function getChannelsAction(clubId: string) {
       }
     }
 
-    // 3. Fetch channels the user is allowed to see.
+    // 3. Fetch channels for active season teams and global channels only
+    const { data: activeSeasonsList } = await adminClient.from('seasons').select('id').eq('club_id', clubId).eq('is_active', true)
+    const activeSeasonIds = (activeSeasonsList || []).map(s => s.id)
+
+    const { data: activeTeams } = await adminClient.from('teams').select('id').in('season_id', activeSeasonIds.length > 0 ? activeSeasonIds : ['none'])
+    const activeTeamIds = new Set((activeTeams || []).map(t => t.id))
+
     const { data: allChannels } = await adminClient
       .from('chat_channels')
       .select('*')
@@ -78,7 +84,8 @@ export async function getChannelsAction(clubId: string) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     const role = profile?.role
 
-    let allowedChannels = allChannels || []
+    // Solo conservar canales globales o de equipos de la temporada activa
+    let allowedChannels = (allChannels || []).filter(c => c.type === 'global' || (c.team_id && activeTeamIds.has(c.team_id)))
 
     if (role === 'family' || role === 'familia' || role === 'tutor' || role === 'jugador') {
       const familyTeamIds = new Set<string>()

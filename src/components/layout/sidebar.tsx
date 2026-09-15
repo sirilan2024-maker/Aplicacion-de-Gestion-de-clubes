@@ -540,6 +540,8 @@ export function Sidebar({ signOutAction }: { signOutAction: any }) {
         </div>
       )}
 
+
+
       {/* ── Context Selector ──────────────────────────────── */}
       {!collapsed && !isAdmin && (equipos.length > 0 || linkedPlayers.length > 0) && (
         <div className={cn("relative px-4 py-3", isAdmin ? "border-b border-slate-800" : "border-b border-gray-100")}>

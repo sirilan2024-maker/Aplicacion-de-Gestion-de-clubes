@@ -34,8 +34,8 @@ export default function AdminEstadisticasPage() {
   const [teams, setTeams] = useState<Array<{ id: string; name: string; category: string }>>([])
   const [seasons, setSeasons] = useState<Array<{ id: string; name: string; isActive: boolean }>>([])
 
-  // Filtros
-  const [selectedSeason, setSelectedSeason] = useState<string>('todas')
+  // Filtros — 'activa' es el valor inicial: se reemplaza al cargar con el id real de la temporada activa
+  const [selectedSeason, setSelectedSeason] = useState<string>('activa')
   const [selectedTeam, setSelectedTeam] = useState<string>('todos')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'equipos' | 'jugadores'>('equipos')
@@ -44,7 +44,10 @@ export default function AdminEstadisticasPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await getGlobalStatsAction(seasonId)
+      // Si todavía está en el valor centinela 'activa', no aplicamos filtro
+      // para que la acción devuelva las temporadas disponibles y podamos autodetectar la activa
+      const effectiveSeasonId = seasonId === 'activa' ? undefined : seasonId
+      const res = await getGlobalStatsAction(effectiveSeasonId)
       if (!res.success) {
         setError(res.error || 'Error al cargar estadísticas globales')
       } else {
@@ -52,7 +55,19 @@ export default function AdminEstadisticasPage() {
         setTeamStats(res.teamStats || [])
         setPlayerStats(res.playerStats || [])
         setTeams(res.teams || [])
-        setSeasons(res.seasons || [])
+        const loadedSeasons = res.seasons || []
+        setSeasons(loadedSeasons)
+
+        // Al cargar por primera vez (selectedSeason === 'activa'), fijar el selector
+        // en la temporada activa para que la próxima carga ya filtre correctamente
+        if (seasonId === 'activa') {
+          const activeSeason = loadedSeasons.find(s => s.isActive)
+          if (activeSeason) {
+            setSelectedSeason(activeSeason.id)
+          } else {
+            setSelectedSeason('todas')
+          }
+        }
       }
     } catch (err: any) {
       setError(err?.message || 'Error de conexión')
@@ -64,6 +79,7 @@ export default function AdminEstadisticasPage() {
   useEffect(() => {
     fetchData(selectedSeason)
   }, [selectedSeason])
+
 
   // Filtrado de equipos
   const filteredTeams = useMemo(() => {
@@ -121,12 +137,17 @@ export default function AdminEstadisticasPage() {
             onChange={(e) => setSelectedSeason(e.target.value)}
             className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500"
           >
+            {/* Centinela inicial — desaparece en cuanto se detecta la temporada activa */}
+            {selectedSeason === 'activa' && (
+              <option value="activa">Cargando temporada…</option>
+            )}
             <option value="todas">Todas las temporadas</option>
             {seasons.map(s => (
               <option key={s.id} value={s.id}>
                 {s.name} {s.isActive ? '(Actual)' : ''}
               </option>
             ))}
+
           </select>
 
           <button

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { assertSeasonEditable } from '@/lib/season-utils';
 
 export async function closeSeason(seasonId: string) {
   const supabase = await createClient();
@@ -154,5 +155,105 @@ export async function cloneTeamsAction(seasonId: string, teamIdsToClone: string[
   
   revalidatePath('/dashboard/equipos');
   revalidatePath('/admin/temporadas/asistente');
+  return { success: true };
+}
+
+export async function renewPlayerSeasonAction(
+  playerId: string,
+  targetSeasonId: string,
+  teamId: string | null,
+  status: 'active' | 'pending_renewal' | 'renewed' | 'baja' | 'inactive' = 'active'
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autorizado');
+
+  const { data: profile } = await supabase.from('profiles').select('club_id, role').eq('id', user.id).single();
+  if (!profile || profile.role !== 'admin') throw new Error('Solo los administradores pueden renovar jugadores');
+
+  await assertSeasonEditable(targetSeasonId, profile.club_id);
+
+  const { data: season } = await supabase.from('seasons').select('id, is_active').eq('id', targetSeasonId).eq('club_id', profile.club_id).single();
+  if (!season) throw new Error('Temporada no encontrada');
+
+  // Validar estrictamente la pertenencia del jugador al club del administrador
+  const { data: player } = await supabase.from('players').select('id, club_id').eq('id', playerId).single();
+  if (!player || player.club_id !== profile.club_id) throw new Error('El jugador no pertenece a tu club.');
+
+  // Validar estrictamente que el equipo pertenece al club y a la temporada objetivo
+  if (teamId) {
+    const { data: team } = await supabase.from('teams').select('season_id, club_id').eq('id', teamId).single();
+    if (!team || team.club_id !== profile.club_id) {
+      throw new Error('El equipo seleccionado no pertenece a tu club.');
+    }
+    if (team.season_id && team.season_id !== targetSeasonId) {
+      throw new Error('El equipo seleccionado no pertenece a la temporada objetivo.');
+    }
+  }
+
+  const { data: existingHistory } = await supabase
+    .from('player_season_history')
+    .select('id')
+    .eq('player_id', playerId)
+    .eq('season_id', targetSeasonId)
+    .maybeSingle();
+
+  if (existingHistory) {
+    const { error } = await supabase
+      .from('player_season_history')
+      .update({ team_id: teamId, status })
+      .eq('id', existingHistory.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from('player_season_history')
+      .insert({ player_id: playerId, season_id: targetSeasonId, team_id: teamId, club_id: profile.club_id, status });
+    if (error) throw new Error(error.message);
+  }
+
+  if (season.is_active) {
+    await supabase.from('players').update({ team_id: teamId, status: status === 'baja' ? 'inactive' : 'active', was_in_club: true }).eq('id', playerId);
+  }
+
+  revalidatePath('/dashboard/club/miembros');
+  revalidatePath('/dashboard/equipos');
+  return { success: true };
+}
+
+export async function requestFamilyPlayerRenewalAction(playerId: string, targetSeasonId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No autorizado');
+
+  const { data: profile } = await supabase.from('profiles').select('id, club_id, role').eq('id', user.id).single();
+  if (!profile?.club_id) throw new Error('No se encontró el club');
+
+  const { data: player } = await supabase.from('players').select('id, club_id, tutor_id').eq('id', playerId).single();
+  if (!player || player.club_id !== profile.club_id) throw new Error('Jugador no encontrado');
+
+  const isTutor = player.tutor_id === user.id || profile.role === 'admin';
+  if (!isTutor) throw new Error('Solo el tutor legal puede solicitar la renovación');
+
+  await assertSeasonEditable(targetSeasonId, profile.club_id);
+
+  const { data: existing } = await supabase
+    .from('player_season_history')
+    .select('id')
+    .eq('player_id', playerId)
+    .eq('season_id', targetSeasonId)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase.from('player_season_history').update({ status: 'pending_renewal' }).eq('id', existing.id);
+  } else {
+    await supabase.from('player_season_history').insert({
+      player_id: playerId,
+      season_id: targetSeasonId,
+      club_id: profile.club_id,
+      status: 'pending_renewal',
+    });
+  }
+
+  revalidatePath('/dashboard/family');
   return { success: true };
 }

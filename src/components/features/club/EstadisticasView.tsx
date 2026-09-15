@@ -8,6 +8,7 @@ import Link from "next/link"
 import { PlayerStatsGrid } from "@/components/features/estadisticas/PlayerStatsGrid"
 import { MatchTrendsModal } from "@/components/features/matches/match-details/MatchTrendsModal"
 import { getGlobalStatsAction, GlobalStatsKPIs, TeamStatDTO } from "@/app/actions/stats-actions"
+import { useSeason } from "@/components/providers/SeasonProvider"
 
 interface RawData {
   players: any[];
@@ -21,6 +22,7 @@ interface RawData {
 }
 
 export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
+  const { selectedSeasonId } = useSeason()
   const [rawData, setRawData] = useState<RawData | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "todos")
@@ -32,15 +34,20 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
   useEffect(() => {
     const fetchAllData = async () => {
-      // Get active season
+      // Get target season
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
-      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+      
+      let targetSeasonId = selectedSeasonId;
+      if (!targetSeasonId) {
+        const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+        targetSeasonId = activeSeason?.id
+      }
 
       // Fetch teams
       let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
-      if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+      if (targetSeasonId) teamsQuery = teamsQuery.eq('season_id', targetSeasonId)
 
       const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
@@ -58,7 +65,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       const teamIds = (teams || []).map(t => t.id);
 
       let players: any[] = []
-      if (teamIds.length > 0 && activeSeason?.id) {
+      if (teamIds.length > 0 && targetSeasonId) {
         const { data } = await supabase
           .from('player_season_history')
           .select(`
@@ -66,7 +73,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             players!inner (id, first_name, last_name, height, weight, status, posicion_principal, dorsal, avatar_url)
           `)
           .in('team_id', teamIds)
-          .eq('season_id', activeSeason.id)
+          .eq('season_id', targetSeasonId)
           .neq('status', 'inactive')
           .limit(5000)
           
@@ -93,17 +100,19 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       }
       
       let attendance: any[] = []
-      let attPage = 0;
-      const attPageSize = 1000;
-      while (true) {
-        const { data: pageAtt, error } = await supabase
-          .from('attendance')
-          .select('status, event_id, player_id')
-          .range(attPage * attPageSize, (attPage + 1) * attPageSize - 1);
-        if (error || !pageAtt || pageAtt.length === 0) break;
-        attendance = attendance.concat(pageAtt);
-        if (pageAtt.length < attPageSize) break;
-        attPage++;
+      if (teamIds.length > 0) {
+        let attPage = 0;
+        const attPageSize = 1000;
+        while (true) {
+          const { data: pageAtt, error } = await supabase
+            .from('attendance')
+            .select('status, event_id, player_id')
+            .range(attPage * attPageSize, (attPage + 1) * attPageSize - 1);
+          if (error || !pageAtt || pageAtt.length === 0) break;
+          attendance = attendance.concat(pageAtt);
+          if (pageAtt.length < attPageSize) break;
+          attPage++;
+        }
       }
 
       // 4. Fetch Metrics Definitions
@@ -113,17 +122,19 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
       // 5. Fetch Performance Data (Trainings & Evaluations across all pages)
       let perf: any[] = []
-      let ptmPage = 0;
-      const ptmPageSize = 1000;
-      while (true) {
-        const { data: pagePerf, error } = await supabase
-          .from('player_training_metrics')
-          .select('metric_id, value_number, player_id, event_id')
-          .range(ptmPage * ptmPageSize, (ptmPage + 1) * ptmPageSize - 1);
-        if (error || !pagePerf || pagePerf.length === 0) break;
-        perf = perf.concat(pagePerf);
-        if (pagePerf.length < ptmPageSize) break;
-        ptmPage++;
+      if (teamIds.length > 0) {
+        let ptmPage = 0;
+        const ptmPageSize = 1000;
+        while (true) {
+          const { data: pagePerf, error } = await supabase
+            .from('player_training_metrics')
+            .select('metric_id, value_number, player_id, event_id')
+            .range(ptmPage * ptmPageSize, (ptmPage + 1) * ptmPageSize - 1);
+          if (error || !pagePerf || pagePerf.length === 0) break;
+          perf = perf.concat(pagePerf);
+          if (pagePerf.length < ptmPageSize) break;
+          ptmPage++;
+        }
       }
 
       // 6. Fetch Match Data (From partidos, convocatorias and match_events)
@@ -183,7 +194,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       
       // Cargar estadísticas deportivas globales y balance de equipos
       try {
-        const statsRes = await getGlobalStatsAction()
+        const statsRes = await getGlobalStatsAction(selectedSeasonId || undefined)
         if (statsRes.success && statsRes.kpis && statsRes.teamStats) {
           setGlobalStats({ kpis: statsRes.kpis, teamStats: statsRes.teamStats })
         }
@@ -202,7 +213,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
     }
 
     fetchAllData()
-  }, [])
+  }, [selectedSeasonId])
 
   // Filtrado de balance por equipo
   const filteredTeamStats = useMemo(() => {
@@ -240,10 +251,18 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
     players.forEach(p => playerTeamMap.set(p.id, p.team_id));
 
     // Filter attendance by player's team or event team
-    const filteredAttendance = attendance.filter(a => filterByTeam(playerTeamMap.get(a.player_id) || eventTeamMap.get(a.event_id)));
+    const filteredAttendance = attendance.filter(a => {
+      const teamId = eventTeamMap.get(a.event_id) || playerTeamMap.get(a.player_id);
+      if (!teamId) return false;
+      return filterByTeam(teamId);
+    });
 
     // Filter performance
-    const filteredPerf = perf.filter(p => filterByTeam(playerTeamMap.get(p.player_id)));
+    const filteredPerf = perf.filter(p => {
+      const teamId = playerTeamMap.get(p.player_id) || eventTeamMap.get(p.event_id);
+      if (!teamId) return false;
+      return filterByTeam(teamId);
+    });
 
     // Filter match stats
     const filteredMatchStats = matchStats.filter(m => filterByTeam(m.team_id));

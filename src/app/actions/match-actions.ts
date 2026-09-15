@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessMatch, canUserAccessPlayer } from "@/lib/auth-helpers"
 import { NotificationService } from "@/lib/notifications/notification-service"
 import { getConvocationEmailHtml } from "@/lib/email-service"
+import { isSeasonEditable, assertSeasonEditable } from "@/lib/season-utils"
 
 export async function updateConvocatoria(matchId: string, playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | null) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -15,8 +16,15 @@ export async function updateConvocatoria(matchId: string, playerId: string, stat
   const supabase = await createAdminClient();
 
   const matchAccess = await canUserAccessMatch(supabase, context, matchId);
-  if (!matchAccess.allowed) {
+  if (!matchAccess.allowed || !matchAccess.match) {
     return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+  }
+
+  if (matchAccess.match.season_id) {
+    const editable = await isSeasonEditable(matchAccess.match.season_id, context.profile.club_id);
+    if (!editable) {
+      return { success: false, error: "No se pueden modificar datos de una temporada cerrada." };
+    }
   }
 
   const playerAccess = await canUserAccessPlayer(supabase, context, playerId);
@@ -64,8 +72,15 @@ export async function updateConvocatoriaBatch(matchId: string, updates: { player
   const supabase = await createAdminClient();
 
   const matchAccess = await canUserAccessMatch(supabase, context, matchId);
-  if (!matchAccess.allowed) {
+  if (!matchAccess.allowed || !matchAccess.match) {
     return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+  }
+
+  if (matchAccess.match.season_id) {
+    const editable = await isSeasonEditable(matchAccess.match.season_id, context.profile.club_id);
+    if (!editable) {
+      return { success: false, error: "No se pueden modificar datos de una temporada cerrada." };
+    }
   }
 
   let hasError = false;

@@ -221,7 +221,7 @@ export async function getTeamAnalysisAction(teamId: string): Promise<{ success: 
 
     const { data: team, error: teamErr } = await adminClient
       .from('teams')
-      .select('id, name, category, color, ffcv_group_id, ffcv_team_id, club_id')
+      .select('id, name, category, color, ffcv_group_id, ffcv_team_id, club_id, season_id')
       .eq('id', teamId)
       .single();
 
@@ -242,6 +242,40 @@ export async function getTeamAnalysisAction(teamId: string): Promise<{ success: 
       .order('created_at', { ascending: false });
 
     const activeSeason = (seasons || []).find(s => s.is_active) || seasons?.[0];
+
+    // Si el equipo pertenece a una temporada anterior (o no es de la temporada activa 26/27),
+    // o si estamos en la temporada 26/27 activa y el equipo no ha sido sincronizado para 26/27:
+    if (activeSeason && (team as any).season_id && (team as any).season_id !== activeSeason.id) {
+      return {
+        success: true,
+        data: {
+          team: { id: team.id, name: team.name, category: team.category, color: team.color, ffcvGroupId: team.ffcv_group_id, ffcvTeamId: team.ffcv_team_id },
+          competition: null,
+          summary: {
+            currentPosition: 0,
+            totalTeams: 0,
+            matchesPlayed: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+            goalDiff: 0,
+            points: 0,
+            possiblePoints: 0,
+            pointsPercentage: 0,
+            winRate: 0,
+            homeRecord: { played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, points: 0 },
+            awayRecord: { played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, points: 0 },
+          },
+          standings: [],
+          matches: [],
+          evolution: [],
+          club: { id: club?.id || '', name: club?.name || '', logoUrl: club?.logo_url || null },
+          historicalSeasons: (seasons || []).map(s => ({ id: s.id, name: s.name, isActive: s.is_active })),
+        }
+      };
+    }
 
     const normalize = (str?: string | null) => {
       if (!str) return '';

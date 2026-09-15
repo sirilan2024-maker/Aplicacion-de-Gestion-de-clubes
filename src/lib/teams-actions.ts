@@ -32,12 +32,21 @@ export async function createTeam(formData: FormData) {
     }
   }
 
+  // Obtener la temporada activa del club para asociar el equipo correctamente
+  const { data: activeSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .single()
+
   const { error } = await supabase.from('teams').insert({
     name,
     category,
     color,
     coach_id: user.id,
-    club_id: clubId
+    club_id: clubId,
+    season_id: activeSeason?.id ?? null
   })
 
   if (error) {

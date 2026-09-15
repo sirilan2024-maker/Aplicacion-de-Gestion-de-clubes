@@ -116,13 +116,14 @@ export function Step3Fees({ clubIban }: { clubIban?: string | null }) {
           <h4 className="font-semibold text-gray-800">Método de Pago <span className="text-red-500">*</span></h4>
           {errors.paymentMethod && <p className="text-xs text-red-500">{errors.paymentMethod.message}</p>}
           <div className="flex flex-col gap-3">
-            <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'Stripe' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'}`}>
+            {/* Ocultado temporalmente por solicitud: Tarjeta / Stripe */}
+            {/* <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'Stripe' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'}`}>
               <input type="radio" value="Stripe" {...register("paymentMethod")} className="w-4 h-4 text-blue-600" />
               <div className="ml-3 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-gray-600" />
                 <span className="block text-sm font-bold text-gray-900">Tarjeta / Apple Pay / Google Pay (Stripe Online)</span>
               </div>
-            </label>
+            </label> */}
             <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${paymentMethod === 'Transferencia' ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'}`}>
               <input type="radio" value="Transferencia" {...register("paymentMethod")} className="w-4 h-4 text-blue-600" />
               <div className="ml-3 flex items-center gap-2">

@@ -392,10 +392,10 @@ export default function MemberBalances() {
           <p className="text-[10px] md:text-xs text-amber-600 mt-0.5">Pendiente de cobro</p>
         </div>
 
-        {/* Estado de Socios */}
+        {/* Estado de Jugadores */}
         <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Socios</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Jugadores</p>
             <div className="p-1.5 md:p-2 bg-indigo-50 text-indigo-600 rounded-xl">
               <Users className="w-4 h-4 md:w-5 md:h-5" />
             </div>
@@ -406,7 +406,7 @@ export default function MemberBalances() {
             <span className="text-xl md:text-2xl font-black text-emerald-600">{summary.membersAlDia}</span>
             <span className="text-[10px] md:text-xs text-slate-500">al día</span>
           </div>
-          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5">Total: {summary.totalMembers} socios</p>
+          <p className="text-[10px] md:text-xs text-slate-400 mt-0.5">Total: {summary.totalMembers} jugadores</p>
         </div>
       </div>
 
@@ -420,7 +420,7 @@ export default function MemberBalances() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Buscar socio..."
+                placeholder="Buscar jugador..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"

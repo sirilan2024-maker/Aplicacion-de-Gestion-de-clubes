@@ -4,7 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessPlayer, canUserManageRegistration, canUserUpdateRegistrationEmail } from "@/lib/auth-helpers";
 
-export async function getInscriptionsAction() {
+export async function getInscriptionsAction(targetSeasonId?: string) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) return { success: false, data: [] };
 
@@ -17,7 +17,31 @@ export async function getInscriptionsAction() {
 
   const adminSupabase = await createAdminClient();
 
-  const { data, error } = await adminSupabase
+  // Obtener temporada solicitada o activa
+  let seasonQuery = adminSupabase
+    .from('seasons')
+    .select('id, start_date, end_date')
+    .eq('club_id', clubId);
+
+  if (targetSeasonId) {
+    seasonQuery = seasonQuery.eq('id', targetSeasonId);
+  } else {
+    seasonQuery = seasonQuery.eq('is_active', true);
+  }
+
+  const { data: seasonRow } = await seasonQuery.maybeSingle();
+
+  if (!seasonRow?.id) return { success: true, data: [] };
+
+  // Consultar solicitudes pendientes asociadas a la temporada elegida (via player_season_history o periodo oficial)
+  const { data: seasonPsh } = await adminSupabase
+    .from('player_season_history')
+    .select('player_id')
+    .eq('season_id', seasonRow.id);
+
+  const seasonPlayerIds = (seasonPsh || []).map(p => p.player_id).filter(Boolean);
+
+  let query = adminSupabase
     .from('players')
     .select(`
       id,
@@ -32,6 +56,15 @@ export async function getInscriptionsAction() {
     .eq('club_id', clubId)
     .in('registration_status', ['pending_revision', 'request_correction', 'pending_payment', 'formalized'])
     .order('created_at', { ascending: false });
+
+  if (seasonPlayerIds.length > 0) {
+    query = query.in('id', seasonPlayerIds);
+  } else if (seasonRow.start_date && seasonRow.end_date) {
+    query = query.gte('created_at', `${seasonRow.start_date}T00:00:00.000Z`)
+                 .lte('created_at', `${seasonRow.end_date}T23:59:59.999Z`);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching pending players:', error);

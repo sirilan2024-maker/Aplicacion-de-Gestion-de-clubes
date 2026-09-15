@@ -806,19 +806,19 @@ export async function getTreasuryBalanceAction() {
   const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
   if (!profile?.club_id) return { ingresos: 0, gastos: 0 };
 
-  // Sum fees where estado = 'pagado' (real income)
+  // Sum fees where estado = 'pagado'
   const { data: feesData } = await adminSupabase
     .from("fees")
-    .select("amount_cents, estado")
+    .select("amount_cents, amount_paid_cents, estado")
     .eq("club_id", profile.club_id)
     .in("estado", ['pagado', 'paid']);
 
-  // Sum ALL expenses (they are always real costs)
+  // Sum expenses
   const { data: expensesData } = await adminSupabase
     .from("expenses")
     .select("amount_cents");
 
-  const ingresos = (feesData || []).reduce((sum: number, f: any) => sum + ((f.amount_cents || 0) / 100), 0);
+  const ingresos = (feesData || []).reduce((sum: number, f: any) => sum + (((f.amount_paid_cents || f.amount_cents) || 0) / 100), 0);
   const gastos = (expensesData || []).reduce((sum: number, e: any) => sum + ((e.amount_cents || 0) / 100), 0);
 
   return { ingresos, gastos };
@@ -1476,7 +1476,24 @@ export async function getMemberBalancesAction() {
   const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
   if (!profile?.club_id) throw new Error("Club no encontrado");
 
-  // 1. Fetch fees with payments for the club
+  // Obtener temporada activa
+  const { data: activeSeasonRow } = await adminSupabase
+    .from('seasons')
+    .select('id')
+    .eq('club_id', profile.club_id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  const activeSeasonId = activeSeasonRow?.id;
+  if (!activeSeasonId) {
+    return {
+      success: true,
+      members: [],
+      summary: { totalCharged: 0, totalPaid: 0, totalPending: 0, membersAlDia: 0, membersConDeuda: 0, membersPorVerificar: 0, totalMembers: 0 },
+    };
+  }
+
+  // 1. Fetch fees for the club
   const { data: fees, error: feesError } = await adminSupabase
     .from("fees")
     .select("id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en, fee_payments(id, amount_cents, payment_method, created_at)")
@@ -1493,21 +1510,31 @@ export async function getMemberBalancesAction() {
     }
   });
 
-  // 2. Fetch players with teams
+  // 2. Fetch active season players from player_season_history
+  const { data: activePsh } = await adminSupabase
+    .from('player_season_history')
+    .select('player_id')
+    .eq('season_id', activeSeasonId);
+
+  const activePlayerIds = (activePsh || []).map(p => p.player_id).filter(Boolean);
+
+  if (activePlayerIds.length === 0) {
+    return {
+      success: true,
+      members: [],
+      summary: { totalCharged: 0, totalPaid: 0, totalPending: 0, membersAlDia: 0, membersConDeuda: 0, membersPorVerificar: 0, totalMembers: 0 },
+    };
+  }
+
   const { data: players, error: playersError } = await adminSupabase
     .from("players")
     .select("id, first_name, last_name, team_id, status, teams(id, name)")
-    .eq("club_id", profile.club_id)
+    .in("id", activePlayerIds)
     .order("first_name", { ascending: true });
 
   if (playersError) throw new Error(playersError.message);
 
-  // Filter players: include all club players who are not inactive OR who have existing fees in the club
-  const eligiblePlayers = (players || []).filter((p: any) => {
-    const hasFees = Boolean(feesByPlayer[p.id] && feesByPlayer[p.id].length > 0);
-    const notInactive = p.status !== "inactive";
-    return notInactive || hasFees;
-  });
+  const eligiblePlayers = players || [];
 
   const memberBalances = eligiblePlayers.map((p: any) => {
     const playerFees = feesByPlayer[p.id] || [];

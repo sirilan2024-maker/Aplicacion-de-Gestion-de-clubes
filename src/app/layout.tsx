@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
+import { SeasonProvider } from "@/components/providers/SeasonProvider";
 
 export const viewport: Viewport = {
   themeColor: "#0f172a",
@@ -25,8 +26,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased font-sans">
-        {children}
-        <Toaster />
+        <SeasonProvider>
+          {children}
+          <Toaster />
+        </SeasonProvider>
       </body>
     </html>
   );

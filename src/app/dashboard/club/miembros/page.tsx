@@ -878,27 +878,41 @@ function GlobalMembersContent() {
         
         if (clubTeams) setAllTeams(clubTeams)
 
-        // Fetch all players for the club
-        const { data: rawPlayers } = await supabase
-          .from("players")
-          .select(`
-            id, first_name, last_name, parent1_email, posicion_principal, team_id, registration_status, status, avatar_url,
-            teams (name, color, club_id)
-          `)
-          .eq("club_id", profile.club_id)
-          .in("status", ["active", "activo", "pending"])
-          
-        if (rawPlayers) {
-          playersData = rawPlayers.map((p: any) => ({
-            id: p.id,
-            first_name: p.first_name,
-            last_name: p.last_name,
-            email: p.parent1_email,
-            posicion: p.posicion_principal,
-            team_id: p.team_id,
-            avatar_url: p.avatar_url,
-            equipos: Array.isArray(p.teams) ? p.teams[0] : p.teams
-          }))
+        // Fetch players for active season (via player_season_history)
+        let activePlayerIds: string[] = []
+        if (activeSeason?.id) {
+          const { data: pshData } = await supabase
+            .from("player_season_history")
+            .select("player_id")
+            .eq("season_id", activeSeason.id)
+
+          if (pshData) {
+            activePlayerIds = pshData.map((p: any) => p.player_id).filter(Boolean)
+          }
+        }
+
+        if (activePlayerIds.length > 0) {
+          const { data: rawPlayers } = await supabase
+            .from("players")
+            .select(`
+              id, first_name, last_name, parent1_email, posicion_principal, team_id, registration_status, status, avatar_url,
+              teams (name, color, club_id)
+            `)
+            .in("id", activePlayerIds)
+            .in("status", ["active", "activo", "pending"])
+            
+          if (rawPlayers) {
+            playersData = rawPlayers.map((p: any) => ({
+              id: p.id,
+              first_name: p.first_name,
+              last_name: p.last_name,
+              email: p.parent1_email,
+              posicion: p.posicion_principal,
+              team_id: p.team_id,
+              avatar_url: p.avatar_url,
+              equipos: Array.isArray(p.teams) ? p.teams[0] : p.teams
+            }))
+          }
         }
 
         const allMembers: Member[] = []

@@ -52,17 +52,43 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club no encontrado' }, { status: 400 })
     }
 
-    // 2. Optional filter: team_id from query params
+    // 2. Optional filter: team_id, season_id from query params
     const { searchParams } = new URL(req.url)
     const teamId = searchParams.get('team_id') // null = all teams
+    const reqSeasonId = searchParams.get('season_id') || searchParams.get('seasonId')
 
     const adminClient = createAdminClient()
 
-    // 3. Get players
+    let targetSeasonId = reqSeasonId
+    if (!targetSeasonId) {
+      const { data: activeSeasonRow } = await adminClient
+        .from('seasons')
+        .select('id')
+        .eq('club_id', clubId)
+        .eq('is_active', true)
+        .maybeSingle()
+      targetSeasonId = activeSeasonRow?.id
+    }
+
+    if (!targetSeasonId) {
+      return NextResponse.json({ error: 'No hay temporada seleccionada ni activa' }, { status: 404 })
+    }
+
+    const { data: seasonPsh } = await adminClient
+      .from('player_season_history')
+      .select('player_id')
+      .eq('season_id', targetSeasonId)
+
+    const seasonPlayerIds = (seasonPsh || []).map(p => p.player_id).filter(Boolean)
+    if (seasonPlayerIds.length === 0) {
+      return NextResponse.json({ error: 'No hay jugadores matriculados en la temporada seleccionada' }, { status: 404 })
+    }
+
+    // 3. Get target season players
     let playersQuery = adminClient
       .from('players')
       .select('id, first_name, last_name, team_id, teams(id, name)')
-      .eq('club_id', clubId)
+      .in('id', seasonPlayerIds)
       .neq('status', 'inactive')
 
     if (teamId && teamId !== 'all') {

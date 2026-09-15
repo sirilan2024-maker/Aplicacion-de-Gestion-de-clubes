@@ -22,7 +22,7 @@ const DEFAULT_ITEMS = [
 ]
 
 // 1. Recuperar tallas y estado de entrega de un jugador
-export async function getApparelForPlayerAction(playerId: string) {
+export async function getApparelForPlayerAction(playerId: string, targetSeasonId?: string) {
   try {
     const { context, error: authError } = await getAuthenticatedContext()
     if (!context || authError) return { success: false, error: authError || 'No autenticado' }
@@ -33,10 +33,27 @@ export async function getApparelForPlayerAction(playerId: string) {
       return { success: false, error: access.reason || 'No tienes permisos sobre este jugador' }
     }
 
-    const { data: apparelData, error } = await adminClient
+    let seasonId = targetSeasonId;
+    if (!seasonId) {
+      const { data: activeSeason } = await adminClient
+        .from('seasons')
+        .select('id')
+        .eq('club_id', context.profile.club_id)
+        .eq('is_active', true)
+        .single();
+      seasonId = activeSeason?.id;
+    }
+
+    let query = adminClient
       .from('player_apparel')
       .select('*')
-      .eq('player_id', playerId)
+      .eq('player_id', playerId);
+
+    if (seasonId) {
+      query = query.eq('season_id', seasonId);
+    }
+
+    const { data: apparelData, error } = await query;
 
     if (error) throw error
 
@@ -59,10 +76,10 @@ export async function getApparelForPlayerAction(playerId: string) {
       }
     })
 
-    // Fetch player dorsal
+    // Fetch player dorsal y tallas biográficas como "Último Dato Conocido"
     const { data: playerData } = await adminClient
       .from('players')
-      .select('dorsal')
+      .select('dorsal, altura, peso, talla_pie')
       .eq('id', playerId)
       .maybeSingle()
 
@@ -235,7 +252,33 @@ export async function getApparelDashboardDataAction(teamId?: string) {
 
     const adminClient = createAdminClient()
 
-    // Consultar jugadores activos del club
+    // Obtener temporada activa
+    const { data: activeSeasonRow } = await adminClient
+      .from('seasons')
+      .select('id')
+      .eq('club_id', context.profile.club_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const activeSeasonId = activeSeasonRow?.id
+
+    // Si no hay temporada activa o 26/27 no tiene jugadores matriculados en player_season_history, retornamos lista vacía
+    if (!activeSeasonId) {
+      return { success: true, data: [] }
+    }
+
+    const { data: activePsh } = await adminClient
+      .from('player_season_history')
+      .select('player_id')
+      .eq('season_id', activeSeasonId)
+
+    const activePlayerIds = (activePsh || []).map(p => p.player_id).filter(Boolean)
+
+    if (activePlayerIds.length === 0) {
+      return { success: true, data: [] }
+    }
+
+    // Consultar jugadores matriculados en la temporada activa
     let query = adminClient
       .from('players')
       .select(`
@@ -257,7 +300,7 @@ export async function getApparelDashboardDataAction(teamId?: string) {
           delivered_at
         )
       `)
-      .eq('club_id', context.profile.club_id)
+      .in('id', activePlayerIds)
       .neq('status', 'inactive')
 
     if (teamId) {
@@ -325,7 +368,30 @@ export async function getApparelSummaryReportAction(teamId?: string) {
 
     const adminClient = createAdminClient()
 
-    // Consultar todos los registros de ropa de jugadores activos del club
+    // Obtener temporada activa
+    const { data: activeSeasonRow } = await adminClient
+      .from('seasons')
+      .select('id')
+      .eq('club_id', context.profile.club_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const activeSeasonId = activeSeasonRow?.id
+    if (!activeSeasonId) {
+      return { success: true, report: {}, totals: { totalNeeded: 0, delivered: 0, pending: 0, fulfillmentRate: 0 } }
+    }
+
+    const { data: activePsh } = await adminClient
+      .from('player_season_history')
+      .select('player_id')
+      .eq('season_id', activeSeasonId)
+
+    const activePlayerIds = (activePsh || []).map(p => p.player_id).filter(Boolean)
+    if (activePlayerIds.length === 0) {
+      return { success: true, report: {}, totals: { totalNeeded: 0, delivered: 0, pending: 0, fulfillmentRate: 0 } }
+    }
+
+    // Consultar todos los registros de ropa de jugadores activos de la temporada activa
     let allApparelRows: any[] = []
     let hasMore = true
     let page = 0
@@ -339,12 +405,13 @@ export async function getApparelSummaryReportAction(teamId?: string) {
           size,
           delivered,
           players!inner (
+            id,
             status,
             team_id,
             club_id
           )
         `)
-        .eq('players.club_id', context.profile.club_id)
+        .in('players.id', activePlayerIds)
         .range(page * pageSize, (page + 1) * pageSize - 1)
 
       if (teamId) {

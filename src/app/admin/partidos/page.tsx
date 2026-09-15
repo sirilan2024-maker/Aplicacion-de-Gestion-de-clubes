@@ -11,8 +11,10 @@ import { Skeleton } from "@/components/ui/Skeleton"
 import { updateMatchDetails } from "@/app/actions/match-actions"
 import { FFCVStandings } from "@/components/features/matches/FFCVStandings"
 import { MatchdayView } from "@/components/features/matches/MatchdayView"
+import { useSeason } from "@/components/providers/SeasonProvider"
 
 export default function AdminPartidosPage() {
+  const { selectedSeasonId } = useSeason()
   const [matches, setMatches] = useState<any[]>([])
   const [teams, setTeams] = useState<any[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all')
@@ -63,8 +65,9 @@ export default function AdminPartidosPage() {
         `)
         .eq("club_id", profile.club_id)
         
-      if (activeSeason?.id) {
-        query = query.eq('season_id', activeSeason.id)
+      const targetSeasonId = selectedSeasonId || activeSeason?.id;
+      if (targetSeasonId) {
+        query = query.eq('season_id', targetSeasonId)
       }
       
       const { data, error } = await query.order("fecha_hora", { ascending: true })
@@ -73,7 +76,7 @@ export default function AdminPartidosPage() {
       setLoading(false)
     }
     fetchPartidos()
-  }, [])
+  }, [selectedSeasonId])
 
   const filteredMatches = matches.filter(m => {
     const matchesSearch = m.rival_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||

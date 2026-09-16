@@ -1,5 +1,6 @@
 'use server';
 
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedContext, ADMIN_ROLES } from '@/lib/auth-helpers';
 import { cookies } from 'next/headers';
@@ -115,30 +116,42 @@ export async function getImpersonationStatusAction() {
   }
 }
 
+// ✅ NUEVA VERSIÓN: no usa getAuthenticatedContext() para evitar .single() que falla
 export async function getClubUsersForImpersonationAction() {
   try {
-    const { context: ctx } = await getAuthenticatedContext();
+    // 1. Obtener el usuario autenticado directamente
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error('[getClubUsers] No autenticado:', authError);
+      return { success: false, data: [] };
+    }
+
     const adminClient = createAdminClient();
 
-    const realRole = ctx?.realAdminRole || ctx?.profile?.role || 'admin';
-    if (!ADMIN_ROLES.includes(realRole)) {
-      return { success: true, data: [] };
-    }
-
-    let clubId = ctx?.profile?.club_id;
-    if (!clubId) {
-      const { data: defaultClub } = await adminClient.from('clubs').select('id').limit(1).maybeSingle();
-      clubId = defaultClub?.id;
-    }
-
-    let { data: profiles, error } = await adminClient
+    // 2. Verificar que el usuario es admin con maybeSingle (nunca falla)
+    const { data: adminProfile } = await adminClient
       .from('profiles')
-      .select('id, first_name, last_name, role, avatar_url, updated_at, club_id')
+      .select('id, role, club_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const realRole = adminProfile?.role || '';
+    if (!ADMIN_ROLES.includes(realRole)) {
+      console.log('[getClubUsers] Usuario sin rol admin:', realRole);
+      return { success: false, data: [] };
+    }
+
+    // 3. Obtener TODOS los perfiles (adminClient bypassa RLS)
+    const { data: profiles, error: profilesError } = await adminClient
+      .from('profiles')
+      .select('id, first_name, last_name, role, avatar_url')
       .order('first_name', { ascending: true });
 
-    if (error) {
-      console.error('[getClubUsersForImpersonationAction Error]:', error);
-      return { success: true, data: [] };
+    if (profilesError) {
+      console.error('[getClubUsers] Error al obtener perfiles:', profilesError);
+      return { success: false, data: [] };
     }
 
     const roleLabels: Record<string, string> = {
@@ -166,9 +179,10 @@ export async function getClubUsersForImpersonationAction() {
       avatarUrl: p.avatar_url,
     }));
 
+    console.log('[getClubUsers] Perfiles encontrados:', formatted.length);
     return { success: true, data: formatted };
   } catch (err: any) {
-    console.error('[getClubUsersForImpersonationAction Exception]:', err);
-    return { success: true, data: [] };
+    console.error('[getClubUsers] Excepción:', err?.message || err);
+    return { success: false, data: [] };
   }
 }

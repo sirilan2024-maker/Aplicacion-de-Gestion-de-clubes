@@ -38,10 +38,10 @@ export function ImpersonationModal({ open, onOpenChange }: ImpersonationModalPro
     setLoading(true);
     try {
       const res = await getClubUsersForImpersonationAction();
-      if (res.success && res.data) {
+      if (res.data && res.data.length > 0) {
         setUsers(res.data);
-      } else {
-        toast.error("Error al cargar los usuarios del club");
+      } else if (!res.success) {
+        toast.error("No tienes permisos para ver usuarios o hubo un error.");
       }
     } catch (e) {
       toast.error("Error de conexión");

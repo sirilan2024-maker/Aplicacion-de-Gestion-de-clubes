@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { ADMIN_ROLES } from '@/lib/auth-helpers';
 
 export async function startImpersonationAction(targetUserId: string) {
   const supabase = await createClient();
@@ -16,7 +17,8 @@ export async function startImpersonationAction(targetUserId: string) {
     .eq('id', user.id)
     .single();
 
-  if (!realProfile || !['admin', 'superadmin'].includes(realProfile.role)) {
+  const isAllowedAdmin = realProfile && (ADMIN_ROLES.includes(realProfile.role) || ['admin', 'superadmin'].includes(realProfile.role));
+  if (!isAllowedAdmin) {
     return { success: false, error: 'Solo los administradores pueden usar la función de vista previa de usuario.' };
   }
 
@@ -111,7 +113,8 @@ export async function getImpersonationStatusAction() {
     .eq('id', user.id)
     .single();
 
-  if (!realProfile || !['admin', 'superadmin'].includes(realProfile.role)) {
+  const isAllowedAdmin1 = realProfile && (ADMIN_ROLES.includes(realProfile.role) || ['admin', 'superadmin'].includes(realProfile.role));
+  if (!isAllowedAdmin1) {
     return { isImpersonating: false };
   }
 
@@ -150,7 +153,8 @@ export async function getClubUsersForImpersonationAction() {
     .eq('id', user.id)
     .single();
 
-  if (!realProfile || !['admin', 'superadmin'].includes(realProfile.role)) {
+  const isAllowedAdmin = realProfile && (ADMIN_ROLES.includes(realProfile.role) || ['admin', 'superadmin'].includes(realProfile.role));
+  if (!isAllowedAdmin) {
     return { success: false, data: [] };
   }
 

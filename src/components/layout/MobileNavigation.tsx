@@ -101,12 +101,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           
         if (profile) {
           setUserRole(profile.role)
-          const computedRoles = Array.from(new Set([
-            ...(profile.roles || []),
-            profile.role || 'usuario',
-            ...(profile.role === 'admin' ? ['admin', 'familia'] : [])
-          ]))
-          setAvailableRoles(computedRoles)
+          setAvailableRoles(profile.roles && profile.roles.length > 0 ? profile.roles : [profile.role || 'usuario'])
           
           if (profile.club_id) {
             const { data: club } = await supabase.from('clubs').select('id, name, logo_url').eq('id', profile.club_id).single()

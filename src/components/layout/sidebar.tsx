@@ -41,7 +41,8 @@ import {
   Building2,
   Sliders,
   Landmark,
-  Bell,
+  FolderOpen,
+  UserPlus,
   Eye
 } from "lucide-react"
 
@@ -493,10 +494,20 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
             </div>
           )}
         </div>
-        {!collapsed && (
-          <NotificationBell />
-        )}
       </div>
+
+      {/* ── Modo Simulación (Ver como otro Usuario) ────── */}
+      {isAdmin && !collapsed && (
+        <div className="px-4 py-2.5 border-b border-slate-800">
+          <button
+            onClick={() => setShowImpersonateModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Ver como otro Usuario</span>
+          </button>
+        </div>
+      )}
 
       {/* ── Role Switcher ──────────────────────────────── */}
       {!collapsed && availableRoles.length > 1 && (

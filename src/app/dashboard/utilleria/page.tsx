@@ -416,7 +416,15 @@ export default function UtilleriaDashboardPage() {
     return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => sizeAcc + stats.delivered, 0)
   }, 0) as number
 
-  const pendingDeliveries = totalItemsNeeded - totalItemsDelivered
+  // Prendas realmente pendientes a comprar/pedir considerando el Stock en Almacén
+  const pendingDeliveries = Object.values(report).reduce((acc: number, sizes: any) => {
+    return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => {
+      const stock = stats.initialStock || 0
+      const pendingDelivery = Math.max(0, (stats.totalNeeded || 0) - (stats.delivered || 0))
+      const toOrder = Math.max(0, pendingDelivery - stock)
+      return sizeAcc + toOrder
+    }, 0)
+  }, 0) as number
 
   // Get size breakdown for the modal
   const getModalBreakdown = (itemKey: string, type: 'total' | 'delivered' | 'pending') => {
@@ -425,7 +433,11 @@ export default function UtilleriaDashboardPage() {
       let count = 0
       if (type === 'total') count = stats.totalNeeded
       else if (type === 'delivered') count = stats.delivered
-      else if (type === 'pending') count = stats.pending
+      else if (type === 'pending') {
+        const stock = stats.initialStock || 0
+        const pendingDelivery = Math.max(0, (stats.totalNeeded || 0) - (stats.delivered || 0))
+        count = Math.max(0, pendingDelivery - stock)
+      }
       return { size, count }
     }).filter(e => e.count > 0)
   }
@@ -900,7 +912,8 @@ export default function UtilleriaDashboardPage() {
                       <div className="divide-y divide-slate-100">
                         {sizesList.map(([size, stats]: any) => {
                           const stock = stats.initialStock || 0;
-                          const toOrder = Math.max(0, (stats.totalNeeded || 0) - stock);
+                          const pendingDelivery = Math.max(0, (stats.totalNeeded || 0) - (stats.delivered || 0));
+                          const toOrder = Math.max(0, pendingDelivery - stock);
                           
                           return (
                           <div key={size} className="py-2.5 flex items-center justify-between text-sm">

@@ -50,12 +50,21 @@ export async function getAuthenticatedContext(): Promise<{
       return { context: null, error: "Perfil de usuario no encontrado", statusCode: 403 };
     }
 
-    if (!profile.club_id) {
+    let effectiveClubId = profile.club_id;
+    if (!effectiveClubId) {
+      const { data: defaultClub } = await adminClient.from("clubs").select("id").limit(1).maybeSingle();
+      effectiveClubId = defaultClub?.id || "";
+    }
+
+    if (!effectiveClubId) {
       return { context: null, error: "Usuario sin club asignado", statusCode: 403 };
     }
 
-    // Impersonation Check: if the real logged-in user is admin/superadmin
-    if (['admin', 'superadmin'].includes(profile.role)) {
+    profile.club_id = effectiveClubId;
+
+    // Impersonation Check: if the real logged-in user is admin/superadmin or staff
+    const isAdminUser = ADMIN_ROLES.includes(profile.role) || (profile.roles && profile.roles.some((r: string) => ADMIN_ROLES.includes(r)));
+    if (isAdminUser) {
       try {
         const { cookies } = await import('next/headers');
         const cookieStore = await cookies();

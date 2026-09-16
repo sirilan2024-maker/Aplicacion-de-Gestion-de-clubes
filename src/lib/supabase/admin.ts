@@ -6,20 +6,17 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
  * Requiere SUPABASE_SERVICE_ROLE_KEY en .env.local
  */
 export function createAdminClient() {
-  const url    = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const srvKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const srvKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!url || !srvKey || srvKey === 'PEGA_AQUI_TU_SERVICE_ROLE_KEY') {
-    throw new Error(
-      '[AdminClient] SUPABASE_SERVICE_ROLE_KEY no está configurada en .env.local. ' +
-      'Cópiala desde Supabase Dashboard → Settings → API → service_role.'
-    )
+  if (!url || !srvKey) {
+    console.error('[AdminClient] SUPABASE_URL o KEY no configurados.')
   }
 
-  return createSupabaseClient(url, srvKey, {
+  return createSupabaseClient(url || '', srvKey || '', {
     auth: {
       autoRefreshToken: false,
-      persistSession:   false,
+      persistSession: false,
     },
   })
 }

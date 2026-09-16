@@ -446,8 +446,13 @@ export async function getApparelSummaryReportAction(teamId?: string) {
     const CLOTHING_SIZES = ['Talla 116', 'Talla 128', 'Talla 140', 'Talla 152', 'Talla 164', 'Talla 176', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
     const SOCKS_SIZES = ['28-32', '33-35', '36-38', '39-42', '43-46'];
 
-    // Obtener cantidad de jugadores activos para prendas de talla única (Medias, Mochila)
-    let playersCountQuery = adminClient.from('players').select('id', { count: 'exact', head: true }).eq('club_id', context.profile.club_id).neq('status', 'inactive')
+    // Obtener cantidad de jugadores activos para prendas de talla única (Medias, Mochila) en la temporada activa
+    let playersCountQuery = adminClient
+      .from('players')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', context.profile.club_id)
+      .neq('status', 'inactive')
+      .in('id', activePlayerIds)
     if (teamId) {
       playersCountQuery = playersCountQuery.eq('team_id', teamId)
     }

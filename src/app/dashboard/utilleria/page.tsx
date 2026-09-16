@@ -407,17 +407,20 @@ export default function UtilleriaDashboardPage() {
 
   const highlightedItemKey = deliveryFilter.startsWith('missing_') ? deliveryFilter.replace('missing_', '') : null
 
-  // Calculate global summary stats
-  const totalItemsNeeded = Object.values(report).reduce((acc: number, sizes: any) => {
-    return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => sizeAcc + stats.totalNeeded, 0)
+  // Calculate global summary stats (excluyendo prendas virtuales consolidadas para evitar duplicación)
+  const totalItemsNeeded = Object.entries(report).reduce((acc: number, [itemName, sizes]: [string, any]) => {
+    if (itemName.includes('(Total ')) return acc;
+    return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => sizeAcc + (stats.totalNeeded || 0), 0)
   }, 0) as number
 
-  const totalItemsDelivered = Object.values(report).reduce((acc: number, sizes: any) => {
-    return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => sizeAcc + stats.delivered, 0)
+  const totalItemsDelivered = Object.entries(report).reduce((acc: number, [itemName, sizes]: [string, any]) => {
+    if (itemName.includes('(Total ')) return acc;
+    return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => sizeAcc + (stats.delivered || 0), 0)
   }, 0) as number
 
-  // Prendas realmente pendientes a comprar/pedir considerando el Stock en Almacén
-  const pendingDeliveries = Object.values(report).reduce((acc: number, sizes: any) => {
+  // Prendas realmente pendientes a comprar/pedir considerando el Stock en Almacén (sin duplicar virtuales)
+  const pendingDeliveries = Object.entries(report).reduce((acc: number, [itemName, sizes]: [string, any]) => {
+    if (itemName.includes('(Total ')) return acc;
     return acc + Object.values(sizes).reduce((sizeAcc: number, stats: any) => {
       const stock = stats.initialStock || 0
       const pendingDelivery = Math.max(0, (stats.totalNeeded || 0) - (stats.delivered || 0))

@@ -469,9 +469,8 @@ export async function getApparelSummaryReportAction(teamId?: string) {
       else if (item === 'Mochila') sizesToUse = ['Única'];
 
       sizesToUse.forEach(size => {
-        const isUnica = sizesToUse.length === 1 && size === 'Única';
         report[item][size] = { 
-          totalNeeded: isUnica ? totalPlayers : 0, 
+          totalNeeded: 0, 
           delivered: 0, 
           pending: 0, 
           initialStock: 0 
@@ -500,10 +499,8 @@ export async function getApparelSummaryReportAction(teamId?: string) {
         report[item][size] = { totalNeeded: 0, delivered: 0, pending: 0, initialStock: 0 }
       }
 
-      // Solo incrementamos totalNeeded si NO es una prenda de talla única (ya lo sumamos arriba por cantidad de jugadores)
-      if (item !== 'Mochila') {
-        report[item][size].totalNeeded += 1
-      }
+      // Incrementar totalNecesitado estrictamente según lo que hayan pedido los jugadores
+      report[item][size].totalNeeded += 1
       
       if (isDelivered) {
         report[item][size].delivered += 1

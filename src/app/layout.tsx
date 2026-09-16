@@ -32,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
-      <body className="antialiased font-sans">
+    <html lang="es" className="bg-slate-50 text-slate-900">
+      <body className="antialiased font-sans bg-slate-50 text-slate-900 min-h-screen">
         <SeasonProvider>
           {children}
           <Toaster />

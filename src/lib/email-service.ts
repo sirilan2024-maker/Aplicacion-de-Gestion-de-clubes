@@ -71,8 +71,9 @@ export async function sendEmail({ to, subject, html, replyTo, fromName: customFr
     const resendApiKey = process.env.RESEND_API_KEY?.trim();
     if (resendApiKey) {
       const resend = new Resend(resendApiKey);
-      const fromAddress = process.env.EMAIL_FROM || `"${effectiveFromName}" <onboarding@resend.dev>`;
-      const effectiveReplyTo = replyTo || defaultReplyTo;
+      const defaultOfficialFrom = `"${effectiveFromName}" <info@clubsportingsaladar.com>`;
+      const fromAddress = process.env.EMAIL_FROM || defaultOfficialFrom;
+      const effectiveReplyTo = replyTo || defaultReplyTo || 'csportingsaladar@gmail.com';
 
       console.log(`[Email Resend] Enviando vía Resend (${fromAddress}) a: ${recipients.join(', ')}`);
       const { data, error } = await resend.emails.send({

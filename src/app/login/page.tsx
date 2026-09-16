@@ -49,15 +49,15 @@ function LoginForm() {
 
         {/* Top header over image */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <img
               src="/escudo-saladar.jpg"
               alt="Escudo Sporting Saladar"
-              className="w-16 h-16 object-contain rounded-full bg-white/10 p-1 border border-white/20 shadow-xl backdrop-blur-sm"
+              className="w-24 h-24 object-contain rounded-full bg-white/15 p-1.5 border-2 border-white/30 shadow-2xl backdrop-blur-md shrink-0"
             />
             <div>
-              <h3 className="text-2xl font-black tracking-wider text-white drop-shadow-md">SPORTING SALADAR</h3>
-              <p className="text-xs text-blue-200 font-medium uppercase tracking-widest drop-shadow">Gestión Integral del Club</p>
+              <h3 className="text-3xl font-black tracking-wider text-white drop-shadow-lg">SPORTING SALADAR</h3>
+              <p className="text-xs text-blue-200 font-bold uppercase tracking-widest drop-shadow">Gestión Integral del Club</p>
             </div>
           </div>
         </div>
@@ -92,7 +92,7 @@ function LoginForm() {
         {/* Footer info over image */}
         <div className="relative z-10 pt-4 border-t border-white/20 flex items-center justify-between text-xs text-slate-300 font-medium">
           <span>Club Sporting Saladar</span>
-          <span>Temporada 24/25</span>
+          <span className="font-bold text-white">Temporada 26/27</span>
         </div>
       </div>
 
@@ -103,7 +103,7 @@ function LoginForm() {
             <img
               src="/escudo-saladar.jpg"
               alt="Escudo Sporting Saladar"
-              className="w-24 h-24 object-contain mb-3 drop-shadow-md rounded-full"
+              className="w-28 h-28 object-contain mb-3 drop-shadow-lg rounded-full"
             />
             <h1 className="text-2xl font-bold text-slate-900">SPORTING SALADAR</h1>
             <p className="text-xs text-slate-500 font-medium mt-0.5">Acceso a la Plataforma</p>

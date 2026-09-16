@@ -4,17 +4,25 @@ import { Toaster } from 'react-hot-toast';
 import { SeasonProvider } from "@/components/providers/SeasonProvider";
 
 export const viewport: Viewport = {
-  themeColor: "#0f172a",
+  themeColor: "#0284c7",
 };
 
 export const metadata: Metadata = {
-  title: "ClubManager Pro",
-  description: "Plataforma Integral de Gestión Deportiva",
+  title: "Club Sporting Saladar - Gestión Integral",
+  description: "Plataforma Oficial de Gestión del Club Sporting Saladar",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ClubManager",
+    title: "Sporting Saladar",
   },
 };
 

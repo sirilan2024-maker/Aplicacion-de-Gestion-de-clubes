@@ -1,23 +1,30 @@
 {
-  "name": "ClubManager Pro",
-  "short_name": "ClubManager",
-  "description": "Plataforma Integral de Gestión Deportiva",
-  "start_url": "/dashboard",
+  "name": "Club Sporting Saladar",
+  "short_name": "Sporting Saladar",
+  "description": "Plataforma Oficial de Gestión del Club Sporting Saladar",
+  "start_url": "/admin/inicio",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#34d399",
+  "background_color": "#ffffff",
+  "theme_color": "#0284c7",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon-192x192.svg",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.svg",
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

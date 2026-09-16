@@ -144,7 +144,7 @@ export async function generateInscriptionPdfBuffer(data: InscriptionPdfData): Pr
   };
 
   const drawField = (label: string, value: string | undefined | null, x: number, y: number, fontRef = font) => {
-    const safeValue = value && value.trim() ? value : '---';
+    const safeValue = value && String(value).trim() ? String(value).trim() : '---';
     page.drawText(`${label}:`, {
       x,
       y,
@@ -152,8 +152,9 @@ export async function generateInscriptionPdfBuffer(data: InscriptionPdfData): Pr
       font: boldFont,
       color: darkNavy,
     });
+    const labelWidth = boldFont.widthOfTextAtSize(`${label}: `, 9);
     page.drawText(safeValue, {
-      x: x + (label.length * 5.2) + 12,
+      x: x + labelWidth + 3,
       y,
       size: 9,
       font: fontRef,
@@ -166,9 +167,9 @@ export async function generateInscriptionPdfBuffer(data: InscriptionPdfData): Pr
 
   page.drawRectangle({
     x: 40,
-    y: currentY - 55,
+    y: currentY - 75,
     width: width - 80,
-    height: 70,
+    height: 90,
     color: lightBg,
     borderColor: grayBorder,
     borderWidth: 1,
@@ -180,11 +181,15 @@ export async function generateInscriptionPdfBuffer(data: InscriptionPdfData): Pr
 
   currentY -= 20;
   drawField('Fecha Nacimiento', data.player.birthDate, 50, currentY);
-  drawField('Categoría / Posición', data.player.category, 340, currentY);
+  drawField('Categoría / Equipo', data.player.category, 340, currentY);
 
   currentY -= 20;
   drawField('Teléfono de Contacto', data.player.phone, 50, currentY);
   drawField('SIP / Nº Sanitario', data.player.sip, 340, currentY);
+
+  currentY -= 20;
+  drawField('Domicilio / Población', data.player.address, 50, currentY);
+  drawField('Email Jugador', data.player.email, 340, currentY);
 
   currentY -= 35;
 

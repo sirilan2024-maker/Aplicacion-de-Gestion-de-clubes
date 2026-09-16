@@ -370,10 +370,11 @@ export async function getInscriptionPdfAction(playerId: string) {
   const { data: player } = await adminSupabase
     .from('players')
     .select(`
-      id, first_name, last_name, dni, phone, email, sip, is_senior, created_at,
-      registration_status, posicion_principal,
+      id, first_name, last_name, dni, birth_date, phone, email, sip, is_senior, created_at,
+      registration_status, posicion_principal, address, municipio,
       parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
-      iban, was_in_club, paid_reservation, payment_method
+      parent2_name, parent2_last_name, parent2_phone, parent2_email,
+      iban, was_in_club, paid_reservation, payment_method, teams(id, name, category)
     `)
     .eq('id', playerId)
     .single();
@@ -396,16 +397,26 @@ export async function getInscriptionPdfAction(playerId: string) {
   // Fee data calculation & auto-creation
   const feeInfo = await getPlayerPdfFeeInfo(adminSupabase, player);
 
+  const formattedBirthDate = player.birth_date
+    ? new Date(player.birth_date).toLocaleDateString('es-ES')
+    : null;
+
+  const teamInfo = Array.isArray(player.teams) ? player.teams[0] : player.teams;
+  const categoryStr = teamInfo?.name || teamInfo?.category || player.posicion_principal || 'Sin asignar';
+  const fullAddress = [player.address, player.municipio].filter(Boolean).join(', ');
+
   const pdfData = {
     player: {
       id: player.id,
       firstName: player.first_name || '',
       lastName: player.last_name || '',
       dni: player.dni,
-      category: player.posicion_principal,
+      birthDate: formattedBirthDate,
+      category: categoryStr,
       phone: player.phone,
       email: player.email,
       sip: player.sip,
+      address: fullAddress,
       registrationStatus: player.registration_status,
       createdAt: player.created_at,
     },
@@ -454,10 +465,11 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
   let query = adminSupabase
     .from('players')
     .select(`
-      id, first_name, last_name, dni, phone, email, sip, is_senior, created_at,
-      registration_status, posicion_principal,
+      id, first_name, last_name, dni, birth_date, phone, email, sip, is_senior, created_at,
+      registration_status, posicion_principal, address, municipio,
       parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
-      iban, was_in_club, paid_reservation, payment_method
+      parent2_name, parent2_last_name, parent2_phone, parent2_email,
+      iban, was_in_club, paid_reservation, payment_method, teams(id, name, category)
     `)
     .eq('club_id', context.profile.club_id);
 
@@ -484,16 +496,26 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
 
     const feeInfo = await getPlayerPdfFeeInfo(adminSupabase, player);
 
+    const formattedBirthDate = player.birth_date
+      ? new Date(player.birth_date).toLocaleDateString('es-ES')
+      : null;
+
+    const teamInfo = Array.isArray(player.teams) ? player.teams[0] : player.teams;
+    const categoryStr = teamInfo?.name || teamInfo?.category || player.posicion_principal || 'Sin asignar';
+    const fullAddress = [player.address, player.municipio].filter(Boolean).join(', ');
+
     return {
       player: {
         id: player.id,
         firstName: player.first_name || '',
         lastName: player.last_name || '',
         dni: player.dni,
-        category: player.posicion_principal,
+        birthDate: formattedBirthDate,
+        category: categoryStr,
         phone: player.phone,
         email: player.email,
         sip: player.sip,
+        address: fullAddress,
         registrationStatus: player.registration_status,
         createdAt: player.created_at,
       },

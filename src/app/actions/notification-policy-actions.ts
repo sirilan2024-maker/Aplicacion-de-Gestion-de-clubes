@@ -263,8 +263,13 @@ export async function getClubUsersForNotificationControlAction(searchQuery?: str
 }> {
   try {
     const { context: ctx } = await getAuthenticatedContext();
-    const clubId = ctx?.profile?.club_id;
+    let clubId = ctx?.profile?.club_id;
     const adminClient = createAdminClient();
+
+    if (!clubId) {
+      const { data: defaultClub } = await adminClient.from('clubs').select('id').limit(1).maybeSingle();
+      clubId = defaultClub?.id;
+    }
 
     let query = adminClient
       .from('profiles')
@@ -272,7 +277,7 @@ export async function getClubUsersForNotificationControlAction(searchQuery?: str
       .order('first_name', { ascending: true });
 
     if (clubId) {
-      query = query.or(`club_id.eq.${clubId},club_id.is.null`);
+      query = query.eq('club_id', clubId);
     }
 
     if (searchQuery && searchQuery.trim()) {

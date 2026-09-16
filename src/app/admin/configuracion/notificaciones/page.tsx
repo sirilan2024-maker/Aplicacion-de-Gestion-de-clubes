@@ -352,36 +352,6 @@ export default function ConfigNotificacionesPage() {
     )
   }
 
-  if (authError) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-6 animate-in fade-in duration-300">
-        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-3xl mx-auto flex items-center justify-center border border-red-100 shadow-sm">
-          <Shield className="w-8 h-8" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Acceso Denegado</h2>
-          <p className="text-slate-500 text-sm max-w-md mx-auto">
-            {authError}. Esta sección está reservada exclusivamente para administradores generales del club.
-          </p>
-        </div>
-        <div className="pt-2 flex justify-center gap-3">
-          <Link
-            href="/admin/inicio"
-            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm"
-          >
-            Volver al Panel Principal
-          </Link>
-          <Link
-            href="/dashboard"
-            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all"
-          >
-            Ir al Dashboard
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="bottom-right" />

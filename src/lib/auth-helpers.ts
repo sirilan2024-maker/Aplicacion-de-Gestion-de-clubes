@@ -18,7 +18,25 @@ export interface AuthenticatedContext {
   impersonatedRole?: string;
 }
 
-export const ADMIN_ROLES = ["admin", "coordinador", "metodologo", "superadmin", "secretario", "tesorero", "directivo"];
+export const ADMIN_ROLES = [
+  "admin",
+  "administrador",
+  "admin_club",
+  "coordinador",
+  "coordinador_general",
+  "metodologo",
+  "metodologia",
+  "superadmin",
+  "secretario",
+  "secretaria",
+  "tesorero",
+  "tesoreria",
+  "directivo",
+  "director",
+  "directiva",
+  "staff",
+  "utillero"
+];
 export const COACH_ROLES = ["coach", "entrenador", "delegado", "preparador_fisico"];
 export const STAFF_ROLES = [...ADMIN_ROLES, ...COACH_ROLES];
 export const TREASURY_ADMIN_ROLES = ["admin", "coordinador", "tesorero", "superadmin", "secretario"];

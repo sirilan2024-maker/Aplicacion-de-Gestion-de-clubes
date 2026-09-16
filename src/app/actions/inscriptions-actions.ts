@@ -295,3 +295,175 @@ export async function resetPasswordAction(email: string) {
   }
   return { success: true };
 }
+
+export async function getInscriptionPdfAction(playerId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) return { success: false, error: authError || 'No autenticado' };
+
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessPlayer(adminSupabase, context, playerId);
+  if (!access.allowed || !access.player) {
+    return { success: false, error: access.reason || 'No autorizado' };
+  }
+
+  const { data: player } = await adminSupabase
+    .from('players')
+    .select(`
+      id, first_name, last_name, dni, phone, email, sip, is_senior, created_at,
+      registration_status, posicion_principal,
+      parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
+      iban
+    `)
+    .eq('id', playerId)
+    .single();
+
+  if (!player) return { success: false, error: 'Jugador no encontrado' };
+
+  // Apparel sizes
+  const { data: apparel } = await adminSupabase
+    .from('player_apparel')
+    .select('item_name, size')
+    .eq('player_id', playerId);
+
+  // Health data
+  const { data: health } = await adminSupabase
+    .from('player_health')
+    .select('allergies, conditions, notes')
+    .eq('player_id', playerId)
+    .maybeSingle();
+
+  // Fee data
+  const { data: fee } = await adminSupabase
+    .from('fees')
+    .select('monto_total, estado, metodo_pago')
+    .eq('player_id', playerId)
+    .maybeSingle();
+
+  const pdfData = {
+    player: {
+      id: player.id,
+      firstName: player.first_name || '',
+      lastName: player.last_name || '',
+      dni: player.dni,
+      category: player.posicion_principal,
+      phone: player.phone,
+      email: player.email,
+      sip: player.sip,
+      registrationStatus: player.registration_status,
+      createdAt: player.created_at,
+    },
+    tutor: {
+      name: player.is_senior ? `${player.first_name} ${player.last_name}` : `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim(),
+      dni: player.is_senior ? player.dni : player.parent1_dni,
+      phone: player.is_senior ? player.phone : player.parent1_phone,
+      email: player.is_senior ? player.email : player.parent1_email,
+    },
+    health: {
+      allergies: health?.allergies,
+      conditions: health?.conditions,
+      notes: health?.notes,
+    },
+    apparel: (apparel || []).map(a => ({ itemName: a.item_name, size: a.size })),
+    payment: {
+      method: fee?.metodo_pago,
+      totalAmount: fee?.monto_total ? fee.monto_total / 100 : 250,
+      status: fee?.estado,
+      iban: player.iban,
+    }
+  };
+
+  const { generateInscriptionPdfBuffer } = await import('@/lib/pdf/inscription-pdf-generator');
+  const pdfBuffer = await generateInscriptionPdfBuffer(pdfData);
+  const base64 = Buffer.from(pdfBuffer).toString('base64');
+  const fileName = `Ficha_Inscripcion_${player.first_name}_${player.last_name}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+
+  return { success: true, base64, fileName };
+}
+
+export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) return { success: false, error: authError || 'No autenticado' };
+
+  if (!ADMIN_ROLES.includes(context.profile.role) && context.profile.role !== 'secretario') {
+    return { success: false, error: 'No tienes permisos' };
+  }
+
+  const adminSupabase = await createAdminClient();
+  let query = adminSupabase
+    .from('players')
+    .select(`
+      id, first_name, last_name, dni, phone, email, sip, is_senior, created_at,
+      registration_status, posicion_principal,
+      parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
+      iban
+    `)
+    .eq('club_id', context.profile.club_id);
+
+  if (playerIds && playerIds.length > 0) {
+    query = query.in('id', playerIds);
+  }
+
+  const { data: players } = await query;
+  if (!players || players.length === 0) {
+    return { success: false, error: 'No se encontraron inscripciones para exportar' };
+  }
+
+  const pdfDataList = await Promise.all(players.map(async (player) => {
+    const { data: apparel } = await adminSupabase
+      .from('player_apparel')
+      .select('item_name, size')
+      .eq('player_id', player.id);
+
+    const { data: health } = await adminSupabase
+      .from('player_health')
+      .select('allergies, conditions, notes')
+      .eq('player_id', player.id)
+      .maybeSingle();
+
+    const { data: fee } = await adminSupabase
+      .from('fees')
+      .select('monto_total, estado, metodo_pago')
+      .eq('player_id', player.id)
+      .maybeSingle();
+
+    return {
+      player: {
+        id: player.id,
+        firstName: player.first_name || '',
+        lastName: player.last_name || '',
+        dni: player.dni,
+        category: player.posicion_principal,
+        phone: player.phone,
+        email: player.email,
+        sip: player.sip,
+        registrationStatus: player.registration_status,
+        createdAt: player.created_at,
+      },
+      tutor: {
+        name: player.is_senior ? `${player.first_name} ${player.last_name}` : `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim(),
+        dni: player.is_senior ? player.dni : player.parent1_dni,
+        phone: player.is_senior ? player.phone : player.parent1_phone,
+        email: player.is_senior ? player.email : player.parent1_email,
+      },
+      health: {
+        allergies: health?.allergies,
+        conditions: health?.conditions,
+        notes: health?.notes,
+      },
+      apparel: (apparel || []).map(a => ({ itemName: a.item_name, size: a.size })),
+      payment: {
+        method: fee?.metodo_pago,
+        totalAmount: fee?.monto_total ? fee.monto_total / 100 : 250,
+        status: fee?.estado,
+        iban: player.iban,
+      }
+    };
+  }));
+
+  const { generateBatchInscriptionsPdfBuffer } = await import('@/lib/pdf/inscription-pdf-generator');
+  const pdfBuffer = await generateBatchInscriptionsPdfBuffer(pdfDataList);
+  const base64 = Buffer.from(pdfBuffer).toString('base64');
+  const fileName = `Fichas_Inscripcion_Lote_Sporting_Saladar.pdf`;
+
+  return { success: true, base64, fileName };
+}

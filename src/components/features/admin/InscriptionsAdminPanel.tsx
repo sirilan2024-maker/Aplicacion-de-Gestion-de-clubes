@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Filter, CheckCircle, XCircle, Clock, FileText, AlertTriangle, Banknote, Loader2 } from "lucide-react";
+import { Search, Filter, CheckCircle, XCircle, Clock, FileText, AlertTriangle, Banknote, Loader2, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSignedDniUrlAction } from "@/app/actions/secretaria-actions";
-import { getInscriptionsAction, approveInscriptionAction, requestCorrectionAction, rejectInscriptionAction, updateRegistrationEmailAction, resetPasswordAction } from "@/app/actions/inscriptions-actions";
+import { getInscriptionsAction, approveInscriptionAction, requestCorrectionAction, rejectInscriptionAction, updateRegistrationEmailAction, resetPasswordAction, getInscriptionPdfAction, getBatchInscriptionsPdfAction } from "@/app/actions/inscriptions-actions";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 
@@ -36,6 +36,52 @@ export function InscriptionsAdminPanel() {
   const [editEmailModalOpen, setEditEmailModalOpen] = useState(false);
   const [selectedRegForEmail, setSelectedRegForEmail] = useState<PlayerInscription | null>(null);
   const [newEmail, setNewEmail] = useState("");
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+
+  const handleDownloadPdf = async (playerId: string) => {
+    setDownloadingPdf(playerId);
+    try {
+      const res = await getInscriptionPdfAction(playerId);
+      if (res.success && res.base64 && res.fileName) {
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${res.base64}`;
+        link.download = res.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("PDF generado con éxito");
+      } else {
+        toast.error(res.error || "Error al generar el PDF");
+      }
+    } catch (e) {
+      toast.error("Error al descargar el PDF");
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
+
+  const handleDownloadBatchPdf = async () => {
+    setDownloadingPdf('batch');
+    try {
+      const playerIds = filteredInscriptions.map(i => i.id);
+      const res = await getBatchInscriptionsPdfAction(playerIds);
+      if (res.success && res.base64 && res.fileName) {
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${res.base64}`;
+        link.download = res.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("PDF de lote descargado con éxito");
+      } else {
+        toast.error(res.error || "Error al generar el lote PDF");
+      }
+    } catch (e) {
+      toast.error("Error al descargar el lote PDF");
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
 
   const fetchInscriptions = async () => {
     setLoading(true);
@@ -174,6 +220,15 @@ export function InscriptionsAdminPanel() {
           <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')} className="text-xs h-8">Todas</Button>
           <Button variant={filter === 'pending_revision' ? 'default' : 'outline'} onClick={() => setFilter('pending_revision')} className="text-xs h-8 bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-0">Revisiones</Button>
           <Button variant={filter === 'pending_payment' ? 'default' : 'outline'} onClick={() => setFilter('pending_payment')} className="text-xs h-8 bg-blue-100 text-blue-800 hover:bg-blue-200 border-0">Pagos</Button>
+          <Button
+            variant="outline"
+            className="text-xs h-8 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+            onClick={handleDownloadBatchPdf}
+            disabled={downloadingPdf === 'batch'}
+          >
+            {downloadingPdf === 'batch' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1" />}
+            Descargar Lote PDF
+          </Button>
         </div>
       </div>
 
@@ -219,6 +274,16 @@ export function InscriptionsAdminPanel() {
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(item.status)}</td>
                     <td className="px-6 py-4 text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-slate-700 border-slate-200 hover:bg-slate-100"
+                        onClick={() => handleDownloadPdf(item.id)}
+                        disabled={downloadingPdf === item.id}
+                      >
+                        {downloadingPdf === item.id ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1 text-blue-600" />}
+                        PDF Ficha
+                      </Button>
                       
                       {item.status === 'pending_revision' && (
                         <>

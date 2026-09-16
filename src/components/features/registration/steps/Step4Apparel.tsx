@@ -34,6 +34,9 @@ export function Step4Apparel() {
   React.useEffect(() => {
     if (!wasInClub) {
       setValue("sizeMochila", "Talla Única");
+    } else {
+      // Si perteneció al club el año pasado, por defecto NO pide mochila salvo que el usuario la seleccione explícitamente
+      setValue("sizeMochila", "");
     }
   }, [wasInClub, setValue]);
 

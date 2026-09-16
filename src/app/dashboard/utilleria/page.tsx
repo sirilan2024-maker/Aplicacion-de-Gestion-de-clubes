@@ -683,15 +683,20 @@ export default function UtilleriaDashboardPage() {
                                 <div className="flex items-center justify-center gap-1 min-w-[95px] mx-auto">
                                   {/* SELECT DE TALLAS */}
                                   {item.key === 'Mochila' ? (
-                                    <div
-                                      className={`px-1 py-1 text-[10px] font-black rounded-lg border w-16 text-center shadow-sm ${
+                                    <select
+                                      value={info.size || ''}
+                                      onChange={(e) => handleSizeChange(p.id, item.key, e.target.value)}
+                                      className={`px-1 py-1 text-[10px] font-black rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-16 text-center shadow-sm bg-white ${
                                         isDelivered 
-                                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
-                                          : 'bg-slate-50 border-slate-200 text-slate-500'
+                                          ? 'border-emerald-300 text-emerald-800' 
+                                          : info.size 
+                                            ? 'border-indigo-300 text-indigo-900' 
+                                            : 'border-slate-200 text-slate-400'
                                       }`}
                                     >
-                                      Única
-                                    </div>
+                                      <option value="">- No -</option>
+                                      <option value="Única">Única</option>
+                                    </select>
                                   ) : (
                                     <select
                                       value={info.size || ''}
@@ -801,16 +806,20 @@ export default function UtilleriaDashboardPage() {
 
                             <div className="flex items-center gap-1.5 shrink-0">
                               {/* SELECT TALLA */}
-                              {['Medias', 'Mochila'].includes(item.key) ? (
+                              {item.key === 'Mochila' ? (
                                 <select
-                                  disabled
-                                  className={`px-1.5 py-1 text-[11px] font-black rounded-lg border w-20 text-center shadow-sm bg-white ${
+                                  value={info.size || ''}
+                                  onChange={(e) => handleSizeChange(p.id, item.key, e.target.value)}
+                                  className={`px-1.5 py-1 text-[11px] font-black rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-20 text-center shadow-sm bg-white ${
                                     isDelivered 
                                       ? 'border-emerald-300 text-emerald-800' 
-                                      : 'border-slate-200 text-slate-400'
+                                      : info.size 
+                                        ? 'border-indigo-300 text-indigo-900 font-bold'
+                                        : 'border-slate-200 text-slate-400'
                                   }`}
                                 >
-                                  <option value="">-</option>
+                                  <option value="">- No -</option>
+                                  <option value="Única">Única</option>
                                 </select>
                               ) : (
                                 <select
@@ -825,7 +834,7 @@ export default function UtilleriaDashboardPage() {
                                   }`}
                                 >
                                   <option value="">-</option>
-                                  {CLOTHING_SIZES.map(sz => (
+                                  {(item.key === 'Medias' ? SOCKS_SIZES : CLOTHING_SIZES).map(sz => (
                                     <option key={sz} value={sz}>{sz}</option>
                                   ))}
                                 </select>

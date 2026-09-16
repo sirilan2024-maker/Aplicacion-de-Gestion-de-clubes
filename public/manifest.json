@@ -1,6 +1,6 @@
 {
   "name": "SPORTING SALADAR",
-  "short_name": "SPORTING SALADAR",
+  "short_name": "SPORTING",
   "description": "Plataforma Oficial de Gestión del Club Sporting Saladar",
   "start_url": "/admin/inicio",
   "display": "standalone",

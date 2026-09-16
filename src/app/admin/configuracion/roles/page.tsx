@@ -117,28 +117,30 @@ export default function ConfigRolesPage() {
       </div>
 
       {/* Subnavigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
-        <Link
-          href="/admin/configuracion"
-          className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
-        >
-          <Landmark className="w-4 h-4" />
-          <span>Métricas y SEPA</span>
-        </Link>
-        <Link
-          href="/admin/configuracion/roles"
-          className="px-4 py-2.5 text-xs md:text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors flex items-center gap-2"
-        >
-          <Shield className="w-4 h-4" />
-          <span>Roles y Permisos</span>
-        </Link>
-        <Link
-          href="/admin/configuracion/notificaciones"
-          className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
-        >
-          <Bell className="w-4 h-4" />
-          <span>Canales y Políticas de Notificación</span>
-        </Link>
+      <div className="flex items-center border-b border-slate-200 overflow-x-auto no-scrollbar max-w-full">
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/admin/configuracion"
+            className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
+          >
+            <Landmark className="w-4 h-4" />
+            <span>Métricas y SEPA</span>
+          </Link>
+          <Link
+            href="/admin/configuracion/roles"
+            className="px-4 py-2.5 text-xs md:text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
+          >
+            <Shield className="w-4 h-4" />
+            <span>Roles y Permisos</span>
+          </Link>
+          <Link
+            href="/admin/configuracion/notificaciones"
+            className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
+          >
+            <Bell className="w-4 h-4" />
+            <span>Notificaciones</span>
+          </Link>
+        </div>
       </div>
 
       {/* Desktop Table View */}

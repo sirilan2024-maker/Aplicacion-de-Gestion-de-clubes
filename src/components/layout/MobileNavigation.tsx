@@ -310,10 +310,10 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                     <span key={i} className="block leading-none py-[1px]">{word}</span>
                   ))}
                 </div>
-                <p className={cn("text-[10px] font-semibold tracking-wide uppercase mt-1 flex items-center gap-1.5", isViewingHistorical ? "text-amber-400 font-extrabold" : "text-slate-400")}>
-                  <span>Temp. {selectedSeason?.name || '2026/27'}</span>
+                <p className={cn("text-[10px] font-semibold tracking-wide uppercase mt-1 flex items-center gap-1.5 whitespace-nowrap", isViewingHistorical ? "text-amber-400 font-extrabold" : "text-slate-400")}>
+                  <span>{selectedSeason?.name ? (selectedSeason.name.toLowerCase().startsWith('temp') ? selectedSeason.name : `Temporada ${selectedSeason.name}`) : 'Temporada 26/27'}</span>
                   {isViewingHistorical && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase tracking-wider">
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase tracking-wider shrink-0">
                       🔒 Histórica
                     </span>
                   )}

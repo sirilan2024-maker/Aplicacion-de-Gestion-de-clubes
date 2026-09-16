@@ -133,19 +133,12 @@ export async function getClubUsersForImpersonationAction() {
 
     let { data: profiles, error } = await adminClient
       .from('profiles')
-      .select('id, first_name, last_name, role, avatar_url, updated_at')
+      .select('id, first_name, last_name, role, avatar_url, updated_at, club_id')
       .order('first_name', { ascending: true });
 
     if (error) {
       console.error('[getClubUsersForImpersonationAction Error]:', error);
       return { success: true, data: [] };
-    }
-
-    if (clubId && profiles) {
-      const filteredByClub = profiles.filter(p => !p.club_id || p.club_id === clubId);
-      if (filteredByClub.length > 0) {
-        profiles = filteredByClub;
-      }
     }
 
     const roleLabels: Record<string, string> = {

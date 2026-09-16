@@ -66,7 +66,10 @@ type NavItem = {
   icon: React.ComponentType<any>;
 };
 
+import { useSeason } from "@/components/providers/SeasonProvider"
+
 export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
+  const { selectedSeason, isViewingHistorical } = useSeason()
   const pathname = usePathname()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -307,8 +310,13 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                     <span key={i} className="block leading-none py-[1px]">{word}</span>
                   ))}
                 </div>
-                <p className="text-[10px] font-semibold tracking-wide uppercase text-slate-400 mt-1">
-                  Temp. 2024/25
+                <p className={cn("text-[10px] font-semibold tracking-wide uppercase mt-1 flex items-center gap-1.5", isViewingHistorical ? "text-amber-400 font-extrabold" : "text-slate-400")}>
+                  <span>Temp. {selectedSeason?.name || '2026/27'}</span>
+                  {isViewingHistorical && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase tracking-wider">
+                      🔒 Histórica
+                    </span>
+                  )}
                 </p>
               </>
             ) : (

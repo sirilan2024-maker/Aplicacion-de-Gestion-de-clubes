@@ -36,6 +36,11 @@ export interface InscriptionPdfData {
   payment?: {
     method?: string | null;
     totalAmount?: number | null;
+    baseTotal?: number | null;
+    isRenewal?: boolean;
+    isReserved?: boolean;
+    reservationAmount?: number;
+    remainingAmount?: number;
     status?: string | null;
     iban?: string | null;
   };
@@ -275,7 +280,15 @@ export async function generateInscriptionPdfBuffer(data: InscriptionPdfData): Pr
     ? 'Tarjeta Bancaria / Online'
     : 'Transferencia / Efectivo';
 
-  const amountStr = data.payment?.totalAmount ? `${data.payment.totalAmount} €` : 'Según cuota oficial';
+  const isRenewal = data.payment?.isRenewal;
+  const baseTotal = data.payment?.baseTotal || data.payment?.totalAmount || (isRenewal ? 195 : 250);
+  const isReserved = Boolean(data.payment?.isReserved);
+  const remaining = isReserved ? Math.max(0, baseTotal - 50) : baseTotal;
+
+  const amountStr = isReserved
+    ? `${baseTotal} € (${isRenewal ? 'Renovación' : 'Alta'}) - 50 € Reserva = ${remaining} €`
+    : `${baseTotal} € (${isRenewal ? 'Renovación' : 'Alta'})`;
+
   const statusStr = data.player.registrationStatus === 'formalized'
     ? 'Formalizada y Aprobada'
     : data.player.registrationStatus === 'pending_payment'
@@ -283,7 +296,7 @@ export async function generateInscriptionPdfBuffer(data: InscriptionPdfData): Pr
     : 'En revisión por el club';
 
   drawField('Forma de Pago', paymentMethodLabel, 50, currentY);
-  drawField('Importe Cuota', amountStr, 340, currentY);
+  drawField('Desglose Cuota', amountStr, 270, currentY);
 
   currentY -= 20;
   drawField('Estado de Inscripción', statusStr, 50, currentY);

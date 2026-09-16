@@ -313,7 +313,7 @@ export async function resetPasswordAction(email: string) {
 async function getPlayerPdfFeeInfo(adminSupabase: any, player: any) {
   let { data: fees } = await adminSupabase
     .from('fees')
-    .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago')
+    .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago, concept')
     .eq('player_id', player.id);
 
   const { count } = await adminSupabase
@@ -330,7 +330,7 @@ async function getPlayerPdfFeeInfo(adminSupabase: any, player: any) {
 
       const { data: refreshedFees } = await adminSupabase
         .from('fees')
-        .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago')
+        .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago, concept')
         .eq('player_id', player.id);
       fees = refreshedFees || [];
     } catch (e) {
@@ -338,8 +338,12 @@ async function getPlayerPdfFeeInfo(adminSupabase: any, player: any) {
     }
   }
 
+  const baseTotal = isRenewal ? 195 : 250;
+  const isReserved = Boolean(player.paid_reservation) || (fees || []).some((f: any) => f.concept?.toLowerCase().includes('reserva'));
+  const remainingAmount = isReserved ? Math.max(0, baseTotal - 50) : baseTotal;
+
   let totalCents = (fees || []).reduce((sum: number, f: any) => sum + (f.amount_cents || f.monto_total || 0), 0);
-  let totalAmount = totalCents > 0 ? totalCents / 100 : (isRenewal ? 195 : 250);
+  let totalAmount = totalCents > 0 ? totalCents / 100 : baseTotal;
 
   let method = fees?.find((f: any) => f.payment_method || f.metodo_pago)?.payment_method ||
                fees?.find((f: any) => f.payment_method || f.metodo_pago)?.metodo_pago ||
@@ -350,7 +354,7 @@ async function getPlayerPdfFeeInfo(adminSupabase: any, player: any) {
                fees?.some((f: any) => f.estado === 'pdte_verif') ? 'pdte_verif' :
                'pendiente';
 
-  return { totalAmount, method, status };
+  return { totalAmount, baseTotal, isRenewal, isReserved, reservationAmount: isReserved ? 50 : 0, remainingAmount, method, status };
 }
 
 export async function getInscriptionPdfAction(playerId: string) {
@@ -420,6 +424,11 @@ export async function getInscriptionPdfAction(playerId: string) {
     payment: {
       method: feeInfo.method,
       totalAmount: feeInfo.totalAmount,
+      baseTotal: feeInfo.baseTotal,
+      isRenewal: feeInfo.isRenewal,
+      isReserved: feeInfo.isReserved,
+      reservationAmount: feeInfo.reservationAmount,
+      remainingAmount: feeInfo.remainingAmount,
       status: feeInfo.status,
       iban: player.iban,
     }
@@ -503,6 +512,11 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
       payment: {
         method: feeInfo.method,
         totalAmount: feeInfo.totalAmount,
+        baseTotal: feeInfo.baseTotal,
+        isRenewal: feeInfo.isRenewal,
+        isReserved: feeInfo.isReserved,
+        reservationAmount: feeInfo.reservationAmount,
+        remainingAmount: feeInfo.remainingAmount,
         status: feeInfo.status,
         iban: player.iban,
       }

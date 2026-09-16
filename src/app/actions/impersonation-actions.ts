@@ -20,13 +20,16 @@ export async function startImpersonationAction(targetUserId: string) {
     return { success: false, error: 'Solo los administradores pueden usar la función de vista previa de usuario.' };
   }
 
-  // Fetch target user profile
-  const { data: targetProfile } = await adminClient
+  let targetQuery = adminClient
     .from('profiles')
     .select('id, role, first_name, last_name, club_id')
-    .eq('id', targetUserId)
-    .eq('club_id', realProfile.club_id)
-    .maybeSingle();
+    .eq('id', targetUserId);
+
+  if (realProfile.club_id) {
+    targetQuery = targetQuery.or(`club_id.eq.${realProfile.club_id},club_id.is.null`);
+  }
+
+  const { data: targetProfile } = await targetQuery.maybeSingle();
 
   if (!targetProfile) {
     return { success: false, error: 'Usuario no encontrado en tu club.' };
@@ -151,11 +154,22 @@ export async function getClubUsersForImpersonationAction() {
     return { success: false, data: [] };
   }
 
-  const { data: profiles, error } = await adminClient
+  let clubId = realProfile?.club_id;
+  if (!clubId) {
+    const { data: defaultClub } = await adminClient.from('clubs').select('id').limit(1).maybeSingle();
+    clubId = defaultClub?.id;
+  }
+
+  let query = adminClient
     .from('profiles')
     .select('id, first_name, last_name, role, avatar_url, updated_at')
-    .eq('club_id', realProfile.club_id)
     .order('first_name', { ascending: true });
+
+  if (clubId) {
+    query = query.or(`club_id.eq.${clubId},club_id.is.null`);
+  }
+
+  const { data: profiles, error } = await query;
 
   if (error || !profiles) return { success: false, data: [] };
 

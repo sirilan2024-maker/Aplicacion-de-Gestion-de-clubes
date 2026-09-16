@@ -8,7 +8,7 @@ import {
   ExternalLink, ShieldCheck, Banknote, RefreshCw
 } from "lucide-react"
 import toast from "react-hot-toast"
-import { approveInscriptionAction, rejectInscriptionAction } from "@/app/actions/inscriptions-actions"
+import { approveInscriptionAction, rejectInscriptionAction, getInscriptionPdfAction, getBatchInscriptionsPdfAction } from "@/app/actions/inscriptions-actions"
 import { createAdminFeeForPlayerAction } from "@/app/actions/treasury-actions"
 import { useSearchParams } from "next/navigation"
 import { useSeason } from "@/components/providers/SeasonProvider"
@@ -404,6 +404,53 @@ export function SecretariaInscripciones() {
 
   useEffect(() => { fetchRequests() }, [fetchRequests])
 
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null)
+
+  const handleDownloadPdf = async (playerId: string) => {
+    setDownloadingPdf(playerId)
+    try {
+      const res = await getInscriptionPdfAction(playerId)
+      if (res.success && res.base64 && res.fileName) {
+        const link = document.createElement('a')
+        link.href = `data:application/pdf;base64,${res.base64}`
+        link.download = res.fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast.success("PDF generado con éxito")
+      } else {
+        toast.error(res.error || "Error al generar el PDF")
+      }
+    } catch (e) {
+      toast.error("Error al descargar el PDF")
+    } finally {
+      setDownloadingPdf(null)
+    }
+  }
+
+  const handleDownloadBatchPdf = async () => {
+    setDownloadingPdf('batch')
+    try {
+      const playerIds = filtered.map(r => r.id)
+      const res = await getBatchInscriptionsPdfAction(playerIds)
+      if (res.success && res.base64 && res.fileName) {
+        const link = document.createElement('a')
+        link.href = `data:application/pdf;base64,${res.base64}`
+        link.download = res.fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast.success("Lote de PDFs generado con éxito")
+      } else {
+        toast.error(res.error || "Error al generar el lote PDF")
+      }
+    } catch (e) {
+      toast.error("Error al descargar el lote PDF")
+    } finally {
+      setDownloadingPdf(null)
+    }
+  }
+
   const handleApprove = async (playerId: string) => {
     try {
       const res = await approveInscriptionAction(playerId)
@@ -470,9 +517,19 @@ export function SecretariaInscripciones() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">Gestión y revisión de solicitudes de inscripción. Aprueba expedientes y genera cuotas automáticamente.</p>
         </div>
-        <button onClick={fetchRequests} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">
-          <RefreshCw size={14} /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadBatchPdf}
+            disabled={downloadingPdf === 'batch'}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:opacity-50"
+          >
+            {downloadingPdf === 'batch' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Descargar Lote PDF
+          </button>
+          <button onClick={fetchRequests} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">
+            <RefreshCw size={14} /> Actualizar
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -584,7 +641,15 @@ export function SecretariaInscripciones() {
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {new Date(req.created_at).toLocaleDateString("es-ES")}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center gap-2">
+                      <button
+                        onClick={() => handleDownloadPdf(req.id)}
+                        disabled={downloadingPdf === req.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        {downloadingPdf === req.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        PDF Ficha
+                      </button>
                       <button
                         onClick={() => setSelectedPlayer(req)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"

@@ -11,6 +11,11 @@ export interface AuthenticatedContext {
     first_name?: string;
     last_name?: string;
   };
+  isImpersonating?: boolean;
+  realAdminId?: string;
+  realAdminRole?: string;
+  impersonatedName?: string;
+  impersonatedRole?: string;
 }
 
 export const ADMIN_ROLES = ["admin", "coordinador", "metodologo", "superadmin", "secretario", "tesorero", "directivo"];
@@ -47,6 +52,47 @@ export async function getAuthenticatedContext(): Promise<{
 
     if (!profile.club_id) {
       return { context: null, error: "Usuario sin club asignado", statusCode: 403 };
+    }
+
+    // Impersonation Check: if the real logged-in user is admin/superadmin
+    if (['admin', 'superadmin'].includes(profile.role)) {
+      try {
+        const { cookies } = await import('next/headers');
+        const cookieStore = await cookies();
+        const impersonatedUserId = cookieStore.get('impersonated_user_id')?.value;
+
+        if (impersonatedUserId && impersonatedUserId !== user.id) {
+          const { data: impProfile } = await adminClient
+            .from("profiles")
+            .select("id, role, roles, club_id, first_name, last_name")
+            .eq("id", impersonatedUserId)
+            .eq("club_id", profile.club_id)
+            .maybeSingle();
+
+          if (impProfile) {
+            return {
+              context: {
+                user: { id: impProfile.id, email: user.email },
+                profile: {
+                  id: impProfile.id,
+                  role: impProfile.role || "family",
+                  roles: impProfile.roles || [impProfile.role || "family"],
+                  club_id: impProfile.club_id,
+                  first_name: impProfile.first_name,
+                  last_name: impProfile.last_name,
+                },
+                isImpersonating: true,
+                realAdminId: user.id,
+                realAdminRole: profile.role,
+                impersonatedName: `${impProfile.first_name || ''} ${impProfile.last_name || ''}`.trim() || 'Usuario del Club',
+                impersonatedRole: impProfile.role || 'family',
+              }
+            };
+          }
+        }
+      } catch (impErr) {
+        // Silently fallback to real admin profile if cookies() is inaccessible
+      }
     }
 
     return {

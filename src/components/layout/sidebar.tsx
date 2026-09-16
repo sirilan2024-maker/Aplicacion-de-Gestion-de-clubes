@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { NotificationBell } from "@/components/features/notifications/NotificationBell"
 import { switchActiveRoleAction } from "@/app/actions/club-actions"
+import { ImpersonationModal } from "@/components/admin/ImpersonationModal"
 import {
   LayoutDashboard,
   CalendarDays,
@@ -40,7 +41,8 @@ import {
   Building2,
   Sliders,
   Landmark,
-  Bell
+  Bell,
+  Eye
 } from "lucide-react"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -98,6 +100,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
   const [linkedPlayers, setLinkedPlayers] = useState<any[]>([])
   const [showTeamDropdown, setShowTeamDropdown] = useState(false)
   const [showEditClub, setShowEditClub] = useState(false)
+  const [showImpersonateModal, setShowImpersonateModal] = useState(false)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
   const supabase = createClient()
 
@@ -544,6 +547,16 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                 </option>
               ))}
             </select>
+            {['admin', 'superadmin'].includes(userRole || '') && (
+              <button
+                type="button"
+                onClick={() => setShowImpersonateModal(true)}
+                className="w-full mt-2 flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-blue-400" />
+                <span>Ver como otro usuario</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -752,6 +765,11 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
         }}
       />
     )}
+
+    <ImpersonationModal
+      open={showImpersonateModal}
+      onOpenChange={setShowImpersonateModal}
+    />
     </>
   )
 }

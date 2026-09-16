@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, FolderOpen, Users, Filter, X, Archive, Download, Loader2, Building2 } from "lucide-react";
+import { Search, FolderOpen, Users, Filter, X, Archive, Download, Loader2, Building2, FileText, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
+import { SecretariaInscripciones } from "@/components/features/admin/SecretariaInscripciones";
 import toast from "react-hot-toast";
 import { useSeason } from "@/components/providers/SeasonProvider";
 
@@ -21,6 +22,7 @@ interface PlayerBrief {
 }
 
 export default function DocumentManagementPage() {
+  const [activeTab, setActiveTab] = useState<"inscripciones" | "documentos">("inscripciones");
   const { selectedSeasonId } = useSeason();
   const [players, setPlayers] = useState<PlayerBrief[]>([]);
   const [teams, setTeams] = useState<{id: string, name: string}[]>([]);
@@ -182,83 +184,110 @@ export default function DocumentManagementPage() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 space-y-5 animate-in fade-in slide-in-from-bottom-4">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header and Tabs */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <FolderOpen className="w-7 h-7 text-blue-600" />
-            Gestor Documental Centralizado
+            Secretaría y Gestión Documental
           </h1>
-          <p className="text-gray-500">Consulta y descarga de expedientes completos (Fichas, DNIs, FFCV)</p>
+          <p className="text-gray-500">Consulta de solicitudes, Fichas oficiales en PDF y expedientes DNI.</p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab("inscripciones")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "inscripciones"
+                ? "bg-white text-blue-700 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <ShieldCheck size={15} />
+            Inscripciones y Fichas PDF
+          </button>
+          <button
+            onClick={() => setActiveTab("documentos")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "documentos"
+                ? "bg-white text-blue-700 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <FolderOpen size={15} />
+            Gestor Documental DNI
+          </button>
         </div>
       </div>
 
-      {/* ====== MASS DOWNLOAD PANEL ====== */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 shadow-lg border border-slate-700">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/20 rounded-xl border border-blue-400/30">
-              <Archive className="w-5 h-5 text-blue-400" />
+      {activeTab === "inscripciones" ? (
+        <SecretariaInscripciones />
+      ) : (
+        <>
+          {/* ====== MASS DOWNLOAD PANEL ====== */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 shadow-lg border border-slate-700">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-500/20 rounded-xl border border-blue-400/30">
+                  <Archive className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-white font-bold text-base">Exportación Masiva de Expedientes</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Descarga todos los documentos de un equipo o del club entero en un único archivo ZIP
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex items-center">
+                  <Building2 className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <select
+                    value={massDownloadTeam}
+                    onChange={e => setMassDownloadTeam(e.target.value)}
+                    disabled={massDownloading}
+                    className="pl-9 pr-4 py-2.5 bg-slate-700 border border-slate-600 text-white text-sm rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 min-w-[200px]"
+                  >
+                    <option value="all">🏟️ Todo el club</option>
+                    {teams.map(t => (
+                      <option key={t.id} value={t.id}>⚽ {t.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleMassDownload}
+                  disabled={massDownloading || loading}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {massDownloading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generando ZIP...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Descargar ZIP
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-            <div>
-              <h2 className="text-white font-bold text-base">Exportación Masiva de Expedientes</h2>
-              <p className="text-slate-400 text-xs mt-0.5">
-                Descarga todos los documentos de un equipo o del club entero en un único archivo ZIP
-              </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600/50">
+                📁 Estructura: Equipo / Jugador / Archivo
+              </span>
+              <span className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600/50">
+                🔒 Acceso seguro con Service Role
+              </span>
+              <span className="text-xs bg-amber-600/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30">
+                ⏳ Puede tardar 30-60 s si hay muchos archivos
+              </span>
             </div>
           </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-            {/* Team selector for mass download */}
-            <div className="relative flex items-center">
-              <Building2 className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
-              <select
-                value={massDownloadTeam}
-                onChange={e => setMassDownloadTeam(e.target.value)}
-                disabled={massDownloading}
-                className="pl-9 pr-4 py-2.5 bg-slate-700 border border-slate-600 text-white text-sm rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 min-w-[200px]"
-              >
-                <option value="all">🏟️ Todo el club</option>
-                {teams.map(t => (
-                  <option key={t.id} value={t.id}>⚽ {t.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              onClick={handleMassDownload}
-              disabled={massDownloading || loading}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-            >
-              {massDownloading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generando ZIP...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  Descargar ZIP
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Info pills */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600/50">
-            📁 Estructura: Equipo / Jugador / Archivo
-          </span>
-          <span className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600/50">
-            🔒 Acceso seguro con Service Role
-          </span>
-          <span className="text-xs bg-amber-600/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30">
-            ⏳ Puede tardar 30-60 s si hay muchos archivos
-          </span>
-        </div>
-      </div>
 
       {/* Main two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -396,6 +425,8 @@ export default function DocumentManagementPage() {
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

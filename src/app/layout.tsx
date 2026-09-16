@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,6 +36,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="bg-slate-50 text-slate-900">
       <body className="antialiased font-sans bg-slate-50 text-slate-900 min-h-screen">
+        <ImpersonationBanner />
         <SeasonProvider>
           {children}
           <Toaster />

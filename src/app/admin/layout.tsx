@@ -1,31 +1,27 @@
 import React from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNavigation } from "@/components/layout/MobileNavigation"
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { signOut } from "@/lib/auth-actions"
+import { getAuthenticatedContext, ADMIN_ROLES } from "@/lib/auth-helpers"
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { context: ctx, error: authErr } = await getAuthenticatedContext()
 
-  if (!user) {
+  if (authErr || !ctx) {
     redirect("/login")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
+  const effectiveRole = ctx.realAdminRole || ctx.profile.role
+  const userRoles = ctx.profile.roles || []
 
-  // Security Check: Only Admin and Superadmin can access the ERP
-  const allowedRoles = ["admin", "superadmin"]
-  if (!allowedRoles.includes(profile?.role || "")) {
+  const isAllowed = (effectiveRole && ADMIN_ROLES.includes(effectiveRole)) || userRoles.some((r: string) => ADMIN_ROLES.includes(r))
+
+  if (!isAllowed) {
     redirect("/dashboard")
   }
 

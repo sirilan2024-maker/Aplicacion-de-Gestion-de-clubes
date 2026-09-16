@@ -1,13 +1,19 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAuthenticatedContext, ADMIN_ROLES, AuthenticatedContext } from '@/lib/auth-helpers';
 import { ClubNotificationPolicy, NotificationType } from '@/lib/notifications/types';
 import { NOTIFICATION_TYPE_REGISTRY } from '@/lib/notifications/registry';
 import type { NotificationPolicyMetadata } from '@/lib/notifications/registry';
 
 export type { NotificationPolicyMetadata };
 
+function checkAdminPermission(ctx: AuthenticatedContext): boolean {
+  const roleToCheck = ctx.realAdminRole || ctx.profile.role;
+  if (roleToCheck && ADMIN_ROLES.includes(roleToCheck.toLowerCase())) return true;
+  if (ctx.profile.roles && ctx.profile.roles.some((r: string) => ADMIN_ROLES.includes(r.toLowerCase()))) return true;
+  return false;
+}
 
 /**
  * Obtiene las políticas de notificación configuradas para el club del administrador actual.
@@ -19,24 +25,14 @@ export async function getClubNotificationPoliciesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAuthorized = ['admin', 'superadmin'].includes(profile.role);
-    if (!isAuthorized) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Se requieren permisos administrativos de Administrador' };
     }
 
-    const clubId = profile.club_id;
+    const clubId = ctx.profile.club_id;
     if (!clubId) {
       return { success: false, error: 'El usuario no está asignado a un club' };
     }
@@ -105,24 +101,14 @@ export async function updateClubNotificationPolicyAction(params: {
   pushEnabled?: boolean;
 }): Promise<{ success: boolean; data?: ClubNotificationPolicy; error?: string }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAdmin = ['admin', 'superadmin'].includes(profile.role);
-    if (!isAdmin) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Solo administradores pueden modificar políticas' };
     }
 
-    const clubId = profile.club_id;
+    const clubId = ctx.profile.club_id;
     if (!clubId) return { success: false, error: 'El usuario no está asignado a un club' };
 
     const adminClient = await createAdminClient();
@@ -217,24 +203,14 @@ export async function saveAllClubNotificationPoliciesAction(
   }>
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAdmin = ['admin', 'superadmin'].includes(profile.role);
-    if (!isAdmin) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Solo administradores pueden guardar políticas' };
     }
 
-    const clubId = profile.club_id;
+    const clubId = ctx.profile.club_id;
     if (!clubId) return { success: false, error: 'El usuario no tiene un club asignado' };
 
     const adminClient = await createAdminClient();
@@ -293,25 +269,16 @@ export async function getClubUsersForNotificationControlAction(searchQuery?: str
   error?: string;
 }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAdmin = ['admin', 'superadmin'].includes(profile.role);
-    if (!isAdmin) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Solo administradores pueden gestionar usuarios' };
     }
 
-    const clubId = profile.club_id;
-    if (!clubId && profile.role !== 'superadmin') {
+    const clubId = ctx.profile.club_id;
+    const effectiveRole = ctx.realAdminRole || ctx.profile.role;
+    if (!clubId && effectiveRole !== 'superadmin') {
       return { success: false, error: 'El usuario no tiene un club asignado' };
     }
 
@@ -321,7 +288,7 @@ export async function getClubUsersForNotificationControlAction(searchQuery?: str
       .select('id, email, first_name, last_name, role, avatar_url, club_id')
       .order('first_name', { ascending: true });
 
-    if (profile.role !== 'superadmin' && clubId) {
+    if (effectiveRole !== 'superadmin' && clubId) {
       query = query.or(`club_id.eq.${clubId},club_id.is.null`);
     }
 
@@ -381,20 +348,10 @@ export async function getAdminUserPreferencesAction(targetUserId: string): Promi
   error?: string;
 }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: callerProfile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!callerProfile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAdmin = ['admin', 'superadmin'].includes(callerProfile.role);
-    if (!isAdmin) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Solo administradores pueden consultar preferencias de usuarios' };
     }
 
@@ -411,11 +368,12 @@ export async function getAdminUserPreferencesAction(targetUserId: string): Promi
       return { success: false, error: 'Usuario objetivo no encontrado' };
     }
 
-    if (callerProfile.role !== 'superadmin' && targetProfile.club_id !== callerProfile.club_id) {
+    const callerRole = ctx.realAdminRole || ctx.profile.role;
+    if (callerRole !== 'superadmin' && targetProfile.club_id !== ctx.profile.club_id) {
       return { success: false, error: 'Violación de seguridad: El usuario pertenece a otro club' };
     }
 
-    const effectiveClubId = targetProfile.club_id || callerProfile.club_id;
+    const effectiveClubId = targetProfile.club_id || ctx.profile.club_id;
 
     // 2. Obtener políticas del club
     const clubPoliciesRes = await getClubNotificationPoliciesAction();
@@ -514,20 +472,10 @@ export async function adminSaveUserPreferencesAction(params: {
   }>;
 }): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: callerProfile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!callerProfile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAdmin = ['admin', 'superadmin'].includes(callerProfile.role);
-    if (!isAdmin) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Solo administradores pueden guardar preferencias de usuarios' };
     }
 
@@ -544,11 +492,12 @@ export async function adminSaveUserPreferencesAction(params: {
       return { success: false, error: 'Usuario objetivo no encontrado' };
     }
 
-    if (callerProfile.role !== 'superadmin' && targetProfile.club_id !== callerProfile.club_id) {
+    const callerRole = ctx.realAdminRole || ctx.profile.role;
+    if (callerRole !== 'superadmin' && targetProfile.club_id !== ctx.profile.club_id) {
       return { success: false, error: 'Violación de seguridad: El usuario pertenece a otro club' };
     }
 
-    const clubId = targetProfile.club_id || callerProfile.club_id;
+    const clubId = targetProfile.club_id || ctx.profile.club_id;
     const now = new Date().toISOString();
 
     // 2. Normalizar permisos (si canModify es true y canView es false -> normalizar canView = true)
@@ -564,7 +513,7 @@ export async function adminSaveUserPreferencesAction(params: {
         can_view: canView,
         can_modify: Boolean(p.canModify),
         is_custom_override: p.isCustomOverride !== undefined ? p.isCustomOverride : true,
-        updated_by: user.id,
+        updated_by: ctx.user.id,
         updated_at: now,
       };
     });
@@ -614,20 +563,10 @@ export async function adminResetUserPreferencesAction(params: {
   notificationType?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'No autenticado' };
+    const { context: ctx, error: authErr } = await getAuthenticatedContext();
+    if (authErr || !ctx) return { success: false, error: authErr || 'No autenticado' };
 
-    const { data: callerProfile } = await supabase
-      .from('profiles')
-      .select('role, club_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!callerProfile) return { success: false, error: 'Perfil no encontrado' };
-
-    const isAdmin = ['admin', 'superadmin'].includes(callerProfile.role);
-    if (!isAdmin) {
+    if (!checkAdminPermission(ctx)) {
       return { success: false, error: 'Acceso denegado: Solo administradores pueden restablecer preferencias' };
     }
 
@@ -642,7 +581,8 @@ export async function adminResetUserPreferencesAction(params: {
 
     if (!targetProfile) return { success: false, error: 'Usuario objetivo no encontrado' };
 
-    if (callerProfile.role !== 'superadmin' && targetProfile.club_id !== callerProfile.club_id) {
+    const callerRole = ctx.realAdminRole || ctx.profile.role;
+    if (callerRole !== 'superadmin' && targetProfile.club_id !== ctx.profile.club_id) {
       return { success: false, error: 'Violación de seguridad: El usuario pertenece a otro club' };
     }
 

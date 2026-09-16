@@ -684,13 +684,14 @@ export async function POST(request: Request) {
           : (!email.includes('@example.invalid') ? email : null);
 
         if (targetEmail) {
-          await sendEmail({
+          const emailResult = await sendEmail({
             to: targetEmail,
             fromName: 'SPORTING SALADAR',
             subject: `⚽ Inscripción Registrada: ${formData.playerFirstName || ''} ${formData.playerLastName || ''}`.trim() + ' - Sporting Saladar',
             html: emailHtml,
-            replyTo: 'info@clubsportingsaladar.com',
+            replyTo: 'csportingsaladar@gmail.com',
           });
+          console.log('[Register Route Email Result]:', emailResult);
         }
       } catch (emailErr) {
         console.error('Error disparando email automático de bienvenida:', emailErr);

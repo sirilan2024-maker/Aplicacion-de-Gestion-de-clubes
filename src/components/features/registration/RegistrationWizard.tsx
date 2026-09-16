@@ -332,7 +332,7 @@ export function RegistrationWizard({
                           <ul className="list-disc pl-5 space-y-2 mt-4">
                             <li><strong>Concepto obligatorio:</strong> <span className="font-mono font-bold text-blue-950">{paymentRef ? `${paymentRef} - ` : ""}INSCRIPCION {effectivePlayerName}</span></li>
                             <li><strong>Jugador:</strong> {effectivePlayerName}</li>
-                            <li>Envía el justificante bancario por email a <strong>secretaria@sportingsaladar.com</strong> indicando la referencia anterior.</li>
+                            <li>Envía el justificante bancario por email a <strong>csportingsaladar@gmail.com</strong> indicando la referencia anterior.</li>
                           </ul>
                         </div>
                       ) : (

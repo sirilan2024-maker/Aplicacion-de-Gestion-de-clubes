@@ -34,8 +34,9 @@ export default async function PublicRegistrationPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto mb-8 text-center">
-        <h1 className="text-3xl font-extrabold text-gray-900 text-center">
-          Formulario de Inscripción Oficial Club Sporting Saladar
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 text-center leading-tight text-balance">
+          Formulario de Inscripción Oficial
+          <span className="block mt-1 text-blue-900">Club Sporting Saladar</span>
         </h1>
       </div>
       

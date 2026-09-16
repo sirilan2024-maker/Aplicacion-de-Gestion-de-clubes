@@ -41,8 +41,6 @@ import {
   Building2,
   Sliders,
   Landmark,
-  FolderOpen,
-  UserPlus,
   Eye
 } from "lucide-react"
 

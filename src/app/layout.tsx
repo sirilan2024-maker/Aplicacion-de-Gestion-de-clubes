@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Sporting Saladar",
+    title: "SPORTING SALADAR",
   },
 };
 

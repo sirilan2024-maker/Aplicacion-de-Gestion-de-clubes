@@ -161,7 +161,7 @@ export async function updatePlayerApparelSizesAction(playerId: string, sizes: { 
         .from('player_apparel')
         .upsert(upserts, { onConflict: 'player_id,item_name' })
       if (error) throw error
-    } else if (Object.keys(sizes).length > 0) {
+    } else if (toDelete.length === 0 && Object.keys(sizes).length > 0) {
       return { success: false, error: `Las prendas seleccionadas no coinciden con la lista oficial del servidor: ${Object.keys(sizes).join(', ')}` }
     }
 

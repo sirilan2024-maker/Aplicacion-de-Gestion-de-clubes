@@ -37,40 +37,59 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left information panel */}
-      <div className="hidden md:flex w-1/2 bg-blue-600 text-white flex-col justify-center items-start p-12">
-        <div className="text-blue-200 font-medium uppercase tracking-wider mb-2">
-          LLEVA A TU CLUB AL SIGUIENTE NIVEL 🚀
+      <div className="hidden md:flex w-1/2 bg-blue-600 text-white flex-col justify-center items-start p-12 relative">
+        <div className="flex items-center gap-3 mb-6">
+          <img
+            src="/escudo-saladar.jpg"
+            alt="Escudo Sporting Saladar"
+            className="w-16 h-16 object-contain rounded-full bg-white/10 p-1 border border-white/20 shadow-md"
+          />
+          <div>
+            <h3 className="text-2xl font-black tracking-wider text-white">SPORTING SALADAR</h3>
+            <p className="text-xs text-blue-200 font-medium uppercase tracking-widest">Gestión Integral</p>
+          </div>
         </div>
-        <h2 className="text-4xl font-bold mt-4">
-          Gestiona tu club deportivo como un profesional
+        <div className="text-blue-200 font-medium uppercase tracking-wider mb-2">
+          BIENVENIDO A LA PLATAFORMA DEL CLUB ⚽
+        </div>
+        <h2 className="text-4xl font-bold mt-2">
+          Gestión integral de tu equipo y miembros
         </h2>
         <p className="text-lg text-blue-100 mt-4">
-          Todo lo que necesitas para administrar tu club en una sola plataforma. Sin complicaciones.
+          Todo lo que necesitas para la gestión deportiva, entrenamientos, convocatorias y comunicación en un solo lugar.
         </p>
         <ul className="mt-8 space-y-4">
           <li className="flex items-center">
-            <span className="text-blue-200 mr-2">✓</span>
+            <span className="text-blue-200 mr-2 font-bold">✓</span>
             Gestión completa de equipos y jugadores
           </li>
           <li className="flex items-center">
-            <span className="text-blue-200 mr-2">✓</span>
+            <span className="text-blue-200 mr-2 font-bold">✓</span>
             Planificación de entrenamientos y asistencia
           </li>
           <li className="flex items-center">
-            <span className="text-blue-200 mr-2">✓</span>
+            <span className="text-blue-200 mr-2 font-bold">✓</span>
             Convocatorias y seguimiento de partidos
           </li>
           <li className="flex items-center">
-            <span className="text-blue-200 mr-2">✓</span>
-            Onboarding por invitación para familias
+            <span className="text-blue-200 mr-2 font-bold">✓</span>
+            Portal para familias y jugadores
           </li>
         </ul>
       </div>
 
       {/* Right form panel */}
       <div className="flex w-full md:w-1/2 bg-white items-center justify-center p-8">
-        <div className="max-w-md w-full space-y-8">
-          <h1 className="text-3xl font-semibold text-slate-900 text-center mb-6">Iniciar sesión</h1>
+        <div className="max-w-md w-full space-y-6">
+          <div className="flex flex-col items-center text-center mb-4">
+            <img
+              src="/escudo-saladar.jpg"
+              alt="Escudo Sporting Saladar"
+              className="w-24 h-24 object-contain mb-3 drop-shadow-md rounded-full"
+            />
+            <h1 className="text-2xl font-bold text-slate-900">SPORTING SALADAR</h1>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Acceso a la Plataforma</p>
+          </div>
 
           {urlError && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-start space-x-3 text-sm animate-in fade-in">
@@ -86,7 +105,7 @@ function LoginForm() {
             </div>
           )}
 
-          <form action={login} className="space-y-6">
+          <form action={login} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
                 Correo electrónico
@@ -98,7 +117,7 @@ function LoginForm() {
                 required
                 value={emailValue}
                 onChange={(e) => setEmailValue(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white text-slate-900 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full rounded-lg border border-slate-300 bg-white text-slate-900 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
             <div>
@@ -116,7 +135,7 @@ function LoginForm() {
                   name="password"
                   type={showPassword ? "text" : "password"}
                   required
-                  className="w-full rounded-lg border border-slate-300 bg-white text-slate-900 px-4 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full rounded-lg border border-slate-300 bg-white text-slate-900 px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
                 <button
                   type="button"
@@ -138,24 +157,10 @@ function LoginForm() {
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg shadow-md transition-colors"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors"
             >
-              Entrar
+              Iniciar sesión
             </button>
-            <div className="text-center space-y-2">
-              <p className="text-sm text-slate-600">
-                ¿Eres nuevo?{' '}
-                <Link href="/register-club" className="text-blue-600 hover:underline font-medium">
-                  Añadir mi Club
-                </Link>
-              </p>
-              <p className="text-sm text-slate-600">
-                ¿Eres jugador o familiar?{' '}
-                <Link href="/invite" className="text-blue-600 hover:underline font-medium">
-                  Entrar con código de invitación
-                </Link>
-              </p>
-            </div>
           </form>
         </div>
       </div>

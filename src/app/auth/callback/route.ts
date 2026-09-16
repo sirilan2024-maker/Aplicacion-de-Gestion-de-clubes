@@ -1,26 +1,27 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import type { EmailOtpType } from '@supabase/supabase-js'
 
 /**
  * Supabase Auth Callback Handler
  *
- * Este Route Handler recibe el ?code= que Supabase incluye en el enlace de
- * verificación de email. Intercambia el código por una sesión válida y
- * redirige al usuario al dashboard (o al login si hay error).
- *
- * URL de callback que debes configurar en Supabase Dashboard:
- *   Authentication > URL Configuration > Redirect URLs
- *   → http://localhost:3000/auth/callback
- *   → https://tu-dominio.com/auth/callback
+ * Este Route Handler recibe el ?code= o ?token_hash= que Supabase incluye en el enlace de
+ * verificación de email o recuperación de contraseña. Intercambia el token por una sesión válida
+ * y redirige al usuario a la página de actualización de contraseña (/actualizar-password) o al dashboard.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
 
   const code        = searchParams.get('code')
-  const next        = searchParams.get('next') ?? '/dashboard'
+  const token_hash  = searchParams.get('token_hash')
+  const type        = searchParams.get('type') as EmailOtpType | null
+  const rawNext     = searchParams.get('next')
   const errorParam  = searchParams.get('error')
   const errorDesc   = searchParams.get('error_description')
+
+  const isRecovery = type === 'recovery' || (rawNext ? rawNext.includes('actualizar-password') : false)
+  const next = isRecovery ? '/actualizar-password' : (rawNext ?? '/dashboard')
 
   // Si Supabase nos devuelve un error directamente en la URL
   if (errorParam) {
@@ -31,50 +32,56 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  if (code) {
-    const supabase = await createClient()
+  const supabase = await createClient()
 
+  let authError = null
+  if (token_hash && type) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash, type })
+    authError = error
+  } else if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (error) {
-      console.error('[AuthCallback] exchangeCodeForSession error:', error.message)
-      return NextResponse.redirect(
-        `${origin}/login?error=${encodeURIComponent('El enlace de verificación ha expirado o ya fue usado.')}`
-      )
+    authError = error
+  } else {
+    if (isRecovery) {
+      return NextResponse.redirect(`${origin}/actualizar-password`)
     }
-
-    // Sesión creada correctamente
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const adminSupabase = await createAdminClient()
-      
-      // Asegurar que email_verified esté marcado como true sin sobreescribir roles existentes
-      const { data: existingProfile } = await adminSupabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const profileUpdate: Record<string, any> = { email_verified: true };
-      if (!existingProfile?.role) {
-        profileUpdate.role = 'family';
-        profileUpdate.rol = 'familia';
-      }
-
-      await adminSupabase.from('profiles').update(profileUpdate).eq('id', user.id);
-    }
-
-    // Redirigir a next (ej. /actualizar-password o /dashboard)
-    const isPasswordRecovery = next.includes('actualizar-password');
-    const redirectUrl = isPasswordRecovery
-      ? `${origin}${next}`
-      : `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`;
-
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent('Enlace de verificación inválido.')}`
+    )
   }
 
-  // Sin código en la URL — situación inesperada
-  return NextResponse.redirect(
-    `${origin}/login?error=${encodeURIComponent('Enlace de verificación inválido.')}`
-  )
+  if (authError) {
+    console.error('[AuthCallback] Auth error:', authError.message)
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent('El enlace de verificación ha expirado o ya fue usado.')}`
+    )
+  }
+
+  // Sesión creada / verificada correctamente
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const adminSupabase = await createAdminClient()
+    
+    // Asegurar que email_verified esté marcado como true sin sobreescribir roles existentes
+    const { data: existingProfile } = await adminSupabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const profileUpdate: Record<string, any> = { email_verified: true };
+    if (!existingProfile?.role) {
+      profileUpdate.role = 'family';
+      profileUpdate.rol = 'familia';
+    }
+
+    await adminSupabase.from('profiles').update(profileUpdate).eq('id', user.id);
+  }
+
+  // Redirigir a next (ej. /actualizar-password o /dashboard)
+  const redirectUrl = isRecovery
+    ? `${origin}/actualizar-password`
+    : `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`;
+
+  return NextResponse.redirect(redirectUrl);
 }

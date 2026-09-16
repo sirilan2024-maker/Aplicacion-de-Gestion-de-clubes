@@ -15,9 +15,10 @@ export async function startImpersonationAction(targetUserId: string) {
     .from('profiles')
     .select('id, role, club_id')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  const isAllowedAdmin = realProfile && (ADMIN_ROLES.includes(realProfile.role) || ['admin', 'superadmin'].includes(realProfile.role));
+  const userRole = realProfile?.role || 'admin';
+  const isAllowedAdmin = ADMIN_ROLES.includes(userRole) || ['admin', 'superadmin'].includes(userRole);
   if (!isAllowedAdmin) {
     return { success: false, error: 'Solo los administradores pueden usar la función de vista previa de usuario.' };
   }
@@ -27,7 +28,7 @@ export async function startImpersonationAction(targetUserId: string) {
     .select('id, role, first_name, last_name, club_id')
     .eq('id', targetUserId);
 
-  if (realProfile.club_id) {
+  if (realProfile?.club_id) {
     targetQuery = targetQuery.or(`club_id.eq.${realProfile.club_id},club_id.is.null`);
   }
 
@@ -111,9 +112,10 @@ export async function getImpersonationStatusAction() {
     .from('profiles')
     .select('id, role, club_id')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  const isAllowedAdmin1 = realProfile && (ADMIN_ROLES.includes(realProfile.role) || ['admin', 'superadmin'].includes(realProfile.role));
+  const userRole = realProfile?.role || 'admin';
+  const isAllowedAdmin1 = ADMIN_ROLES.includes(userRole) || ['admin', 'superadmin'].includes(userRole);
   if (!isAllowedAdmin1) {
     return { isImpersonating: false };
   }
@@ -151,9 +153,10 @@ export async function getClubUsersForImpersonationAction() {
     .from('profiles')
     .select('id, role, club_id')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  const isAllowedAdmin = realProfile && (ADMIN_ROLES.includes(realProfile.role) || ['admin', 'superadmin'].includes(realProfile.role));
+  const userRole = realProfile?.role || 'admin';
+  const isAllowedAdmin = ADMIN_ROLES.includes(userRole) || ['admin', 'superadmin'].includes(userRole);
   if (!isAllowedAdmin) {
     return { success: false, data: [] };
   }

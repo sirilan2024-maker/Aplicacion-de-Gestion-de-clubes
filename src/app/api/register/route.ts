@@ -37,6 +37,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Club no encontrado' }, { status: 400 });
     }
 
+    // Obtener la temporada activa del club para vincular la inscripción
+    const { data: activeSeason } = await supabaseAdmin
+      .from('seasons')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('is_active', true)
+      .maybeSingle();
+    const activeSeasonId = activeSeason?.id || null;
+
     // 2. Extraer parámetros base
     const { teamId, paymentMethod, paymentPlan, password, confirmPassword, ...formData } = data;
 
@@ -389,6 +398,16 @@ export async function POST(request: Request) {
         });
       }
 
+      // Registrar al jugador en la temporada activa en player_season_history
+      if (activeSeasonId) {
+        await supabaseAdmin.from('player_season_history').upsert({
+          player_id: player.id,
+          season_id: activeSeasonId,
+          team_id: teamId || null,
+          status: 'activo',
+        }, { onConflict: 'player_id,season_id' });
+      }
+
       // ────────────────────────────────────────────────────────────────────────
       // FASE 2: Insertar tallas de utillería en player_apparel
       // Artículos exactos según el catálogo del club
@@ -413,12 +432,16 @@ export async function POST(request: Request) {
 
       for (const { item, size } of apparelItems) {
         if (size) {
-          await supabaseAdmin.from('player_apparel').insert({
+          const insertPayload: any = {
             player_id: player.id,
             item_name: item,
             size: size,
             delivered: false,
-          });
+          };
+          if (activeSeasonId) {
+            insertPayload.season_id = activeSeasonId;
+          }
+          await supabaseAdmin.from('player_apparel').insert(insertPayload);
         }
       }
 

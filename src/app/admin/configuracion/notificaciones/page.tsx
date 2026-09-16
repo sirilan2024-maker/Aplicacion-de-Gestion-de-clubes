@@ -67,6 +67,7 @@ export default function ConfigNotificacionesPage() {
 
   // --- TAB 2: CONTROL POR USUARIO ---
   const [clubUsers, setClubUsers] = useState<ClubUser[]>([])
+  const [userRoleFilter, setUserRoleFilter] = useState<'staff' | 'all' | 'players'>('staff')
   const [userSearchQuery, setUserSearchQuery] = useState("")
   const [selectedUser, setSelectedUser] = useState<ClubUser | null>(null)
   const [userLoading, setUserLoading] = useState(false)
@@ -75,6 +76,15 @@ export default function ConfigNotificacionesPage() {
   const [userClubPolicies, setUserClubPolicies] = useState<Record<string, ClubNotificationPolicy>>({})
   const [userHasUnsavedChanges, setUserHasUnsavedChanges] = useState(false)
   const [userCategory, setUserCategory] = useState<string>("TODAS")
+
+  const STAFF_ROLES = ['admin', 'directiva', 'entrenador', 'coordinador', 'staff', 'tesorero', 'secretaria', 'secretario']
+  const isStaffRole = (role: string) => STAFF_ROLES.includes((role || '').toLowerCase())
+
+  const displayUsers = clubUsers.filter(u => {
+    if (userRoleFilter === 'staff') return isStaffRole(u.role)
+    if (userRoleFilter === 'players') return !isStaffRole(u.role)
+    return true
+  })
 
   const loadClubPolicies = async () => {
     setLoading(true)
@@ -446,25 +456,25 @@ export default function ConfigNotificacionesPage() {
         </div>
 
         {/* Subnavigation Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-200">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-200 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/admin/configuracion"
-              className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
+              className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2 whitespace-nowrap"
             >
               <Landmark className="w-4 h-4" />
               <span>Métricas y SEPA</span>
             </Link>
             <Link
               href="/admin/configuracion/roles"
-              className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2"
+              className="px-4 py-2.5 text-xs md:text-sm font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors flex items-center gap-2 whitespace-nowrap"
             >
               <Shield className="w-4 h-4" />
               <span>Roles y Permisos</span>
             </Link>
             <Link
               href="/admin/configuracion/notificaciones"
-              className="px-4 py-2.5 text-xs md:text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 transition-colors flex items-center gap-2"
+              className="px-4 py-2.5 text-xs md:text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 transition-colors flex items-center gap-2 whitespace-nowrap"
             >
               <Bell className="w-4 h-4" />
               <span>Notificaciones</span>
@@ -690,6 +700,54 @@ export default function ConfigNotificacionesPage() {
         <div className="space-y-6 animate-in fade-in duration-300">
           {/* USER SELECTOR STRIP */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            {/* Role Filter Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                  Filtrar por Tipo:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('staff')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                    userRoleFilter === 'staff'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Solo Staff / Directiva ({clubUsers.filter(u => isStaffRole(u.role)).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('all')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                    userRoleFilter === 'all'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Todas las Cuentas ({clubUsers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('players')}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                    userRoleFilter === 'players'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Jugadores / Familias ({clubUsers.filter(u => !isStaffRole(u.role)).length})
+                </button>
+              </div>
+
+              <div className="text-[11px] text-slate-400 font-medium">
+                {userRoleFilter === 'staff' && "Mostrando únicamente personal con rol directivo o técnico."}
+                {userRoleFilter === 'players' && "Mostrando cuentas registradas de deportistas y tutores."}
+                {userRoleFilter === 'all' && "Mostrando la totalidad de usuarios registrados en el sistema."}
+              </div>
+            </div>
+
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="space-y-1">
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -704,7 +762,7 @@ export default function ConfigNotificacionesPage() {
               {/* Dropdown Selector de Miembros */}
               <div className="w-full lg:w-96">
                 <label htmlFor="member-dropdown-select" className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Desplegable de Miembros ({clubUsers.length})
+                  Desplegable de Miembros {userRoleFilter === 'staff' ? 'Staff' : userRoleFilter === 'players' ? 'Jugadores/Familias' : ''} ({displayUsers.length})
                 </label>
                 <div className="relative">
                   <select
@@ -719,7 +777,7 @@ export default function ConfigNotificacionesPage() {
                     <option value="" disabled>
                       {userLoading ? "Cargando miembros..." : "-- Selecciona un usuario de la lista --"}
                     </option>
-                    {clubUsers.map(u => {
+                    {displayUsers.map(u => {
                       const fullName = u.firstName ? `${u.firstName} ${u.lastName || ''}`.trim() : u.email
                       const roleBadge = u.role.toUpperCase()
                       return (
@@ -742,7 +800,7 @@ export default function ConfigNotificacionesPage() {
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
                   Acceso Rápido:
                 </span>
-                {clubUsers.map(u => {
+                {displayUsers.slice(0, 10).map(u => {
                   const isSelected = selectedUser?.id === u.id
                   return (
                     <button
@@ -776,7 +834,7 @@ export default function ConfigNotificacionesPage() {
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Filtrar miembros..."
+                  placeholder="Buscar miembro..."
                   value={userSearchQuery}
                   onChange={(e) => {
                     setUserSearchQuery(e.target.value)
@@ -784,6 +842,14 @@ export default function ConfigNotificacionesPage() {
                   }}
                   className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
+              </div>
+            </div>
+
+            {/* Explanation box */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 text-xs text-slate-600 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>¿Por qué se registran jugadores/familias en perfiles?</strong> Cada miembro o tutor dispone de cuenta de usuario en la app para recibir convocatorias de partidos, citaciones de entrenamiento, recibos de cuotas y avisos del club en su móvil.
               </div>
             </div>
           </div>

@@ -51,7 +51,9 @@ export async function getInscriptionsAction(targetSeasonId?: string) {
       created_at,
       user_auth_id,
       status,
-      registration_status
+      registration_status,
+      was_in_club,
+      payment_method
     `)
     .eq('club_id', clubId)
     .in('registration_status', ['pending_revision', 'request_correction', 'pending_payment', 'formalized'])
@@ -71,20 +73,32 @@ export async function getInscriptionsAction(targetSeasonId?: string) {
     return { success: false, data: [] };
   }
 
-  // Transform data to match frontend interface
-  const formattedData = data.map((item: any) => {
+  // Transform data with real fee calculations (195€ renewal / 250€ new)
+  const formattedData = await Promise.all((data || []).map(async (item: any) => {
+    const { data: fees } = await adminSupabase
+      .from('fees')
+      .select('amount_cents, monto_total, estado, payment_method, metodo_pago')
+      .eq('player_id', item.id);
+
+    let totalCents = (fees || []).reduce((acc: number, f: any) => acc + (f.amount_cents || f.monto_total || 0), 0);
+    let feeTotal = totalCents > 0 ? totalCents / 100 : (item.was_in_club ? 195 : 250);
+    let paymentMethod = fees?.find((f: any) => f.payment_method || f.metodo_pago)?.payment_method ||
+                        fees?.find((f: any) => f.payment_method || f.metodo_pago)?.metodo_pago ||
+                        item.payment_method ||
+                        'Por Confirmar';
+
     return {
       id: item.id,
       name: `${item.first_name || 'Desconocido'} ${item.last_name || ''}`,
       category: item.posicion_principal || 'Sin categoría',
       date: new Date(item.created_at).toLocaleDateString('es-ES'),
-      status: item.registration_status || 'pending_revision', // Mapped to UI status
-      paymentMethod: 'Por Confirmar',
-      feeTotal: 250, // Default for now
-      raw_form_data: {}, // Not needed anymore for UI rendering
+      status: item.registration_status || 'pending_revision',
+      paymentMethod,
+      feeTotal,
+      raw_form_data: {},
       userId: item.user_auth_id
     };
-  });
+  }));
 
   return { success: true, data: formattedData };
 }
@@ -296,6 +310,49 @@ export async function resetPasswordAction(email: string) {
   return { success: true };
 }
 
+async function getPlayerPdfFeeInfo(adminSupabase: any, player: any) {
+  let { data: fees } = await adminSupabase
+    .from('fees')
+    .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago')
+    .eq('player_id', player.id);
+
+  const { count } = await adminSupabase
+    .from('player_season_history')
+    .select('id', { count: 'exact', head: true })
+    .eq('player_id', player.id);
+
+  const isRenewal = Boolean(player.was_in_club) || (count ? count > 1 : false);
+
+  if (!fees || fees.length === 0) {
+    try {
+      const { createAdminFeeForPlayerAction } = await import('@/app/actions/treasury-actions');
+      await createAdminFeeForPlayerAction(player.id, isRenewal);
+
+      const { data: refreshedFees } = await adminSupabase
+        .from('fees')
+        .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago')
+        .eq('player_id', player.id);
+      fees = refreshedFees || [];
+    } catch (e) {
+      console.error('Error al generar cuota automáticamente para el PDF:', e);
+    }
+  }
+
+  let totalCents = (fees || []).reduce((sum: number, f: any) => sum + (f.amount_cents || f.monto_total || 0), 0);
+  let totalAmount = totalCents > 0 ? totalCents / 100 : (isRenewal ? 195 : 250);
+
+  let method = fees?.find((f: any) => f.payment_method || f.metodo_pago)?.payment_method ||
+               fees?.find((f: any) => f.payment_method || f.metodo_pago)?.metodo_pago ||
+               player.payment_method ||
+               'Por Confirmar';
+
+  let status = fees?.some((f: any) => f.estado === 'pagado') ? 'pagado' :
+               fees?.some((f: any) => f.estado === 'pdte_verif') ? 'pdte_verif' :
+               'pendiente';
+
+  return { totalAmount, method, status };
+}
+
 export async function getInscriptionPdfAction(playerId: string) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) return { success: false, error: authError || 'No autenticado' };
@@ -312,7 +369,7 @@ export async function getInscriptionPdfAction(playerId: string) {
       id, first_name, last_name, dni, phone, email, sip, is_senior, created_at,
       registration_status, posicion_principal,
       parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
-      iban
+      iban, was_in_club, paid_reservation, payment_method
     `)
     .eq('id', playerId)
     .single();
@@ -332,12 +389,8 @@ export async function getInscriptionPdfAction(playerId: string) {
     .eq('player_id', playerId)
     .maybeSingle();
 
-  // Fee data
-  const { data: fee } = await adminSupabase
-    .from('fees')
-    .select('monto_total, estado, metodo_pago')
-    .eq('player_id', playerId)
-    .maybeSingle();
+  // Fee data calculation & auto-creation
+  const feeInfo = await getPlayerPdfFeeInfo(adminSupabase, player);
 
   const pdfData = {
     player: {
@@ -365,9 +418,9 @@ export async function getInscriptionPdfAction(playerId: string) {
     },
     apparel: (apparel || []).map(a => ({ itemName: a.item_name, size: a.size })),
     payment: {
-      method: fee?.metodo_pago,
-      totalAmount: fee?.monto_total ? fee.monto_total / 100 : 250,
-      status: fee?.estado,
+      method: feeInfo.method,
+      totalAmount: feeInfo.totalAmount,
+      status: feeInfo.status,
       iban: player.iban,
     }
   };
@@ -395,7 +448,7 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
       id, first_name, last_name, dni, phone, email, sip, is_senior, created_at,
       registration_status, posicion_principal,
       parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
-      iban
+      iban, was_in_club, paid_reservation, payment_method
     `)
     .eq('club_id', context.profile.club_id);
 
@@ -420,11 +473,7 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
       .eq('player_id', player.id)
       .maybeSingle();
 
-    const { data: fee } = await adminSupabase
-      .from('fees')
-      .select('monto_total, estado, metodo_pago')
-      .eq('player_id', player.id)
-      .maybeSingle();
+    const feeInfo = await getPlayerPdfFeeInfo(adminSupabase, player);
 
     return {
       player: {
@@ -452,9 +501,9 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
       },
       apparel: (apparel || []).map(a => ({ itemName: a.item_name, size: a.size })),
       payment: {
-        method: fee?.metodo_pago,
-        totalAmount: fee?.monto_total ? fee.monto_total / 100 : 250,
-        status: fee?.estado,
+        method: feeInfo.method,
+        totalAmount: feeInfo.totalAmount,
+        status: feeInfo.status,
         iban: player.iban,
       }
     };

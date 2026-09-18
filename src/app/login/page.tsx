@@ -179,6 +179,14 @@ function LoginForm() {
             >
               Iniciar sesión
             </button>
+            <div className="pt-3 text-center border-t border-slate-100">
+              <p className="text-sm text-slate-600">
+                ¿Eres jugador o familiar?{' '}
+                <Link href="/invite" className="text-blue-600 hover:text-blue-700 hover:underline font-semibold transition-colors">
+                  Entrar con código o PIN
+                </Link>
+              </p>
+            </div>
           </form>
         </div>
       </div>

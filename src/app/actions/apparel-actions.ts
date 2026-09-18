@@ -33,27 +33,10 @@ export async function getApparelForPlayerAction(playerId: string, targetSeasonId
       return { success: false, error: access.reason || 'No tienes permisos sobre este jugador' }
     }
 
-    let seasonId = targetSeasonId;
-    if (!seasonId) {
-      const { data: activeSeason } = await adminClient
-        .from('seasons')
-        .select('id')
-        .eq('club_id', context.profile.club_id)
-        .eq('is_active', true)
-        .single();
-      seasonId = activeSeason?.id;
-    }
-
-    let query = adminClient
+    const { data: apparelData, error } = await adminClient
       .from('player_apparel')
       .select('*')
       .eq('player_id', playerId);
-
-    if (seasonId) {
-      query = query.eq('season_id', seasonId);
-    }
-
-    const { data: apparelData, error } = await query;
 
     if (error) throw error
 

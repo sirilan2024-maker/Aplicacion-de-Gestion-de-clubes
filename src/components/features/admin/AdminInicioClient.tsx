@@ -102,7 +102,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
     {
       title: "Secretaría y Documentación",
       desc: "Expedientes de jugadores, DNI, SIP y autorizaciones",
-      href: "/dashboard/inscripciones",
+      href: "/admin/secretaria",
       icon: FileText,
       color: "bg-blue-50 text-blue-600 border-blue-100",
       badge: alerts.pendingInscriptionsCount > 0 ? `${alerts.pendingInscriptionsCount} pdtes` : undefined,
@@ -273,7 +273,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     </div>
                     <div className="flex items-center gap-2 self-end">
                       <Link
-                        href="/dashboard/inscripciones?status=pending_revision"
+                        href="/admin/secretaria?status=pending_revision"
                         className="text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1 shrink-0"
                       >
                         <span>Ir a secretaría</span>
@@ -1139,7 +1139,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
               <span className="text-[11px] font-medium text-amber-600 font-bold">pendientes</span>
             </div>
             <Link
-              href="/dashboard/inscripciones"
+              href="/admin/secretaria"
               className="text-[11px] font-bold text-amber-600 hover:text-amber-800 mt-2 inline-flex items-center gap-1"
             >
               <span>Gestionar altas</span>

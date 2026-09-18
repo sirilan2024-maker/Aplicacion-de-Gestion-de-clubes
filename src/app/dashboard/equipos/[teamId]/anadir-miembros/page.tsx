@@ -23,6 +23,7 @@ import {
   Plus
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { generateLinkCode } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
 /* Types */
@@ -263,6 +264,7 @@ function ScreenTablaManual({
         posicion: r.rol,
         team_id: teamId,
         club_id,
+        link_code: generateLinkCode(),
         birth_date: "2010-01-01",
         parent_contact: "Pendiente",
       }));
@@ -346,6 +348,7 @@ function ScreenTablaManual({
         posicion: r.rol,
         team_id: teamId,
         club_id,
+        link_code: generateLinkCode(),
         birth_date: "2010-01-01",
         parent_contact: "Pendiente",
       }));

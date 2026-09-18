@@ -47,7 +47,7 @@ export function PendingRequestsReview() {
           <p className="text-sm text-amber-700">Revisa la documentación y aprueba o rechaza desde el panel de Secretaría.</p>
         </div>
       </div>
-      <Link href="/dashboard/inscripciones" className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 transition-colors">
+      <Link href="/admin/secretaria" className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded-lg hover:bg-amber-700 transition-colors">
         Ir a Secretaría <ArrowRight size={16} />
       </Link>
     </div>

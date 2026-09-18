@@ -1254,7 +1254,7 @@ export interface FfcvIntegrationData {
   }>;
 }
 
-export async function getFfcvIntegrationStatusAction(): Promise<{ success: boolean; data?: FfcvIntegrationData; error?: string }> {
+export async function getFfcvIntegrationStatusAction(targetSeasonId?: string): Promise<{ success: boolean; data?: FfcvIntegrationData; error?: string }> {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
     return { success: false, error: authError || 'No autenticado' };
@@ -1275,23 +1275,43 @@ export async function getFfcvIntegrationStatusAction(): Promise<{ success: boole
       .eq('id', clubId)
       .single();
 
-    const { data: teams } = await adminClient
+    let seasonId = targetSeasonId;
+    if (!seasonId) {
+      const { data: activeSeason } = await adminClient
+        .from('seasons')
+        .select('id, name')
+        .eq('club_id', clubId)
+        .eq('is_active', true)
+        .maybeSingle();
+      seasonId = activeSeason?.id;
+    }
+
+    let teamsQuery = adminClient
       .from('teams')
-      .select('id, name, category')
+      .select('id, name, category, season_id')
       .eq('club_id', clubId)
       .order('name');
 
-    const { count: matchesCount } = await adminClient
-      .from('partidos')
-      .select('*', { count: 'exact', head: true })
-      .eq('club_id', clubId);
+    if (seasonId) {
+      teamsQuery = teamsQuery.eq('season_id', seasonId);
+    }
+
+    const { data: teams } = await teamsQuery;
 
     const teamIds = (teams || []).map(t => t.id);
-    const { data: teamMatches } = await adminClient
+
+    let matchesQuery = adminClient
       .from('partidos')
-      .select('equipo_id')
-      .eq('club_id', clubId)
-      .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000']);
+      .select('equipo_id', { count: 'exact' })
+      .eq('club_id', clubId);
+
+    if (teamIds.length > 0) {
+      matchesQuery = matchesQuery.in('equipo_id', teamIds);
+    } else {
+      matchesQuery = matchesQuery.eq('equipo_id', '00000000-0000-0000-0000-000000000000');
+    }
+
+    const { data: teamMatches, count: matchesCount } = await matchesQuery;
 
     const matchCountByTeam: Record<string, number> = {};
     (teamMatches || []).forEach((m: { equipo_id: string }) => {

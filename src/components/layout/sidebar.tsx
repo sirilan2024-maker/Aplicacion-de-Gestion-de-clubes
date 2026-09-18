@@ -308,8 +308,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
         label: "GESTION",
         items: [
           { name: "Tesorería", href: "/dashboard/treasury", icon: Wallet },
-          { name: "Secretaria", href: "/dashboard/inscripciones", icon: Settings },
-          { name: "Expedientes (Doc)", href: "/admin/secretaria", icon: FolderOpen },
+          { name: "Secretaría", href: "/admin/secretaria", icon: FolderOpen },
           { name: "Configuración del Club", href: "/admin/configuracion", icon: Landmark },
           { name: "Políticas Notificaciones", href: "/admin/configuracion/notificaciones", icon: Bell },
           { name: "Configuracion de roles", href: "/admin/configuracion/roles", icon: Shield },

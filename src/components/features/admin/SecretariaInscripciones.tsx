@@ -42,9 +42,6 @@ interface PlayerRequest {
   teams: { id?: string; name: string; category?: string } | null
 }
 
-// Documentos obligatorios mínimos para tramitar la ficha
-const REQUIRED_DOCS = ["pasaporte", "foto_carnet"]
-
 // Mapa de etiquetas legibles para los tipos de documentos
 const DOC_LABELS: Record<string, string> = {
   pasaporte: "DNI/NIE del Jugador",
@@ -86,35 +83,63 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+// Helper para comprobar si el jugador cuenta con la documentación federativa obligatoria
+function checkDocumentCompleteness(docs: DocumentInfo[]) {
+  const docTypes = docs.map(d => d.document_type.toLowerCase());
+  
+  // Identificación del Jugador (DNI/NIE jugador, Pasaporte o Libro de Familia)
+  const hasPlayerId = docTypes.some(t => 
+    (t.includes("jugador") && (t.includes("dni") || t.includes("nie") || t.includes("pasaporte"))) ||
+    t.includes("pasaporte") ||
+    t.includes("libro_de_familia") ||
+    t.includes("libro") ||
+    t === "dni_nie_del_jugador_anverso" ||
+    t === "dni_nie_del_jugador_reverso"
+  );
+
+  // Foto Carnet / Foto del jugador
+  const hasPhoto = docTypes.some(t => t.includes("foto"));
+
+  const missing: string[] = [];
+  if (!hasPlayerId) missing.push("DNI/NIE del jugador (o Pasaporte/Libro)");
+  if (!hasPhoto) missing.push("Foto carnet");
+
+  return {
+    isComplete: hasPlayerId && hasPhoto,
+    hasPlayerId,
+    hasPhoto,
+    missing,
+  };
+}
+
 // ─── Semáforo de documentación ────────────────────────────────────────────────
 
 function DocTrafficLight({ docs }: { docs: DocumentInfo[] }) {
-  const docTypes = docs.map(d => d.document_type.toLowerCase())
-  const hasRequiredAll = REQUIRED_DOCS.every(req => docTypes.some(t => t.includes(req.replace("pasaporte", "pasaporte").replace("foto_carnet", "foto_carnet"))))
-  const hasAny = docs.length > 0
+  const { isComplete } = checkDocumentCompleteness(docs);
+  const hasAny = docs.length > 0;
 
-  if (hasRequiredAll) {
+  if (isComplete) {
     return (
-      <span title="Documentación completa" className="inline-flex items-center gap-1 text-emerald-600 text-xs font-bold">
+      <span title="Documentación completa (DNI y Foto)" className="inline-flex items-center gap-1 text-emerald-600 text-xs font-bold">
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/30 animate-pulse" />
         {docs.length} doc{docs.length !== 1 ? "s" : ""}
       </span>
-    )
+    );
   }
   if (hasAny) {
     return (
-      <span title="Faltan documentos obligatorios" className="inline-flex items-center gap-1 text-amber-600 text-xs font-bold">
+      <span title="Faltan archivos federativos obligatorios (DNI o Foto)" className="inline-flex items-center gap-1 text-amber-600 text-xs font-bold">
         <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/30" />
         {docs.length} doc{docs.length !== 1 ? "s" : ""} · Incompleto
       </span>
-    )
+    );
   }
   return (
     <span title="Sin documentación" className="inline-flex items-center gap-1 text-red-500 text-xs font-bold">
       <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm shadow-red-500/30" />
       Sin documentos
     </span>
-  )
+  );
 }
 
 // ─── Modal de expediente ──────────────────────────────────────────────────────
@@ -170,9 +195,8 @@ function ExpedienteModal({
     onClose()
   }
 
-  const hasMissingDocs = REQUIRED_DOCS.some(req =>
-    !player.player_documents.some(d => d.document_type.toLowerCase().includes(req))
-  )
+  const { isComplete, missing } = checkDocumentCompleteness(player.player_documents);
+  const hasMissingDocs = !isComplete;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
@@ -216,7 +240,9 @@ function ExpedienteModal({
           {hasMissingDocs && (
             <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
               <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-500" />
-              <span><strong>Documentación incompleta.</strong> Faltan archivos obligatorios para tramitar la ficha federativa (DNI del jugador y/o foto carnet).</span>
+              <span>
+                <strong>Documentación incompleta.</strong> Faltan archivos obligatorios para tramitar la ficha federativa: <strong>{missing.join(", ")}</strong>.
+              </span>
             </div>
           )}
 

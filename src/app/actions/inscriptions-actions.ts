@@ -160,6 +160,7 @@ export async function approveInscriptionAction(id: string) {
     console.error('Error generando recibo automático al inscribir miembro:', e);
   }
 
+  revalidatePath('/admin/secretaria');
   revalidatePath('/dashboard/inscripciones');
   revalidatePath('/dashboard/club/miembros');
   revalidatePath('/dashboard/utilleria');
@@ -195,6 +196,7 @@ export async function requestCorrectionAction(id: string, reason: string) {
 
   if (error) return { success: false, error: error.message };
 
+  revalidatePath('/admin/secretaria');
   revalidatePath('/dashboard/inscripciones');
   return { success: true };
 }
@@ -239,6 +241,7 @@ export async function rejectInscriptionAction(id: string) {
 
   if (error) return { success: false, error: error.message };
 
+  revalidatePath('/admin/secretaria');
   revalidatePath('/dashboard/inscripciones');
   return { success: true };
 }
@@ -292,6 +295,7 @@ export async function updateRegistrationEmailAction(registrationId: string, newE
     if (profErr) return { success: false, error: profErr.message };
   }
 
+  revalidatePath('/admin/secretaria');
   revalidatePath('/dashboard/inscripciones');
   return { success: true };
 }
@@ -311,6 +315,20 @@ export async function resetPasswordAction(email: string) {
 }
 
 async function getPlayerPdfFeeInfo(adminSupabase: any, player: any) {
+  // Los jugadores senior no tienen cuotas de inscripción por diseño
+  if (player.is_senior) {
+    return {
+      totalAmount: 0,
+      baseTotal: 0,
+      isRenewal: false,
+      isReserved: false,
+      reservationAmount: 0,
+      remainingAmount: 0,
+      method: player.payment_method || 'Sin cuota',
+      status: 'no_aplica',
+    };
+  }
+
   let { data: fees } = await adminSupabase
     .from('fees')
     .select('amount_cents, amount_paid_cents, monto_total, estado, payment_method, metodo_pago, concept')
@@ -367,11 +385,11 @@ export async function getInscriptionPdfAction(playerId: string) {
     return { success: false, error: access.reason || 'No autorizado' };
   }
 
-  const { data: player } = await adminSupabase
+  const { data: player, error: playerQueryError } = await adminSupabase
     .from('players')
     .select(`
-      id, first_name, last_name, dni, birth_date, phone, email, sip, is_senior, created_at,
-      registration_status, posicion_principal, address, municipio,
+      id, first_name, last_name, dni, birth_date, sip, is_senior, created_at,
+      registration_status, posicion_principal, address, city,
       parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
       parent2_name, parent2_last_name, parent2_phone, parent2_email,
       iban, was_in_club, paid_reservation, payment_method, teams(id, name, category)
@@ -379,6 +397,7 @@ export async function getInscriptionPdfAction(playerId: string) {
     .eq('id', playerId)
     .single();
 
+  if (playerQueryError) console.error('[getInscriptionPdfAction] Query error:', playerQueryError.message);
   if (!player) return { success: false, error: 'Jugador no encontrado' };
 
   // Apparel sizes
@@ -403,7 +422,7 @@ export async function getInscriptionPdfAction(playerId: string) {
 
   const teamInfo = Array.isArray(player.teams) ? player.teams[0] : player.teams;
   const categoryStr = teamInfo?.name || teamInfo?.category || player.posicion_principal || 'Sin asignar';
-  const fullAddress = [player.address, player.municipio].filter(Boolean).join(', ');
+  const fullAddress = [player.address, player.city].filter(Boolean).join(', ');
 
   const pdfData = {
     player: {
@@ -413,18 +432,20 @@ export async function getInscriptionPdfAction(playerId: string) {
       dni: player.dni,
       birthDate: formattedBirthDate,
       category: categoryStr,
-      phone: player.phone,
-      email: player.email,
+      phone: player.parent1_phone,
+      email: player.parent1_email,
       sip: player.sip,
       address: fullAddress,
       registrationStatus: player.registration_status,
       createdAt: player.created_at,
     },
     tutor: {
-      name: player.is_senior ? `${player.first_name} ${player.last_name}` : `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim(),
+      name: player.is_senior
+        ? `${player.first_name} ${player.last_name}`.trim()
+        : `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim(),
       dni: player.is_senior ? player.dni : player.parent1_dni,
-      phone: player.is_senior ? player.phone : player.parent1_phone,
-      email: player.is_senior ? player.email : player.parent1_email,
+      phone: player.parent1_phone,
+      email: player.parent1_email,
     },
     health: {
       allergies: health?.allergies,
@@ -465,8 +486,8 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
   let query = adminSupabase
     .from('players')
     .select(`
-      id, first_name, last_name, dni, birth_date, phone, email, sip, is_senior, created_at,
-      registration_status, posicion_principal, address, municipio,
+      id, first_name, last_name, dni, birth_date, sip, is_senior, created_at,
+      registration_status, posicion_principal, address, city,
       parent1_name, parent1_last_name, parent1_dni, parent1_phone, parent1_email,
       parent2_name, parent2_last_name, parent2_phone, parent2_email,
       iban, was_in_club, paid_reservation, payment_method, teams(id, name, category)
@@ -502,7 +523,7 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
 
     const teamInfo = Array.isArray(player.teams) ? player.teams[0] : player.teams;
     const categoryStr = teamInfo?.name || teamInfo?.category || player.posicion_principal || 'Sin asignar';
-    const fullAddress = [player.address, player.municipio].filter(Boolean).join(', ');
+    const fullAddress = [player.address, player.city].filter(Boolean).join(', ');
 
     return {
       player: {
@@ -512,18 +533,20 @@ export async function getBatchInscriptionsPdfAction(playerIds?: string[]) {
         dni: player.dni,
         birthDate: formattedBirthDate,
         category: categoryStr,
-        phone: player.phone,
-        email: player.email,
+        phone: player.parent1_phone,
+        email: player.parent1_email,
         sip: player.sip,
         address: fullAddress,
         registrationStatus: player.registration_status,
         createdAt: player.created_at,
       },
       tutor: {
-        name: player.is_senior ? `${player.first_name} ${player.last_name}` : `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim(),
+        name: player.is_senior
+          ? `${player.first_name} ${player.last_name}`.trim()
+          : `${player.parent1_name || ''} ${player.parent1_last_name || ''}`.trim(),
         dni: player.is_senior ? player.dni : player.parent1_dni,
-        phone: player.is_senior ? player.phone : player.parent1_phone,
-        email: player.is_senior ? player.email : player.parent1_email,
+        phone: player.parent1_phone,
+        email: player.parent1_email,
       },
       health: {
         allergies: health?.allergies,

@@ -438,9 +438,6 @@ export async function POST(request: Request) {
             size: size,
             delivered: false,
           };
-          if (activeSeasonId) {
-            insertPayload.season_id = activeSeasonId;
-          }
           await supabaseAdmin.from('player_apparel').insert(insertPayload);
         }
       }
@@ -702,6 +699,7 @@ export async function POST(request: Request) {
     try {
       revalidatePath('/admin/inicio');
       revalidatePath('/admin');
+      revalidatePath('/admin/secretaria');
       revalidatePath('/dashboard/inscripciones');
       revalidatePath('/dashboard/treasury');
       revalidatePath('/dashboard/equipos');

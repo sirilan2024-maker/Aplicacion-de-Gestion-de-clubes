@@ -96,7 +96,8 @@ export async function registerWithInviteCode(
   const firstName  = (formData.get('first_name')   as string)?.trim()
   const lastName   = (formData.get('last_name')    as string)?.trim()
   const phone      = (formData.get('phone')        as string)?.trim() || null
-  const role       =  formData.get('role')         as string
+  const rawRole    = (formData.get('role')         as string)?.trim().toLowerCase()
+  const role       = rawRole === 'familia' ? 'tutor' : rawRole
 
   // ── Validaciones básicas ─────────────────────────────────────────────────
   if (!inviteCode || !email || !password || !firstName || !lastName || !role) {
@@ -107,8 +108,8 @@ export async function registerWithInviteCode(
     return { success: false, error: 'Rol no permitido para registro público.' }
   }
 
-  if (password.length < 8) {
-    return { success: false, error: 'La contraseña debe tener al menos 8 caracteres.' }
+  if (password.length < 6) {
+    return { success: false, error: 'La contraseña debe tener al menos 6 caracteres.' }
   }
 
   // ── Usar cliente sin sesión para la búsqueda pública del equipo ──────────

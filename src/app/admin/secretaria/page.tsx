@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Search, FolderOpen, Users, Filter, X, Archive, Download, Loader2, Building2, FileText, ShieldCheck } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,8 +22,21 @@ interface PlayerBrief {
   team_id?: string;
 }
 
-export default function DocumentManagementPage() {
-  const [activeTab, setActiveTab] = useState<"inscripciones" | "documentos">("inscripciones");
+function DocumentManagementContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get("tab")?.toLowerCase();
+
+  const [activeTab, setActiveTab] = useState<"inscripciones" | "documentos">(() => {
+    return tabParam === "documentos" || tabParam === "expedientes" ? "documentos" : "inscripciones";
+  });
+
+  useEffect(() => {
+    if (tabParam === "documentos" || tabParam === "expedientes") {
+      setActiveTab("documentos");
+    } else if (tabParam === "inscripciones") {
+      setActiveTab("inscripciones");
+    }
+  }, [tabParam]);
   const { selectedSeasonId } = useSeason();
   const [players, setPlayers] = useState<PlayerBrief[]>([]);
   const [teams, setTeams] = useState<{id: string, name: string}[]>([]);
@@ -428,5 +442,19 @@ export default function DocumentManagementPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function DocumentManagementPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        </div>
+      }
+    >
+      <DocumentManagementContent />
+    </Suspense>
   );
 }

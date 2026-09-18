@@ -17,8 +17,10 @@ import {
   Info,
 } from "lucide-react";
 import { getFfcvIntegrationStatusAction, type FfcvIntegrationData } from "@/app/actions/club-actions";
+import { useSeason } from "@/components/providers/SeasonProvider";
 
 export default function FfcvApiPage() {
+  const { selectedSeasonId } = useSeason();
   const [data, setData] = useState<FfcvIntegrationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function FfcvApiPage() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const res = await getFfcvIntegrationStatusAction();
+        const res = await getFfcvIntegrationStatusAction(selectedSeasonId || undefined);
         if (!res.success || !res.data) {
           setError(res.error || "No se pudo cargar la información de integración FFCV.");
         } else {
@@ -46,7 +48,7 @@ export default function FfcvApiPage() {
       }
     }
     loadData();
-  }, []);
+  }, [selectedSeasonId]);
 
   const handleFetchStandings = async (e: React.FormEvent) => {
     e.preventDefault();

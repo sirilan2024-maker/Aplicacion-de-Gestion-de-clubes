@@ -1,24 +1,21 @@
-import React, { Suspense } from "react";
-import { SecretariaInscripciones } from "@/components/features/admin/SecretariaInscripciones";
-import { Loader2 } from "lucide-react";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Secretaría de Inscripciones | Sporting Saladar",
-  description: "Panel de gestión de inscripciones del club.",
-};
+export default async function InscripcionesRedirectPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolvedParams = searchParams ? await searchParams : {};
+  const query = new URLSearchParams();
 
-export default function InscripcionesPage() {
-  return (
-    <div className="min-h-screen bg-gray-50/50 py-8">
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-          </div>
-        }
-      >
-        <SecretariaInscripciones />
-      </Suspense>
-    </div>
-  );
+  for (const [key, value] of Object.entries(resolvedParams)) {
+    if (typeof value === "string") {
+      query.set(key, value);
+    } else if (Array.isArray(value)) {
+      value.forEach((v) => query.append(key, v));
+    }
+  }
+
+  const queryString = query.toString();
+  redirect(`/admin/secretaria${queryString ? `?${queryString}` : ""}`);
 }

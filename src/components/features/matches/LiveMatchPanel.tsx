@@ -124,14 +124,14 @@ export function LiveMatchPanel({
 
   // Goals calculations
   const localGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol') return isLocal ? !!e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : !!e.player_id;
     return false;
   });
   
   const awayGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return !isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol') return isLocal ? !e.player_id : !!e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !!e.player_id : !e.player_id;
     return false;
   });
 

@@ -1041,7 +1041,7 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
                         {!isFamilyView && (
                           <button
                             onClick={() => handleDeleteEvent(ev.id)}
-                            className="w-6 h-6 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-all"
+                            className="w-7 h-7 rounded-full bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center shrink-0 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 active:scale-95"
                             title="Borrar evento"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

@@ -661,20 +661,27 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
                   </div>
                 </div>
                 
-                <div className="flex justify-between items-center py-4">
+                <div className="flex justify-between items-center py-4 gap-2">
                   {/* EQUIPO LOCAL (Columna 1) */}
-                  <div className="flex flex-col items-center flex-1 text-center">
-                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-sm border border-slate-200">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: homeColor }}
-                      />
+                  <div className="flex flex-col items-center flex-1 text-center min-w-0">
+                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-xs border border-slate-200 p-1.5 shrink-0 overflow-hidden">
+                      {isLocal ? (
+                        <img src="/apple-icon.png" alt="Sporting Saladar" className="w-full h-full object-contain drop-shadow-xs" onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }} />
+                      ) : ffcvMatch?.home_shield_url ? (
+                        <img src={ffcvMatch.home_shield_url} alt={homeTeamName} className="w-full h-full object-contain" onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }} />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: homeColor }} />
+                      )}
                     </div>
-                    <span className="font-bold text-sm text-slate-900 leading-tight">{homeTeamName}</span>
+                    <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug line-clamp-2">{homeTeamName}</span>
                   </div>
                   
                   {/* MARCADOR O VS */}
-                  <div className="px-4 flex flex-col items-center justify-center">
+                  <div className="px-2 sm:px-4 flex flex-col items-center justify-center shrink-0">
                     {!showScore ? (
                       <span className="text-slate-300 font-black text-xl italic">VS</span>
                     ) : (
@@ -695,14 +702,21 @@ export function GlobalMatchesView({ initialMatches, teams, players = [], convoca
                   </div>
 
                   {/* EQUIPO VISITANTE (Columna 2) */}
-                  <div className="flex flex-col items-center flex-1 text-center">
-                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-sm border border-slate-200">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: awayColor }}
-                      />
+                  <div className="flex flex-col items-center flex-1 text-center min-w-0">
+                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-xs border border-slate-200 p-1.5 shrink-0 overflow-hidden">
+                      {!isLocal ? (
+                        <img src="/apple-icon.png" alt="Sporting Saladar" className="w-full h-full object-contain drop-shadow-xs" onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }} />
+                      ) : ffcvMatch?.away_shield_url ? (
+                        <img src={ffcvMatch.away_shield_url} alt={awayTeamName} className="w-full h-full object-contain" onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }} />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: awayColor }} />
+                      )}
                     </div>
-                    <span className="font-bold text-sm text-slate-900 leading-tight">{awayTeamName}</span>
+                    <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug line-clamp-2">{awayTeamName}</span>
                   </div>
                 </div>
 

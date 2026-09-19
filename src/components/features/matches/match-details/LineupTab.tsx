@@ -118,7 +118,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
     id: p.id,
     name: p.first_name || "",
     pos: p.posicion_principal || "N/A",
-    avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
+    avatar: `${(p.first_name && p.first_name[0]) || ''}${(p.last_name && p.last_name[0]) || ''}`,
     demarcation: "Mediocampista",
     number: p.dorsal 
   }))

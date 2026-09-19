@@ -66,7 +66,15 @@ const IconMap: Record<string, React.ComponentType<any>> = {
   Layers: Layers,
   Compass: Compass,
   LineChart: LineChart,
-  ClipboardList: ClipboardList
+  ClipboardList: ClipboardList,
+  MessageSquare: MessageSquare,
+  Shirt: Shirt,
+  Activity: Activity,
+  Building2: Building2,
+  Sliders: Sliders,
+  UserPlus: UserPlus,
+  Landmark: Landmark,
+  Bell: Bell
 }
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"

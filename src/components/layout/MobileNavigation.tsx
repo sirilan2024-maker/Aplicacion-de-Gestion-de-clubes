@@ -34,7 +34,14 @@ import {
   Radio,
   UserPlus,
   Bell,
-  Landmark
+  Landmark,
+  BookOpen,
+  Layers,
+  Compass,
+  LineChart,
+  Building2,
+  Sliders,
+  ClipboardList
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -57,7 +64,21 @@ const IconMap: Record<string, React.ComponentType<any>> = {
   Wallet: Wallet,
   Brain: Brain,
   Globe: Globe,
-  Timer: Timer
+  Timer: Timer,
+  FolderOpen: FolderOpen,
+  BookOpen: BookOpen,
+  Layers: Layers,
+  Compass: Compass,
+  LineChart: LineChart,
+  ClipboardList: ClipboardList,
+  MessageSquare: MessageSquare,
+  Shirt: Shirt,
+  Activity: Activity,
+  Building2: Building2,
+  Sliders: Sliders,
+  UserPlus: UserPlus,
+  Landmark: Landmark,
+  Bell: Bell
 }
 
 type NavItem = {

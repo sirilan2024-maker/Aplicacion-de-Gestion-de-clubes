@@ -106,6 +106,94 @@ export async function syncAppNavigationAction() {
 }
 
 /**
+ * Obtiene toda la configuración de roles, módulos y permisos desde el servidor.
+ */
+export async function getRolesConfigDataAction() {
+  try {
+    const adminSupabase = await createAdminClient()
+
+    // 1. Sincronizar módulos base
+    const inserts = SYSTEM_MODULES.map(m => ({
+      id: m.id,
+      label: m.label,
+      path: m.path,
+      icon_name: m.icon_name,
+      sort_order: m.sort_order
+    }))
+    await adminSupabase.from('app_navigation').upsert(inserts, { onConflict: 'id' })
+
+    // 2. Obtener lista completa de módulos
+    const { data: navData } = await adminSupabase
+      .from('app_navigation')
+      .select('*')
+      .order('sort_order')
+
+    const modules: AppNavModule[] = (navData && navData.length > 0)
+      ? navData.map((dbItem: any) => {
+          const sys = SYSTEM_MODULES.find(m => m.id === dbItem.id)
+          return {
+            id: dbItem.id,
+            label: dbItem.label,
+            path: dbItem.path,
+            icon_name: dbItem.icon_name || 'Home',
+            sort_order: dbItem.sort_order || 0,
+            category: sys?.category || 'General / Club'
+          }
+        })
+      : SYSTEM_MODULES
+
+    // 3. Obtener permisos actuales
+    const { data: roleNavData } = await adminSupabase
+      .from('role_navigation')
+      .select('role, nav_id')
+
+    const perms: Record<string, string[]> = {}
+    const existingDbRoles = new Set<string>()
+
+    if (roleNavData) {
+      roleNavData.forEach(item => {
+        existingDbRoles.add(item.role)
+        if (!perms[item.role]) perms[item.role] = []
+        perms[item.role].push(item.nav_id)
+      })
+    }
+
+    // 4. Lista de roles
+    const roles: { key: string; label: string; category: string; isCustom?: boolean }[] = [...BASE_SYSTEM_ROLES]
+    existingDbRoles.forEach(dbRole => {
+      if (!roles.some(r => r.key === dbRole)) {
+        roles.push({
+          key: dbRole,
+          label: dbRole.charAt(0).toUpperCase() + dbRole.slice(1).replace(/_/g, ' '),
+          category: 'Personalizado',
+          isCustom: true
+        })
+      }
+    })
+
+    roles.forEach(r => {
+      if (!perms[r.key]) perms[r.key] = []
+    })
+
+    return {
+      success: true,
+      modules,
+      roles,
+      perms
+    }
+  } catch (err: any) {
+    console.error('Error in getRolesConfigDataAction:', err)
+    return {
+      success: false,
+      error: err.message,
+      modules: SYSTEM_MODULES,
+      roles: BASE_SYSTEM_ROLES,
+      perms: {}
+    }
+  }
+}
+
+/**
  * Actualiza los permisos de navegación para un rol dado.
  */
 export async function updateRoleNavigationAction(role: string, navIds: string[]) {

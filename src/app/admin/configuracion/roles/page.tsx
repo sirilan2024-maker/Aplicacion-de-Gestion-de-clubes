@@ -27,6 +27,7 @@ import {
   syncAppNavigationAction, 
   createCustomRoleAction, 
   deleteCustomRoleAction,
+  getRolesConfigDataAction,
   BASE_SYSTEM_ROLES,
   SYSTEM_MODULES,
   AppNavModule
@@ -57,80 +58,23 @@ export default function ConfigRolesPage() {
   const [newRoleNavs, setNewRoleNavs] = useState<string[]>([])
   const [creatingRole, setCreatingRole] = useState(false)
 
-  const supabase = createClient()
-
   const loadData = async () => {
     setLoading(true)
     try {
-      // 1. Obtener todos los módulos de app_navigation
-      const { data: navData } = await supabase
-        .from("app_navigation")
-        .select("*")
-        .order("sort_order")
-
-      if (navData && navData.length >= SYSTEM_MODULES.length) {
-        // Enlazar con categorías
-        const enriched = navData.map((dbItem: any) => {
-          const sys = SYSTEM_MODULES.find(m => m.id === dbItem.id)
-          return {
-            id: dbItem.id,
-            label: dbItem.label,
-            path: dbItem.path,
-            icon_name: dbItem.icon_name || "Home",
-            sort_order: dbItem.sort_order || 0,
-            category: sys?.category || "General / Club"
-          }
-        })
-        setNavItems(enriched)
+      const res = await getRolesConfigDataAction()
+      if (res && res.modules && res.roles && res.perms) {
+        setNavItems(res.modules)
+        setRolesList(res.roles)
+        setRolePermissions(res.perms)
       } else {
-        // Si faltan módulos en DB, usar SYSTEM_MODULES como base
         setNavItems(SYSTEM_MODULES)
-        // Auto-sincronizar en segundo plano
-        syncAppNavigationAction()
+        setRolesList(BASE_SYSTEM_ROLES)
       }
-
-      // 2. Obtener todos los role_navigation
-      const { data: roleNavData } = await supabase
-        .from("role_navigation")
-        .select("role, nav_id")
-
-      const perms: Record<string, string[]> = {}
-      const existingDbRoles = new Set<string>()
-
-      if (roleNavData) {
-        roleNavData.forEach(item => {
-          existingDbRoles.add(item.role)
-          if (!perms[item.role]) perms[item.role] = []
-          perms[item.role].push(item.nav_id)
-        })
-      }
-
-      // 3. Construir lista de roles combinando base + personalizados
-      const builtRoles: RoleItem[] = [...BASE_SYSTEM_ROLES]
-
-      // Detectar roles en DB que no estén en BASE_SYSTEM_ROLES (roles personalizados)
-      existingDbRoles.forEach(dbRole => {
-        if (!builtRoles.some(r => r.key === dbRole)) {
-          builtRoles.push({
-            key: dbRole,
-            label: dbRole.charAt(0).toUpperCase() + dbRole.slice(1).replace(/_/g, " "),
-            category: "Personalizado",
-            isCustom: true
-          })
-        }
-      })
-
-      // Asegurar que cada rol tenga su entrada en perms
-      builtRoles.forEach(r => {
-        if (!perms[r.key]) perms[r.key] = []
-      })
-
-      setRolesList(builtRoles)
-      setRolePermissions(perms)
-
     } catch (e) {
       console.error("Error loading navigation data", e)
-      toast.error("Error al cargar la configuración")
+      // Fallback seguro sin bloquear la interfaz
+      setNavItems(SYSTEM_MODULES)
+      setRolesList(BASE_SYSTEM_ROLES)
     } finally {
       setLoading(false)
     }

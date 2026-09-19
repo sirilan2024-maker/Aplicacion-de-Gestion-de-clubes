@@ -243,24 +243,24 @@ export function LiveMatchPanel({
         </div>
 
         {/* Body */}
-        <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
           {/* Local */}
-          <div className="flex flex-col md:flex-row items-center gap-4 flex-1 text-center md:text-left">
-            <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
+          <div className="flex flex-row md:flex-row items-center justify-center md:justify-start gap-3 md:gap-4 flex-1 text-center md:text-left w-full">
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xl md:text-2xl shadow-sm shrink-0">
               {isLocal && clubLogoUrl ? (
                 <img src={clubLogoUrl} alt="Local" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
               ) : (
                 '🛡️'
               )}
             </div>
-            <div>
-              <h2 className="text-lg font-black text-slate-950 leading-tight">{localName}</h2>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">Local</span>
+            <div className="min-w-0">
+              <h2 className="text-base md:text-lg font-black text-slate-950 leading-tight truncate">{localName}</h2>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-0.5">Local</span>
             </div>
           </div>
 
           {/* Score & Timer */}
-          <div className="flex items-center gap-5 shrink-0">
+          <div className="flex items-center justify-center gap-3 sm:gap-5 shrink-0 py-2 md:py-0 w-full md:w-auto">
             {(() => {
               const isFinalizado = match?.estado === 'Finalizado';
               const isDescanso = match?.estado === 'Descanso' ||
@@ -272,13 +272,13 @@ export function LiveMatchPanel({
               const scoreColor = isLiveNow ? 'text-green-600' : isFinalizado ? 'text-red-600' : isDescanso ? 'text-amber-600' : 'text-black';
               
               return (
-                <span className={`text-5xl font-extrabold ${scoreColor} tabular-nums leading-none`}>
+                <span className={`text-4xl sm:text-5xl font-extrabold ${scoreColor} tabular-nums leading-none shrink-0`}>
                   {localGoals}
                 </span>
               );
             })()}
             
-            <div className="flex flex-col items-center justify-center px-4">
+            <div className="flex flex-col items-center justify-center px-2 sm:px-4">
               {(() => {
                 const isFinalizado = match?.estado === 'Finalizado';
                 const isDescanso = match?.estado === 'Descanso' ||
@@ -290,7 +290,7 @@ export function LiveMatchPanel({
                 if (isFinalizado) {
                   return (
                     <div className="flex flex-col items-center">
-                      <span className="text-[14px] font-black tracking-[0.2em] uppercase px-4 py-2 rounded-xl border-2 text-slate-800 bg-slate-100 border-slate-200">
+                      <span className="text-[11px] sm:text-[13px] font-black tracking-[0.15em] uppercase px-3 py-1.5 rounded-xl border-2 text-slate-800 bg-slate-100 border-slate-200">
                         Finalizado
                       </span>
                     </div>
@@ -298,16 +298,16 @@ export function LiveMatchPanel({
                 }
                 return (
                   <>
-                    <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">
-                      {isDescanso ? 'Estado del Partido' : 'Tiempo de Juego'}
+                    <span className="text-[9px] sm:text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">
+                      {isDescanso ? 'Estado' : 'Tiempo'}
                     </span>
-                    <div className={`text-2xl font-black tabular-nums tracking-tight px-4 py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-2 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : isDescanso ? 'bg-amber-100 text-amber-950 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                    <div className={`text-xl sm:text-2xl font-black tabular-nums tracking-tight px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-1.5 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : isDescanso ? 'bg-amber-100 text-amber-950 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
                       {match?.live_timer_started_at && (
                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
                       )}
                       {formatTime(seconds)}
                     </div>
-                    <span className={`text-[10px] font-black mt-2 uppercase tracking-widest px-3 py-1 rounded-md border ${isDescanso ? 'bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse' : (match?.live_timer_started_at != null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'text-slate-400 border-slate-200'}`}>
+                    <span className={`text-[9px] sm:text-[10px] font-black mt-1.5 uppercase tracking-widest px-2.5 py-0.5 rounded-md border ${isDescanso ? 'bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse' : (match?.live_timer_started_at != null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'text-slate-400 border-slate-200'}`}>
                       {isDescanso ? 'DESCANSO' : (match?.live_timer_started_at != null ? (match?.first_half_duration_seconds ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado'))}
                     </span>
                   </>
@@ -326,7 +326,7 @@ export function LiveMatchPanel({
               const scoreColor = isLiveNow ? 'text-green-600' : isFinalizado ? 'text-red-600' : isDescanso ? 'text-amber-600' : 'text-black';
               
               return (
-                <span className={`text-5xl font-extrabold ${scoreColor} tabular-nums leading-none`}>
+                <span className={`text-4xl sm:text-5xl font-extrabold ${scoreColor} tabular-nums leading-none shrink-0`}>
                   {awayGoals}
                 </span>
               );
@@ -334,24 +334,24 @@ export function LiveMatchPanel({
           </div>
 
           {/* Away */}
-          <div className="flex flex-col md:flex-row-reverse items-center gap-4 flex-1 text-center md:text-right">
-            <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
+          <div className="flex flex-row md:flex-row-reverse items-center justify-center md:justify-start gap-3 md:gap-4 flex-1 text-center md:text-right w-full">
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xl md:text-2xl shadow-sm shrink-0">
               {!isLocal && clubLogoUrl ? (
                 <img src={clubLogoUrl} alt="Visitante" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
               ) : (
                 '🏆'
               )}
             </div>
-            <div>
-              <h2 className="text-lg font-black text-slate-950 leading-tight">{awayName}</h2>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">Visitante</span>
+            <div className="min-w-0">
+              <h2 className="text-base md:text-lg font-black text-slate-950 leading-tight truncate">{awayName}</h2>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-0.5">Visitante</span>
             </div>
           </div>
         </div>
 
         {/* GOALS TIMELINE */}
         {goalTimeline.length > 0 && (
-          <div className="bg-slate-50 border-t border-slate-200 p-5">
+          <div className="bg-slate-50 border-t border-slate-200 p-3 sm:p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center mb-3">Goles del Partido</p>
             <div className="max-w-2xl mx-auto space-y-2">
               {goalTimeline.map((goal) => {
@@ -365,13 +365,13 @@ export function LiveMatchPanel({
                   : (fullPlayerName || (goal.isHomeGoal ? 'Sporting' : 'Rival'));
 
                 return (
-                  <div key={goal.id || Math.random()} className="grid grid-cols-12 items-center gap-2 text-xs font-bold">
+                  <div key={goal.id || Math.random()} className="grid grid-cols-12 items-center gap-1 sm:gap-2 text-xs font-bold">
                     {/* Columna Goles Local (Alineada a la Izquierda) */}
-                    <div className="col-span-5 text-right flex items-center justify-end gap-2 pr-2">
+                    <div className="col-span-4 sm:col-span-5 text-right flex items-center justify-end gap-1.5 pr-1 sm:pr-2 min-w-0">
                       {goal.isHomeGoal ? (
                         <>
-                          <span className="text-slate-800 font-bold truncate max-w-[150px]">{playerName}</span>
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-black tabular-nums">
+                          <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs">{playerName}</span>
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-black tabular-nums shrink-0">
                             {displayMinuto}'
                           </span>
                         </>
@@ -379,18 +379,18 @@ export function LiveMatchPanel({
                     </div>
 
                     {/* Marcador Acumulado Central */}
-                    <div className="col-span-2 text-center bg-white py-1 px-2.5 rounded-lg border border-slate-200 shadow-sm font-black text-slate-800 text-xs tracking-wider shrink-0 mx-auto">
+                    <div className="col-span-4 sm:col-span-2 text-center bg-white py-1 px-2 rounded-lg border border-slate-200 shadow-xs font-black text-slate-800 text-[11px] sm:text-xs tracking-wider shrink-0 mx-auto whitespace-nowrap">
                       {goal.score}
                     </div>
 
                     {/* Columna Goles Visitante (Alineada a la Derecha) */}
-                    <div className="col-span-5 text-left flex items-center justify-start gap-2 pl-2">
+                    <div className="col-span-4 sm:col-span-5 text-left flex items-center justify-start gap-1.5 pl-1 sm:pl-2 min-w-0">
                       {!goal.isHomeGoal ? (
                         <>
-                          <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-black tabular-nums">
+                          <span className="bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-black tabular-nums shrink-0">
                             {displayMinuto}'
                           </span>
-                          <span className="text-slate-800 font-bold truncate max-w-[150px]">{playerName}</span>
+                          <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs">{playerName}</span>
                         </>
                       ) : null}
                     </div>

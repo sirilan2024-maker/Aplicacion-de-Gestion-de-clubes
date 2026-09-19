@@ -87,13 +87,15 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
 
     playerConvs.forEach(conv => {
       const match = matches.find(m => m.id === conv.partido_id)
-      if (match && (conv.yellow_cards > 0 || conv.red_cards > 0)) {
-        totalYellow += (conv.yellow_cards || 0)
-        totalRed += (conv.red_cards || 0)
+      const yellowCount = conv.yellow_cards ?? conv.tarjetas_amarillas ?? 0
+      const redCount = conv.red_cards ?? conv.tarjetas_rojas ?? 0
+      if (match && (yellowCount > 0 || redCount > 0)) {
+        totalYellow += yellowCount
+        totalRed += redCount
         rawEvents.push({
           match,
-          yellow: conv.yellow_cards || 0,
-          red: conv.red_cards || 0
+          yellow: yellowCount,
+          red: redCount
         })
       }
     })

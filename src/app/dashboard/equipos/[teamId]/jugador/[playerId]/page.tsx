@@ -284,10 +284,10 @@ export default function GlobalPlayerProfilePage() {
         convocatoriasData.forEach(c => {
           if (c.partidos) {
             const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
-            const gCount = c.goals || c.goles || mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
-            const yCount = c.yellow_cards || c.tarjetas_amarillas || mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
-            const rCount = c.red_cards || c.tarjetas_rojas || mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
-            const mins = c.minutes_played || c.minutos_jugados || (c.status === 'convocado' || mEvs.length > 0 ? 80 : 0);
+            const gCount = c.goals ?? c.goles ?? mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
+            const yCount = c.yellow_cards ?? c.tarjetas_amarillas ?? mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
+            const rCount = c.red_cards ?? c.tarjetas_rojas ?? mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
+            const mins = c.minutes_played ?? c.minutos_jugados ?? (c.status === 'convocado' || mEvs.length > 0 ? 80 : 0);
 
             totalMatchMinutes += mins;
             totalGoalsCount += gCount;

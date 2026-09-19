@@ -38,25 +38,26 @@ export default function FamilyDisciplinePage() {
       // Fetch cards from convocatorias
       const { data: convData, error: convError } = await supabase
         .from('convocatorias')
-        .select('yellow_cards, red_cards, partidos(fecha_hora, rival_nombre, lugar)')
-        .eq('player_id', playerId)
-        .or('yellow_cards.gt.0,red_cards.gt.0');
+        .select('yellow_cards, red_cards, tarjetas_amarillas, tarjetas_rojas, partidos(fecha_hora, rival_nombre, lugar)')
+        .eq('player_id', playerId);
 
       if (convError) throw convError;
 
-      const records = convData || [];
+      const records = (convData || []).filter(r => (r.yellow_cards || r.tarjetas_amarillas || 0) > 0 || (r.red_cards || r.tarjetas_rojas || 0) > 0);
       let yellow = 0, red = 0;
       const allCards: any[] = [];
 
       records.forEach(r => {
         const match = Array.isArray(r.partidos) ? r.partidos[0] : r.partidos;
-        if (r.yellow_cards > 0) {
-          yellow += r.yellow_cards;
-          allCards.push({ type: 'yellow', count: r.yellow_cards, match });
+        const yCount = r.yellow_cards ?? r.tarjetas_amarillas ?? 0;
+        const rCount = r.red_cards ?? r.tarjetas_rojas ?? 0;
+        if (yCount > 0) {
+          yellow += yCount;
+          allCards.push({ type: 'yellow', count: yCount, match });
         }
-        if (r.red_cards > 0) {
-          red += r.red_cards;
-          allCards.push({ type: 'red', count: r.red_cards, match });
+        if (rCount > 0) {
+          red += rCount;
+          allCards.push({ type: 'red', count: rCount, match });
         }
       });
 
@@ -66,8 +67,8 @@ export default function FamilyDisciplinePage() {
       // Format for DisciplineModal
       const formattedCardEvents = records.map(r => ({
         match: Array.isArray(r.partidos) ? r.partidos[0] : r.partidos,
-        yellow: r.yellow_cards || 0,
-        red: r.red_cards || 0
+        yellow: r.yellow_cards ?? r.tarjetas_amarillas ?? 0,
+        red: r.red_cards ?? r.tarjetas_rojas ?? 0
       })).sort((a, b) => new Date(b.match?.fecha_hora || 0).getTime() - new Date(a.match?.fecha_hora || 0).getTime());
 
       setStats({ yellow, red });

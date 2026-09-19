@@ -170,8 +170,28 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
   const [pitchPlayers, setPitchPlayers] = useState<Record<string, { x: number, y: number }>>(initialPitchPlayers)
   const [savedAlert, setSavedAlert] = useState(false)
   const [limitWarning, setLimitWarning] = useState<string | null>(null)
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null)
+  const [contextMenuPlayerId, setContextMenuPlayerId] = useState<string | null>(null);
+  const [benchPlayerModalId, setBenchPlayerModalId] = useState<string | null>(null);
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTouchStartPlayer = (playerId: string) => {
+    if (isFamilyView) return;
+    setDraggedPlayerId(playerId);
+    
+    // Iniciar temporizador de 500ms para Long-Press (pulsación prolongada)
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    touchTimerRef.current = setTimeout(() => {
+      setContextMenuPlayerId(playerId);
+      setDraggedPlayerId(null);
+    }, 500);
+  };
+
+  const handleTouchEndPlayer = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+  };
   
   const pitchRef = useRef<HTMLDivElement>(null)
   const isFamilyView = rol === "familia" || rol === "jugador"
@@ -498,8 +518,15 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                       }}
                       onTouchStart={(e) => {
                         if (!isFamilyView) {
-                          setDraggedPlayerId(player.id);
+                          handleTouchStartPlayer(player.id);
                         }
+                      }}
+                      onTouchMove={() => {
+                        // Si se empieza a mover el dedo, cancelar la pulsación prolongada
+                        handleTouchEndPlayer();
+                      }}
+                      onTouchEnd={() => {
+                        handleTouchEndPlayer();
                       }}
                       onDragStart={isFamilyView ? undefined : e => {
                         e.dataTransfer.setData("playerId", player.id);
@@ -523,7 +550,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                             e.stopPropagation();
                             handleRemoveFromPitch(player.id);
                           }}
-                          className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 border border-white shadow-md flex items-center justify-center transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 z-30 active:scale-95"
+                          className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 border border-white shadow-md items-center justify-center transition-all hidden md:flex md:opacity-0 md:group-hover:opacity-100 z-30 active:scale-95"
                           title="Quitar del campo"
                         >
                           <X className="w-3 h-3 stroke-[3]" />
@@ -538,6 +565,56 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
               )
             })}
           </div>
+
+          {/* Modal Contextual tras Pulsación Prolongada (0.5s Long-Press) en Móvil */}
+          {contextMenuPlayerId && (
+            <div 
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+              onClick={() => setContextMenuPlayerId(null)}
+            >
+              <div 
+                className="bg-white rounded-2xl p-5 max-w-xs w-full shadow-2xl border border-slate-200 text-center space-y-4 animate-in zoom-in-95 duration-150"
+                onClick={e => e.stopPropagation()}
+              >
+                {(() => {
+                  const targetPlayer = initialPlayersList.find(p => p.id === contextMenuPlayerId);
+                  return (
+                    <>
+                      <div className="flex items-center justify-center gap-3 border-b border-slate-100 pb-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-black text-sm flex items-center justify-center shadow-md">
+                          {targetPlayer?.number || "?"}
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-extrabold text-slate-900 text-sm">{targetPlayer?.name || "Jugador"}</h4>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{targetPlayer?.pos || "Jugador"}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        <button
+                          onClick={() => {
+                            handleRemoveFromPitch(contextMenuPlayerId);
+                            setContextMenuPlayerId(null);
+                          }}
+                          className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-extrabold text-xs rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-all active:scale-98"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Quitar del Campo
+                        </button>
+
+                        <button
+                          onClick={() => setContextMenuPlayerId(null)}
+                          className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {!isFamilyView && (
             <div className="flex justify-end pt-2">
@@ -596,11 +673,11 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                   draggable={true}
                   onClick={() => {
                     if (!isFamilyView) {
-                      if (Object.keys(pitchPlayers).length >= 11 && selectedPlayerId !== player.id) {
+                      if (Object.keys(pitchPlayers).length >= 11 && !pitchPlayers[player.id]) {
                         showLimitError();
                         return;
                       }
-                      setSelectedPlayerId(selectedPlayerId === player.id ? null : player.id);
+                      setBenchPlayerModalId(player.id);
                     }
                   }}
                   onTouchStart={() => {
@@ -623,8 +700,8 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                     </div>
                   </div>
 
-                  <span className="text-[9px] font-extrabold uppercase tracking-wide text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
-                    {player.pos}
+                  <span className="text-[9px] font-extrabold uppercase tracking-wide text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    + Añadir
                   </span>
                 </div>
               ))}
@@ -637,6 +714,87 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
               )}
             </div>
           </div>
+
+          {/* Modal Selector de Posición para Añadir al Campo */}
+          {benchPlayerModalId && (
+            <div 
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+              onClick={() => setBenchPlayerModalId(null)}
+            >
+              <div 
+                className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4 animate-in zoom-in-95 duration-150"
+                onClick={e => e.stopPropagation()}
+              >
+                {(() => {
+                  const targetPlayer = initialPlayersList.find(p => p.id === benchPlayerModalId);
+                  const currentFormSlots = allFormations[tactic] || DEFAULT_FORMATIONS["4-3-3"];
+                  
+                  return (
+                    <>
+                      <div className="flex items-center justify-center gap-3 border-b border-slate-100 pb-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-md">
+                          {targetPlayer?.number || "?"}
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-extrabold text-slate-900 text-sm">{targetPlayer?.name || "Jugador"}</h4>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Añadir al campo ({tactic})</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-500 font-semibold">
+                        Selecciona en qué posición del campo quieres colocar a este jugador:
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-2 max-h-[220px] overflow-y-auto p-1">
+                        {currentFormSlots.map((slot) => {
+                          const occupiedByPlayerId = Object.keys(pitchPlayers).find(pId => {
+                            const pCoords = pitchPlayers[pId];
+                            return Math.abs(pCoords.x - slot.x) < 5 && Math.abs(pCoords.y - slot.y) < 5;
+                          });
+                          const occupiedPlayer = occupiedByPlayerId ? initialPlayersList.find(p => p.id === occupiedByPlayerId) : null;
+
+                          return (
+                            <button
+                              key={slot.id}
+                              onClick={() => {
+                                // Si estaba ocupada por otro, quitamos a ese otro del campo o intercambiamos
+                                setPitchPlayers(prev => {
+                                  const next = { ...prev };
+                                  if (occupiedByPlayerId) {
+                                    delete next[occupiedByPlayerId];
+                                  }
+                                  next[benchPlayerModalId] = { x: slot.x, y: slot.y };
+                                  return next;
+                                });
+                                setBenchPlayerModalId(null);
+                              }}
+                              className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center transition-all ${
+                                occupiedPlayer 
+                                  ? 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100' 
+                                  : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                              }`}
+                            >
+                              <span className="text-xs font-black">{slot.label}</span>
+                              <span className="text-[9px] font-bold truncate max-w-full">
+                                {occupiedPlayer ? `Sustituye a ${occupiedPlayer.name.split(" ")[0]}` : 'Libre'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() => setBenchPlayerModalId(null)}
+                        className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

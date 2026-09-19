@@ -232,25 +232,43 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
   }, [events]);
 
   const updateParentScores = (updatedEvents: LiveEvent[]) => {
-    const local = updatedEvents.filter(e => (e.tipo_evento === "Gol" && e.player_id) || (e.tipo_evento === "Gol en propia puerta" && !e.player_id)).length;
-    const away = updatedEvents.filter(e => (e.tipo_evento === "Gol" && !e.player_id) || (e.tipo_evento === "Gol en propia puerta" && e.player_id)).length;
+    const isLocal = match?.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match?.lugar || '');
+    const teamName = match?.equipo?.name || "Sporting Saladar";
+    const rivalName = match?.rival_nombre || "Rival por definir";
+    const localName = isLocal ? teamName : rivalName;
+    const awayName = isLocal ? rivalName : teamName;
+
+    const localEvents = updatedEvents.filter(e => {
+      if (e.tipo_evento === 'Gol') return isLocal ? !!e.player_id : !e.player_id;
+      if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : !!e.player_id;
+      return false;
+    });
+
+    const awayEvents = updatedEvents.filter(e => {
+      if (e.tipo_evento === 'Gol') return isLocal ? !e.player_id : !!e.player_id;
+      if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !!e.player_id : !e.player_id;
+      return false;
+    });
+
+    const local = localEvents.length;
+    const away = awayEvents.length;
 
     // Build scorers lists
-    const localScorers = updatedEvents
-      .filter(e => (e.tipo_evento === "Gol" && e.player_id) || (e.tipo_evento === "Gol en propia puerta" && !e.player_id))
+    const localScorers = localEvents
       .map(e => {
         const player = players.find((p: any) => p.id === e.player_id);
-        if (e.tipo_evento === "Gol en propia puerta") return `Rival PP (${e.minuto}')`;
-        return player ? `${player.first_name} (${e.minuto}')` : `Sporting (${e.minuto}')`;
+        const isPP = e.tipo_evento === "Gol en propia puerta" || e.tipo_evento === "Gol en Propia";
+        if (isPP) return `${awayName} PP (${e.minuto}')`;
+        return player ? `${player.first_name} (${e.minuto}')` : `${localName} (${e.minuto}')`;
       })
       .join(", ");
 
-    const awayScorers = updatedEvents
-      .filter(e => (e.tipo_evento === "Gol" && !e.player_id) || (e.tipo_evento === "Gol en propia puerta" && e.player_id))
+    const awayScorers = awayEvents
       .map(e => {
         const player = players.find((p: any) => p.id === e.player_id);
-        if (e.tipo_evento === "Gol en propia puerta") return `${player?.first_name || 'Sporting'} PP (${e.minuto}')`;
-        return `Rival (${e.minuto}')`;
+        const isPP = e.tipo_evento === "Gol en propia puerta" || e.tipo_evento === "Gol en Propia";
+        if (isPP) return `${localName} PP (${e.minuto}')`;
+        return player ? `${player.first_name} (${e.minuto}')` : `${awayName} (${e.minuto}')`;
       })
       .join(", ");
 

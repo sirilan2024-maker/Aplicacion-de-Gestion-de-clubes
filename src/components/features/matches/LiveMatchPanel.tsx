@@ -365,9 +365,12 @@ export function LiveMatchPanel({
                 const pFirstName = goal.player?.first_name || '';
                 const pLastName = goal.player?.last_name || '';
                 const fullPlayerName = `${pFirstName} ${pLastName}`.trim();
+                const targetTeamName = goal.isHomeGoal ? localName : awayName;
+                const ownGoalScorerTeamName = goal.isHomeGoal ? awayName : localName;
+
                 const playerName = isPP 
-                  ? (goal.isHomeGoal ? 'Rival (p.p.)' : 'Sporting (p.p.)') 
-                  : (fullPlayerName || (goal.isHomeGoal ? 'Sporting' : 'Rival'));
+                  ? (fullPlayerName ? `${fullPlayerName} (p.p.)` : `${ownGoalScorerTeamName} (p.p.)`) 
+                  : (fullPlayerName || targetTeamName);
 
                 return (
                   <div key={goal.id || Math.random()} className="grid grid-cols-12 items-center gap-1 sm:gap-2 text-xs font-bold">

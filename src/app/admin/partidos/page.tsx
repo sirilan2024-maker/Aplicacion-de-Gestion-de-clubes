@@ -43,7 +43,7 @@ export default function AdminPartidosPage() {
       // Obtener equipos del club
       const { data: teamsData } = await supabase
         .from('teams')
-        .select('id, name, ffcv_url, season_id')
+        .select('id, name, ffcv_url, ffcv_group_id, ffcv_team_id, season_id')
         .eq('club_id', profile.club_id)
       
       // Obtener temporada activa
@@ -304,7 +304,7 @@ export default function AdminPartidosPage() {
         </div>
       ) : viewMode === 'clasificacion' ? (
         <div className="pt-2">
-          <FFCVStandings ffcvUrl={selectedTeam?.ffcv_url} teamName={selectedTeam?.name || "CADETE A"} />
+          <FFCVStandings ffcvGroupId={selectedTeam?.ffcv_group_id} ffcvTeamId={selectedTeam?.ffcv_team_id} ffcvUrl={selectedTeam?.ffcv_url} teamName={selectedTeam?.name || "CADETE A"} />
         </div>
       ) : (
         <>

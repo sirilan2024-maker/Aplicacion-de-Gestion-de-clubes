@@ -48,12 +48,20 @@ export default async function PartidosPage() {
       
     if (playersError) {
       console.error("Error fetching players in matches/page.tsx:", playersError);
-    } else if (historyData) {
+    } else if (historyData && historyData.length > 0) {
       players = historyData.map((h: any) => ({
         ...h.players,
         team_id: h.team_id
       }));
     }
+  }
+
+  if (players.length === 0) {
+    const { data: directPlayers } = await supabase
+      .from("players")
+      .select("id, first_name, last_name, posicion, status, team_id")
+      .neq("status", "inactive");
+    if (directPlayers) players = directPlayers;
   }
 
   const matchIds = (matches || []).map(m => m.id);

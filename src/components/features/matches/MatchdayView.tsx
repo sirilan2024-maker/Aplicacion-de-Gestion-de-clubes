@@ -375,7 +375,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                                 }
                               }
                             }}
-                            className="absolute top-3 right-3 p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 shadow-sm opacity-0 group-hover:opacity-100 transition-all z-20 flex items-center gap-1 text-[10px] font-bold"
+                            className="absolute top-3 right-3 p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 shadow-sm opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 flex items-center gap-1 text-[10px] font-bold"
                             title="Eliminar partido de la vista en vivo"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

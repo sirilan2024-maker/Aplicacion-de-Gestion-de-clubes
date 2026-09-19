@@ -370,6 +370,7 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
 
   revalidatePath(`/dashboard/matches`);
   revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
+  revalidatePath(`/live`);
   return { success: true };
 }
 

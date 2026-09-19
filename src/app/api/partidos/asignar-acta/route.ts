@@ -61,7 +61,10 @@ export async function POST(req: NextRequest) {
 
       const { error: dbError } = await supabase
         .from("partidos")
-        .update({ acta_oficial_url: assignedPath })
+        .update({ 
+          acta_oficial_url: assignedPath,
+          estado: 'Finalizado'
+        })
         .eq("id", partidoId);
 
       if (dbError) {
@@ -124,10 +127,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Actualizar el partido en la base de datos
-    const { error: dbError } = await supabase
-      .from("partidos")
-      .update({ acta_oficial_url: assignedPath })
-      .eq("id", partidoId);
+      const { error: dbError } = await supabase
+        .from("partidos")
+        .update({ 
+          acta_oficial_url: assignedPath,
+          estado: 'Finalizado'
+        })
+        .eq("id", partidoId);
 
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });

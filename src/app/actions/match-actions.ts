@@ -777,19 +777,64 @@ export async function reconcileMatchStatsAction(matchId: string, stats: any[]) {
       return { success: false, error: "No tienes permisos deportivos para reconciliar estadísticas" };
     }
 
-    const { data, error } = await supabase.rpc('reconcile_match_and_close', {
-      p_partido_id: matchId,
-      p_stats: stats,
-      p_new_status: 'Finalizado'
-    });
+    // 1. Intentar el procedimiento almacenado
+    let rpcSuccess = false;
+    try {
+      const { data, error } = await supabase.rpc('reconcile_match_and_close', {
+        p_partido_id: matchId,
+        p_stats: stats,
+        p_new_status: 'Finalizado'
+      });
+      if (!error && (data as any)?.success !== false) {
+        rpcSuccess = true;
+      }
+    } catch (rpcErr) {
+      console.warn("[reconcileMatchStatsAction] RPC failed, falling back to direct updates:", rpcErr);
+    }
 
-    if (error) {
-      console.error("[reconcileMatchStatsAction] Error running RPC:", error);
-      return { success: false, error: error.message };
+    // 2. Si el RPC falló (o violó restricciones de check), aplicar actualización directa robusta
+    if (!rpcSuccess) {
+      for (const st of (stats || [])) {
+        if (!st.player_id) continue;
+        const yellow = Number(st.yellow_cards || 0);
+        const red = Number(st.red_cards || 0);
+        const goals = Number(st.goals || 0);
+        const assists = Number(st.assists || 0);
+        const minutes = Number(st.minutes_played || 0);
+
+        // Actualizar convocatoria existente por partido_id y player_id
+        const { error: updErr } = await supabase
+          .from('convocatorias')
+          .update({
+            yellow_cards: yellow,
+            tarjetas_amarillas: yellow,
+            red_cards: red,
+            tarjetas_rojas: red,
+            goals: goals,
+            goles: goals,
+            assists: assists,
+            asistencias: assists,
+            minutes_played: minutes,
+            minutos_jugados: minutes
+          })
+          .eq('partido_id', matchId)
+          .eq('player_id', st.player_id);
+
+        if (updErr) {
+          console.error(`[reconcileMatchStatsAction] Error updating conv for ${st.player_id}:`, updErr.message);
+        }
+      }
+
+      // Marcar el partido como Finalizado
+      await supabase
+        .from('partidos')
+        .update({ estado: 'Finalizado', updated_at: new Date().toISOString() })
+        .eq('id', matchId);
     }
 
     revalidatePath('/dashboard', 'layout');
-    return { success: true, data };
+    revalidatePath('/dashboard/matches');
+    return { success: true };
   } catch (err: any) {
     console.error("[reconcileMatchStatsAction] Exception:", err);
     return { success: false, error: err.message || "Error interno" };

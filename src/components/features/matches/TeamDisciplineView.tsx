@@ -70,11 +70,25 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     }
   }
 
-  // Filtrar jugadores válidos (del equipo actual y sin cuerpo técnico)
+  // Filtrar jugadores válidos (del equipo actual o convocados en partidos del equipo, y sin cuerpo técnico)
   const validPlayers = players.filter(p => {
     const pos = (p.posicion || '').toLowerCase()
-    const isTeamMatch = teamId === 'all' || p.team_id === teamId
-    return isTeamMatch && !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico')
+    const isCoachingStaff = pos.includes('entrenador') || pos.includes('delegado') || pos.includes('cuerpo técnico')
+    if (isCoachingStaff) return false
+
+    if (teamId === 'all') return true
+
+    // Pertenece directamente al equipo
+    if (p.team_id === teamId) return true
+
+    // O tiene convocatorias en partidos de este equipo
+    const hasConvocatoriaInTeam = localConvocatorias.some(c => {
+      if (c.player_id !== p.id) return false
+      const m = matches.find(match => match.id === c.partido_id)
+      return m && m.equipo_id === teamId
+    })
+
+    return hasConvocatoriaInTeam
   })
 
   // Calcular totales por jugador

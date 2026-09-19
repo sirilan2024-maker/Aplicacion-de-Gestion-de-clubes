@@ -172,6 +172,8 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
   const [limitWarning, setLimitWarning] = useState<string | null>(null)
   const [contextMenuPlayerId, setContextMenuPlayerId] = useState<string | null>(null);
   const [benchPlayerModalId, setBenchPlayerModalId] = useState<string | null>(null);
+  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTouchStartPlayer = (playerId: string) => {

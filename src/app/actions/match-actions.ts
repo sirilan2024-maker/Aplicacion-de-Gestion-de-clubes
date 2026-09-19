@@ -343,35 +343,42 @@ export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summ
 }
 
 export async function deleteMatchAction(matchId: string, teamId: string) {
-  const { context, error: authError } = await getAuthenticatedContext();
-  if (!context || authError) {
-    throw new Error(authError || "No autenticado");
-  }
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
 
-  if (!ADMIN_ROLES.includes(context.profile.role)) {
-    throw new Error("Solo los administradores pueden eliminar partidos");
-  }
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: "Solo los administradores pueden eliminar partidos" };
+    }
 
-  const adminClient = await createAdminClient();
-  const matchAccess = await canUserAccessMatch(adminClient, context, matchId);
-  if (!matchAccess.allowed) {
-    throw new Error(matchAccess.reason || "No tienes permisos sobre este partido");
-  }
-  
-  const { error } = await adminClient
-    .from("partidos")
-    .delete()
-    .eq("id", matchId)
-    .eq("club_id", context.profile.club_id);
+    const adminClient = await createAdminClient();
+    const matchAccess = await canUserAccessMatch(adminClient, context, matchId);
+    if (!matchAccess.allowed) {
+      return { success: false, error: matchAccess.reason || "No tienes permisos sobre este partido" };
+    }
+    
+    const { error } = await adminClient
+      .from("partidos")
+      .delete()
+      .eq("id", matchId)
+      .eq("club_id", context.profile.club_id);
 
-  if (error) {
-    throw new Error(error.message);
-  }
+    if (error) {
+      return { success: false, error: error.message };
+    }
 
-  revalidatePath(`/dashboard/matches`);
-  revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
-  revalidatePath(`/live`);
-  return { success: true };
+    revalidatePath(`/dashboard/matches`);
+    if (teamId) {
+      revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
+    }
+    revalidatePath(`/live`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("deleteMatchAction exception:", err);
+    return { success: false, error: err.message || "Error inesperado al eliminar el partido" };
+  }
 }
 
 

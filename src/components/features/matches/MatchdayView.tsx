@@ -367,11 +367,15 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                               e.stopPropagation();
                               if (window.confirm(`¿Estás seguro de eliminar el partido de ${match.equipo?.name || 'Sporting'} vs ${match.rival_nombre}?`)) {
                                 try {
-                                  await deleteMatchAction(match.id, match.equipo_id);
+                                  const res = await deleteMatchAction(match.id, match.equipo_id);
+                                  if (res && res.success === false) {
+                                    toast.error(res.error || "No se pudo eliminar el partido.");
+                                    return;
+                                  }
                                   setMatches(prev => prev.filter(m => m.id !== match.id));
                                   toast.success("Partido eliminado correctamente");
                                 } catch (err: any) {
-                                  toast.error("Error al eliminar el partido: " + err.message);
+                                  toast.error("Error al eliminar el partido: " + (err.message || "Error desconocido"));
                                 }
                               }
                             }}

@@ -27,11 +27,14 @@ import {
   syncAppNavigationAction, 
   createCustomRoleAction, 
   deleteCustomRoleAction,
-  getRolesConfigDataAction,
+  getRolesConfigDataAction
+} from "@/app/actions/roles-actions"
+import { 
   BASE_SYSTEM_ROLES,
   SYSTEM_MODULES,
   AppNavModule
-} from "@/app/actions/roles-actions"
+} from "@/lib/roles-config"
+
 
 interface RoleItem {
   key: string

@@ -4,7 +4,7 @@ import Image from "next/image"
 
 import { getLiveAds } from "@/app/actions/ad-actions"
 
-import { LiveBackButton } from "@/components/features/matches/LiveBackButton"
+import { LiveBackButton, ShareLiveButton } from "@/components/features/matches/LiveBackButton"
 
 export const revalidate = 0 // Opt out of caching for live route
 
@@ -15,8 +15,16 @@ export default async function PublicLivePage() {
   const { data: teamsData } = await supabase
     .from('teams')
     .select('id, name, category')
-    
-  const { data: matchesData } = await supabase
+
+  // Fetch active season to show matches for the current active season
+  const { data: activeSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle()
+
+  let matchesQuery = supabase
     .from('partidos')
     .select(`
       *,
@@ -28,7 +36,12 @@ export default async function PublicLivePage() {
         player:players (first_name, last_name, nickname)
       )
     `)
-    .order('fecha_hora', { ascending: true })
+
+  if (activeSeason?.id) {
+    matchesQuery = matchesQuery.eq('season_id', activeSeason.id)
+  }
+
+  const { data: matchesData } = await matchesQuery.order('fecha_hora', { ascending: true })
 
   const matchesWithTeams = matchesData || []
   const liveAds = await getLiveAds();
@@ -78,6 +91,7 @@ export default async function PublicLivePage() {
             ) : (
               <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest relative z-10 hidden md:block">Resultados en Directo</p>
             )}
+            <ShareLiveButton />
           </div>
 
           <div className="flex items-center gap-2 relative z-10 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full">

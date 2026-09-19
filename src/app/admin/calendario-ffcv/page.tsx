@@ -21,7 +21,12 @@ export default function FfcvCalendarPage() {
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
         if (profile?.club_id) {
-          const { data } = await supabase.from('teams').select('id, name, category').eq('club_id', profile.club_id).order('name')
+          const { data: activeSeason } = await supabase.from('seasons').select('id, name').eq('club_id', profile.club_id).eq('is_active', true).single()
+          let query = supabase.from('teams').select('id, name, category, season_id').eq('club_id', profile.club_id).order('name')
+          if (activeSeason?.id) {
+            query = query.eq('season_id', activeSeason.id)
+          }
+          const { data } = await query
           if (data) setEquipos(data)
         }
       }

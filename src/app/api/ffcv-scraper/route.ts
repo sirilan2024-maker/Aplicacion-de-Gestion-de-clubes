@@ -33,7 +33,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Protocolo no permitido' }, { status: 400 });
     }
 
-    const allowedDomains = ['ffcv.es', 'competiciones.ffcv.es', 'novanet.es'];
+    const allowedDomains = ['ffcv.es', 'competiciones.ffcv.es', 'novanet.es', 'isquad.es', 'resultadosffcv.isquad.es'];
     const hostname = parsedUrl.hostname.toLowerCase();
     const isAllowed = allowedDomains.some(d => hostname === d || hostname.endsWith(`.${d}`));
 

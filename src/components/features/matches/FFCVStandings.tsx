@@ -15,6 +15,7 @@ interface FFCVStandingsProps {
 export function FFCVStandings({
   ffcvGroupId,
   ffcvTeamId,
+  ffcvUrl,
   teamName,
 }: FFCVStandingsProps) {
   const [standings, setStandings] = useState<FFCVStandingRecord[]>([]);
@@ -23,9 +24,9 @@ export function FFCVStandings({
   const [selectedJornada, setSelectedJornada] = useState<number>(1);
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
-  // Fetch standings from Supabase
+  // Fetch standings from Supabase or Live Scraper URL
   useEffect(() => {
-    if (!ffcvGroupId) {
+    if (!ffcvGroupId && !ffcvUrl) {
       setStandings([]);
       setLoading(false);
       return;
@@ -35,36 +36,69 @@ export function FFCVStandings({
       setLoading(true);
       setError(null);
       try {
-        const supabase = createClient();
-        const { data, error: sbError } = await supabase
-          .from("ffcv_standings")
-          .select("*")
-          .eq("ffcv_group_id", ffcvGroupId)
-          .order("matchday", { ascending: true })
-          .order("position", { ascending: true });
+        if (ffcvGroupId) {
+          const supabase = createClient();
+          const { data, error: sbError } = await supabase
+            .from("ffcv_standings")
+            .select("*")
+            .eq("ffcv_group_id", ffcvGroupId)
+            .order("matchday", { ascending: true })
+            .order("position", { ascending: true });
 
-        if (sbError) {
-          throw new Error(sbError.message);
+          if (sbError) {
+            throw new Error(sbError.message);
+          }
+
+          if (data && data.length > 0) {
+            setStandings(data as FFCVStandingRecord[]);
+            const jSet = Array.from(new Set(data.map((s: any) => s.matchday))).sort((a: any, b: any) => a - b);
+            if (jSet.length > 0) {
+              setSelectedJornada(jSet[jSet.length - 1] as number);
+            }
+            return;
+          }
         }
 
-        if (data) {
-          setStandings(data as FFCVStandingRecord[]);
-          // Default to latest matchday available
-          const jSet = Array.from(new Set(data.map((s: any) => s.matchday))).sort((a: any, b: any) => a - b);
-          if (jSet.length > 0) {
-            setSelectedJornada(jSet[jSet.length - 1] as number);
+        // Fallback to live URL Scraper if ffcvUrl exists
+        if (ffcvUrl) {
+          try {
+            const res = await fetch(`/api/ffcv-scraper?url=${encodeURIComponent(ffcvUrl)}`);
+            const json = await res.json();
+            if (res.ok && json.data && Array.isArray(json.data) && json.data.length > 0) {
+              const mapped: FFCVStandingRecord[] = json.data.map((item: any) => ({
+                id: String(item.position),
+                ffcv_group_id: ffcvGroupId || "live",
+                matchday: 1,
+                position: Number(item.position) || 0,
+                team_name: item.team || "Equipo",
+                points: Number(item.points) || 0,
+                played: Number(item.played) || 0,
+                won: Number(item.won) || 0,
+                drawn: Number(item.drawn) || 0,
+                lost: Number(item.lost) || 0,
+                goals_for: Number(item.gf) || 0,
+                goals_against: Number(item.gc) || 0,
+                goal_difference: (Number(item.gf) || 0) - (Number(item.gc) || 0),
+                shield_url: item.logo || null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }));
+              setStandings(mapped);
+            }
+          } catch (scraperErr) {
+            console.warn("Live scraper fallback skipped:", scraperErr);
           }
         }
       } catch (err: any) {
-        console.error("Error loading FFCV standings from Supabase:", err);
-        setError(err.message || "Error al cargar la clasificación oficial.");
+        console.error("Error loading FFCV standings:", err);
+        setError(err.message || "La clasificación oficial aún no está disponible.");
       } finally {
         setLoading(false);
       }
     }
 
     loadStandings();
-  }, [ffcvGroupId]);
+  }, [ffcvGroupId, ffcvUrl]);
 
   // Available matchdays in database
   const availableJornadas = useMemo(() => {
@@ -109,7 +143,7 @@ export function FFCVStandings({
     });
   };
 
-  if (!ffcvGroupId) {
+  if (!ffcvGroupId && !ffcvUrl) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3 shadow-sm">
         <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
@@ -117,7 +151,7 @@ export function FFCVStandings({
         </div>
         <h3 className="font-bold text-slate-800 text-base">Sin Clasificación FFCV Vinculada</h3>
         <p className="text-xs text-slate-500 max-w-md mx-auto">
-          Este equipo no tiene asignado un grupo de la FFCV. Cuando se configure en la base de datos, aparecerá aquí la tabla de clasificación oficial.
+          Este equipo no tiene asignado un enlace de la FFCV. Puedes configurarlo des de el panel de administración de equipos.
         </p>
       </div>
     );

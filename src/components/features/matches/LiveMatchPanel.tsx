@@ -135,8 +135,13 @@ export function LiveMatchPanel({
     return false;
   });
 
-  const localGoals = match?.resultado_propio ?? localGoalsList.length;
-  const awayGoals = match?.resultado_rival ?? awayGoalsList.length;
+  const localGoals = isLocal 
+    ? (match?.resultado_propio ?? localGoalsList.length) 
+    : (match?.resultado_rival ?? localGoalsList.length);
+    
+  const awayGoals = isLocal 
+    ? (match?.resultado_rival ?? awayGoalsList.length) 
+    : (match?.resultado_propio ?? awayGoalsList.length);
 
   const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta').sort((a, b) => a.minuto - b.minuto);
   let runningLocal = 0;

@@ -42,8 +42,12 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
   const localGoalsCount = localGoalsList.length;
   const awayGoalsCount = awayGoalsList.length;
   
-  const [localGoals, setLocalGoals] = useState<number>(match.resultado_propio ?? localGoalsCount)
-  const [awayGoals, setAwayGoals] = useState<number>(match.resultado_rival ?? awayGoalsCount)
+  const isLocal = match?.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match?.lugar || '');
+  const localGoalsVal = isLocal ? (match.resultado_propio ?? localGoalsCount) : (match.resultado_rival ?? awayGoalsCount);
+  const awayGoalsVal = isLocal ? (match.resultado_rival ?? awayGoalsCount) : (match.resultado_propio ?? localGoalsCount);
+
+  const [localGoals, setLocalGoals] = useState<number>(localGoalsVal)
+  const [awayGoals, setAwayGoals] = useState<number>(awayGoalsVal)
   const [goalsList, setGoalsList] = useState({
     local: localGoalsList.map(e => `${e.player?.first_name || 'Jugador'} (${e.minuto}')`).join(', '),
     away: awayGoalsList.map(e => `Rival (${e.minuto}')`).join(', ')

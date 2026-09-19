@@ -172,6 +172,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
   const [limitWarning, setLimitWarning] = useState<string | null>(null)
   const [contextMenuPlayerId, setContextMenuPlayerId] = useState<string | null>(null);
   const [benchPlayerModalId, setBenchPlayerModalId] = useState<string | null>(null);
+  const [showBenchListModal, setShowBenchListModal] = useState(false);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -388,6 +389,15 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                   </optgroup>
                 )}
               </select>
+
+              <button
+                onClick={() => setShowBenchListModal(true)}
+                className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg border border-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
+                title="Ver lista de suplentes para añadir al campo"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>+ Suplentes ({availablePlayers.length})</span>
+              </button>
 
               <button
                 onClick={() => setShowSaveTacticModal(true)}
@@ -690,7 +700,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                     setDraggedPlayerId(player.id);
                   }}
                   onDragEnd={() => setDraggedPlayerId(null)}
-                  className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none touch-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
+                  className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
@@ -716,6 +726,77 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
               )}
             </div>
           </div>
+
+          {/* Modal Lista Completa de Suplentes (Acceso rápido Móvil y Desktop) */}
+          {showBenchListModal && (
+            <div 
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+              onClick={() => setShowBenchListModal(false)}
+            >
+              <div 
+                className="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm">Jugadores Suplentes</h3>
+                    <p className="text-[10px] text-slate-400 font-bold">SELECCIONA UN JUGADOR PARA AÑADIR AL CAMPO</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowBenchListModal(false)}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {availablePlayers.map(player => (
+                    <button
+                      key={player.id}
+                      onClick={() => {
+                        setShowBenchListModal(false);
+                        if (Object.keys(pitchPlayers).length >= 11 && !pitchPlayers[player.id]) {
+                          showLimitError();
+                          return;
+                        }
+                        setBenchPlayerModalId(player.id);
+                      }}
+                      className="w-full flex items-center justify-between p-3 border border-slate-150 rounded-xl bg-slate-50/60 hover:bg-blue-50/50 hover:border-blue-300 transition-all text-left active:scale-98"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                          {player.number || player.avatar}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900">{player.name}</h4>
+                          <span className="text-[10px] text-slate-500 font-semibold">{player.demarcation}</span>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
+                        + Seleccionar
+                      </span>
+                    </button>
+                  ))}
+
+                  {availablePlayers.length === 0 && (
+                    <div className="py-12 text-center text-slate-400">
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-xs font-medium">Todos los jugadores ya están en el campo</p>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowBenchListModal(false)}
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Modal Selector de Posición para Añadir al Campo */}
           {benchPlayerModalId && (

@@ -124,19 +124,24 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
 
   // Calculate live scores from events
   const liveLocalGoalsComputed = events.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol') return isLocal ? !!e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : !!e.player_id;
     return false;
   }).length;
   
   const liveAwayGoalsComputed = events.filter(e => {
-    if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return !isLocal ? !e.player_id : e.player_id;
+    if (e.tipo_evento === 'Gol') return isLocal ? !e.player_id : !!e.player_id;
+    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !!e.player_id : !e.player_id;
     return false;
   }).length;
 
-  const liveLocalGoals = match.resultado_propio ?? liveLocalGoalsComputed;
-  const liveAwayGoals = match.resultado_rival ?? liveAwayGoalsComputed;
+  const liveLocalGoals = isLocal
+    ? (match.resultado_propio ?? liveLocalGoalsComputed)
+    : (match.resultado_rival ?? liveLocalGoalsComputed);
+    
+  const liveAwayGoals = isLocal
+    ? (match.resultado_rival ?? liveAwayGoalsComputed)
+    : (match.resultado_propio ?? liveAwayGoalsComputed);
 
   const ourName = match.equipo?.name || 'Sporting Saladar'
   const ourCleanName = ourName.replace(/Sporting Saladar\s*/i, '').trim() || 'Sporting Saladar';

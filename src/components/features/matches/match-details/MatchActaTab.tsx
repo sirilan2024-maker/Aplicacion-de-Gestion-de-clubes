@@ -275,7 +275,10 @@ export function MatchActaTab({ matchId, match, players = [], convocatorias = [],
           players={players}
           convocatorias={convocatorias}
           onClose={() => setShowConciliation(false)}
-          onSaveSuccess={fetchSignedUrl}
+          onSaveSuccess={() => {
+            fetchSignedUrl();
+            window.location.reload();
+          }}
         />
       )}
     </div>

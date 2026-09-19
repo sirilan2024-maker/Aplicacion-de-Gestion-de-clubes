@@ -43,11 +43,9 @@ export default function AdminPartidosPage() {
       // Obtener equipos del club
       const { data: teamsData } = await supabase
         .from('teams')
-        .select('id, name, ffcv_url')
+        .select('id, name, ffcv_url, season_id')
         .eq('club_id', profile.club_id)
       
-      if (teamsData) setTeams(teamsData)
-
       // Obtener temporada activa
       const { data: activeSeason } = await supabase
         .from('seasons')
@@ -55,6 +53,27 @@ export default function AdminPartidosPage() {
         .eq('club_id', profile.club_id)
         .eq('is_active', true)
         .single()
+
+      const targetSeasonId = selectedSeasonId || activeSeason?.id;
+
+      if (teamsData) {
+        // Filtrar los equipos para el desplegable: por temporada o por presencia de partidos en la temporada seleccionada
+        const filteredTeams = targetSeasonId 
+          ? teamsData.filter(t => t.season_id === targetSeasonId)
+          : teamsData;
+        
+        // Evitar nombres duplicados en el desplegable
+        const uniqueTeamsByName: any[] = [];
+        const seenNames = new Set<string>();
+        for (const t of (filteredTeams.length > 0 ? filteredTeams : teamsData)) {
+          const normName = (t.name || '').trim().toLowerCase();
+          if (!seenNames.has(normName)) {
+            seenNames.add(normName);
+            uniqueTeamsByName.push(t);
+          }
+        }
+        setTeams(uniqueTeamsByName);
+      }
 
       // Buscar los partidos del club
       let query = supabase
@@ -65,7 +84,6 @@ export default function AdminPartidosPage() {
         `)
         .eq("club_id", profile.club_id)
         
-      const targetSeasonId = selectedSeasonId || activeSeason?.id;
       if (targetSeasonId) {
         query = query.eq('season_id', targetSeasonId)
       }

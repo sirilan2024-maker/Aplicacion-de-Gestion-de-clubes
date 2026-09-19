@@ -24,8 +24,8 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
   const matchDate = match?.fecha_hora ? new Date(match.fecha_hora) : new Date();
   const matchLocation = match?.lugar || "Ubicación sin definir";
 
-  const displayLocalGoals = isLocal ? localGoals : awayGoals;
-  const displayAwayGoals = isLocal ? awayGoals : localGoals;
+  const displayLocalGoals = localGoals;
+  const displayAwayGoals = awayGoals;
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

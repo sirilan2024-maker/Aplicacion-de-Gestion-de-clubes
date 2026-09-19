@@ -905,9 +905,13 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       let currentPos: number | undefined = undefined;
       const groupSt = standingsByGroup.get(team.ffcv_group_id || '');
       if (groupSt && groupSt.length > 0) {
-        const latestMatchday = groupSt[0].matchday;
-        const latestRows = groupSt.filter(r => r.matchday === latestMatchday);
-        const clubRow = latestRows.find(r => r.team_name.toLowerCase().includes('saladar') || r.team_name.toLowerCase().includes(team.name.toLowerCase()));
+        // Buscar primero por team_ffcv_id o por nombre "saladar" en las filas del grupo
+        const teamIdStr = team.ffcv_team_id ? String(team.ffcv_team_id).trim() : '';
+        const clubRow = groupSt.find(r => 
+          (teamIdStr && String(r.team_ffcv_id || '').trim() === teamIdStr) ||
+          r.team_name.toLowerCase().includes('saladar') ||
+          r.team_name.toLowerCase().includes(team.name.toLowerCase().trim())
+        );
         if (clubRow) currentPos = clubRow.position;
       }
 
@@ -1004,9 +1008,70 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
 
     // 8. Estadísticas individuales de jugadores y Líderes Deportivos
     const unreportedMatchesCount = allMatches.filter(p => p.estado === 'Programado' && p.fecha_hora < new Date().toISOString()).length;
-    const topScorer = null;
-    const topMinutes = null;
-    const apercibidosCount = 0;
+    
+    // Calcular dinámicamente máximo goleador y más minutos a partir de convocatorias
+    let topScorer: { playerId: string; playerName: string; goals: number; teamName: string } | null = null;
+    let topMinutes: { playerId: string; playerName: string; minutesPlayed: number; teamName: string } | null = null;
+    let apercibidosCount = 0;
+
+    const matchIds = allMatches.map(m => m.id);
+    if (matchIds.length > 0) {
+      const { data: convData } = await adminClient
+        .from('convocatorias')
+        .select('id, player_id, goals, goles, minutes_played, minutos_jugados, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, players(id, first_name, last_name, team_id, teams:team_id(name))')
+        .in('partido_id', matchIds)
+        .or('goals.gt.0,goles.gt.0,minutes_played.gt.0,minutos_jugados.gt.0,yellow_cards.gt.0,tarjetas_amarillas.gt.0');
+
+      if (convData && convData.length > 0) {
+        const playerStatsMap = new Map<string, { id: string; name: string; teamName: string; goals: number; minutes: number; yellows: number }>();
+
+        convData.forEach((c: any) => {
+          const p = c.players;
+          if (!p) return;
+          const pid = p.id;
+          const existing = playerStatsMap.get(pid) || {
+            id: pid,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+            teamName: p.teams?.name || 'Equipo',
+            goals: 0,
+            minutes: 0,
+            yellows: 0
+          };
+
+          existing.goals += Number(c.goals ?? c.goles ?? 0);
+          existing.minutes += Number(c.minutes_played ?? c.minutos_jugados ?? 0);
+          existing.yellows += Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
+          playerStatsMap.set(pid, existing);
+        });
+
+        const pList = Array.from(playerStatsMap.values());
+        
+        // Máximo goleador
+        const scorers = [...pList].filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals);
+        if (scorers.length > 0) {
+          topScorer = {
+            playerId: scorers[0].id,
+            playerName: scorers[0].name,
+            goals: scorers[0].goals,
+            teamName: scorers[0].teamName
+          };
+        }
+
+        // Más minutos disputados
+        const minuteLeaders = [...pList].filter(p => p.minutes > 0).sort((a, b) => b.minutes - a.minutes);
+        if (minuteLeaders.length > 0) {
+          topMinutes = {
+            playerId: minuteLeaders[0].id,
+            playerName: minuteLeaders[0].name,
+            minutesPlayed: minuteLeaders[0].minutes,
+            teamName: minuteLeaders[0].teamName
+          };
+        }
+
+        // Apercibidos (con 4 amarillas acumuladas)
+        apercibidosCount = pList.filter(p => p.yellows % 5 === 4).length;
+      }
+    }
 
     // 9. Enfermería y Lesiones Activas (filtradas por jugadores de la temporada consultada)
     let activeInjuriesList: Array<{

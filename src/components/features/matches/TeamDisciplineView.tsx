@@ -70,11 +70,18 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     }
   }
 
-  // Filtrar jugadores válidos (del equipo actual o convocados en partidos del equipo, y sin cuerpo técnico)
+  // Filtrar jugadores y técnicos amonestados del equipo
   const validPlayers = players.filter(p => {
     const pos = (p.posicion || '').toLowerCase()
     const isCoachingStaff = pos.includes('entrenador') || pos.includes('delegado') || pos.includes('cuerpo técnico')
-    if (isCoachingStaff) return false
+
+    // Si es cuerpo técnico, solo lo incluimos si tiene tarjetas registradas en convocatorias
+    if (isCoachingStaff) {
+      const hasCards = localConvocatorias.some(c => 
+        c.player_id === p.id && ((c.yellow_cards ?? c.tarjetas_amarillas ?? 0) > 0 || (c.red_cards ?? c.tarjetas_rojas ?? 0) > 0)
+      )
+      if (!hasCards) return false
+    }
 
     if (teamId === 'all') return true
 

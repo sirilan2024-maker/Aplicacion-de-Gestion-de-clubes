@@ -81,8 +81,17 @@ export default function AdminPartidosPage() {
   const filteredMatches = matches.filter(m => {
     const matchesSearch = m.rival_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.equipo?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTeam = selectedTeamId === 'all' || m.equipo_id === selectedTeamId
-    return matchesSearch && matchesTeam
+    
+    if (selectedTeamId === 'all') return matchesSearch;
+
+    const selectedTeamObj = teams.find(t => t.id === selectedTeamId);
+    if (!selectedTeamObj) return matchesSearch && m.equipo_id === selectedTeamId;
+
+    const selectedTeamName = (selectedTeamObj.name || '').trim().toLowerCase();
+    const matchTeamName = (m.equipo?.name || '').trim().toLowerCase();
+
+    const matchesTeam = m.equipo_id === selectedTeamId || (matchTeamName && matchTeamName === selectedTeamName);
+    return matchesSearch && matchesTeam;
   })
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId) || teams[0]

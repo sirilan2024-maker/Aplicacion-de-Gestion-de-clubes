@@ -523,9 +523,10 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                             e.stopPropagation();
                             handleRemoveFromPitch(player.id);
                           }}
-                          className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 border border-white shadow-sm flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                          className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 border border-white shadow-md flex items-center justify-center transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 z-30 active:scale-95"
+                          title="Quitar del campo"
                         >
-                          <X className="w-2.5 h-2.5" />
+                          <X className="w-3 h-3 stroke-[3]" />
                         </button>
                       )}
                     </div>

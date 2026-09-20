@@ -1512,17 +1512,17 @@ export async function promotePlayerToStaffAction(
         .eq('id', existingProfile.id);
     } else {
       // Buscar en auth.users si existe un usuario registrado con ese email
-      const { data: authUsers } = await adminClient.auth.admin.listUsers();
-      const existingAuthUser = authUsers?.users?.find(u => u.email?.toLowerCase() === targetEmail);
+      let generatedPassword: string | null = null;
+      let generatedToken: string | null = null;
 
       if (existingAuthUser) {
         staffProfileId = existingAuthUser.id;
       } else {
-        // Crear usuario auth con contraseña temporal o link
-        const tempPassword = 'Club' + Math.random().toString(36).substring(2, 8) + '!';
+        // Crear usuario auth con contraseña temporal
+        generatedPassword = 'Club' + Math.random().toString(36).substring(2, 8) + '!';
         const { data: newAuth, error: createAuthErr } = await adminClient.auth.admin.createUser({
           email: targetEmail,
-          password: tempPassword,
+          password: generatedPassword,
           email_confirm: true,
           user_metadata: {
             first_name: player.first_name,
@@ -1535,6 +1535,24 @@ export async function promotePlayerToStaffAction(
           return { success: false, error: 'Error creando credenciales: ' + (createAuthErr?.message || 'desconocido') };
         }
         staffProfileId = newAuth.user.id;
+      }
+
+      // Generar token de invitación por si prefiere enviarle el enlace para que elija su contraseña
+      const { data: inviteRec } = await adminClient
+        .from('staff_invitations')
+        .insert({
+          club_id: context.profile.club_id,
+          role: role,
+          name: `${player.first_name} ${player.last_name}`.trim(),
+          email: targetEmail,
+          team_id: teamIds[0] || null,
+          created_by: context.user.id
+        })
+        .select('token')
+        .maybeSingle();
+
+      if (inviteRec?.token) {
+        generatedToken = inviteRec.token;
       }
 
       // Upsert perfil
@@ -1584,7 +1602,13 @@ export async function promotePlayerToStaffAction(
     }
 
     revalidatePath('/dashboard/club/miembros');
-    return { success: true, profileId: staffProfileId };
+    return { 
+      success: true, 
+      profileId: staffProfileId, 
+      tempPassword: generatedPassword, 
+      inviteToken: generatedToken,
+      email: targetEmail 
+    };
   } catch (err: any) {
     console.error('Error promoting player to staff:', err);
     return { success: false, error: err.message };

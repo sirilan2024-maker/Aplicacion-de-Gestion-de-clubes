@@ -562,6 +562,13 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
   const [emailInput, setEmailInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+  const [copiedPass, setCopiedPass] = useState(false);
+  const [promotionResult, setPromotionResult] = useState<{
+    email: string;
+    tempPassword?: string | null;
+    inviteLink?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (member) {
@@ -571,6 +578,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         : [member.role || "entrenador"];
       setAssignedRoles(initialRoles);
       setEmailInput(member.email?.includes('/register/staff/') ? '' : (member.email || ''));
+      setPromotionResult(null);
       
       if (member.teams && member.teams.length > 0) {
         setTeamIds(member.teams.map(t => t.id));
@@ -604,7 +612,19 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
           }
           const res = await promotePlayerToStaffAction(member.id, emailInput, activeRole, assignedRoles, teamIds);
           if (!res.success) throw new Error(res.error);
+          
           toast.success("Rol asignado y miembro promovido a Staff correctamente");
+          
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          const fullInviteLink = res.inviteToken ? `${baseUrl}/register/staff/${res.inviteToken}` : null;
+          
+          setPromotionResult({
+            email: res.email || emailInput,
+            tempPassword: res.tempPassword,
+            inviteLink: fullInviteLink
+          });
+          onSuccess();
+          return;
         } else {
           // Si sigue siendo solo jugador
           if (teamIds.length > 0) {
@@ -637,163 +657,244 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
       <div className="animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">
-            {member.type === 'player' ? 'Gestionar Rol de Miembro' : 'Gestionar Staff'}
+            {promotionResult ? '¡Acceso Creado con Éxito!' : (member.type === 'player' ? 'Gestionar Rol de Miembro' : 'Gestionar Staff')}
           </h2>
           <button onClick={onClose} className="rounded-full p-1 hover:bg-gray-200">
             <X className="h-5 w-5 text-gray-800" />
           </button>
         </div>
-        
-        <div className="mb-6 text-sm text-gray-600 bg-gray-50 p-4 rounded-xl border border-gray-100">
-          <span className="block text-lg font-bold text-gray-900 mb-1">{member.first_name} {member.last_name}</span>
-          
-          {member.email?.includes('/register/staff/') ? (
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-                <strong>Pendiente de confirmación</strong><br/>
-                Copia este enlace y envíaselo por WhatsApp o correo para que complete su registro. Al hacerlo, se unirá automáticamente a su equipo.
+
+        {promotionResult ? (
+          <div className="space-y-5">
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-sm">
+              <p className="font-semibold text-base mb-1">¡Rol y acceso asignados a {member.first_name}!</p>
+              <p className="text-xs text-emerald-700">
+                Se ha vinculado el nuevo rol. Puedes enviarle el enlace directo para que configure su contraseña o facilitarle los datos generados.
+              </p>
+            </div>
+
+            {promotionResult.inviteLink && (
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Enlace de Invitación Directo (WhatsApp / Email):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={promotionResult.inviteLink}
+                    className="flex-1 border border-gray-300 rounded-lg p-2.5 bg-gray-50 text-xs font-mono outline-none text-gray-700"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(promotionResult.inviteLink!);
+                      setCopiedInvite(true);
+                      toast.success("Enlace copiado al portapapeles");
+                      setTimeout(() => setCopiedInvite(false), 2000);
+                    }}
+                    className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0"
+                  >
+                    {copiedInvite ? <Check size={16} /> : <Copy size={16} />}
+                    {copiedInvite ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Al abrir este enlace, {member.first_name} completará su contraseña y entrará de inmediato con su rol.
+                </p>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <input readOnly value={member.email || ''} className="flex-1 border border-gray-300 rounded-lg p-2.5 bg-white text-sm outline-none text-gray-600" />
+            )}
+
+            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 font-medium">Correo de acceso:</span>
+                <span className="font-semibold text-gray-800">{promotionResult.email}</span>
+              </div>
+              {promotionResult.tempPassword && (
+                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                  <span className="text-gray-500 font-medium">Contraseña temporal:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono bg-white px-2 py-0.5 border border-gray-300 rounded font-bold text-blue-700">
+                      {promotionResult.tempPassword}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(promotionResult.tempPassword!);
+                        setCopiedPass(true);
+                        toast.success("Contraseña copiada");
+                        setTimeout(() => setCopiedPass(false), 2000);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                      title="Copiar contraseña"
+                    >
+                      {copiedPass ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={onClose}
+                className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                Cerrar y Actualizar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-6 text-sm text-gray-600 bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <span className="block text-lg font-bold text-gray-900 mb-1">{member.first_name} {member.last_name}</span>
+              
+              {member.email?.includes('/register/staff/') ? (
+                <div className="mt-4 flex flex-col gap-3">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                    <strong>Pendiente de confirmación</strong><br/>
+                    Copia este enlace y envíaselo por WhatsApp o correo para que complete su registro. Al hacerlo, se unirá automáticamente a su equipo.
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input readOnly value={member.email || ''} className="flex-1 border border-gray-300 rounded-lg p-2.5 bg-white text-sm outline-none text-gray-600" />
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(member.email || '');
+                        setCopied(true);
+                        toast.success("Enlace copiado al portapapeles");
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="p-2.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0"
+                      title="Copiar enlace"
+                    >
+                      {copied ? <Check size={20} /> : <Copy size={20} />}
+                    </button>
+                  </div>
+                </div>
+              ) : member.type === 'player' ? (
+                <div className="mt-3 space-y-1">
+                  <label className="block text-xs font-semibold text-gray-700">Email de acceso (necesario para rol Staff / Entrenador):</label>
+                  <input 
+                    type="email" 
+                    value={emailInput} 
+                    onChange={(e) => setEmailInput(e.target.value)} 
+                    placeholder="correo@ejemplo.com" 
+                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-[11px] text-gray-400">Si asignas rol de Entrenador o Staff, podrá acceder con este correo.</span>
+                </div>
+              ) : (
+                <span className="text-gray-500">{member.email}</span>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Roles Asignados</label>
+                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  {[
+                    { val: 'admin', label: 'Admin' },
+                    { val: 'coordinador', label: 'Coordinador' },
+                    { val: 'entrenador', label: 'Entrenador' },
+                    { val: 'jugador', label: 'Jugador' },
+                    { val: 'tutor', label: 'Padre/Madre/Tutor' },
+                    { val: 'secretario', label: 'Secretario' },
+                    { val: 'tesorero', label: 'Tesorero' },
+                    { val: 'delegado', label: 'Delegado' },
+                    { val: 'utillero', label: 'Utillero' },
+                    { val: 'directivo', label: 'Miembro Directivo' }
+                  ].map(r => {
+                    const checked = assignedRoles.includes(r.val);
+                    return (
+                      <label key={r.val} className="flex items-center gap-2 p-1 cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            let newRoles = [...assignedRoles];
+                            if (e.target.checked) {
+                              if (!newRoles.includes(r.val)) newRoles.push(r.val);
+                            } else {
+                              newRoles = newRoles.filter(roleVal => roleVal !== r.val);
+                            }
+                            setAssignedRoles(newRoles);
+                            if (activeRole === r.val && !e.target.checked) {
+                              if (newRoles.length > 0) {
+                                setActiveRole(newRoles[0]);
+                              } else {
+                                setActiveRole("");
+                              }
+                            } else if (newRoles.length > 0 && !newRoles.includes(activeRole)) {
+                              setActiveRole(newRoles[0]);
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">{r.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {assignedRoles.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rol Activo Inicial</label>
+                  <select 
+                    value={activeRole} 
+                    onChange={e => setActiveRole(e.target.value)} 
+                    className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 capitalize"
+                  >
+                    {assignedRoles.map(r => (
+                      <option key={r} value={r}>
+                        {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r === 'directivo' ? 'Miembro Directivo' : r.charAt(0).toUpperCase() + r.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Asignar a Equipo(s)</label>
+                <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto p-2 bg-white">
+                  {teams.length === 0 && <p className="text-sm text-gray-500 p-2">No hay equipos disponibles</p>}
+                  {teams.map(t => (
+                    <label key={t.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={teamIds.includes(t.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setTeamIds([...teamIds, t.id]);
+                          } else {
+                            setTeamIds(teamIds.filter(id => id !== t.id));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="ml-3 text-sm text-gray-700">{t.name}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Al asignar un equipo, este miembro será el responsable principal de dicho equipo.</p>
+              </div>
+              
+              <div className="pt-2 flex gap-3">
                 <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(member.email || '');
-                    setCopied(true);
-                    toast.success("Enlace copiado al portapapeles");
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="p-2.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors flex-shrink-0"
-                  title="Copiar enlace"
+                  onClick={handleSave} 
+                  disabled={submitting} 
+                  className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {copied ? <Check size={20} /> : <Copy size={20} />}
+                  {submitting ? "Guardando..." : "Guardar Cambios"}
+                </button>
+                <button 
+                  onClick={onClose} 
+                  className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>
-          ) : member.type === 'player' ? (
-            <div className="mt-3 space-y-1">
-              <label className="block text-xs font-semibold text-gray-700">Email de acceso (necesario para rol Staff / Entrenador):</label>
-              <input 
-                type="email" 
-                value={emailInput} 
-                onChange={(e) => setEmailInput(e.target.value)} 
-                placeholder="correo@ejemplo.com" 
-                className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-[11px] text-gray-400">Si asignas rol de Entrenador o Staff, podrá acceder con este correo.</span>
-            </div>
-          ) : (
-            <span className="text-gray-500">{member.email}</span>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Roles Asignados</label>
-            <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              {[
-                { val: 'admin', label: 'Admin' },
-                { val: 'coordinador', label: 'Coordinador' },
-                { val: 'entrenador', label: 'Entrenador' },
-                { val: 'jugador', label: 'Jugador' },
-                { val: 'tutor', label: 'Padre/Madre/Tutor' },
-                { val: 'secretario', label: 'Secretario' },
-                { val: 'tesorero', label: 'Tesorero' },
-                { val: 'delegado', label: 'Delegado' },
-                { val: 'utillero', label: 'Utillero' },
-                { val: 'directivo', label: 'Miembro Directivo' }
-              ].map(r => {
-                const checked = assignedRoles.includes(r.val);
-                return (
-                  <label key={r.val} className="flex items-center gap-2 p-1 cursor-pointer">
-                    <input 
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        let newRoles = [...assignedRoles];
-                        if (e.target.checked) {
-                          if (!newRoles.includes(r.val)) newRoles.push(r.val);
-                        } else {
-                          newRoles = newRoles.filter(roleVal => roleVal !== r.val);
-                        }
-                        setAssignedRoles(newRoles);
-                        if (activeRole === r.val && !e.target.checked) {
-                          if (newRoles.length > 0) {
-                            setActiveRole(newRoles[0]);
-                          } else {
-                            setActiveRole("");
-                          }
-                        } else if (newRoles.length > 0 && !newRoles.includes(activeRole)) {
-                          setActiveRole(newRoles[0]);
-                        }
-                      }}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">{r.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {assignedRoles.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Rol Activo Inicial</label>
-              <select 
-                value={activeRole} 
-                onChange={e => setActiveRole(e.target.value)} 
-                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 capitalize"
-              >
-                {assignedRoles.map(r => (
-                  <option key={r} value={r}>
-                    {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r === 'directivo' ? 'Miembro Directivo' : r.charAt(0).toUpperCase() + r.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Asignar a Equipo(s)</label>
-            <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto p-2 bg-white">
-              {teams.length === 0 && <p className="text-sm text-gray-500 p-2">No hay equipos disponibles</p>}
-              {teams.map(t => (
-                <label key={t.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={teamIds.includes(t.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setTeamIds([...teamIds, t.id]);
-                      } else {
-                        setTeamIds(teamIds.filter(id => id !== t.id));
-                      }
-                    }}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="ml-3 text-sm text-gray-700">{t.name}</span>
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Al asignar un equipo, este miembro será el responsable principal de dicho equipo.</p>
-          </div>
-          
-          <div className="pt-2 flex gap-3">
-            <button 
-              onClick={handleSave} 
-              disabled={submitting} 
-              className="flex-1 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              {submitting ? "Guardando..." : "Guardar Cambios"}
-            </button>
-            <button 
-              onClick={onClose} 
-              className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-bold hover:bg-gray-200 transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

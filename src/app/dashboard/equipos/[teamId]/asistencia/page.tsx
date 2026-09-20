@@ -110,25 +110,140 @@ export default function AsistenciaEquipoPage() {
     const supabase = createClient();
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { data: evs, error: err1 } = await supabase
+
+      // 1. Obtener la temporada del equipo o activa
+      const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
+      const teamSeasonId = teamData?.season_id;
+
+      // 2. Cargar eventos de team_events (entrenamientos y sesiones)
+      let eventsQuery = supabase
         .from('team_events')
         .select('id, title, date, event_type')
         .eq('team_id', teamId)
         .lte('date', today)
         .order('date', { ascending: false })
-        .limit(15);
-      
+        .limit(20);
+
+      if (teamSeasonId) {
+        eventsQuery = eventsQuery.eq('season_id', teamSeasonId);
+      }
+
+      const { data: evs, error: err1 } = await eventsQuery;
       if (err1) throw err1;
-      
+
+      // 3. Cargar partidos oficiales jugados (partidos)
+      let matchesQuery = supabase
+        .from('partidos')
+        .select('id, rival_nombre, fecha_hora')
+        .eq('equipo_id', teamId)
+        .lte('fecha_hora', `${today}T23:59:59`)
+        .order('fecha_hora', { ascending: false })
+        .limit(20);
+
+      if (teamSeasonId) {
+        matchesQuery = matchesQuery.eq('season_id', teamSeasonId);
+      }
+
+      const { data: pastMatches } = await matchesQuery;
+
+      // Fusionar eventos pasados evitando duplicados de fecha/id
+      const allPastEventsMap = new Map<string, PastEvent>();
+
+      (evs || []).forEach(e => {
+        allPastEventsMap.set(e.id, {
+          id: e.id,
+          title: e.title,
+          date: e.date,
+          event_type: e.event_type || 'Sesión'
+        });
+      });
+
+      (pastMatches || []).forEach(m => {
+        const dStr = m.fecha_hora ? m.fecha_hora.split('T')[0] : today;
+        if (!allPastEventsMap.has(m.id)) {
+          allPastEventsMap.set(m.id, {
+            id: m.id,
+            title: `Jornada vs ${m.rival_nombre || 'Rival'}`,
+            date: dStr,
+            event_type: 'Partido'
+          });
+        }
+      });
+
+      const combinedPastEvents = Array.from(allPastEventsMap.values())
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(-15); // Los últimos 15 eventos pasados
+
+      const combinedEventIds = combinedPastEvents.map(e => e.id);
+
+      // 4. Cargar asistencias de la tabla attendance
       const { data: atts, error: err2 } = await supabase
         .from('attendance')
         .select('player_id, event_id, date, status')
-        .in('event_id', evs?.map(e => e.id) || []);
+        .in('event_id', combinedEventIds.length > 0 ? combinedEventIds : ['none']);
         
       if (err2) throw err2;
 
-      setPastEvents(evs?.reverse() || []);
-      setSummaryData(atts || []);
+      // 5. Cargar convocatorias de los partidos incluidos para incorporar automáticamente
+      // a jugadores que hayan jugado o asistido al partido según acta oficial
+      const matchIds = combinedPastEvents.filter(e => e.event_type === 'Partido').map(e => e.id);
+      let convocatoriasAtts: AttendanceRecord[] = [];
+
+      if (matchIds.length > 0) {
+        const { data: matchConvs } = await supabase
+          .from('convocatorias')
+          .select('partido_id, player_id, titular, minutes_played, minutos_jugados, estado_asistencia, status')
+          .in('partido_id', matchIds);
+
+        if (matchConvs) {
+          matchConvs.forEach(conv => {
+            const ev = combinedPastEvents.find(e => e.id === conv.partido_id);
+            const dateStr = ev ? ev.date : today;
+
+            // Determinar si jugó / asistió según el acta o convocatoria:
+            // - Si tiene minutos jugados > 0
+            // - Si fue titular
+            // - Si su estado_asistencia es Confirmado o Presente
+            // - Si su status es 'convocado' y no 'lesionado'/'ausente'/'no_convocado'
+            const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
+            const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
+            const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'no_convocado';
+            const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado';
+
+            let deducedStatus: string | null = null;
+            if (minPlayed > 0 || conv.titular || isConfirmed) {
+              deducedStatus = 'present';
+            } else if (isInjured) {
+              deducedStatus = 'excused';
+            } else if (isAbsent) {
+              deducedStatus = 'absent';
+            } else if (conv.status === 'convocado') {
+              deducedStatus = 'present';
+            }
+
+            if (deducedStatus) {
+              convocatoriasAtts.push({
+                player_id: conv.player_id,
+                event_id: conv.partido_id,
+                date: dateStr,
+                status: deducedStatus
+              });
+            }
+          });
+        }
+      }
+
+      // Fusionar attendance explícita con la derivada de convocatorias/actas (attendance manual tiene precedencia)
+      const mergedAttendanceMap = new Map<string, AttendanceRecord>();
+      convocatoriasAtts.forEach(a => {
+        mergedAttendanceMap.set(`${a.player_id}_${a.event_id}`, a);
+      });
+      (atts || []).forEach(a => {
+        mergedAttendanceMap.set(`${a.player_id}_${a.event_id}`, a);
+      });
+
+      setPastEvents(combinedPastEvents);
+      setSummaryData(Array.from(mergedAttendanceMap.values()));
     } catch (err: any) {
       toast.error("Error al cargar resumen: " + err.message);
     } finally {
@@ -197,6 +312,31 @@ export default function AsistenciaEquipoPage() {
       if (attError) throw attError;
 
       const attMap: Record<string, string> = {};
+
+      // Si es un partido, pre-poblar con datos de la convocatoria/acta
+      const { data: matchConvs } = await supabase
+        .from('convocatorias')
+        .select('player_id, titular, minutes_played, minutos_jugados, estado_asistencia, status')
+        .eq('partido_id', queryEventId);
+
+      if (matchConvs) {
+        matchConvs.forEach(conv => {
+          const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
+          const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
+          const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'no_convocado';
+          const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado';
+
+          if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
+            attMap[conv.player_id] = 'present';
+          } else if (isInjured) {
+            attMap[conv.player_id] = 'excused';
+          } else if (isAbsent) {
+            attMap[conv.player_id] = 'absent';
+          }
+        });
+      }
+
+      // La tabla attendance explícita sobrescribe los datos deducidos
       if (atts) {
         atts.forEach(a => {
           attMap[a.player_id] = a.status;

@@ -832,7 +832,7 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
 
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-black text-xs sm:text-sm text-slate-900 shadow-2xs">
-                    {m.sportingScore !== null ? `${m.homeScore} - ${m.awayScore}` : "Aplazado"}
+                    {m.sportingScore !== null ? `${m.homeScore} - ${m.awayScore}` : (m.status || "Pendiente")}
                   </div>
                   {m.codActa && (
                     <Link

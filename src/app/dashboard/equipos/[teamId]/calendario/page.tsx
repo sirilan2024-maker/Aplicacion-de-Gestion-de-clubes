@@ -68,20 +68,35 @@ export default function CalendarioEquipoPage() {
     setLoading(true);
     const supabase = createClient();
     
-    const start = format(startOfMonth(currentMonth), "yyyy-MM-dd");
-    const end = format(endOfMonth(currentMonth), "yyyy-MM-dd");
+    // 1. Obtener la temporada del equipo o activa para filtrar
+    const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
+    const teamSeasonId = teamData?.season_id;
 
-    const { data: teamEvents, error: eventsError } = await supabase
+    // 2. Cargar eventos manuales del equipo (entrenamientos, reuniones, etc.)
+    let eventsQuery = supabase
       .from('team_events')
       .select('*')
       .eq('team_id', teamId)
       .gte('date', start)
       .lte('date', end);
 
-    const { data: partidos, error: partidosError } = await supabase
+    if (teamSeasonId) {
+      eventsQuery = eventsQuery.eq('season_id', teamSeasonId);
+    }
+
+    const { data: teamEvents, error: eventsError } = await eventsQuery;
+
+    // 3. Cargar partidos oficiales de la temporada
+    let partidosQuery = supabase
       .from('partidos')
       .select('*')
       .eq('equipo_id', teamId);
+
+    if (teamSeasonId) {
+      partidosQuery = partidosQuery.eq('season_id', teamSeasonId);
+    }
+
+    const { data: partidos, error: partidosError } = await partidosQuery;
 
     const mergedEvents: TeamEvent[] = [];
     const seenMatchDates = new Set<string>();
@@ -101,6 +116,7 @@ export default function CalendarioEquipoPage() {
         const dt = new Date(p.fecha_hora);
         const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
         if (seenMatchDates.has(dateStr)) return;
+        seenMatchDates.add(dateStr);
 
         const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
         

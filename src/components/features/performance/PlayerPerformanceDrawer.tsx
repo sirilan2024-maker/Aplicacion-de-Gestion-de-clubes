@@ -24,6 +24,7 @@ export function PlayerPerformanceDrawer({
   const [teamCategory, setTeamCategory] = useState<string>('');
   const [teamName, setTeamName] = useState<string>('');
   const [playerInfo, setPlayerInfo] = useState<any>(null);
+  const [officialMatches, setOfficialMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +43,21 @@ export function PlayerPerformanceDrawer({
         if (!onlyFormative) {
           const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type, title').eq('team_id', teamId).order('date', { ascending: false });
           if (allEvents) setEvents(allEvents);
+
+          // Fetch official matches convocatorias for this player
+          const { data: officialConvs } = await supabase
+            .from('convocatorias')
+            .select(`
+              id, partido_id, minutos_jugados, minutes_played, goles, goals, asistencias, assists, tarjetas_amarillas, yellow_cards, tarjetas_rojas, red_cards, status, titular,
+              partidos!inner(id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival, equipo_id)
+            `)
+            .eq('player_id', playerId)
+            .eq('partidos.equipo_id', teamId)
+            .order('created_at', { ascending: false });
+
+          if (officialConvs) {
+            setOfficialMatches(officialConvs);
+          }
 
           try {
             const res = await fetch('/api/player-metrics', {
@@ -203,50 +219,87 @@ export function PlayerPerformanceDrawer({
 
           {activeTab === 'partidos' && (
             <div className="space-y-6 animate-in fade-in">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                  <div className="text-2xl font-black text-slate-900">{globalMatchStats?.goals ?? '-'}</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Goles</div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                  <div className="text-xl font-black text-slate-900">{globalMatchStats?.matchMinutes ?? 0}</div>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Minutos</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                  <div className="text-2xl font-black text-slate-900">{globalMatchStats?.assists ?? '-'}</div>
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Asistencias</div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                  <div className="text-xl font-black text-slate-900">{globalMatchStats?.goals ?? 0}</div>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Goles</div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                  <div className="text-xl font-black text-slate-900">{globalMatchStats?.assists ?? 0}</div>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Asistencias</div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                  <div className="text-xl font-black text-amber-600">{globalMatchStats?.yellowCards ?? 0}🟨 / {globalMatchStats?.redCards ?? 0}🟥</div>
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Tarjetas</div>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-800 text-sm mb-3">Historial de Partidos</h3>
+                <h3 className="font-bold text-slate-800 text-sm mb-3">Historial de Partidos (Actas Oficiales)</h3>
                 {loading ? <div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-indigo-500" /></div> : (
                   <div className="space-y-3">
-                    {events.filter(e => e.event_type === 'Partido').map(ev => {
-                      const m = metrics.filter(mx => mx.event_id === ev.id);
-                      const min = m.find(x => x.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number;
-                      const gol = m.find(x => x.club_metrics?.name?.toLowerCase() === 'goles')?.value_number;
-                      const ast = m.find(x => x.club_metrics?.name?.toLowerCase() === 'asistencias')?.value_number;
-                      if (min === undefined && gol === undefined && ast === undefined) return null;
-                      return (
-                        <div key={ev.id} className="p-3 border border-slate-100 rounded-xl bg-white shadow-sm flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-bold text-slate-700">{new Date(ev.date).toLocaleDateString('es-ES')}</div>
-                            <div className="text-xs text-slate-400">{ev.title}</div>
+                    {officialMatches.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-gray-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        No hay convocatorias registradas en actas oficiales para este jugador.
+                      </div>
+                    ) : (
+                      officialMatches.map((conv) => {
+                        const partido = conv.partidos;
+                        const matchDate = partido?.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES') : '-';
+                        const mins = conv.minutos_jugados || conv.minutes_played || 0;
+                        const gols = conv.goles ?? conv.goals ?? 0;
+                        const asts = conv.asistencias ?? conv.assists ?? 0;
+                        const yellows = conv.tarjetas_amarillas ?? conv.yellow_cards ?? 0;
+                        const reds = conv.tarjetas_rojas ?? conv.red_cards ?? 0;
+
+                        return (
+                          <div key={conv.id} className="p-3 border border-slate-100 rounded-xl bg-white shadow-sm flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-bold text-slate-800">{partido?.rival_nombre ? `vs ${partido.rival_nombre}` : 'Partido'}</div>
+                              <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                                <span>{matchDate}</span>
+                                {conv.titular && (
+                                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                                    Titular
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-3 text-center items-center">
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">Min</div>
+                                <div className="text-sm font-black text-indigo-700">{mins}'</div>
+                              </div>
+                              {gols > 0 && (
+                                <div>
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Gol</div>
+                                  <div className="text-sm font-black text-emerald-600">⚽ {gols}</div>
+                                </div>
+                              )}
+                              {asts > 0 && (
+                                <div>
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Ast</div>
+                                  <div className="text-sm font-black text-blue-600">{asts}</div>
+                                </div>
+                              )}
+                              {(yellows > 0 || reds > 0) && (
+                                <div>
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Tarj</div>
+                                  <div className="text-xs font-black">
+                                    {yellows > 0 && <span className="text-amber-500 mr-1">🟨{yellows}</span>}
+                                    {reds > 0 && <span className="text-red-500">🟥{reds}</span>}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex gap-3 text-center">
-                            <div>
-                              <div className="text-[10px] font-bold text-slate-400 uppercase">Min</div>
-                              <div className="text-sm font-black text-indigo-700">{min ?? '-'}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold text-slate-400 uppercase">Gol</div>
-                              <div className="text-sm font-black text-slate-700">{gol ?? '-'}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold text-slate-400 uppercase">Ast</div>
-                              <div className="text-sm font-black text-slate-700">{ast ?? '-'}</div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>

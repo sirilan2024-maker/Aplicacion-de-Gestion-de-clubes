@@ -34,8 +34,11 @@ interface MatchStats {
   totalMatches: number;
   matchesAttended: number;
   matchAttendancePct: number;
+  starts: number;
   goals: number | null;
   assists: number | null;
+  yellowCards: number;
+  redCards: number;
   technicalRating: number | null;
 }
 
@@ -107,10 +110,26 @@ export default function RendimientoGlobalPage() {
       });
 
       // 3. Fetch all events and separate them
+      // 3. Fetch all events and official matches
       const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type').eq('team_id', teamId);
       const trainings = allEvents?.filter(e => e.event_type === 'Entrenamiento') || [];
-      const matches = allEvents?.filter(e => e.event_type === 'Partido') || [];
       const eventIds = allEvents?.map(e => e.id) || [];
+
+      // Fetch official team matches and their convocatorias
+      const { data: teamOfficialMatches } = await supabase
+        .from('partidos')
+        .select('id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival')
+        .eq('equipo_id', teamId);
+
+      const officialMatchIds = (teamOfficialMatches || []).map(m => m.id);
+      let officialConvocatorias: any[] = [];
+      if (officialMatchIds.length > 0) {
+        const { data: convData } = await supabase
+          .from('convocatorias')
+          .select('id, partido_id, player_id, minutos_jugados, minutes_played, goles, goals, asistencias, assists, tarjetas_amarillas, yellow_cards, tarjetas_rojas, red_cards, status, titular')
+          .in('partido_id', officialMatchIds);
+        if (convData) officialConvocatorias = convData;
+      }
 
       // 4. Fetch Attendance
       let attendanceData: any[] = [];
@@ -191,20 +210,43 @@ export default function RendimientoGlobalPage() {
           trainingAttendancePct: tPct
         });
 
-        // --- MATCH STATS ---
-        const mAtt = playerAtt.filter(a => matches.find(m => m.id === a.event_id));
-        const mPresents = mAtt.filter(a => ['presente', 'present', 'retraso', 'late', 'convocado'].includes(a.status.toLowerCase())).length;
-        const totalMatches = matches.length;
-        const mPct = totalMatches > 0 ? Math.round((mPresents / totalMatches) * 100) : 0;
+        // --- MATCH STATS (From Official Convocatorias / Actas FFCV) ---
+        const playerConvs = officialConvocatorias.filter(c => c.player_id === p.id);
+        const playedMatchesCount = (teamOfficialMatches || []).filter(m => m.estado?.toLowerCase() === 'finalizado').length;
+        const totalMatches = (teamOfficialMatches && teamOfficialMatches.length > 0) ? teamOfficialMatches.length : 0;
 
-        let totalGoals = 0;
-        let totalAssists = 0;
-        matches.forEach(ev => {
-          const goals = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase() === 'goles')?.value_number;
-          const assists = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase() === 'asistencias')?.value_number;
-          if (goals) totalGoals += goals;
-          if (assists) totalAssists += assists;
+        let totalOfficialMinutes = 0;
+        let totalOfficialGoals = 0;
+        let totalOfficialAssists = 0;
+        let totalOfficialYellows = 0;
+        let totalOfficialReds = 0;
+        let startsCount = 0;
+
+        playerConvs.forEach(c => {
+          const mins = Number(c.minutos_jugados || c.minutes_played || 0);
+          totalOfficialMinutes += mins;
+
+          const g = Number(c.goles ?? c.goals ?? 0);
+          totalOfficialGoals += g;
+
+          const a = Number(c.asistencias ?? c.assists ?? 0);
+          totalOfficialAssists += a;
+
+          const y = Number(c.tarjetas_amarillas ?? c.yellow_cards ?? 0);
+          totalOfficialYellows += y;
+
+          const r = Number(c.tarjetas_rojas ?? c.red_cards ?? 0);
+          totalOfficialReds += r;
+
+          if (c.titular) startsCount++;
         });
+
+        const convsCount = playerConvs.length;
+        const effectiveMatchesDenom = playedMatchesCount > 0 ? playedMatchesCount : totalMatches;
+        const mPct = effectiveMatchesDenom > 0 ? Math.round((convsCount / effectiveMatchesDenom) * 100) : 0;
+
+        // Si no hay minutos en actas, recurrimos como fallback a accumulated_minutes
+        const finalMatchMinutes = totalOfficialMinutes > 0 ? totalOfficialMinutes : (p.accumulated_minutes || 0);
 
         mResults.push({
           id: p.id,
@@ -212,12 +254,15 @@ export default function RendimientoGlobalPage() {
           last_name: p.last_name,
           dorsal: p.dorsal,
           avatar_url: p.avatar_url,
-          matchMinutes: p.accumulated_minutes || 0,
+          matchMinutes: finalMatchMinutes,
           totalMatches,
-          matchesAttended: mPresents,
+          matchesAttended: convsCount,
           matchAttendancePct: mPct,
-          goals: totalGoals,
-          assists: totalAssists,
+          starts: startsCount,
+          goals: totalOfficialGoals,
+          assists: totalOfficialAssists,
+          yellowCards: totalOfficialYellows,
+          redCards: totalOfficialReds,
           technicalRating: p.technical_rating || null
         });
       }
@@ -607,29 +652,38 @@ export default function RendimientoGlobalPage() {
                     </div>
                   </div>
 
-                  {/* Bloque Estadísticas de Directo (Futuro) */}
+                  {/* Bloque Estadísticas Oficiales (Actas FFCV) */}
                   <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5">
                         <Target size={12} className="text-amber-500" />
                         <span className="text-[10px] font-bold text-gray-500 uppercase">Goles</span>
                       </div>
-                      <span className="font-bold text-sm text-gray-900">{player.goals ?? '-'}</span>
+                      <span className="font-bold text-sm text-gray-900">{player.goals ?? 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5">
                         <Crosshair size={12} className="text-blue-500" />
                         <span className="text-[10px] font-bold text-gray-500 uppercase">Asist.</span>
                       </div>
-                      <span className="font-bold text-sm text-gray-900">{player.assists ?? '-'}</span>
+                      <span className="font-bold text-sm text-gray-900">{player.assists ?? 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5">
-                        <BarChart2 size={12} className="text-purple-500" />
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Valoración</span>
+                        <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm inline-block shadow-xs"></div>
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Tarjetas</span>
                       </div>
-                      <span className="font-bold text-sm text-gray-900">{player.technicalRating ? `${player.technicalRating}/10` : '-'}</span>
+                      <div className="flex items-center gap-2 text-xs font-bold">
+                        <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">{player.yellowCards} 🟨</span>
+                        <span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">{player.redCards} 🟥</span>
+                      </div>
                     </div>
+                    {player.starts > 0 && (
+                      <div className="flex justify-between items-center pt-1 border-t border-gray-200/60">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Titular</span>
+                        <span className="text-xs font-black text-slate-700">{player.starts} partidos</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </button>

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Users, Search, Loader2, Mail, Shield, User as UserIcon, Archive } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
 import { archivePlayerAction, updatePlayerPositionAction, exportRgpdAction, createFamilyAndPlayerAction, getClubStaffAction } from "@/app/actions/player-actions"
-import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction } from "@/app/actions/club-actions"
+import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction, promotePlayerToStaffAction } from "@/app/actions/club-actions"
 import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
@@ -555,11 +555,11 @@ function AddPlayerModal({ open, onClose, onSuccess, clubId, teams }: { open: boo
     </div>
   );
 }
-// --- Modal para Gestionar Staff ---
 function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: boolean; onClose: () => void; member: Member | null; teams: {id: string, name: string}[]; onSuccess: () => void }) {
   const [activeRole, setActiveRole] = useState("");
   const [assignedRoles, setAssignedRoles] = useState<string[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -570,6 +570,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         ? member.roles 
         : [member.role || "entrenador"];
       setAssignedRoles(initialRoles);
+      setEmailInput(member.email?.includes('/register/staff/') ? '' : (member.email || ''));
       
       if (member.teams && member.teams.length > 0) {
         setTeamIds(member.teams.map(t => t.id));
@@ -593,13 +594,35 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         throw new Error("El rol activo debe estar entre los roles asignados.");
       }
 
-      const resRole = await updateUserRolesAction(member.id, activeRole, assignedRoles);
-      if (!resRole.success) throw new Error(resRole.error);
-      
-      const resTeam = await assignStaffToTeamAction(member.id, teamIds);
-      if (!resTeam.success) throw new Error(resTeam.error);
-      
-      toast.success("Staff actualizado correctamente");
+      if (member.type === 'player') {
+        const staffRoles = ['entrenador', 'coach', 'coordinador', 'admin', 'delegado', 'secretario', 'tesorero', 'utillero', 'directivo'];
+        const hasStaffRole = assignedRoles.some(r => staffRoles.includes(r.toLowerCase())) || staffRoles.includes(activeRole.toLowerCase());
+
+        if (hasStaffRole) {
+          if (!emailInput || !emailInput.includes('@')) {
+            throw new Error("Para asignar un rol de staff o entrenador a un miembro, debes indicar un correo electrónico válido.");
+          }
+          const res = await promotePlayerToStaffAction(member.id, emailInput, activeRole, assignedRoles, teamIds);
+          if (!res.success) throw new Error(res.error);
+          toast.success("Rol asignado y miembro promovido a Staff correctamente");
+        } else {
+          // Si sigue siendo solo jugador
+          if (teamIds.length > 0) {
+            const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
+            await assignPlayerToTeamAction(member.id, teamIds[0]);
+          }
+          toast.success("Datos del jugador actualizados correctamente");
+        }
+      } else {
+        const resRole = await updateUserRolesAction(member.id, activeRole, assignedRoles);
+        if (!resRole.success) throw new Error(resRole.error);
+        
+        const resTeam = await assignStaffToTeamAction(member.id, teamIds);
+        if (!resTeam.success) throw new Error(resTeam.error);
+        
+        toast.success("Staff actualizado correctamente");
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -611,9 +634,11 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+      <div className="animate-in fade-in-0 zoom-in-95 duration-300 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Gestionar Staff</h2>
+          <h2 className="text-xl font-bold text-gray-900">
+            {member.type === 'player' ? 'Gestionar Rol de Miembro' : 'Gestionar Staff'}
+          </h2>
           <button onClick={onClose} className="rounded-full p-1 hover:bg-gray-200">
             <X className="h-5 w-5 text-gray-800" />
           </button>
@@ -644,6 +669,18 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                   {copied ? <Check size={20} /> : <Copy size={20} />}
                 </button>
               </div>
+            </div>
+          ) : member.type === 'player' ? (
+            <div className="mt-3 space-y-1">
+              <label className="block text-xs font-semibold text-gray-700">Email de acceso (necesario para rol Staff / Entrenador):</label>
+              <input 
+                type="email" 
+                value={emailInput} 
+                onChange={(e) => setEmailInput(e.target.value)} 
+                placeholder="correo@ejemplo.com" 
+                className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-[11px] text-gray-400">Si asignas rol de Entrenador o Staff, podrá acceder con este correo.</span>
             </div>
           ) : (
             <span className="text-gray-500">{member.email}</span>
@@ -1325,13 +1362,28 @@ function GlobalMembersContent() {
                         >
                           {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4" /> Cancelar</>}
                         </button>
-                      ) : (
+                      ) : member.type === 'staff' ? (
                         <button 
-                          onClick={(e) => { e.stopPropagation(); member.type === 'staff' ? setManagingMember(member) : router.push(`/dashboard/club/jugador/${member.id}`); }}
+                          onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
                           className="text-blue-600 font-medium text-sm px-2 py-1 rounded-md hover:bg-blue-50"
                         >
                           Gestionar
                         </button>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                            className="text-indigo-600 font-medium text-xs px-2 py-1 rounded-md bg-indigo-50 border border-indigo-200"
+                          >
+                            Rol
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.id}`); }}
+                            className="text-blue-600 font-medium text-xs px-2 py-1 rounded-md hover:bg-blue-50"
+                          >
+                            Ficha
+                          </button>
+                        </div>
                       )}
                       {member.type === 'player' && (
                         <button 
@@ -1475,12 +1527,21 @@ function GlobalMembersContent() {
                             Gestionar
                           </button>
                         ) : (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.id}`); }}
-                            className="text-blue-600 hover:text-blue-800 font-medium text-sm px-3 py-1 rounded-md hover:bg-blue-50 transition-colors"
-                          >
-                            Gestionar
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                              className="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-2.5 py-1 rounded-md hover:bg-indigo-50 transition-colors border border-indigo-200"
+                              title="Cambiar rol o convertir a Entrenador/Staff"
+                            >
+                              Cambiar Rol
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.id}`); }}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2.5 py-1 rounded-md hover:bg-blue-50 transition-colors"
+                            >
+                              Ficha
+                            </button>
+                          </div>
                         )}
                         {member.type === 'player' && (
                           <button 

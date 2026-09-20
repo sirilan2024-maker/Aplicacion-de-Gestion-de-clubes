@@ -135,25 +135,42 @@ export default function InviteRegisterPage() {
               </div>
             </div>
 
-            {/* PIN de vinculación opcional para familias */}
-            {role === 'familia' && (
-              <div>
-                <label htmlFor="pin_code" className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>PIN de jugador (opcional)</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Si el club te facilitó un PIN</span>
+            {/* PIN de vinculación para familias o jugadores */}
+            <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="pin_code" className="block text-xs font-bold text-blue-900">
+                  ¿Tienes un PIN de jugador del club?
                 </label>
-                <div className="relative">
-                  <input
-                    id="pin_code"
-                    name="pin_code"
-                    type="text"
-                    placeholder="Ej: A8F2K9"
-                    className="w-full rounded-lg border border-slate-300 bg-white text-slate-900 uppercase font-mono px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input type="hidden" name="registration_type" value="pin" />
-                </div>
+                <span className="text-[10px] text-blue-600 font-semibold">Recomendado</span>
               </div>
-            )}
+              <p className="text-[11px] text-blue-700 leading-snug">
+                Si el club ya te asignó un PIN, completa la <strong>inscripción oficial completa</strong> (tallas de ropa, documentos y ficha médica) usando tu PIN.
+              </p>
+              <div className="flex gap-2 pt-1">
+                <input
+                  id="pin_code"
+                  name="pin_code"
+                  type="text"
+                  placeholder="Ej: PNVJNG"
+                  className="flex-1 rounded-lg border border-blue-300 bg-white text-slate-900 uppercase font-mono font-bold px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => {
+                    const pinVal = e.target.value.trim().toUpperCase();
+                    const btn = document.getElementById('btn-redirect-inscripcion') as HTMLAnchorElement;
+                    if (btn) {
+                      btn.href = pinVal ? `/inscripcion?pin=${encodeURIComponent(pinVal)}` : '/inscripcion';
+                    }
+                  }}
+                />
+                <a
+                  id="btn-redirect-inscripcion"
+                  href="/inscripcion"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center shrink-0 shadow-xs"
+                >
+                  Ir a Ficha Oficial →
+                </a>
+              </div>
+              <input type="hidden" name="registration_type" value="pin" />
+            </div>
 
             {/* Nombre y Apellidos */}
             <div className="grid grid-cols-2 gap-3">

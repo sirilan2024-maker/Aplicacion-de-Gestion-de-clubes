@@ -815,7 +815,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const teamIds = teams.map(t => t.id);
     const { data: rawPartidos } = await adminClient
       .from('partidos')
-      .select('id, estado, resultado_propio, resultado_rival, equipo_id, es_local, rival_nombre, lugar, fecha_hora, jornada')
+      .select('id, estado, resultado_propio, resultado_rival, equipo_id, es_local, rival_nombre, lugar, fecha_hora')
       .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
       .order('fecha_hora', { ascending: false });
 
@@ -872,7 +872,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
 
     const { data: allStandings } = await adminClient
       .from('ffcv_standings')
-      .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id')
+      .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id, played, won, drawn, lost, goals_for, goals_against')
       .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none'])
       .order('matchday', { ascending: false });
 
@@ -897,23 +897,35 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         else tLosses++;
       });
 
-      const tPoints = (tWins * 3) + tDraws;
-      const tPlayed = tMatches.length;
-      const tWinRate = tPlayed > 0 ? Math.round((tWins / tPlayed) * 100) : 0;
+      let tPoints = (tWins * 3) + tDraws;
+      let tPlayed = tMatches.length;
 
-      // Buscar posición actual en ffcv_standings si existe para el club
+      // Buscar fila oficial en ffcv_standings si existe para el club
       let currentPos: number | undefined = undefined;
       const groupSt = standingsByGroup.get(team.ffcv_group_id || '');
       if (groupSt && groupSt.length > 0) {
-        // Buscar primero por team_ffcv_id o por nombre "saladar" en las filas del grupo
         const teamIdStr = team.ffcv_team_id ? String(team.ffcv_team_id).trim() : '';
         const clubRow = groupSt.find(r => 
           (teamIdStr && String(r.team_ffcv_id || '').trim() === teamIdStr) ||
           r.team_name.toLowerCase().includes('saladar') ||
           r.team_name.toLowerCase().includes(team.name.toLowerCase().trim())
         );
-        if (clubRow) currentPos = clubRow.position;
+        if (clubRow) {
+          currentPos = clubRow.position;
+          // Si la clasificación oficial tiene datos registrados, priorizar los datos oficiales de la FFCV
+          if (clubRow.played !== undefined && clubRow.played !== null) {
+            tPlayed = Number(clubRow.played);
+            tWins = Number(clubRow.won ?? 0);
+            tDraws = Number(clubRow.drawn ?? 0);
+            tLosses = Number(clubRow.lost ?? 0);
+            tGf = Number(clubRow.goals_for ?? 0);
+            tGa = Number(clubRow.goals_against ?? 0);
+            tPoints = Number(clubRow.points ?? 0);
+          }
+        }
       }
+
+      const tWinRate = tPlayed > 0 ? Math.round((tWins / tPlayed) * 100) : 0;
 
       teamStats.push({
         teamId: team.id,
@@ -1424,5 +1436,157 @@ export async function getFfcvIntegrationStatusAction(targetSeasonId?: string): P
     };
   } catch {
     return { success: false, error: 'Error al obtener estado de integración FFCV' };
+  }
+}
+
+export async function promotePlayerToStaffAction(
+  playerId: string,
+  email: string,
+  role: string,
+  rolesList: string[],
+  teamIds: string[]
+) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || 'No autenticado' };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: 'No tienes permisos de administración para promover miembros' };
+    }
+
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminClient = createAdminClient();
+
+    // Obtener los datos del jugador
+    const { data: player, error: pError } = await adminClient
+      .from('players')
+      .select('*')
+      .eq('id', playerId)
+      .eq('club_id', context.profile.club_id)
+      .single();
+
+    if (pError || !player) {
+      return { success: false, error: 'Jugador no encontrado en tu club' };
+    }
+
+    const targetEmail = (email || player.email || player.parent1_email || '').trim().toLowerCase();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      return { success: false, error: 'Se requiere un correo electrónico válido para crear/asociar el usuario staff' };
+    }
+
+    // Actualizar la posición del jugador en la tabla players
+    const roleCapitalized = role.charAt(0).toUpperCase() + role.slice(1);
+    await adminClient
+      .from('players')
+      .update({
+        posicion: roleCapitalized,
+        posicion_principal: roleCapitalized,
+        email: targetEmail
+      })
+      .eq('id', playerId);
+
+    // Buscar si ya existe un perfil con ese email
+    const { data: existingProfile } = await adminClient
+      .from('profiles')
+      .select('id, email, club_id, roles')
+      .eq('email', targetEmail)
+      .maybeSingle();
+
+    let staffProfileId = existingProfile?.id;
+
+    if (existingProfile) {
+      // Unir roles existentes con los nuevos
+      const mergedRoles = Array.from(new Set([...(existingProfile.roles || []), ...rolesList, role]));
+      await adminClient
+        .from('profiles')
+        .update({
+          role: role,
+          roles: mergedRoles,
+          club_id: context.profile.club_id,
+          first_name: player.first_name,
+          last_name: player.last_name,
+          linked_player_id: playerId
+        })
+        .eq('id', existingProfile.id);
+    } else {
+      // Buscar en auth.users si existe un usuario registrado con ese email
+      const { data: authUsers } = await adminClient.auth.admin.listUsers();
+      const existingAuthUser = authUsers?.users?.find(u => u.email?.toLowerCase() === targetEmail);
+
+      if (existingAuthUser) {
+        staffProfileId = existingAuthUser.id;
+      } else {
+        // Crear usuario auth con contraseña temporal o link
+        const tempPassword = 'Club' + Math.random().toString(36).substring(2, 8) + '!';
+        const { data: newAuth, error: createAuthErr } = await adminClient.auth.admin.createUser({
+          email: targetEmail,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: {
+            first_name: player.first_name,
+            last_name: player.last_name,
+            role: role
+          }
+        });
+
+        if (createAuthErr || !newAuth.user) {
+          return { success: false, error: 'Error creando credenciales: ' + (createAuthErr?.message || 'desconocido') };
+        }
+        staffProfileId = newAuth.user.id;
+      }
+
+      // Upsert perfil
+      await adminClient
+        .from('profiles')
+        .upsert({
+          id: staffProfileId,
+          club_id: context.profile.club_id,
+          email: targetEmail,
+          first_name: player.first_name,
+          last_name: player.last_name,
+          role: role,
+          roles: rolesList.length > 0 ? rolesList : [role],
+          linked_player_id: playerId,
+          is_active: true
+        });
+    }
+
+    // Vincular user_auth_id en la tabla players
+    if (staffProfileId) {
+      await adminClient
+        .from('players')
+        .update({ user_auth_id: staffProfileId })
+        .eq('id', playerId);
+
+      // Asignar equipos en team_coaches
+      await adminClient
+        .from('team_coaches')
+        .delete()
+        .eq('profile_id', staffProfileId)
+        .eq('club_id', context.profile.club_id);
+
+      if (teamIds && teamIds.length > 0) {
+        const inserts = teamIds.map(tId => ({
+          profile_id: staffProfileId,
+          team_id: tId,
+          club_id: context.profile.club_id
+        }));
+        await adminClient.from('team_coaches').insert(inserts);
+
+        // También actualizar team_id en el jugador si procede
+        await adminClient
+          .from('players')
+          .update({ team_id: teamIds[0] })
+          .eq('id', playerId);
+      }
+    }
+
+    revalidatePath('/dashboard/club/miembros');
+    return { success: true, profileId: staffProfileId };
+  } catch (err: any) {
+    console.error('Error promoting player to staff:', err);
+    return { success: false, error: err.message };
   }
 }

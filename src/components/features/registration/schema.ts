@@ -52,6 +52,8 @@ const isValidDniNie = (value: string) => {
 
 export const registrationSchema = z.object({
   // STEP 1: Personal & Family Data
+  pinCode: z.string().optional(),
+  existingPlayerId: z.string().optional(),
   playerFirstName: z.string().optional(),
   playerLastName: z.string().optional(),
   playerDni: z.string().optional(), // Puede ser opcional si es muy pequeño, o validarlo si es senior

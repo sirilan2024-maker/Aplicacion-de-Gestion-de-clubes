@@ -267,10 +267,23 @@ export async function POST(request: Request) {
     const isSenior = formData.isSeniorTeam === true || formData.isSeniorTeam === "true" || formData.isSeniorSelection === "senior";
 
     // ──────────────────────────────────────────────────────────────────────────
-    // FASE 1 (cont.): Inserción directa en players con TODOS los campos
+    // FASE 1 (cont.): Inserción o Actualización en players con TODOS los campos
+    // Si viene pinCode o existingPlayerId, actualizamos el registro existente
     // tutor_id = auth.uid() para que el RLS funcione desde el minuto 0
     // ──────────────────────────────────────────────────────────────────────────
-    const { data: player, error: playerError } = await supabaseAdmin.from('players').insert({
+    let player: any = null;
+    let targetPlayerId = formData.existingPlayerId || null;
+
+    if (!targetPlayerId && formData.pinCode) {
+      const { data: foundByPin } = await supabaseAdmin
+        .from('players')
+        .select('id')
+        .eq('link_code', formData.pinCode.trim().toUpperCase())
+        .maybeSingle();
+      if (foundByPin?.id) targetPlayerId = foundByPin.id;
+    }
+
+    const playerPayload: any = {
       // Datos personales del jugador
       first_name: formData.playerFirstName || formData.tutor1Name || email.split('@')[0],
       last_name: formData.playerLastName || formData.tutor1LastName || "-",
@@ -341,19 +354,43 @@ export async function POST(request: Request) {
       consent_image_at: formData.consentImage ? new Date().toISOString() : null,
       consent_ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '0.0.0.0',
       consent_user_agent: request.headers.get('user-agent') || 'Unknown',
-    }).select('id').single();
+    };
 
-    if (playerError) {
-      console.error('Error insertando player:', playerError);
-      return NextResponse.json({ error: playerError.message }, { status: 500 });
+    if (targetPlayerId) {
+      // Actualizar ficha existente
+      const { data: updatedPlayer, error: updateErr } = await supabaseAdmin
+        .from('players')
+        .update(playerPayload)
+        .eq('id', targetPlayerId)
+        .select('id')
+        .single();
+
+      if (updateErr) {
+        console.error('Error actualizando player existente con PIN:', updateErr);
+        return NextResponse.json({ error: updateErr.message }, { status: 500 });
+      }
+      player = updatedPlayer;
+    } else {
+      // Alta nueva
+      const { data: newPlayer, error: playerError } = await supabaseAdmin
+        .from('players')
+        .insert(playerPayload)
+        .select('id')
+        .single();
+
+      if (playerError) {
+        console.error('Error insertando player:', playerError);
+        return NextResponse.json({ error: playerError.message }, { status: 500 });
+      }
+      player = newPlayer;
     }
 
     // Enlazar el tutor explícitamente en player_tutors para las relaciones del dashboard familiar
     if (authUserId && player?.id) {
-      const { error: tutorError } = await supabaseAdmin.from('player_tutors').insert({
+      const { error: tutorError } = await supabaseAdmin.from('player_tutors').upsert({
         player_id: player.id,
         tutor_id: authUserId
-      });
+      }, { onConflict: 'player_id,tutor_id' });
       if (tutorError) console.error('Error linking player_tutor:', tutorError);
     }
 
@@ -429,6 +466,9 @@ export async function POST(request: Request) {
         { item: 'Medias', size: formData.sizeMedias },
         { item: 'Mochila', size: formData.sizeMochila },
       ];
+
+      // Limpiar tallas anteriores si es una actualización de jugador
+      await supabaseAdmin.from('player_apparel').delete().eq('player_id', player.id);
 
       for (const { item, size } of apparelItems) {
         if (size) {

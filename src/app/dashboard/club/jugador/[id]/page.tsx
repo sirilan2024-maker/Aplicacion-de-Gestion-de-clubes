@@ -17,6 +17,7 @@ import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
+import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 
 interface PlayerData {
@@ -136,6 +137,7 @@ export default function GlobalPlayerProfilePage() {
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
   const [hasActiveInjury, setHasActiveInjury] = useState<boolean>(false);
   const [openInjuryModal, setOpenInjuryModal] = useState<boolean>(false);
+  const [showFfcvModal, setShowFfcvModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -813,6 +815,15 @@ export default function GlobalPlayerProfilePage() {
             </div>
             {!isEditing ? (
               <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setShowFfcvModal(true)}
+                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-lg font-bold transition-all shadow-sm text-xs sm:text-sm cursor-pointer"
+                  title="Consultar datos federativos oficiales en tiempo real de la FFCV"
+                >
+                  <ShieldCheck size={16} className="text-blue-100" />
+                  <span>FICHA FFCV</span>
+                </button>
                 <button 
                   onClick={() => setIsEditing(true)}
                   disabled={player.status === 'inactive'}
@@ -2034,6 +2045,16 @@ export default function GlobalPlayerProfilePage() {
         )}
 
       </div>
+
+      {/* MODAL FICHA FFCV */}
+      {player && (
+        <FfcvPlayerModal
+          playerId={player.id}
+          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+          isOpen={showFfcvModal}
+          onClose={() => setShowFfcvModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -607,19 +607,16 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         const hasStaffRole = assignedRoles.some(r => staffRoles.includes(r.toLowerCase())) || staffRoles.includes(activeRole.toLowerCase());
 
         if (hasStaffRole) {
-          if (!emailInput || !emailInput.includes('@')) {
-            throw new Error("Para asignar un rol de staff o entrenador a un miembro, debes indicar un correo electrónico válido.");
-          }
           const res = await promotePlayerToStaffAction(member.id, emailInput, activeRole, assignedRoles, teamIds);
           if (!res.success) throw new Error(res.error);
           
-          toast.success("Rol asignado y miembro promovido a Staff correctamente");
+          toast.success("Rol asignado correctamente");
           
           const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
           const fullInviteLink = res.inviteToken ? `${baseUrl}/register/staff/${res.inviteToken}` : null;
           
           setPromotionResult({
-            email: res.email || emailInput,
+            email: res.email || emailInput || "Lo indicará el propio miembro al registrarse",
             tempPassword: res.tempPassword,
             inviteLink: fullInviteLink
           });
@@ -771,15 +768,15 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                 </div>
               ) : member.type === 'player' ? (
                 <div className="mt-3 space-y-1">
-                  <label className="block text-xs font-semibold text-gray-700">Email de acceso (necesario para rol Staff / Entrenador):</label>
+                  <label className="block text-xs font-semibold text-gray-700">Email de acceso (Opcional):</label>
                   <input 
                     type="email" 
                     value={emailInput} 
                     onChange={(e) => setEmailInput(e.target.value)} 
-                    placeholder="correo@ejemplo.com" 
+                    placeholder="Dejar en blanco si el miembro lo indicará él mismo" 
                     className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-[11px] text-gray-400">Si asignas rol de Entrenador o Staff, podrá acceder con este correo.</span>
+                  <span className="text-[11px] text-gray-400">Si lo dejas en blanco, se creará un enlace de invitación para que el miembro ingrese su propio email y contraseña.</span>
                 </div>
               ) : (
                 <span className="text-gray-500">{member.email}</span>

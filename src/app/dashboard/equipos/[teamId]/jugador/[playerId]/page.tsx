@@ -19,6 +19,7 @@ import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
+import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 
 interface PlayerData {
   id: string;
@@ -134,6 +135,7 @@ export default function GlobalPlayerProfilePage() {
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
   const [hasActiveInjury, setHasActiveInjury] = useState<boolean>(false);
   const [openInjuryModal, setOpenInjuryModal] = useState<boolean>(false);
+  const [showFfcvModal, setShowFfcvModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -800,10 +802,19 @@ export default function GlobalPlayerProfilePage() {
             </div>
             {!isEditing ? (
               <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setShowFfcvModal(true)}
+                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 hover:from-blue-800 hover:to-slate-950 text-white px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm text-xs sm:text-sm border border-blue-500/30 group active:scale-95"
+                  title="Consultar datos oficiales e historial en la FFCV"
+                >
+                  <Shield size={16} className="text-blue-300 group-hover:rotate-12 transition-transform" />
+                  <span>FICHA FFCV</span>
+                </button>
                 <button 
                   onClick={() => setIsEditing(true)}
                   disabled={player.status === 'inactive'}
-                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
                   title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
                 >
                   <Edit3 size={16} /> Editar Perfil
@@ -2199,6 +2210,16 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
+
+      {/* MODAL FICHA FFCV */}
+      {player && (
+        <FfcvPlayerModal
+          playerId={player.id}
+          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+          isOpen={showFfcvModal}
+          onClose={() => setShowFfcvModal(false)}
+        />
+      )}
     </div>
   );
 }

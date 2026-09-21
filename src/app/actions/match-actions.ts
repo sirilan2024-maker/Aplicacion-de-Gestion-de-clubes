@@ -247,23 +247,34 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
 
   const clubId = context.profile.club_id;
 
-  // 1. Obtener la temporada activa del club para no traer equipos ni plantillas de temporadas anteriores
-  const { data: activeSeason } = await supabase
-    .from('seasons')
-    .select('id')
-    .eq('club_id', clubId)
-    .eq('is_active', true)
+  // 1. Obtener la temporada del partido o en su defecto la temporada activa del club
+  const { data: matchData } = await supabase
+    .from('partidos')
+    .select('season_id, equipo:teams(season_id)')
+    .eq('id', matchId)
     .single();
 
-  // 2. Obtener los equipos juveniles del club (filtrando por temporada activa si existe)
+  let targetSeasonId = matchData?.season_id || (matchData?.equipo as any)?.season_id;
+
+  if (!targetSeasonId) {
+    const { data: activeSeason } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('is_active', true)
+      .single();
+    targetSeasonId = activeSeason?.id;
+  }
+
+  // 2. Obtener los equipos juveniles del club para esa temporada
   let teamsQuery = supabase
     .from('teams')
     .select('id, name, category, season_id')
     .eq('club_id', clubId)
     .ilike('category', '%juvenil%');
 
-  if (activeSeason?.id) {
-    teamsQuery = teamsQuery.eq('season_id', activeSeason.id);
+  if (targetSeasonId) {
+    teamsQuery = teamsQuery.eq('season_id', targetSeasonId);
   }
 
   const { data: juvenileTeams, error: teamsErr } = await teamsQuery;
@@ -274,8 +285,7 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
 
   const juvenileTeamIds = juvenileTeams.map(t => t.id);
 
-  // 3. Obtener jugadores activos de la plantilla actual mediante player_season_history
-  // o fallback directo a players activos si la tabla history está vacía
+  // 3. Obtener jugadores activos de la plantilla juvenil mediante player_season_history
   let playersList: any[] = [];
 
   const { data: historyData, error: hErr } = await supabase
@@ -295,7 +305,7 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
       posicion: h.players?.posicion_principal || h.players?.posicion
     }));
   } else {
-    // Fallback: consultar directamente de players asignados a los equipos juveniles activos
+    // Fallback: solo dentro de los equipos juveniles de la temporada seleccionada
     const { data: directPlayers } = await supabase
       .from('players')
       .select('id, first_name, last_name, dorsal, status, medical_notes, posicion, posicion_principal, team_id, teams(name, category)')
@@ -306,17 +316,22 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
     playersList = directPlayers || [];
   }
 
-  // Filtrar si alguno tiene rol de entrenador / cuerpo técnico
+  // Filtrar si alguno tiene rol de entrenador / cuerpo técnico o estado inactivo
   const validPlayers = (playersList || []).filter(p => {
+    if (p.status === 'inactive') return false;
     const pos = (p.posicion_principal || p.posicion || '').toLowerCase();
     return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
   });
 
-  // Deduplicar por id y ordenar por nombre
+  // Deduplicar estrictamente por id Y por nombre normalizado (para evitar duplicados por registros repetidos)
   const uniquePlayersMap = new Map<string, any>();
+  const seenNormalizedNames = new Set<string>();
+
   validPlayers.forEach(p => {
-    if (!uniquePlayersMap.has(p.id)) {
+    const normalizedName = `${p.first_name || ''} ${p.last_name || ''}`.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!uniquePlayersMap.has(p.id) && !seenNormalizedNames.has(normalizedName)) {
       uniquePlayersMap.set(p.id, p);
+      seenNormalizedNames.add(normalizedName);
     }
   });
 

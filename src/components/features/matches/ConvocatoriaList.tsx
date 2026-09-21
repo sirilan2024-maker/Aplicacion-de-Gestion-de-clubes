@@ -21,7 +21,16 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
     return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
   });
 
-  const mappedPlayers: Player[] = validPlayers.map(p => {
+  const mappedPlayers: Player[] = [];
+  const seenPlayerIds = new Set<string>();
+  const seenNames = new Set<string>();
+
+  validPlayers.forEach(p => {
+    const normalizedName = `${p.first_name || ''} ${p.last_name || ''}`.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (seenPlayerIds.has(p.id) || seenNames.has(normalizedName)) return;
+    seenPlayerIds.add(p.id);
+    seenNames.add(normalizedName);
+
     // If the player is in `convocatorias`, find their status
     const conv = convocatorias.find(c => c.player_id === p.id);
     let status: AttendanceStatus = null;
@@ -32,14 +41,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
       else if (conv.status === 'lesionado') status = 'Lesión';
     }
     const isJuv = p.teams?.category?.toLowerCase().includes('juvenil') || p.team_category?.toLowerCase().includes('juvenil');
-    return {
+    mappedPlayers.push({
       id: p.id,
       name: `${p.first_name} ${p.last_name}`.toUpperCase(),
       position: (p.posicion || 'Jugador').toLowerCase(),
       status: status,
       teamName: p.teams?.name || (isJuv ? 'Juvenil' : undefined),
       isJuvenile: isJuv
-    };
+    });
   });
 
   const [playerList, setPlayerList] = useState<Player[]>(mappedPlayers);

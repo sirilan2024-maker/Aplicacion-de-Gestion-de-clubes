@@ -42,9 +42,9 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .order("first_name");
 
   if (convPlayerIds.length > 0) {
-    playersQuery = playersQuery.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId},id.in.(${convPlayerIds.join(',')})`);
+    playersQuery = playersQuery.or(`team_id.eq.${teamId},id.in.(${convPlayerIds.join(',')})`);
   } else {
-    playersQuery = playersQuery.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`);
+    playersQuery = playersQuery.eq("team_id", teamId);
   }
 
   const { data: playersData } = await playersQuery;

@@ -24,13 +24,6 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
       
       if (matchData) setMatchDetails(matchData)
 
-      // Handle both new teams table ID and old equipos table ID
-      const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", teamId).single()
-      let oldTeamId = teamId;
-      if (newTeamData) {
-        const { data: oldTeamData } = await supabase.from('teams').select("id").ilike("name", newTeamData.name).single()
-        if (oldTeamData) oldTeamId = oldTeamData.id;
-      }
 
       // 2. Fetch current convocados first
       const { data: convData } = await supabase
@@ -51,9 +44,9 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
         .order("first_name")
 
       if (convPlayerIds.length > 0) {
-        query = query.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId},id.in.(${convPlayerIds.join(',')})`)
+        query = query.or(`team_id.eq.${teamId},id.in.(${convPlayerIds.join(',')})`)
       } else {
-        query = query.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`)
+        query = query.eq('team_id', teamId)
       }
 
       const { data: playersData } = await query

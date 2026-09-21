@@ -190,13 +190,21 @@ export async function GET(req: Request) {
       const tit = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Titular')?.valor || '0';
       const sup = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Suplente')?.valor || '0';
 
+      const clubName = comp && comp.nombre_club 
+        ? comp.nombre_club 
+        : (comp && comp.nombre_equipo ? comp.nombre_equipo : (pastData.equipo || 'Club Federado FFCV'));
+
+      const equipoName = comp && comp.nombre_equipo 
+        ? comp.nombre_equipo 
+        : (pastData.equipo || 'Sin especificar');
+
       return {
         temporada: temp.nombre_temporada,
         codigo_temporada: temp.codigo_temporada,
-        club: comp && comp.nombre_club ? comp.nombre_club : 'Club Federado FFCV',
-        equipo: comp && comp.nombre_equipo ? comp.nombre_equipo : 'Sin especificar',
-        competicion: comp && comp.nombre_competicion ? comp.nombre_competicion : (pastData.categoria_equipo || 'Competición FFCV'),
-        grupo: comp && comp.nombre_grupo ? comp.nombre_grupo : '',
+        club: clubName.trim(),
+        equipo: equipoName.trim(),
+        competicion: comp && comp.nombre_competicion ? comp.nombre_competicion.trim() : (pastData.categoria_equipo || 'Competición FFCV'),
+        grupo: comp && comp.nombre_grupo ? comp.nombre_grupo.trim() : '',
         partidos_jugados: parseInt(pj, 10) || 0,
         titular: parseInt(tit, 10) || 0,
         suplente: parseInt(sup, 10) || 0,
@@ -212,6 +220,17 @@ export async function GET(req: Request) {
       if (h) historialTemporadas.push(h);
     });
 
+    // Formatear foto correctamente (detectar si ya viene con 'data:image' o si es base64 puro)
+    const rawPhoto = matchedFfcvPlayer.foto || fullPlayerData.foto;
+    let finalPhoto = null;
+    if (rawPhoto) {
+      if (rawPhoto.startsWith('data:image')) {
+        finalPhoto = rawPhoto;
+      } else {
+        finalPhoto = 'data:image/jpeg;base64,' + rawPhoto;
+      }
+    }
+
     return NextResponse.json({
       found: true,
       player: {
@@ -225,7 +244,7 @@ export async function GET(req: Request) {
         minutos_totales: fullPlayerData.minutos_totales_jugados || 0,
         media_minutos: fullPlayerData.media_minutos_totales_jugados || '0',
         es_portero: fullPlayerData.es_portero === '1',
-        foto_base64: matchedFfcvPlayer.foto ? 'data:image/jpeg;base64,' + matchedFfcvPlayer.foto : null,
+        foto_base64: finalPhoto,
         partidos: fullPlayerData.partidos || [],
         tarjetas: fullPlayerData.tarjetas || [],
         competiciones: fullPlayerData.competiciones_participa || [],

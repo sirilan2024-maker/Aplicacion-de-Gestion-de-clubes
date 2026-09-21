@@ -32,25 +32,32 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
         if (oldTeamData) oldTeamId = oldTeamData.id;
       }
 
-      // 2. Fetch all team players
-      const { data: playersData } = await supabase
-        .from("players")
-        .select("id, first_name, last_name, dorsal, status, medical_notes")
-        .or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`)
-        .neq('status', 'inactive')
-        .order("first_name")
-      
-      if (playersData) setPlayers(playersData)
-
-      // 3. Fetch current convocados
+      // 2. Fetch current convocados first
       const { data: convData } = await supabase
         .from("convocatorias")
         .select("player_id")
         .eq("partido_id", matchId)
 
+      const convPlayerIds = (convData || []).map(c => c.player_id)
       if (convData) {
-        setConvocados(new Set(convData.map(c => c.player_id)))
+        setConvocados(new Set(convPlayerIds))
       }
+
+      // 3. Fetch all team players AND players already in convocatoria (juveniles)
+      let query = supabase
+        .from("players")
+        .select("id, first_name, last_name, dorsal, status, medical_notes, team_id, teams(name, category)")
+        .neq('status', 'inactive')
+        .order("first_name")
+
+      if (convPlayerIds.length > 0) {
+        query = query.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId},id.in.(${convPlayerIds.join(',')})`)
+      } else {
+        query = query.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`)
+      }
+
+      const { data: playersData } = await query
+      if (playersData) setPlayers(playersData)
 
       setLoading(false)
     }
@@ -130,9 +137,16 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                     {p.dorsal || '-'}
                   </div>
                   <div>
-                    <h4 className={`font-bold text-base ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
-                      {p.first_name} {p.last_name}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className={`font-bold text-base ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
+                        {p.first_name} {p.last_name}
+                      </h4>
+                      {(p.teams?.category?.toLowerCase().includes('juvenil') || (p.team_id !== teamId && p.team_id !== oldTeamId)) && (
+                        <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200">
+                          {p.teams?.name || 'Juvenil'}
+                        </span>
+                      )}
+                    </div>
                     {isLesionado && (
                       <p className="text-red-500 text-xs font-bold flex items-center gap-1 mt-0.5">
                         <AlertTriangle size={12} /> LESIONADO {p.medical_notes && `(${p.medical_notes})`}

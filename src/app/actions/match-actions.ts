@@ -233,6 +233,54 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
   return { success: true, message: `Alertas enviadas a ${dispatchItems.length} destinatarios.` }
 }
 
+export async function getAvailableJuvenilePlayersAction(matchId: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado", players: [] };
+  }
+
+  const supabase = await createAdminClient();
+  const matchAccess = await canUserAccessMatch(supabase, context, matchId);
+  if (!matchAccess.allowed || !matchAccess.match) {
+    return { success: false, error: matchAccess.reason || "No tienes acceso a este partido", players: [] };
+  }
+
+  const clubId = context.profile.club_id;
+
+  // 1. Obtener los equipos juveniles del club
+  const { data: juvenileTeams, error: teamsErr } = await supabase
+    .from('teams')
+    .select('id, name, category')
+    .eq('club_id', clubId)
+    .ilike('category', '%juvenil%');
+
+  if (teamsErr || !juvenileTeams || juvenileTeams.length === 0) {
+    return { success: true, players: [] };
+  }
+
+  const juvenileTeamIds = juvenileTeams.map(t => t.id);
+
+  // 2. Obtener jugadores activos de esos equipos juveniles
+  const { data: players, error: pErr } = await supabase
+    .from('players')
+    .select('id, first_name, last_name, dorsal, status, medical_notes, posicion, team_id, teams(name, category)')
+    .in('team_id', juvenileTeamIds)
+    .neq('status', 'inactive')
+    .order('first_name');
+
+  if (pErr) {
+    return { success: false, error: pErr.message, players: [] };
+  }
+
+  // Filtrar si alguno tiene rol de entrenador / cuerpo técnico
+  const validPlayers = (players || []).filter(p => {
+    const pos = (p.posicion || '').toLowerCase();
+    return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
+  });
+
+  return { success: true, players: validPlayers };
+}
+
 export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null }) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
@@ -248,7 +296,17 @@ export async function updateMatchDetails(matchId: string, teamId: string, update
   return { success: true };
 }
 
-export async function saveMatchReport(matchId: string, report: { coach_rating: number, coach_summary: string, positive_aspects: string, improvement_aspects: string, attitude_notes: string }) {
+export async function saveMatchReport(
+  matchId: string, 
+  report: { 
+    coach_rating?: number, 
+    coach_summary?: string, 
+    positive_aspects?: string, 
+    improvement_aspects?: string, 
+    attitude_notes?: string,
+    coach_report?: any 
+  }
+) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
     return { success: false, error: authError || "No autenticado" };
@@ -258,9 +316,84 @@ export async function saveMatchReport(matchId: string, report: { coach_rating: n
   if (!access.allowed || !access.match) {
     return { success: false, error: access.reason || "No tienes acceso a este partido" };
   }
-  await adminSupabase.from('partidos').update(report).eq('id', matchId);
+
+  // Si se incluye coach_report, hacer merge con el existente si ya contiene campos (como la foto)
+  const updatePayload: any = { ...report };
+  if (report.coach_report) {
+    const { data: currentMatch } = await adminSupabase
+      .from('partidos')
+      .select('coach_report')
+      .eq('id', matchId)
+      .single();
+    const existingReport = (typeof currentMatch?.coach_report === 'object' && currentMatch?.coach_report) ? currentMatch.coach_report : {};
+    updatePayload.coach_report = {
+      ...existingReport,
+      ...report.coach_report
+    };
+  }
+
+  await adminSupabase.from('partidos').update(updatePayload).eq('id', matchId);
   revalidatePath(`/dashboard/e/[teamId]/partidos/${matchId}`, 'page');
   return { success: true };
+}
+
+export async function uploadTeamPhotoAction(matchId: string, formData: FormData) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessMatch(adminSupabase, context, matchId);
+  if (!access.allowed || !access.match) {
+    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+
+  const file = formData.get("file") as File;
+  if (!file) {
+    return { success: false, error: "No se seleccionó ningún archivo" };
+  }
+
+  const ext = file.name.split('.').pop() || 'jpg';
+  const filePath = `partidos/${matchId}/team_photo_${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: uploadError } = await adminSupabase.storage
+    .from("avatars")
+    .upload(filePath, buffer, {
+      contentType: file.type || 'image/jpeg',
+      upsert: true
+    });
+
+  if (uploadError) {
+    return { success: false, error: uploadError.message };
+  }
+
+  const { data: publicUrlData } = adminSupabase.storage
+    .from("avatars")
+    .getPublicUrl(filePath);
+
+  const teamPhotoUrl = publicUrlData.publicUrl;
+
+  // Obtener el coach_report existente y guardar la URL
+  const { data: currentMatch } = await adminSupabase
+    .from('partidos')
+    .select('coach_report')
+    .eq('id', matchId)
+    .single();
+
+  const existingReport = (typeof currentMatch?.coach_report === 'object' && currentMatch?.coach_report) ? currentMatch.coach_report : {};
+  const updatedReport = {
+    ...existingReport,
+    team_photo_url: teamPhotoUrl
+  };
+
+  await adminSupabase
+    .from('partidos')
+    .update({ coach_report: updatedReport })
+    .eq('id', matchId);
+
+  revalidatePath(`/dashboard`, 'layout');
+  return { success: true, teamPhotoUrl };
 }
 
 

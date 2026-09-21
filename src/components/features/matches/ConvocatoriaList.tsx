@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
-import { updateConvocatoria, sendConvocatoriaAlerts } from '@/app/actions/match-actions';
-import { Loader2 } from 'lucide-react';
+import React, { useState, useTransition, useEffect } from 'react';
+import { updateConvocatoria, sendConvocatoriaAlerts, getAvailableJuvenilePlayersAction } from '@/app/actions/match-actions';
+import { Loader2, UserPlus, X, ShieldCheck } from 'lucide-react';
 
 export type AttendanceStatus = 'Convocado' | 'No convocado' | 'Duda' | 'Lesión' | null;
 
@@ -11,6 +11,8 @@ export interface Player {
   name: string;
   position: string;
   status: AttendanceStatus;
+  teamName?: string;
+  isJuvenile?: boolean;
 }
 
 export function ConvocatoriaList({ players = [], matchId, convocatorias = [], onCloseModal }: { players?: any[], matchId?: string, convocatorias?: any[], onCloseModal?: () => void }) {
@@ -29,16 +31,61 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
       else if (conv.status === 'duda') status = 'Duda';
       else if (conv.status === 'lesionado') status = 'Lesión';
     }
+    const isJuv = p.teams?.category?.toLowerCase().includes('juvenil') || p.team_category?.toLowerCase().includes('juvenil');
     return {
       id: p.id,
       name: `${p.first_name} ${p.last_name}`.toUpperCase(),
       position: (p.posicion || 'Jugador').toLowerCase(),
-      status: status
+      status: status,
+      teamName: p.teams?.name || (isJuv ? 'Juvenil' : undefined),
+      isJuvenile: isJuv
     };
   });
 
   const [playerList, setPlayerList] = useState<Player[]>(mappedPlayers);
   const [isPending, startTransition] = useTransition();
+
+  // Modal para añadir juveniles
+  const [showJuvenileModal, setShowJuvenileModal] = useState(false);
+  const [juvenileCandidates, setJuvenileCandidates] = useState<any[]>([]);
+  const [loadingJuveniles, setLoadingJuveniles] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const openJuvenileModal = async () => {
+    setShowJuvenileModal(true);
+    if (matchId) {
+      setLoadingJuveniles(true);
+      try {
+        const res = await getAvailableJuvenilePlayersAction(matchId);
+        if (res.success && res.players) {
+          setJuvenileCandidates(res.players);
+        }
+      } catch (err) {
+        console.error("Error fetching juvenile players:", err);
+      } finally {
+        setLoadingJuveniles(false);
+      }
+    }
+  };
+
+  const handleAddJuvenile = (p: any) => {
+    // Si ya está en la lista, no duplicar, simplemente convocar
+    const exists = playerList.find(item => item.id === p.id);
+    if (exists) {
+      handleStatusChange(p.id, 'Convocado');
+    } else {
+      const newPlayer: Player = {
+        id: p.id,
+        name: `${p.first_name} ${p.last_name}`.toUpperCase(),
+        position: (p.posicion || 'Jugador').toLowerCase(),
+        status: 'Convocado',
+        teamName: p.teams?.name || 'Juvenil',
+        isJuvenile: true
+      };
+      setPlayerList(prev => [newPlayer, ...prev]);
+    }
+    setShowJuvenileModal(false);
+  };
 
   const handleStatusChange = (playerId: string, newStatus: AttendanceStatus) => {
     setPlayerList((prev) =>
@@ -133,6 +180,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
         </div>
         <div className="flex gap-2">
           <button
+            onClick={openJuvenileModal}
+            type="button"
+            className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
+            + Añadir Juvenil
+          </button>
+          <button
             onClick={handleConvocarTodos}
             className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-sm"
           >
@@ -172,7 +227,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                 }`}
               >
                 <div className="min-w-0 w-full sm:w-auto pr-0 sm:pr-4">
-                  <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
+                    {player.isJuvenile && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded border border-indigo-200 shrink-0">
+                        {player.teamName || 'JUVENIL'}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
                 </div>
                 
@@ -228,6 +290,98 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
           </button>
         </div>
       </div>
+
+      {/* Modal para añadir juveniles */}
+      {showJuvenileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500 text-white flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm">Convocar Jugador Juvenil</h3>
+                  <p className="text-[11px] text-slate-500">Sube a un jugador de categoría Juvenil para este partido</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowJuvenileModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 border-b border-slate-100">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre o equipo juvenil..."
+                className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="p-3 overflow-y-auto flex-1 divide-y divide-slate-100 custom-scrollbar">
+              {loadingJuveniles ? (
+                <div className="py-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                  Buscando juveniles disponibles...
+                </div>
+              ) : juvenileCandidates.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  No se encontraron jugadores en equipos Juveniles del club.
+                </div>
+              ) : (
+                juvenileCandidates
+                  .filter(p => {
+                    const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+                    const team = (p.teams?.name || '').toLowerCase();
+                    const query = searchTerm.toLowerCase();
+                    return fullName.includes(query) || team.includes(query);
+                  })
+                  .map(p => {
+                    const isAlreadyAdded = playerList.some(item => item.id === p.id && item.status === 'Convocado');
+                    return (
+                      <div key={p.id} className="py-2.5 flex items-center justify-between hover:bg-slate-50 px-2 rounded-lg transition-colors">
+                        <div>
+                          <p className="font-bold text-slate-800 text-xs uppercase">{p.first_name} {p.last_name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-slate-500 font-medium">{p.posicion || 'Jugador'}</span>
+                            <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-100">
+                              {p.teams?.name || 'Juvenil'}
+                            </span>
+                            {p.dorsal && <span className="text-[10px] text-slate-400 font-semibold">#{p.dorsal}</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleAddJuvenile(p)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            isAlreadyAdded 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 pointer-events-none' 
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                          }`}
+                        >
+                          {isAlreadyAdded ? 'Ya convocado' : '+ Convocar'}
+                        </button>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setShowJuvenileModal(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

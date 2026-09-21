@@ -10,8 +10,10 @@ export interface AuthenticatedContext {
     club_id: string;
     first_name?: string;
     last_name?: string;
+    linked_player_id?: string;
   };
   isImpersonating?: boolean;
+  impersonatedPlayerId?: string;
   realAdminId?: string;
   realAdminRole?: string;
   impersonatedName?: string;
@@ -89,6 +91,41 @@ export async function getAuthenticatedContext(): Promise<{
         const impersonatedUserId = cookieStore.get('impersonated_user_id')?.value;
 
         if (impersonatedUserId && impersonatedUserId !== user.id) {
+          // Si se seleccionó un jugador directo
+          if (impersonatedUserId.startsWith('player_')) {
+            const playerId = impersonatedUserId.replace('player_', '');
+            const { data: playerRec } = await adminClient
+              .from("players")
+              .select("id, first_name, last_name, club_id, team_id, user_auth_id, tutor_id, teams(name)")
+              .eq("id", playerId)
+              .eq("club_id", profile.club_id)
+              .maybeSingle();
+
+            if (playerRec) {
+              const teamName = (playerRec.teams as any)?.name;
+              return {
+                context: {
+                  user: { id: playerRec.user_auth_id || playerRec.tutor_id || user.id, email: user.email },
+                  profile: {
+                    id: playerRec.user_auth_id || playerRec.tutor_id || user.id,
+                    role: "family",
+                    roles: ["family", "jugador"],
+                    club_id: playerRec.club_id,
+                    first_name: playerRec.first_name,
+                    last_name: playerRec.last_name,
+                    linked_player_id: playerRec.id,
+                  },
+                  isImpersonating: true,
+                  impersonatedPlayerId: playerRec.id,
+                  realAdminId: user.id,
+                  realAdminRole: profile.role,
+                  impersonatedName: `${playerRec.first_name || ''} ${playerRec.last_name || ''}`.trim() || 'Jugador del Club',
+                  impersonatedRole: teamName ? `Jugador (${teamName})` : 'jugador',
+                }
+              };
+            }
+          }
+
           const { data: impProfile } = await adminClient
             .from("profiles")
             .select("id, role, roles, club_id, first_name, last_name")
@@ -113,6 +150,38 @@ export async function getAuthenticatedContext(): Promise<{
                 realAdminRole: profile.role,
                 impersonatedName: `${impProfile.first_name || ''} ${impProfile.last_name || ''}`.trim() || 'Usuario del Club',
                 impersonatedRole: impProfile.role || 'family',
+              }
+            };
+          }
+
+          // Fallback: verificar si es un ID de jugador directo sin prefijo
+          const { data: fallbackPlayer } = await adminClient
+            .from("players")
+            .select("id, first_name, last_name, club_id, team_id, user_auth_id, tutor_id, teams(name)")
+            .eq("id", impersonatedUserId)
+            .eq("club_id", profile.club_id)
+            .maybeSingle();
+
+          if (fallbackPlayer) {
+            const teamName = (fallbackPlayer.teams as any)?.name;
+            return {
+              context: {
+                user: { id: fallbackPlayer.user_auth_id || fallbackPlayer.tutor_id || user.id, email: user.email },
+                profile: {
+                  id: fallbackPlayer.user_auth_id || fallbackPlayer.tutor_id || user.id,
+                  role: "family",
+                  roles: ["family", "jugador"],
+                  club_id: fallbackPlayer.club_id,
+                  first_name: fallbackPlayer.first_name,
+                  last_name: fallbackPlayer.last_name,
+                  linked_player_id: fallbackPlayer.id,
+                },
+                isImpersonating: true,
+                impersonatedPlayerId: fallbackPlayer.id,
+                realAdminId: user.id,
+                realAdminRole: profile.role,
+                impersonatedName: `${fallbackPlayer.first_name || ''} ${fallbackPlayer.last_name || ''}`.trim() || 'Jugador del Club',
+                impersonatedRole: teamName ? `Jugador (${teamName})` : 'jugador',
               }
             };
           }
@@ -167,8 +236,8 @@ export async function canUserAccessPlayer(
     return { allowed: false, reason: "El jugador no pertenece a tu club" };
   }
 
-  // 1. Directiva / Admin
-  if (ADMIN_ROLES.includes(ctx.profile.role)) {
+  // 1. Directiva / Admin o simulación activa para este jugador
+  if (ADMIN_ROLES.includes(ctx.profile.role) || (ctx.isImpersonating && ctx.impersonatedPlayerId === playerId)) {
     return { allowed: true, player };
   }
 
@@ -193,16 +262,31 @@ export async function canUserAccessPlayer(
     return { allowed: true, player };
   }
 
-  // 4. Entrenador asignado al equipo del jugador
-  if (COACH_ROLES.includes(ctx.profile.role) && player.team_id) {
-    const { data: coachAssignment } = await adminClient
+  // 4. Entrenador asignado al equipo del jugador o del mismo club (para convocatorias cruzadas entre categorías)
+  if (COACH_ROLES.includes(ctx.profile.role)) {
+    if (player.team_id) {
+      const { data: coachAssignment } = await adminClient
+        .from("team_coaches")
+        .select("id")
+        .eq("team_id", player.team_id)
+        .eq("profile_id", ctx.user.id)
+        .maybeSingle();
+
+      if (coachAssignment) {
+        return { allowed: true, player };
+      }
+    }
+
+    // Comprobar si el entrenador pertenece a algún equipo del mismo club
+    const { data: anyCoachAssignment } = await adminClient
       .from("team_coaches")
-      .select("id")
-      .eq("team_id", player.team_id)
+      .select("teams!inner(club_id)")
       .eq("profile_id", ctx.user.id)
+      .eq("teams.club_id", ctx.profile.club_id)
+      .limit(1)
       .maybeSingle();
 
-    if (coachAssignment) {
+    if (anyCoachAssignment) {
       return { allowed: true, player };
     }
   }

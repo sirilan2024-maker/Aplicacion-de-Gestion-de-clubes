@@ -58,8 +58,76 @@ export default function PlayerDashboardPage() {
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [disciplineCardEvents, setDisciplineCardEvents] = useState<any[]>([]);
+
+  // Filtro por equipo / categoría (Todos, Juvenil, Senior)
+  const [rawConvData, setRawConvData] = useState<any[]>([]);
+  const [rawMatchEvents, setRawMatchEvents] = useState<any[]>([]);
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('all');
+  const [availableTeams, setAvailableTeams] = useState<{ id: string, name: string }[]>([]);
   const [apparelStats, setApparelStats] = useState({ total: 12, delivered: 0 });
   const [apparelData, setApparelData] = useState<{ [key: string]: any }>({});
+
+  // Recalcular estadísticas e historial cuando cambia el filtro de equipo seleccionado
+  useEffect(() => {
+    if (!rawConvData || rawConvData.length === 0) return;
+
+    const filteredConv = selectedTeamFilter === 'all'
+      ? rawConvData
+      : rawConvData.filter(c => c.partidos?.equipo_id === selectedTeamFilter);
+
+    let yellowCards = 0;
+    let redCards = 0;
+    let goals = 0;
+    let minutes = 0;
+    let matchesPlayed = 0;
+
+    filteredConv.forEach((c: any) => {
+      const mEvs = (rawMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
+      const g = (c.goals ?? c.goles) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+      const y = (c.yellow_cards ?? c.tarjetas_amarillas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+      const r = (c.red_cards ?? c.tarjetas_rojas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
+      const m = (c.minutes_played ?? c.minutos_jugados) || (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
+
+      goals += g;
+      yellowCards += y;
+      redCards += r;
+      minutes += m;
+      if (m > 0 || c.status === 'convocado' || mEvs.length > 0) {
+        matchesPlayed++;
+      }
+    });
+
+    setStats(prev => ({
+      ...prev,
+      goals,
+      yellowCards,
+      redCards,
+      minutes,
+      matchesPlayed
+    }));
+
+    const allCardEvents = filteredConv
+      .filter((h: any) => ((h.yellow_cards ?? h.tarjetas_amarillas) || 0) > 0 || ((h.red_cards ?? h.tarjetas_rojas) || 0) > 0)
+      .map((h: any) => ({
+        match: h.partidos,
+        yellow: (h.yellow_cards ?? h.tarjetas_amarillas) || 0,
+        red: (h.red_cards ?? h.tarjetas_rojas) || 0
+      }));
+    setDisciplineCardEvents(allCardEvents);
+
+    const finalizedHistory = filteredConv
+      .filter(h => h.partidos && (h.partidos as any).estado === 'Finalizado')
+      .map((h: any) => ({
+        ...h,
+        goles: h.goals ?? h.goles ?? 0,
+        minutos_jugados: h.minutes_played ?? h.minutos_jugados ?? 0,
+        tarjetas_amarillas: h.yellow_cards ?? h.tarjetas_amarillas ?? 0,
+        tarjetas_rojas: h.red_cards ?? h.tarjetas_rojas ?? 0
+      }))
+      .sort((a, b) => new Date((b.partidos as any).fecha_hora).getTime() - new Date((a.partidos as any).fecha_hora).getTime())
+      .slice(0, 10);
+    setMatchHistory(finalizedHistory);
+  }, [selectedTeamFilter, rawConvData, rawMatchEvents]);
 
   useEffect(() => {
     if (!playerId) return
@@ -130,7 +198,7 @@ export default function PlayerDashboardPage() {
         // Fetch Discipline and Match Stats from convocatorias and match_events (from federative actas)
         const { data: convData } = await supabase
           .from("convocatorias")
-          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado)')
+          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado, equipo_id, equipo:teams(id, name, category))')
           .eq("player_id", playerId);
 
         const { data: matchEventsData } = await supabase
@@ -143,6 +211,28 @@ export default function PlayerDashboardPage() {
         let goals = 0;
         let minutes = 0;
         let matchesPlayed = 0;
+
+        if (convData) {
+          setRawConvData(convData);
+        }
+        if (matchEventsData) {
+          setRawMatchEvents(matchEventsData);
+        }
+
+        // Detectar los diferentes equipos en los que ha jugado o sido convocado
+        const teamsMap = new Map<string, string>();
+        if (playerData.teams?.name) {
+          teamsMap.set(playerData.team_id, playerData.teams.name);
+        }
+        (convData || []).forEach((c: any) => {
+          const tId = c.partidos?.equipo_id;
+          const tName = c.partidos?.equipo?.name;
+          if (tId && tName && !teamsMap.has(tId)) {
+            teamsMap.set(tId, tName);
+          }
+        });
+        const detectedTeams = Array.from(teamsMap.entries()).map(([id, name]) => ({ id, name }));
+        setAvailableTeams(detectedTeams);
 
         if (convData && convData.length > 0) {
           convData.forEach((c: any) => {
@@ -186,30 +276,43 @@ export default function PlayerDashboardPage() {
           matchesPlayed
         })
 
-        // Fetch Next Match & Match History if player belongs to a team
-        if (playerData.team_id) {
-          // Next Match
+        // Fetch Next Match & Match History
+        // Prioritize upcoming matches where player is specifically convened (e.g. Senior or Juvenil)
+        // or next match of player's base team
+        const nowIso = new Date().toISOString();
+        
+        // 1. Check if convened to ANY upcoming match (including Senior)
+        const upcomingConv = (convData || [])
+          .filter((c: any) => c.partidos && c.partidos.fecha_hora > nowIso && c.status === 'convocado')
+          .sort((a: any, b: any) => new Date(a.partidos.fecha_hora).getTime() - new Date(b.partidos.fecha_hora).getTime())[0];
+
+        if (upcomingConv && upcomingConv.partidos) {
+          setNextMatch(upcomingConv.partidos);
+          setNextMatchCallup(upcomingConv);
+        } else if (playerData.team_id) {
+          // Fallback to base team next match
           const { data: nextMData } = await supabase
             .from("partidos")
-            .select('*')
+            .select('*, equipo:teams(id, name, category)')
             .eq("equipo_id", playerData.team_id)
-            .gt("fecha_hora", new Date().toISOString())
+            .gt("fecha_hora", nowIso)
             .order("fecha_hora", { ascending: true })
             .limit(1)
-            .maybeSingle()
+            .maybeSingle();
 
           if (nextMData) {
-            setNextMatch(nextMData)
-            // Check if called up
+            setNextMatch(nextMData);
             const { data: callupData } = await supabase
               .from("convocatorias")
               .select('*')
               .eq("partido_id", nextMData.id)
               .eq("player_id", playerId)
-              .maybeSingle()
-            setNextMatchCallup(callupData)
+              .maybeSingle();
+            setNextMatchCallup(callupData);
           }
+        }
 
+        if (playerData.team_id) {
           // Fetch Next Team Event (training, meeting, etc.)
           const todayStr = new Date().toISOString().split('T')[0]
           const { data: nextEvData } = await supabase
@@ -547,22 +650,47 @@ export default function PlayerDashboardPage() {
                 </p>
               </div>
               <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
-                <p className="text-white font-bold text-lg">{player.teams?.name} vs {nextMatch.rival_nombre}</p>
-                <p className="text-blue-200 text-sm flex items-center gap-1 mt-0.5">
-                  <MapPin size={14} /> {nextMatch.lugar === 'Local' ? 'En casa' : 'Fuera de casa'}
+                <p className="text-white font-bold text-lg">
+                  {nextMatch.equipo?.name || player.teams?.name} vs {nextMatch.rival_nombre}
                 </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-blue-200 text-sm flex items-center gap-1">
+                    <MapPin size={14} /> {nextMatch.lugar === 'Local' ? 'En casa' : 'Fuera de casa'}
+                  </p>
+                  {nextMatch.equipo_id && nextMatch.equipo_id !== player.team_id && (
+                    <span className="px-2 py-0.5 bg-amber-400 text-slate-950 font-black text-[10px] rounded uppercase tracking-wider">
+                      {nextMatch.equipo?.name || 'SENIOR'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 {nextMatchCallup ? (
                   <>
-                    <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      nextMatch.equipo_id && nextMatch.equipo_id !== player.team_id 
+                        ? 'bg-amber-100 text-amber-600' 
+                        : 'bg-green-100 text-green-600'
+                    }`}>
                       <CheckCircle2 size={24} />
                     </div>
                     <div>
-                      <p className="font-bold text-green-700 text-lg">¡Estás convocado!</p>
-                      <p className="text-sm text-gray-500">El entrenador cuenta contigo para este partido.</p>
+                      {nextMatch.equipo_id && nextMatch.equipo_id !== player.team_id ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-amber-700 text-lg">¡Estás convocado con el {nextMatch.equipo?.name || 'Senior'}!</p>
+                            <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full uppercase">Categoría Superior</span>
+                          </div>
+                          <p className="text-sm text-gray-500">El entrenador del primer equipo te ha convocado para jugar este partido.</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-bold text-green-700 text-lg">¡Estás convocado!</p>
+                          <p className="text-sm text-gray-500">El entrenador cuenta contigo para este partido.</p>
+                        </>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -721,6 +849,43 @@ export default function PlayerDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* SELECTOR DE EQUIPO / CATEGORÍA (Para ver estadísticas globales o de categoría superior Senior) */}
+      {availableTeams.length > 1 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">Filtrar estadísticas por equipo:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setSelectedTeamFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedTeamFilter === 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Todos (Global)
+            </button>
+            {availableTeams.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTeamFilter(t.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  selectedTeamFilter === t.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {t.name}
+                {t.id !== player?.team_id && (
+                  <span className="px-1 py-0.2 bg-amber-400 text-slate-900 text-[9px] font-black rounded">Senior</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* WIDGETS DE ESTADÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1011,8 +1176,17 @@ export default function PlayerDashboardPage() {
                         {new Date(p.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-gray-900">{p.lugar === 'Local' ? player.teams?.name : p.rival_nombre}</div>
-                        <div className="text-sm text-gray-500">vs {p.lugar === 'Local' ? p.rival_nombre : player.teams?.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">
+                            {p.lugar === 'Local' ? (p.equipo?.name || player.teams?.name) : p.rival_nombre}
+                          </span>
+                          {p.equipo_id && p.equipo_id !== player.team_id && (
+                            <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-black rounded border border-amber-200 uppercase">
+                              {p.equipo?.name || 'Senior'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">vs {p.lugar === 'Local' ? p.rival_nombre : (p.equipo?.name || player.teams?.name)}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-center">
                         <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full font-bold text-sm">

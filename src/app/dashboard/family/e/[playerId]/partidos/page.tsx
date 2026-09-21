@@ -13,6 +13,7 @@ export default function FamilyMatchesPage() {
 
   const [loading, setLoading] = useState(true);
   const [teamName, setTeamName] = useState("");
+  const [playerTeamId, setPlayerTeamId] = useState<string | null>(null);
   const [matches, setMatches] = useState<any[]>([]);
   const [convocatorias, setConvocatorias] = useState<Record<string, any>>({});
 
@@ -32,18 +33,9 @@ export default function FamilyMatchesPage() {
         
       if (pError) throw pError;
       setTeamName((pData.teams as any)?.name || "Equipo");
+      setPlayerTeamId(pData.team_id);
 
       if (pData.team_id) {
-        // Fetch matches
-        const { data: mData, error: mError } = await supabase
-          .from('partidos')
-          .select('*, equipo:teams(id, name, color), match_events(*, player:players(first_name, last_name))')
-          .eq('equipo_id', pData.team_id)
-          .order('fecha_hora', { ascending: true });
-
-        if (mError) throw mError;
-        setMatches(mData || []);
-
         // Fetch convocatorias for this specific player to see if they were called up
         const { data: cData, error: cError } = await supabase
           .from('convocatorias')
@@ -53,10 +45,28 @@ export default function FamilyMatchesPage() {
         if (cError) throw cError;
 
         const convMap: Record<string, any> = {};
+        const convMatchIds: string[] = [];
         cData?.forEach(c => {
           convMap[c.partido_id] = c;
+          if (c.partido_id) convMatchIds.push(c.partido_id);
         });
         setConvocatorias(convMap);
+
+        // Fetch matches: base team matches OR any match where player was convened (e.g. Senior)
+        let query = supabase
+          .from('partidos')
+          .select('*, equipo:teams(id, name, color, category), match_events(*, player:players(first_name, last_name))')
+          .order('fecha_hora', { ascending: true });
+
+        if (convMatchIds.length > 0) {
+          query = query.or(`equipo_id.eq.${pData.team_id},id.in.(${convMatchIds.join(',')})`);
+        } else {
+          query = query.eq('equipo_id', pData.team_id);
+        }
+
+        const { data: mData, error: mError } = await query;
+        if (mError) throw mError;
+        setMatches(mData || []);
       }
 
     } catch (err: any) {
@@ -99,10 +109,14 @@ export default function FamilyMatchesPage() {
             const date = new Date(match.fecha_hora);
             const myConv = convocatorias[match.id];
             
+            // Match team vs player team
+            const currentMatchTeamName = match.equipo?.name || teamName;
+            const isDifferentTeam = match.equipo_id && playerTeamId && match.equipo_id !== playerTeamId;
+            
             // By default the coach view forces club on left. We'll do the same to match the aesthetic.
             const isLocal = match.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match.lugar || '');
-            const localName = isLocal ? teamName : match.rival_nombre;
-            const awayName = isLocal ? match.rival_nombre : teamName;
+            const localName = isLocal ? currentMatchTeamName : match.rival_nombre;
+            const awayName = isLocal ? match.rival_nombre : currentMatchTeamName;
             
             const localGoals = isLocal ? match.resultado_propio : match.resultado_rival;
             const awayGoals = isLocal ? match.resultado_rival : match.resultado_propio;
@@ -120,6 +134,12 @@ export default function FamilyMatchesPage() {
                       <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${match.estado === 'Programado' ? "bg-slate-100 text-slate-500 border border-slate-200" : match.estado === 'Finalizado' ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
                         {(match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : match.estado}
                       </div>
+
+                      {isDifferentTeam && (
+                        <div className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                          {currentMatchTeamName}
+                        </div>
+                      )}
                       
                       {myConv ? (
                         myConv.status === 'convocado' ? (

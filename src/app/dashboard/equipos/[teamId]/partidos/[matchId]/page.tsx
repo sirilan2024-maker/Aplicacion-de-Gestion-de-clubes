@@ -28,17 +28,26 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     if (oldTeamData) oldTeamId = oldTeamData.id;
   }
 
-  const { data: playersData } = await supabase
-    .from("players")
-    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion")
-    .or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`)
-    .neq("status", "inactive")
-    .order("first_name")
-
   const { data: convocatoriasData } = await supabase
     .from("convocatorias")
     .select("*")
     .eq("partido_id", matchId)
+
+  const convPlayerIds = (convocatoriasData || []).map(c => c.player_id).filter(Boolean);
+
+  let playersQuery = supabase
+    .from("players")
+    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion")
+    .neq("status", "inactive")
+    .order("first_name");
+
+  if (convPlayerIds.length > 0) {
+    playersQuery = playersQuery.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId},id.in.(${convPlayerIds.join(',')})`);
+  } else {
+    playersQuery = playersQuery.or(`team_id.eq.${teamId},team_id.eq.${oldTeamId}`);
+  }
+
+  const { data: playersData } = await playersQuery;
 
   const { data: eventsData } = await supabase
     .from("match_events")

@@ -430,10 +430,58 @@ export async function POST(req: NextRequest) {
 
           // Extraer y conciliar eventos individuales de jugadores (Goles, Tarjetas, Minutos jugados)
           try {
-            const { data: teamPlayers } = await supabase
+            // Obtener convocados existentes para este partido
+            const { data: currentConvs } = await supabase
+              .from('convocatorias')
+              .select('player_id')
+              .eq('partido_id', bestMatch.id);
+
+            const convPlayerIds = (currentConvs || []).map(c => c.player_id);
+
+            // Obtener jugadores del equipo base O ya convocados
+            let pQuery = supabase
               .from('players')
-              .select('id, first_name, last_name, dorsal')
-              .eq('team_id', bestMatch.equipo_id);
+              .select('id, first_name, last_name, dorsal, team_id');
+
+            if (convPlayerIds.length > 0) {
+              pQuery = pQuery.or(`team_id.eq.${bestMatch.equipo_id},id.in.(${convPlayerIds.join(',')})`);
+            } else {
+              pQuery = pQuery.eq('team_id', bestMatch.equipo_id);
+            }
+
+            const { data: initialTeamPlayers } = await pQuery;
+            let teamPlayers = initialTeamPlayers || [];
+
+            // Si es un equipo Senior, también traer a los juveniles del mismo club como posibles convocados
+            const matchTeamCategory = (bestMatch.equipo?.category || '').toLowerCase();
+            const matchTeamName = (bestMatch.equipo?.name || '').toLowerCase();
+            const isSenior = matchTeamCategory.includes('senior') || matchTeamCategory.includes('2ª ffcv') || matchTeamName.includes('senior');
+
+            if (isSenior && bestMatch.equipo?.club_id) {
+              const { data: juvTeams } = await supabase
+                .from('teams')
+                .select('id')
+                .eq('club_id', bestMatch.equipo.club_id)
+                .ilike('category', '%juvenil%');
+
+              if (juvTeams && juvTeams.length > 0) {
+                const juvTeamIds = juvTeams.map(t => t.id);
+                const { data: juvPlayers } = await supabase
+                  .from('players')
+                  .select('id, first_name, last_name, dorsal, team_id')
+                  .in('team_id', juvTeamIds)
+                  .neq('status', 'inactive');
+
+                if (juvPlayers && juvPlayers.length > 0) {
+                  const existingIds = new Set(teamPlayers.map(p => p.id));
+                  juvPlayers.forEach(jp => {
+                    if (!existingIds.has(jp.id)) {
+                      teamPlayers.push(jp);
+                    }
+                  });
+                }
+              }
+            }
 
             const matchEventsToInsert: any[] = [];
             
@@ -568,23 +616,44 @@ export async function POST(req: NextRequest) {
 
             // Actualizar convocatorias y minutos jugados
             const { data: convocatorias } = await supabase.from('convocatorias').select('*').eq('partido_id', bestMatch.id);
-            if (convocatorias && convocatorias.length > 0) {
-              for (const conv of convocatorias) {
-                const pEvents = matchEventsToInsert.filter(e => e.player_id === conv.player_id);
-                const gCount = pEvents.filter(e => e.tipo_evento === 'Gol').length;
-                const aCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Amarilla').length;
-                const rCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Roja').length;
+            const existingConvMap = new Map<string, any>();
+            (convocatorias || []).forEach(c => existingConvMap.set(c.player_id, c));
 
-                const minutesInfo = calculatedMinutesMap.get(conv.player_id);
-                const minutos = minutesInfo ? minutesInfo.minutes : (conv.status === 'convocado' || pEvents.length > 0 ? 90 : 0);
+            // Si hay jugadores en calculatedMinutesMap o con eventos (ej. juveniles) que no estaban en convocatorias, insertarlos
+            const allInvolvedPlayerIds = new Set<string>();
+            calculatedMinutesMap.forEach((_, pId) => allInvolvedPlayerIds.add(pId));
+            matchEventsToInsert.forEach(e => { if (e.player_id) allInvolvedPlayerIds.add(e.player_id); });
 
-                await supabase.from('convocatorias').update({
-                  minutes_played: minutos,
-                  goals: gCount,
-                  yellow_cards: aCount,
-                  red_cards: rCount
-                }).eq('id', conv.id);
+            for (const pId of allInvolvedPlayerIds) {
+              if (!existingConvMap.has(pId)) {
+                const minInfo = calculatedMinutesMap.get(pId);
+                const { data: newConv } = await supabase.from('convocatorias').insert({
+                  partido_id: bestMatch.id,
+                  player_id: pId,
+                  status: 'convocado',
+                  titular: minInfo?.isTitular ?? false
+                }).select().single();
+                if (newConv) {
+                  existingConvMap.set(pId, newConv);
+                }
               }
+            }
+
+            for (const [pId, conv] of existingConvMap.entries()) {
+              const pEvents = matchEventsToInsert.filter(e => e.player_id === pId);
+              const gCount = pEvents.filter(e => e.tipo_evento === 'Gol').length;
+              const aCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Amarilla').length;
+              const rCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Roja').length;
+
+              const minutesInfo = calculatedMinutesMap.get(pId);
+              const minutos = minutesInfo ? minutesInfo.minutes : (conv.status === 'convocado' || pEvents.length > 0 ? 90 : 0);
+
+              await supabase.from('convocatorias').update({
+                minutes_played: minutos,
+                goals: gCount,
+                yellow_cards: aCount,
+                red_cards: rCount
+              }).eq('id', conv.id);
             }
           } catch (recErr: any) {
             console.warn("[clasificar-actas] Error al conciliar eventos de jugadores:", recErr.message);

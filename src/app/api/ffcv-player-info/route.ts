@@ -22,7 +22,7 @@ async function fetchFfcvJson(url: string) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/javascript, */*; q=0.01'
       },
-      next: { revalidate: 300 }
+      cache: 'no-store'
     });
     if (!res.ok) return null;
     return await res.json();
@@ -157,19 +157,25 @@ export async function GET(req: Request) {
 
     const historyPromises = temporadasToFetch.map(async (temp) => {
       if (temp.codigo_temporada === fullPlayerData.codigo_temporada) {
-        const comp = fullPlayerData.competiciones_participa && fullPlayerData.competiciones_participa[0];
+        // En temporada actual, buscar competición de liga preferentemente
+        const compList = fullPlayerData.competiciones_participa || [];
+        const comp = compList.find((c: any) => !c.nombre_competicion?.toLowerCase().includes('copa')) || compList[0];
+
         const pj = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Jugados')?.valor || '0';
         const goles = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Total Goles')?.valor || '0';
         const tit = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Titular')?.valor || '0';
         const sup = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Suplente')?.valor || '0';
 
+        const clubName = comp?.nombre_club || comp?.nombre_equipo || fullPlayerData.equipo || 'Sporting Saladar';
+        const equipoName = comp?.nombre_equipo || fullPlayerData.equipo || clubName;
+
         return {
           temporada: temp.nombre_temporada,
           codigo_temporada: temp.codigo_temporada,
-          club: comp && comp.nombre_club ? comp.nombre_club : 'Sporting Saladar',
-          equipo: comp && comp.nombre_equipo ? comp.nombre_equipo : 'Sporting Saladar',
-          competicion: comp && comp.nombre_competicion ? comp.nombre_competicion : (fullPlayerData.categoria_equipo || 'Competición FFCV'),
-          grupo: comp && comp.nombre_grupo ? comp.nombre_grupo : '',
+          club: clubName.trim(),
+          equipo: equipoName.trim(),
+          competicion: comp && comp.nombre_competicion ? comp.nombre_competicion.trim() : (fullPlayerData.categoria_equipo || 'Competición FFCV'),
+          grupo: comp && comp.nombre_grupo ? comp.nombre_grupo.trim() : '',
           partidos_jugados: parseInt(pj, 10) || 0,
           titular: parseInt(tit, 10) || 0,
           suplente: parseInt(sup, 10) || 0,
@@ -184,19 +190,24 @@ export async function GET(req: Request) {
       const pastData = await fetchFfcvJson(pastUrl);
       if (!pastData) return null;
 
-      const comp = pastData.competiciones_participa && pastData.competiciones_participa[0];
+      // Si tiene varias competiciones (ej. liga + copa), preferir la liga regular sobre copas
+      const compList = pastData.competiciones_participa || [];
+      const comp = compList.find((c: any) => !c.nombre_competicion?.toLowerCase().includes('copa')) || compList[0];
+
       const pj = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Jugados')?.valor || '0';
       const goles = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Total Goles')?.valor || '0';
       const tit = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Titular')?.valor || '0';
       const sup = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Suplente')?.valor || '0';
 
-      const clubName = comp && comp.nombre_club 
-        ? comp.nombre_club 
-        : (comp && comp.nombre_equipo ? comp.nombre_equipo : (pastData.equipo || 'Club Federado FFCV'));
+      const clubName = comp?.nombre_club 
+        || comp?.nombre_equipo 
+        || pastData.equipo 
+        || fullPlayerData.equipo 
+        || 'Sporting Saladar';
 
-      const equipoName = comp && comp.nombre_equipo 
-        ? comp.nombre_equipo 
-        : (pastData.equipo || 'Sin especificar');
+      const equipoName = comp?.nombre_equipo 
+        || pastData.equipo 
+        || clubName;
 
       return {
         temporada: temp.nombre_temporada,
@@ -221,13 +232,14 @@ export async function GET(req: Request) {
     });
 
     // Formatear foto correctamente (detectar si ya viene con 'data:image' o si es base64 puro)
-    const rawPhoto = matchedFfcvPlayer.foto || fullPlayerData.foto;
+    const rawPhoto = fullPlayerData.foto || matchedFfcvPlayer.foto;
     let finalPhoto = null;
-    if (rawPhoto) {
-      if (rawPhoto.startsWith('data:image')) {
-        finalPhoto = rawPhoto;
+    if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim().length > 20) {
+      const cleanPhoto = rawPhoto.trim();
+      if (cleanPhoto.startsWith('data:image')) {
+        finalPhoto = cleanPhoto;
       } else {
-        finalPhoto = 'data:image/jpeg;base64,' + rawPhoto;
+        finalPhoto = 'data:image/jpeg;base64,' + cleanPhoto;
       }
     }
 

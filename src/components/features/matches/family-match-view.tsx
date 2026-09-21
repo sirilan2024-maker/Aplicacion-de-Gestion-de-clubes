@@ -238,9 +238,30 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
           {/* Header */}
           <div className="bg-indigo-600 text-white px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 text-xs font-bold tracking-wide">
             <span className="uppercase">{match.competicion_nombre || 'Liga'}</span>
-            <div className="flex items-center gap-4 opacity-90 text-[11px]">
+            <div className="flex flex-wrap items-center gap-3 md:gap-4 opacity-95 text-[11px]">
               <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
               <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {match?.lugar || 'Por definir'}</span>
+              
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/partidos/get-acta-url?partidoId=${matchId}`);
+                    const data = await res.json();
+                    if (res.ok && data.url) {
+                      window.open(data.url, '_blank');
+                    } else {
+                      alert(data.error || 'El acta oficial federativa aún no está disponible para este partido.');
+                    }
+                  } catch (e: any) {
+                    alert('No se pudo acceder al acta en este momento.');
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all backdrop-blur-xs font-bold border border-white/20 active:scale-95"
+                title="Ver o descargar acta oficial de la FFCV"
+              >
+                📄 Ver Acta Oficial
+              </button>
             </div>
           </div>
 

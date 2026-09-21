@@ -13,8 +13,9 @@ import { DisciplineModal } from "@/components/features/matches/DisciplineModal"
 import { AttendanceModal } from "@/components/features/events/AttendanceModal"
 import { ApparelModal } from "@/components/features/club/ApparelModal"
 import { GoalsModal } from "@/components/features/matches/GoalsModal"
+import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal"
 import { getApparelForPlayerAction } from "@/app/actions/apparel-actions"
-import { Shirt } from "lucide-react"
+import { Shirt, Shield } from "lucide-react"
 
 export default function PlayerDashboardPage() {
   const router = useRouter()
@@ -26,6 +27,7 @@ export default function PlayerDashboardPage() {
   const [siblings, setSiblings] = useState<any[]>([])
   const [pendingRequests, setPendingRequests] = useState<any[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showFfcvModal, setShowFfcvModal] = useState(false)
   const [stats, setStats] = useState({
     asistencia: 0,
     faltas: 0,
@@ -125,32 +127,43 @@ export default function PlayerDashboardPage() {
           retrasosCount = attendanceData.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
         }
 
-        // Fetch Discipline (Cards)
-        const { data: tarjetas } = await supabase
-          .from("player_cards")
-          .select('card_type')
-          .eq("player_id", playerId)
-          
+        // Fetch Discipline and Match Stats from convocatorias and match_events (from federative actas)
+        const { data: convData } = await supabase
+          .from("convocatorias")
+          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado)')
+          .eq("player_id", playerId);
+
+        const { data: matchEventsData } = await supabase
+          .from("match_events")
+          .select('id, partido_id, tipo_evento')
+          .eq("player_id", playerId);
+
         let yellowCards = 0;
         let redCards = 0;
-        if (tarjetas) {
-          yellowCards = tarjetas.filter(t => t.card_type === 'Amarilla').length;
-          redCards = tarjetas.filter(t => t.card_type === 'Roja').length;
-        }
-
-        // Fetch Match Stats (Goals, Minutes)
-        const { data: matchStats } = await supabase
-          .from("match_player_stats")
-          .select('goals, minutes_played, started')
-          .eq("player_id", playerId)
-          
         let goals = 0;
         let minutes = 0;
-        let matchesPlayed = matchStats?.length || 0;
-        
-        if (matchStats) {
-          goals = matchStats.reduce((sum, stat) => sum + (stat.goals || 0), 0);
-          minutes = matchStats.reduce((sum, stat) => sum + (stat.minutes_played || 0), 0);
+        let matchesPlayed = 0;
+
+        if (convData && convData.length > 0) {
+          convData.forEach((c: any) => {
+            const mEvs = (matchEventsData || []).filter((e: any) => e.partido_id === c.partido_id);
+            const g = (c.goals ?? c.goles) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+            const y = (c.yellow_cards ?? c.tarjetas_amarillas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+            const r = (c.red_cards ?? c.tarjetas_rojas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
+            const m = (c.minutes_played ?? c.minutos_jugados) || (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
+
+            goals += g;
+            yellowCards += y;
+            redCards += r;
+            minutes += m;
+            if (m > 0 || c.status === 'convocado' || mEvs.length > 0) {
+              matchesPlayed++;
+            }
+          });
+        } else if (matchEventsData && matchEventsData.length > 0) {
+          goals = matchEventsData.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+          yellowCards = matchEventsData.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+          redCards = matchEventsData.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
         }
 
         let ratio = 0;
@@ -220,29 +233,28 @@ export default function PlayerDashboardPage() {
             setNextEventAttendance(attData)
           }
 
-
-          const { data: historyData, error: historyError } = await supabase
-            .from("convocatorias")
-            .select('titular, minutos_jugados, goles, asistencias, tarjetas_amarillas, tarjetas_rojas, asistencia_confirmada_familia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado)')
-            .eq("player_id", playerId)
-          
-          if (historyError) {
-             console.error("Error fetching match history:", historyError)
-          } else if (historyData) {
-            const allCardEvents = historyData
-              .filter((h: any) => (h.tarjetas_amarillas || 0) > 0 || (h.tarjetas_rojas || 0) > 0)
+          if (convData) {
+            const allCardEvents = convData
+              .filter((h: any) => ((h.yellow_cards ?? h.tarjetas_amarillas) || 0) > 0 || ((h.red_cards ?? h.tarjetas_rojas) || 0) > 0)
               .map((h: any) => ({
                 match: h.partidos,
-                yellow: h.tarjetas_amarillas || 0,
-                red: h.tarjetas_rojas || 0
+                yellow: (h.yellow_cards ?? h.tarjetas_amarillas) || 0,
+                red: (h.red_cards ?? h.tarjetas_rojas) || 0
               }));
             setDisciplineCardEvents(allCardEvents);
 
-            const finalizedHistory = historyData
+            const finalizedHistory = convData
               .filter(h => h.partidos && (h.partidos as any).estado === 'Finalizado')
+              .map((h: any) => ({
+                ...h,
+                goles: h.goals ?? h.goles ?? 0,
+                minutos_jugados: h.minutes_played ?? h.minutos_jugados ?? 0,
+                tarjetas_amarillas: h.yellow_cards ?? h.tarjetas_amarillas ?? 0,
+                tarjetas_rojas: h.red_cards ?? h.tarjetas_rojas ?? 0
+              }))
               .sort((a, b) => new Date((b.partidos as any).fecha_hora).getTime() - new Date((a.partidos as any).fecha_hora).getTime())
-              .slice(0, 10)
-            setMatchHistory(finalizedHistory)
+              .slice(0, 10);
+            setMatchHistory(finalizedHistory);
           }
 
           // Fetch Apparel Data
@@ -471,16 +483,25 @@ export default function PlayerDashboardPage() {
         </div>
         
         <div className="flex flex-col sm:flex-row justify-center md:justify-end shrink-0 w-full md:w-auto px-4 sm:px-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFfcvModal(true)}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 hover:from-blue-800 hover:to-slate-950 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-sm text-sm border border-blue-500/30 group active:scale-95"
+            title="Consultar datos oficiales e historial en la FFCV"
+          >
+            <Shield size={18} className="text-blue-300 group-hover:rotate-12 transition-transform" />
+            <span>FICHA FFCV</span>
+          </button>
           <button 
             onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha?tab=documentos`)}
-            className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors shadow-xs"
+            className="flex items-center justify-center gap-2 bg-white text-blue-700 border border-blue-200 px-5 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors shadow-xs text-sm"
           >
             <ShieldAlert size={18} className="text-blue-600" />
             DOCUMENTACIÓN
           </button>
           <button 
             onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha`)}
-            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-sm text-sm"
           >
             <FileText size={20} />
             VER FICHA TÉCNICA
@@ -1113,6 +1134,16 @@ export default function PlayerDashboardPage() {
           matchHistory={matchHistory}
           totalGoals={stats.goals}
           onClose={() => setShowGoalsModal(false)}
+        />
+      )}
+
+      {/* MODAL FICHA FFCV */}
+      {player && (
+        <FfcvPlayerModal
+          playerId={player.id}
+          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+          isOpen={showFfcvModal}
+          onClose={() => setShowFfcvModal(false)}
         />
       )}
     </div>

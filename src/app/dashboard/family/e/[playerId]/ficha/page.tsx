@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { 
   ArrowLeft, User as UserIcon, Activity, FileText, 
   Calendar, CheckCircle, Clock, HeartPulse, Edit3, 
-  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Trash2
+  Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Trash2, Shield
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FamilyDocumentUploader } from "@/components/features/family/FamilyDocumentUploader";
@@ -15,6 +15,7 @@ import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import Subscriptions from "@/components/features/treasury/Subscriptions";
+import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 
 interface PlayerData {
   id: string;
@@ -131,6 +132,7 @@ export default function PlayerProfilePage() {
   const [showAllTrainings, setShowAllTrainings] = useState(false);
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
+  const [showFfcvModal, setShowFfcvModal] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -201,6 +203,11 @@ export default function PlayerProfilePage() {
         .select('*, partidos:partido_id(*)')
         .eq('player_id', playerId);
 
+      const { data: pMatchEvents } = await supabase
+        .from('match_events')
+        .select('*')
+        .eq('player_id', playerId);
+
       let teamMatches = [];
       if (teamId) {
         const { data: tm } = await supabase.from('partidos').select('*').eq('equipo_id', teamId);
@@ -213,18 +220,27 @@ export default function PlayerProfilePage() {
       if (convocatoriasData) {
         convocatoriasData.forEach(c => {
           if (c.partidos) {
+            const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
+            const gCount = c.goals ?? c.goles ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+            const yCount = c.yellow_cards ?? c.tarjetas_amarillas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+            const rCount = c.red_cards ?? c.tarjetas_rojas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
+            const mins = c.minutes_played ?? c.minutos_jugados ?? (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
+
             mHistory.push({
               id: c.partido_id,
               date: c.partidos.fecha_hora,
               title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar})`,
               attendance: c.estado_asistencia || 'Pendiente',
-              minutes: c.minutes_played || 0,
-              goles: c.goals || 0,
+              minutes: mins,
+              goles: gCount,
+              goals: gCount,
               asistencias: c.assists || 0,
               coach_rating: c.coach_rating || 0,
               actitud: c.actitud || 0,
-              amarillas: c.yellow_cards || 0,
-              rojas: c.red_cards || 0
+              amarillas: yCount,
+              yellow_cards: yCount,
+              rojas: rCount,
+              red_cards: rCount
             });
             processedMatches.add(c.partido_id);
           }
@@ -602,14 +618,25 @@ export default function PlayerProfilePage() {
               </div>
             </div>
             {!isEditing ? (
-              <button 
-                onClick={() => setIsEditing(true)}
-                disabled={player.status === 'inactive'}
-                className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 sm:mt-0"
-                title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
-              >
-                <Edit3 size={16} /> Editar Perfil
-              </button>
+              <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setShowFfcvModal(true)}
+                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 hover:from-blue-800 hover:to-slate-950 text-white px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm text-xs sm:text-sm border border-blue-500/30 group active:scale-95"
+                  title="Consultar datos oficiales e historial en la FFCV"
+                >
+                  <Shield size={16} className="text-blue-300 group-hover:rotate-12 transition-transform" />
+                  <span>FICHA FFCV</span>
+                </button>
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  disabled={player.status === 'inactive'}
+                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm"
+                  title={player.status === 'inactive' ? 'Jugador archivado (solo lectura)' : ''}
+                >
+                  <Edit3 size={16} /> Editar Perfil
+                </button>
+              </div>
             ) : (
               <div className="flex w-full sm:w-auto gap-2 mt-2 sm:mt-0">
                 <button 
@@ -1702,6 +1729,16 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
+
+      {/* MODAL FICHA FFCV */}
+      {player && (
+        <FfcvPlayerModal
+          playerId={player.id}
+          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+          isOpen={showFfcvModal}
+          onClose={() => setShowFfcvModal(false)}
+        />
+      )}
     </div>
   )
 }

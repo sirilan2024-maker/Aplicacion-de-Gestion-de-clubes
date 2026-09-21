@@ -128,21 +128,21 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
             return (
               <div 
                 key={p.id} 
-                className={`p-4 flex items-center justify-between transition-colors ${!isAvailable ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}
+                className={`p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between transition-colors gap-3 sm:gap-4 ${!isAvailable ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm border-2 
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs border-2 shrink-0
                     ${isConvocado ? 'bg-blue-600 text-white border-blue-700' : 
                       !isAvailable ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-white text-slate-600 border-gray-200'}`}>
                     {p.dorsal || '-'}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className={`font-bold text-base ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className={`font-bold text-sm sm:text-base truncate ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
                         {p.first_name} {p.last_name}
                       </h4>
                       {(p.teams?.category?.toLowerCase().includes('juvenil') || (p.team_id !== teamId && p.team_id !== oldTeamId)) && (
-                        <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200">
+                        <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
                           {p.teams?.name || 'Juvenil'}
                         </span>
                       )}
@@ -166,12 +166,12 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                 <button
                   onClick={() => toggleConvocatoria(p.id, p.status)}
                   disabled={!isAvailable}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all duration-200 w-full sm:w-auto shrink-0
                     ${isConvocado 
                       ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 hover:text-green-800' 
                       : !isAvailable 
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' 
-                        : 'bg-white border border-gray-300 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 shadow-sm'
+                        : 'bg-white border border-gray-300 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 shadow-xs'
                     }`}
                 >
                   {isConvocado ? <><CheckCircle2 size={16} /> Convocado</> : <><User size={16} /> Convocar</>}

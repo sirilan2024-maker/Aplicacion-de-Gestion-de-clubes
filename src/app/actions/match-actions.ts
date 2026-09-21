@@ -247,12 +247,26 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
 
   const clubId = context.profile.club_id;
 
-  // 1. Obtener los equipos juveniles del club
-  const { data: juvenileTeams, error: teamsErr } = await supabase
+  // 1. Obtener la temporada activa del club para no traer equipos ni plantillas de temporadas anteriores
+  const { data: activeSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .single();
+
+  // 2. Obtener los equipos juveniles del club (filtrando por temporada activa si existe)
+  let teamsQuery = supabase
     .from('teams')
-    .select('id, name, category')
+    .select('id, name, category, season_id')
     .eq('club_id', clubId)
     .ilike('category', '%juvenil%');
+
+  if (activeSeason?.id) {
+    teamsQuery = teamsQuery.eq('season_id', activeSeason.id);
+  }
+
+  const { data: juvenileTeams, error: teamsErr } = await teamsQuery;
 
   if (teamsErr || !juvenileTeams || juvenileTeams.length === 0) {
     return { success: true, players: [] };
@@ -260,25 +274,57 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
 
   const juvenileTeamIds = juvenileTeams.map(t => t.id);
 
-  // 2. Obtener jugadores activos de esos equipos juveniles
-  const { data: players, error: pErr } = await supabase
-    .from('players')
-    .select('id, first_name, last_name, dorsal, status, medical_notes, posicion, team_id, teams(name, category)')
-    .in('team_id', juvenileTeamIds)
-    .neq('status', 'inactive')
-    .order('first_name');
+  // 3. Obtener jugadores activos de la plantilla actual mediante player_season_history
+  // o fallback directo a players activos si la tabla history está vacía
+  let playersList: any[] = [];
 
-  if (pErr) {
-    return { success: false, error: pErr.message, players: [] };
+  const { data: historyData, error: hErr } = await supabase
+    .from('player_season_history')
+    .select(`
+      status,
+      team_id,
+      players!inner (id, first_name, last_name, dorsal, status, medical_notes, posicion, posicion_principal, teams(name, category))
+    `)
+    .in('team_id', juvenileTeamIds)
+    .neq('status', 'inactive');
+
+  if (!hErr && historyData && historyData.length > 0) {
+    playersList = historyData.map((h: any) => ({
+      ...h.players,
+      team_id: h.team_id,
+      posicion: h.players?.posicion_principal || h.players?.posicion
+    }));
+  } else {
+    // Fallback: consultar directamente de players asignados a los equipos juveniles activos
+    const { data: directPlayers } = await supabase
+      .from('players')
+      .select('id, first_name, last_name, dorsal, status, medical_notes, posicion, posicion_principal, team_id, teams(name, category)')
+      .in('team_id', juvenileTeamIds)
+      .neq('status', 'inactive')
+      .order('first_name');
+
+    playersList = directPlayers || [];
   }
 
   // Filtrar si alguno tiene rol de entrenador / cuerpo técnico
-  const validPlayers = (players || []).filter(p => {
-    const pos = (p.posicion || '').toLowerCase();
+  const validPlayers = (playersList || []).filter(p => {
+    const pos = (p.posicion_principal || p.posicion || '').toLowerCase();
     return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
   });
 
-  return { success: true, players: validPlayers };
+  // Deduplicar por id y ordenar por nombre
+  const uniquePlayersMap = new Map<string, any>();
+  validPlayers.forEach(p => {
+    if (!uniquePlayersMap.has(p.id)) {
+      uniquePlayersMap.set(p.id, p);
+    }
+  });
+
+  const sortedPlayers = Array.from(uniquePlayersMap.values()).sort((a, b) => 
+    (a.first_name || '').localeCompare(b.first_name || '')
+  );
+
+  return { success: true, players: sortedPlayers };
 }
 
 export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null }) {

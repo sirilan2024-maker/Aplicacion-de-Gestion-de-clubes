@@ -137,7 +137,7 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
   };
 
   const getStatusClasses = (currentStatus: AttendanceStatus, targetStatus: AttendanceStatus) => {
-    const baseClasses = "px-3 py-1 text-[11px] font-bold rounded-md transition-all shadow-sm";
+    const baseClasses = "flex-1 sm:flex-none px-2 sm:px-3 py-1.5 sm:py-1 text-[11px] font-bold rounded-lg sm:rounded-md transition-all text-center";
     
     if (currentStatus !== targetStatus) {
       return `${baseClasses} bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200`;
@@ -172,45 +172,47 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
       <div className="flex flex-col gap-3 mb-4 shrink-0 px-1">
         <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
           <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">Resumen</span>
-          <div className="text-xs font-bold">
+          <div className="text-xs font-bold flex flex-wrap gap-1.5 justify-end">
             <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">Conv: {counts.convocados}</span>
-            <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 ml-2">Dudas: {counts.dudas}</span>
-            <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded-md border border-rose-100 ml-2">Les: {counts.lesionados}</span>
+            <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100">Dudas: {counts.dudas}</span>
+            <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded-md border border-rose-100">Les: {counts.lesionados}</span>
           </div>
         </div>
-        <div className="flex gap-2">
+
+        {/* Botones de acción superiores: adaptativos a móvil con grid de 2 columnas o 1 fila en desktop */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2">
           <button
             onClick={openJuvenileModal}
             type="button"
-            className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            className="col-span-1 py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
           >
-            <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
-            + Añadir Juvenil
+            <UserPlus className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span className="truncate">+ Juvenil</span>
           </button>
           <button
             onClick={handleConvocarTodos}
-            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-sm"
+            className="col-span-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-xs truncate"
           >
-            Convocar a Todos
+            Convocar Todos
           </button>
           <button
             onClick={handleDesmarcarTodos}
-            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-sm"
+            className="col-span-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-xs truncate"
           >
             Desmarcar Todos
           </button>
           <button 
             onClick={handleGuardar}
             disabled={isPending}
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-md shadow-emerald-500/20 flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+            className="col-span-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Guardar Cambios
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
+            <span className="truncate">Guardar</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 pr-2 custom-scrollbar px-1">
+      <div className="flex-1 overflow-y-auto min-h-0 pr-1 sm:pr-2 custom-scrollbar px-1">
         {playerList.length === 0 ? (
           <div className="text-center text-slate-500 py-8 text-sm">
             No hay jugadores disponibles en la plantilla.
@@ -220,14 +222,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
             {playerList.map((player) => (
               <li 
                 key={player.id} 
-                className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-3 sm:gap-0 ${
+                className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-2.5 sm:gap-0 ${
                   player.status === 'Convocado' 
                     ? 'border-emerald-200 bg-emerald-50/30' 
                     : 'border-slate-100 bg-white hover:bg-slate-50'
                 }`}
               >
                 <div className="min-w-0 w-full sm:w-auto pr-0 sm:pr-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
                     {player.isJuvenile && (
                       <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded border border-indigo-200 shrink-0">
@@ -238,7 +240,7 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                   <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
                 </div>
                 
-                <div className="flex flex-wrap gap-1.5 shrink-0">
+                <div className="grid grid-cols-4 sm:flex sm:flex-nowrap gap-1.5 w-full sm:w-auto shrink-0 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <button
                     onClick={() => handleStatusChange(player.id, 'Convocado')}
                     className={getStatusClasses(player.status, 'Convocado')}
@@ -270,12 +272,12 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
         )}
       </div>
 
-      <div className="mt-2 shrink-0 bg-white border-t border-slate-200 p-4 flex items-center justify-end rounded-b-xl">
-        <div className="flex gap-3">
+      <div className="mt-2 shrink-0 bg-white border-t border-slate-200 p-3 sm:p-4 flex items-center justify-end rounded-b-xl">
+        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto justify-end">
           {onCloseModal && (
             <button 
               onClick={onCloseModal}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-sm"
+              className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-sm"
             >
               Cancelar
             </button>
@@ -283,9 +285,9 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
           <button 
             onClick={handleGuardar}
             disabled={isPending}
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+            className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+            {isPending && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
             Guardar Convocatoria
           </button>
         </div>

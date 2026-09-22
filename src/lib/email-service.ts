@@ -274,30 +274,45 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
 
     // 4. Caja especial para Transferencia Bancaria
     if (isTransfer) {
+      const fullReference = paymentSummary.paymentReference 
+        ? `${paymentSummary.paymentReference} ${playerName.toUpperCase()}`
+        : playerName.toUpperCase();
+
       paymentDetailsHtml += `
-        <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 12px; padding: 14px; margin-top: 14px;">
-          <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #854d0e; margin-bottom: 8px;">
+        <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 12px; padding: 16px; margin-top: 14px;">
+          <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #854d0e; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
             🏦 Instrucciones para Transferencia Bancaria
           </div>
-          ${paymentSummary.clubIban ? `
-            <div style="margin-bottom: 6px; font-size: 13px;">
-              <span style="color: #713f12; font-weight: 600;">IBAN del Club:</span><br>
-              <strong style="font-family: monospace; font-size: 14px; color: #0f172a; letter-spacing: 0.5px;">${paymentSummary.clubIban}</strong>
-            </div>
-          ` : ''}
-          ${paymentSummary.paymentReference ? `
-            <div style="margin-bottom: 6px; font-size: 13px;">
-              <span style="color: #713f12; font-weight: 600;">Concepto / Referencia obligatorio:</span><br>
-              <strong style="font-family: monospace; font-size: 14px; color: #1e3a8a; background: #e0e7ff; padding: 2px 6px; border-radius: 4px;">${paymentSummary.paymentReference}</strong>
-            </div>
-          ` : ''}
-          <div style="font-size: 12px; color: #854d0e; line-height: 1.4; margin-top: 6px;">
+          
+          <div style="margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #713f12; font-weight: 600;">IBAN del Club:</span><br>
+            <strong style="font-family: monospace; font-size: 14px; color: #0f172a; letter-spacing: 0.5px;">${paymentSummary.clubIban || 'ES12 3456 7890 1234 5678 9012'}</strong>
+          </div>
+
+          <div style="margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #713f12; font-weight: 600;">Beneficiario:</span> <strong>Club Sporting Saladar</strong> &nbsp;|&nbsp; <span style="color: #713f12; font-weight: 600;">CIF:</span> <strong>03671971</strong>
+          </div>
+
+          <div style="margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #713f12; font-weight: 600;">Concepto / Referencia obligatorio:</span><br>
+            <strong style="font-family: monospace; font-size: 13.5px; color: #1e3a8a; background: #e0e7ff; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-top: 3px;">${fullReference}</strong>
+          </div>
+
+          <div style="font-size: 12px; color: #854d0e; line-height: 1.5; margin-top: 8px; border-top: 1px dashed #fef08a; padding-top: 8px;">
             Por favor, realiza la transferencia indicando la referencia exacta en el concepto para que Secretaría pueda conciliar tu ingreso.
           </div>
         </div>
       `;
     }
   }
+
+  const paymentMethodLabel = isTransfer
+    ? 'Transferencia (número cuenta corriente, beneficiario y código de referencia)'
+    : (paymentSummary?.paymentMethod === 'Contado' ? 'Efectivo' : (paymentSummary?.paymentMethod || 'No especificado'));
+
+  const feeBreakdownText = paymentSummary 
+    ? `${formatCentsToEur(paymentSummary.totalAmountCents)} (${paymentSummary.paymentPlan || 'Alta'})`
+    : '250,00 € (Alta)';
 
   return `
   <!DOCTYPE html>
@@ -337,13 +352,18 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
         <!-- Bloque 1: Ficha del Jugador -->
         <div class="card">
           <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #059669; margin-bottom: 10px;">
-            📋 Datos de la Ficha:
+            📋 Datos de la Ficha de Inscripción:
           </div>
           <table width="100%" cellpadding="6" cellspacing="0" style="font-size: 13.5px; border-collapse: collapse;">
             <tr style="border-bottom: 1px dashed #e2e8f0;">
               <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Jugador/a:</td>
               <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">${playerName}</td>
             </tr>
+            ${tutorName ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Tutor/a responsable:</td>
+              <td align="right" style="color: #0f172a; font-weight: 700; padding: 6px 0;">${tutorName}</td>
+            </tr>` : ''}
             ${displayCategory ? `
             <tr style="border-bottom: 1px dashed #e2e8f0;">
               <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Categoría:</td>
@@ -354,9 +374,20 @@ export function getPlayerRegistrationEmailHtml(params: PlayerRegistrationEmailPa
               <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Dorsal Asignado:</td>
               <td align="right" style="color: #0f172a; font-weight: 800; padding: 6px 0;">#${dorsal}</td>
             </tr>` : ''}
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Modalidad de Pago y Estado de Cuota:</td>
+              <td align="right" style="color: #0f172a; font-weight: 700; padding: 6px 0;">
+                <div><strong>Forma de Pago:</strong> ${paymentMethodLabel}</div>
+                <div style="color: #475569; font-size: 12.5px; margin-top: 2px;"><strong>Desglose Cuota:</strong> ${feeBreakdownText}</div>
+              </td>
+            </tr>
             <tr>
-              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Estado de la Ficha:</td>
-              <td align="right" style="color: #059669; font-weight: 800; padding: 6px 0;">Registrada / En trámite administrativo</td>
+              <td style="color: #64748b; font-weight: 600; padding: 6px 0;">Estado de Inscripción:</td>
+              <td align="right" style="color: #2563eb; font-weight: 800; padding: 6px 0;">
+                <span style="background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 6px; border: 1px solid #bfdbfe;">
+                  En revisión por el club
+                </span>
+              </td>
             </tr>
           </table>
         </div>

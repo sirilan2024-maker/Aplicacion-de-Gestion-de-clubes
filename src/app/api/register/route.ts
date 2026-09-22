@@ -25,12 +25,12 @@ export async function POST(request: Request) {
     // 1. Obtener el club_id base y su configuración bancaria
     const { data: clubData } = await supabaseAdmin.from('clubs').select('id, sepa_iban, name').eq('slug', 'club-sporting-saladar').maybeSingle();
     let clubId = clubData?.id;
-    let clubIban = clubData?.sepa_iban || null;
+    let clubIban = clubData?.sepa_iban || 'ES12 3456 7890 1234 5678 9012';
     
     if (!clubId) {
       const { data: fallbackClub } = await supabaseAdmin.from('clubs').select('id, sepa_iban, name').limit(1).maybeSingle();
       clubId = fallbackClub?.id;
-      clubIban = fallbackClub?.sepa_iban || null;
+      if (fallbackClub?.sepa_iban) clubIban = fallbackClub.sepa_iban;
     }
 
     if (!clubId) {

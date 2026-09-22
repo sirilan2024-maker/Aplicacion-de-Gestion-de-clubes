@@ -123,52 +123,38 @@ export function ManagePlayerPinModal({
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Acceso Familiar y Credenciales Digitales (PIN)"
-      description={`Gestión del código de acceso digital para los tutores legales de ${playerName}.`}
-      className="max-w-xl p-0 overflow-hidden"
+      title="PIN de Acceso Familiar"
+      description={`Código para vincular a los tutores legales de ${playerName}.`}
+      className="max-w-md p-0 overflow-hidden"
     >
-      <div className="p-6 space-y-5">
-        {/* BANNER CLAVE EXPLICATIVO (Anti-Confusión) */}
-        <div className="bg-amber-50/80 border-2 border-amber-200/90 rounded-2xl p-4 text-xs text-amber-950 space-y-2 shadow-xs">
-          <div className="flex items-center gap-2 font-black text-amber-900 text-sm">
-            <Info className="w-4 h-4 text-amber-600 flex-shrink-0" />
-            <span>¿Para qué sirve este PIN de Acceso Familiar?</span>
-          </div>
-          <p className="leading-relaxed">
-            Este código es la <strong>llave de vinculación digital</strong> a la ficha deportiva de este jugador.
-          </p>
-          <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200 text-[11px] leading-relaxed">
-            <span className="font-bold text-amber-900">⚠️ No confundir con el PIN de inscripción:</span> Este PIN no es para rellenar formularios, sino para que el <strong>segundo progenitor (padre o madre separado)</strong> o un tutor legal pueda darse de alta con su <strong>propio correo y contraseña</strong>, viendo las convocatorias, asistencias y datos de su hijo con total privacidad e independencia.
-          </div>
-        </div>
-
+      <div className="p-5 space-y-4">
         {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center space-y-2 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <span className="text-xs font-medium">Cargando credenciales del jugador...</span>
+          <div className="py-8 flex flex-col items-center justify-center space-y-2 text-slate-500">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            <span className="text-xs font-medium">Cargando credenciales...</span>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* TARJETA DEL CÓDIGO PIN */}
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-5 rounded-2xl text-white shadow-md relative overflow-hidden">
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-4 rounded-xl text-white shadow-sm relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold tracking-widest text-indigo-300 uppercase">
                   Código PIN de Acceso
                 </span>
-                <span className="text-xs font-semibold text-slate-300">
+                <span className="text-xs text-slate-300">
                   {pinData?.teamName}
                 </span>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-4">
-                <div className="font-mono text-3xl sm:text-4xl font-black tracking-widest text-white bg-white/10 px-4 py-2 rounded-xl border border-white/15">
+              <div className="mt-2.5 flex items-center justify-between gap-3">
+                <div className="font-mono text-2xl sm:text-3xl font-black tracking-widest text-white bg-white/10 px-3.5 py-1.5 rounded-lg border border-white/15">
                   {pinData?.pin || "------"}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <Button
                     onClick={handleCopyPin}
-                    className="bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm"
+                    className="bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs h-auto"
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? "Copiado" : "Copiar"}</span>
@@ -177,21 +163,17 @@ export function ManagePlayerPinModal({
                   <button
                     onClick={handleRegenerate}
                     disabled={regenerating}
-                    title="Regenerar PIN (invalida el anterior)"
-                    className="p-2 hover:bg-white/15 text-slate-300 hover:text-white rounded-xl transition-colors border border-white/20 disabled:opacity-50"
+                    title="Regenerar PIN"
+                    className="p-1.5 hover:bg-white/15 text-slate-300 hover:text-white rounded-lg transition-colors border border-white/20 disabled:opacity-50"
                   >
-                    <RefreshCw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
-              </div>
-
-              <div className="mt-3 text-[11px] text-slate-400">
-                Comparte este código por teléfono o WhatsApp con el padre o madre que desee acceder a la app.
               </div>
             </div>
 
             {/* SECCIÓN: ENVIAR PIN POR EMAIL */}
-            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3">
+            <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/50 space-y-2.5">
               <div className="flex items-center gap-2 font-bold text-xs text-slate-800">
                 <Mail className="w-4 h-4 text-indigo-600" />
                 <span>Enviar Instrucciones y PIN por Correo Oficial:</span>

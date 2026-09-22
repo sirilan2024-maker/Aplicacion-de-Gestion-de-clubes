@@ -68,14 +68,19 @@ export function ImpersonationModal({ open, onOpenChange }: ImpersonationModalPro
     }
   };
 
+  const playersCount = users.filter(u => u.roleKey === "jugador").length;
+  const familyCount = users.filter(u => ["familia", "family", "tutor"].includes(u.roleKey)).length;
+  const staffCount = users.filter(u => ["coach", "entrenador", "delegado", "coordinador", "utillero"].includes(u.roleKey)).length;
+  const adminCount = users.filter(u => ["admin", "superadmin", "secretario", "tesorero", "directivo"].includes(u.roleKey)).length;
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) ||
                           user.roleLabel.toLowerCase().includes(search.toLowerCase());
     const matchesRole = roleFilter === "all" ||
-                        (roleFilter === "staff" && ["coach", "entrenador", "delegado", "coordinador"].includes(user.roleKey)) ||
-                        (roleFilter === "family" && ["familia", "family", "tutor", "jugador"].includes(user.roleKey)) ||
-                        (roleFilter === "admin" && ["admin", "superadmin", "secretario", "tesorero", "directivo"].includes(user.roleKey)) ||
-                        (roleFilter === "utillero" && user.roleKey === "utillero");
+                        (roleFilter === "players" && user.roleKey === "jugador") ||
+                        (roleFilter === "family" && ["familia", "family", "tutor"].includes(user.roleKey)) ||
+                        (roleFilter === "staff" && ["coach", "entrenador", "delegado", "coordinador", "utillero"].includes(user.roleKey)) ||
+                        (roleFilter === "admin" && ["admin", "superadmin", "secretario", "tesorero", "directivo"].includes(user.roleKey));
     return matchesSearch && matchesRole;
   });
 
@@ -94,7 +99,7 @@ export function ImpersonationModal({ open, onOpenChange }: ImpersonationModalPro
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
-              placeholder="Buscar usuario por nombre o rol..."
+              placeholder="Buscar por nombre, equipo o rol..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 bg-slate-50 border-slate-200 text-sm rounded-xl"
@@ -109,28 +114,28 @@ export function ImpersonationModal({ open, onOpenChange }: ImpersonationModalPro
               Todos ({users.length})
             </button>
             <button
+              onClick={() => setRoleFilter("players")}
+              className={`px-3 py-1 rounded-full font-medium transition-all ${roleFilter === "players" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+            >
+              Jugadores ({playersCount})
+            </button>
+            <button
               onClick={() => setRoleFilter("family")}
               className={`px-3 py-1 rounded-full font-medium transition-all ${roleFilter === "family" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
             >
-              Familias / Jugadores
+              Familias / Tutores ({familyCount})
             </button>
             <button
               onClick={() => setRoleFilter("staff")}
               className={`px-3 py-1 rounded-full font-medium transition-all ${roleFilter === "staff" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
             >
-              Cuerpo Técnico / Entrenadores
-            </button>
-            <button
-              onClick={() => setRoleFilter("utillero")}
-              className={`px-3 py-1 rounded-full font-medium transition-all ${roleFilter === "utillero" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-            >
-              Utillería
+              Cuerpo Técnico ({staffCount})
             </button>
             <button
               onClick={() => setRoleFilter("admin")}
               className={`px-3 py-1 rounded-full font-medium transition-all ${roleFilter === "admin" ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
             >
-              Gestión / Administración
+              Administración ({adminCount})
             </button>
           </div>
         </div>

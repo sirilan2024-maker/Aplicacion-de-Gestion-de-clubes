@@ -17,67 +17,112 @@ export async function startImpersonationAction(targetUserId: string) {
       return { success: false, error: 'Solo los administradores pueden usar la función de simulación.' };
     }
 
+    const cookieStore = await cookies();
+
+    // 1. Caso: Seleccionar un jugador directamente (por id o con prefijo player_)
+    const isPlayerPrefix = targetUserId.startsWith('player_');
+    const playerId = isPlayerPrefix ? targetUserId.replace('player_', '') : targetUserId;
+
+    if (isPlayerPrefix) {
+      const { data: playerRec } = await adminClient
+        .from('players')
+        .select('id, first_name, last_name, club_id')
+        .eq('id', playerId)
+        .maybeSingle();
+
+      if (playerRec) {
+        cookieStore.set('impersonated_user_id', `player_${playerRec.id}`, {
+          path: '/',
+          httpOnly: true,
+          maxAge: 60 * 60 * 24,
+          sameSite: 'lax',
+        });
+
+        revalidatePath('/', 'layout');
+        return { success: true, redirectUrl: `/dashboard/family/e/${playerRec.id}/perfil` };
+      }
+    }
+
+    // 2. Caso: Perfil de usuario existente en profiles
     const { data: targetProfile } = await adminClient
       .from('profiles')
       .select('id, role, first_name, last_name, club_id')
       .eq('id', targetUserId)
       .maybeSingle();
 
-    if (!targetProfile) {
-      return { success: false, error: 'Usuario objetivo no encontrado.' };
-    }
+    if (targetProfile) {
+      cookieStore.set('impersonated_user_id', targetUserId, {
+        path: '/',
+        httpOnly: true,
+        maxAge: 60 * 60 * 24, // 24 hours
+        sameSite: 'lax',
+      });
 
-    const cookieStore = await cookies();
-    cookieStore.set('impersonated_user_id', targetUserId, {
-      path: '/',
-      httpOnly: true,
-      maxAge: 60 * 60 * 24, // 24 hours
-      sameSite: 'lax',
-    });
+      let redirectUrl = '/dashboard';
+      const role = targetProfile.role || 'family';
 
-    let redirectUrl = '/dashboard';
-    const role = targetProfile.role || 'family';
-
-    if (role === 'admin' || role === 'superadmin') {
-      redirectUrl = '/admin/inicio';
-    } else if (role === 'coordinador') {
-      redirectUrl = '/dashboard/equipos';
-    } else if (role === 'coach' || role === 'entrenador' || role === 'delegado') {
-      redirectUrl = '/dashboard/mis-equipos';
-    } else if (role === 'utillero') {
-      redirectUrl = '/dashboard/utilleria';
-    } else if (role === 'secretario') {
-      redirectUrl = '/admin/secretaria';
-    } else if (role === 'tesorero') {
-      redirectUrl = '/admin/tesoreria';
-    } else if (role === 'tutor' || role === 'familia' || role === 'family' || role === 'jugador') {
-      const { data: playerRec } = await adminClient
-        .from('players')
-        .select('id')
-        .eq('user_auth_id', targetUserId)
-        .neq('status', 'inactive')
-        .maybeSingle();
-
-      if (playerRec) {
-        redirectUrl = `/dashboard/family/e/${playerRec.id}/perfil`;
-      } else {
-        const { data: tutorLink } = await adminClient
-          .from('player_tutors')
-          .select('player_id')
-          .eq('tutor_id', targetUserId)
-          .limit(1)
+      if (role === 'admin' || role === 'superadmin') {
+        redirectUrl = '/admin/inicio';
+      } else if (role === 'coordinador') {
+        redirectUrl = '/dashboard/equipos';
+      } else if (role === 'coach' || role === 'entrenador' || role === 'delegado') {
+        redirectUrl = '/dashboard/mis-equipos';
+      } else if (role === 'utillero') {
+        redirectUrl = '/dashboard/utilleria';
+      } else if (role === 'secretario') {
+        redirectUrl = '/admin/secretaria';
+      } else if (role === 'tesorero') {
+        redirectUrl = '/admin/tesoreria';
+      } else if (role === 'tutor' || role === 'familia' || role === 'family' || role === 'jugador') {
+        const { data: playerRec } = await adminClient
+          .from('players')
+          .select('id')
+          .eq('user_auth_id', targetUserId)
+          .neq('status', 'inactive')
           .maybeSingle();
 
-        if (tutorLink) {
-          redirectUrl = `/dashboard/family/e/${tutorLink.player_id}/perfil`;
+        if (playerRec) {
+          redirectUrl = `/dashboard/family/e/${playerRec.id}/perfil`;
         } else {
-          redirectUrl = '/dashboard/family';
+          const { data: tutorLink } = await adminClient
+            .from('player_tutors')
+            .select('player_id')
+            .eq('tutor_id', targetUserId)
+            .limit(1)
+            .maybeSingle();
+
+          if (tutorLink) {
+            redirectUrl = `/dashboard/family/e/${tutorLink.player_id}/perfil`;
+          } else {
+            redirectUrl = '/dashboard/family';
+          }
         }
       }
+
+      revalidatePath('/', 'layout');
+      return { success: true, redirectUrl };
     }
 
-    revalidatePath('/', 'layout');
-    return { success: true, redirectUrl };
+    // 3. Fallback: verificar si targetUserId corresponde a la tabla players
+    const { data: fallbackPlayer } = await adminClient
+      .from('players')
+      .select('id, first_name, last_name, club_id')
+      .eq('id', playerId)
+      .maybeSingle();
+
+    if (fallbackPlayer) {
+      cookieStore.set('impersonated_user_id', `player_${fallbackPlayer.id}`, {
+        path: '/',
+        httpOnly: true,
+        maxAge: 60 * 60 * 24,
+        sameSite: 'lax',
+      });
+
+      revalidatePath('/', 'layout');
+      return { success: true, redirectUrl: `/dashboard/family/e/${fallbackPlayer.id}/perfil` };
+    }
+
+    return { success: false, error: 'Usuario o jugador no encontrado.' };
   } catch (err: any) {
     console.error('[startImpersonationAction Exception]:', err);
     return { success: false, error: 'Error al iniciar simulación de usuario' };
@@ -116,7 +161,6 @@ export async function getImpersonationStatusAction() {
   }
 }
 
-// ✅ NUEVA VERSIÓN: no usa getAuthenticatedContext() para evitar .single() que falla
 export async function getClubUsersForImpersonationAction() {
   try {
     // 1. Obtener el usuario autenticado directamente
@@ -130,7 +174,7 @@ export async function getClubUsersForImpersonationAction() {
 
     const adminClient = createAdminClient();
 
-    // 2. Verificar que el usuario es admin con maybeSingle (nunca falla)
+    // 2. Verificar que el usuario es admin con maybeSingle
     const { data: adminProfile } = await adminClient
       .from('profiles')
       .select('id, role, club_id')
@@ -143,15 +187,69 @@ export async function getClubUsersForImpersonationAction() {
       return { success: false, data: [] };
     }
 
-    // 3. Obtener TODOS los perfiles (adminClient bypassa RLS)
-    const { data: profiles, error: profilesError } = await adminClient
+    const clubId = adminProfile?.club_id;
+
+    // 3. Obtener perfiles de usuarios registrados del club
+    let profilesQuery = adminClient
       .from('profiles')
-      .select('id, first_name, last_name, role, avatar_url')
+      .select('id, first_name, last_name, role, avatar_url, club_id')
       .order('first_name', { ascending: true });
+
+    if (clubId) {
+      profilesQuery = profilesQuery.eq('club_id', clubId);
+    }
+
+    const { data: profiles, error: profilesError } = await profilesQuery;
 
     if (profilesError) {
       console.error('[getClubUsers] Error al obtener perfiles:', profilesError);
-      return { success: false, data: [] };
+    }
+
+    // 4. Obtener la temporada activa del club para asociar equipos a los jugadores
+    let activeSeasonQuery = adminClient
+      .from('seasons')
+      .select('id')
+      .eq('is_active', true);
+    if (clubId) {
+      activeSeasonQuery = activeSeasonQuery.eq('club_id', clubId);
+    }
+    const { data: activeSeason } = await activeSeasonQuery.maybeSingle();
+
+    // 5. Mapear jugadores de la temporada activa
+    const seasonPlayerMap = new Map<string, { teamName: string }>();
+
+    if (activeSeason) {
+      let pshQuery = adminClient
+        .from('player_season_history')
+        .select('player_id, team_id, teams(name)')
+        .eq('season_id', activeSeason.id);
+      if (clubId) {
+        pshQuery = pshQuery.eq('club_id', clubId);
+      }
+      const { data: psh } = await pshQuery;
+
+      (psh || []).forEach((item: any) => {
+        if (item.player_id) {
+          seasonPlayerMap.set(item.player_id, {
+            teamName: item.teams?.name || '',
+          });
+        }
+      });
+    }
+
+    // 6. Obtener jugadores activos del club
+    let playersQuery = adminClient
+      .from('players')
+      .select('id, first_name, last_name, avatar_url, team_id, teams(name), user_auth_id, status')
+      .neq('status', 'inactive')
+      .order('first_name', { ascending: true });
+    if (clubId) {
+      playersQuery = playersQuery.eq('club_id', clubId);
+    }
+    const { data: activePlayers, error: playersError } = await playersQuery;
+
+    if (playersError) {
+      console.error('[getClubUsers] Error al obtener jugadores:', playersError);
     }
 
     const roleLabels: Record<string, string> = {
@@ -171,16 +269,48 @@ export async function getClubUsersForImpersonationAction() {
       jugador: 'Jugador',
     };
 
-    const formatted = (profiles || []).map(p => ({
-      id: p.id,
-      name: `${p.first_name || 'Usuario'} ${p.last_name || ''}`.trim(),
-      roleKey: p.role || 'family',
-      roleLabel: roleLabels[p.role] || p.role || 'Usuario',
-      avatarUrl: p.avatar_url,
-    }));
+    const formattedList: Array<{
+      id: string;
+      name: string;
+      roleKey: string;
+      roleLabel: string;
+      avatarUrl?: string | null;
+    }> = [];
 
-    console.log('[getClubUsers] Perfiles encontrados:', formatted.length);
-    return { success: true, data: formatted };
+    // Añadir perfiles de cuentas (Administración, Cuerpo Técnico, Familias)
+    (profiles || []).forEach(p => {
+      const isStaff = ['coach', 'entrenador', 'delegado', 'coordinador', 'utillero'].includes(p.role);
+      const isAdmin = ['admin', 'superadmin', 'secretario', 'tesorero', 'directivo'].includes(p.role);
+      const roleLabel = roleLabels[p.role] || p.role || 'Usuario';
+
+      formattedList.push({
+        id: p.id,
+        name: `${p.first_name || 'Usuario'} ${p.last_name || ''}`.trim(),
+        roleKey: p.role || 'family',
+        roleLabel: roleLabel,
+        avatarUrl: p.avatar_url,
+      });
+    });
+
+    // Añadir EXCLUSIVAMENTE los jugadores de la temporada actual activa
+    // Si hay temporada activa, mostramos solo sus jugadores (34-38), no los históricos de años anteriores
+    const playersToUse = activeSeason
+      ? (activePlayers || []).filter(p => seasonPlayerMap.has(p.id))
+      : (activePlayers || []).filter(p => p.team_id);
+
+    playersToUse.forEach(p => {
+      const teamName = seasonPlayerMap.get(p.id)?.teamName || (p.teams as any)?.name || '';
+      formattedList.push({
+        id: `player_${p.id}`,
+        name: `${p.first_name || 'Jugador'} ${p.last_name || ''}`.trim(),
+        roleKey: 'jugador',
+        roleLabel: teamName ? `Jugador (${teamName})` : 'Jugador',
+        avatarUrl: p.avatar_url,
+      });
+    });
+
+    console.log(`[getClubUsers] Total usuarios y jugadores devueltos: ${formattedList.length} (Perfiles: ${(profiles || []).length}, Jugadores: ${playersToUse.length})`);
+    return { success: true, data: formattedList };
   } catch (err: any) {
     console.error('[getClubUsers] Excepción:', err?.message || err);
     return { success: false, data: [] };

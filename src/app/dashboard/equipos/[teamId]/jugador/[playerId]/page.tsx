@@ -1182,7 +1182,7 @@ export default function GlobalPlayerProfilePage() {
                   </div>
                   <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                 </summary>
-              {!(player as any).is_senior && (
+              {!Boolean((player as any)?.is_senior || (player as any)?.teams?.name?.toUpperCase().includes('SENIOR') || (player as any)?.teams?.category?.toUpperCase().includes('SENIOR')) && (
               <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">

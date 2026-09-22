@@ -977,7 +977,7 @@ export default function PlayerProfilePage() {
             </div>
 
             {/* ── FASE 5: Bloque de Facturación ── */}
-            {!(player as any).is_senior && (
+            {!Boolean((player as any)?.is_senior || (player as any)?.teams?.name?.toUpperCase().includes('SENIOR') || (player as any)?.teams?.category?.toUpperCase().includes('SENIOR')) && (
             <div className="md:col-span-2 border-t pt-8 mt-4">
               <details className="group">
                 <summary className="text-lg font-bold text-gray-900 border-b pb-2 mb-4 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">

@@ -147,21 +147,34 @@ export default function PlayerDashboardPage() {
           setPlayer(playerData)
         }
 
-        // Fetch siblings (for the child switcher)
-        const { data: userAuth } = await supabase.auth.getUser()
+        // Fetch siblings (for the child switcher - both direct and linked through player_tutors)
+        const { data: userAuth } = await supabase.auth.getUser();
         if (userAuth.user) {
-          const { data: childrenLinks } = await supabase
+          const { data: directChildren } = await supabase
             .from("players")
-            .select('id, first_name, last_name')
+            .select('id, first_name, last_name, status')
             .eq("tutor_id", userAuth.user.id)
-            
-          if (childrenLinks) {
-            setSiblings(childrenLinks.map(c => ({
-              id: c.id,
-              first_name: c.first_name,
-              last_name: c.last_name
-            })))
-          }
+            .neq("status", "inactive");
+
+          const { data: linkedChildren } = await supabase
+            .from("player_tutors")
+            .select('player_id, players!inner(id, first_name, last_name, status)')
+            .eq("tutor_id", userAuth.user.id);
+
+          const allChildrenMap = new Map<string, { id: string; first_name: string; last_name: string }>();
+
+          (directChildren || []).forEach(c => {
+            allChildrenMap.set(c.id, { id: c.id, first_name: c.first_name, last_name: c.last_name });
+          });
+
+          (linkedChildren || []).forEach((lc: any) => {
+            const p = lc.players;
+            if (p && p.status !== "inactive") {
+              allChildrenMap.set(p.id, { id: p.id, first_name: p.first_name, last_name: p.last_name });
+            }
+          });
+
+          setSiblings(Array.from(allChildrenMap.values()));
 
           // Fetch Pending Requests
           const { data: requestsData } = await supabase
@@ -1209,7 +1222,7 @@ export default function PlayerDashboardPage() {
       )}
 
       {/* WIDGET: CUOTAS (SUBSCRIPTIONS) */}
-      {!(player as any).is_senior && (
+      {!Boolean((player as any)?.is_senior || player?.teams?.name?.toUpperCase().includes('SENIOR') || player?.teams?.category?.toUpperCase().includes('SENIOR')) && (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
         <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">

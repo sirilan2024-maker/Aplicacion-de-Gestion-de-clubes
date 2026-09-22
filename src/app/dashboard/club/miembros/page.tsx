@@ -900,6 +900,8 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
 
 interface Member {
   id: string
+  staff_id?: string | null
+  player_id?: string | null
   first_name: string
   last_name: string
   email: string | null
@@ -1030,7 +1032,7 @@ function GlobalMembersContent() {
           const { data: rawPlayers } = await supabase
             .from("players")
             .select(`
-              id, first_name, last_name, parent1_email, posicion_principal, team_id, registration_status, status, avatar_url,
+              id, first_name, last_name, parent1_email, email, posicion_principal, team_id, registration_status, status, avatar_url, user_auth_id,
               teams (name, color, club_id)
             `)
             .in("id", activePlayerIds)
@@ -1041,10 +1043,11 @@ function GlobalMembersContent() {
               id: p.id,
               first_name: p.first_name,
               last_name: p.last_name,
-              email: p.parent1_email,
+              email: p.email || p.parent1_email,
               posicion: p.posicion_principal,
               team_id: p.team_id,
               avatar_url: p.avatar_url,
+              user_auth_id: p.user_auth_id,
               equipos: Array.isArray(p.teams) ? p.teams[0] : p.teams
             }))
           }
@@ -1054,24 +1057,36 @@ function GlobalMembersContent() {
         let staffCount = 0;
         let playersCount = 0;
 
+        const staffByProfileId = new Map<string, Member>();
+        const staffByEmail = new Map<string, Member>();
+        const staffByLinkedPlayerId = new Map<string, Member>();
+
         if (staffData) {
           staffData.forEach((s: any) => {
             const teamsArray = Array.isArray(s.teams) ? s.teams : [];
             const primaryTeam = teamsArray[0];
-            allMembers.push({
+            const memberObj: Member = {
               id: s.id,
+              staff_id: s.id,
+              player_id: s.linked_player_id || null,
               first_name: s.first_name || '',
               last_name: s.last_name || '',
               email: s.email,
               role: s.role || 'staff',
-              roles: s.roles || [s.role || 'staff'],
+              roles: s.roles && s.roles.length > 0 ? s.roles : [s.role || 'staff'],
               team_id: primaryTeam?.id,
               team_name: primaryTeam?.name,
               team_color: primaryTeam?.color,
               teams: teamsArray,
+              avatar_url: s.avatar_url,
               type: 'staff'
-            })
+            };
+            allMembers.push(memberObj);
             staffCount++;
+
+            staffByProfileId.set(s.id, memberObj);
+            if (s.email) staffByEmail.set(s.email.toLowerCase().trim(), memberObj);
+            if (s.linked_player_id) staffByLinkedPlayerId.set(s.linked_player_id, memberObj);
           })
         }
 
@@ -1085,10 +1100,12 @@ function GlobalMembersContent() {
             const teamInfo = Array.isArray(inv.teams) ? inv.teams[0] : inv.teams;
             allMembers.push({
               id: inv.id,
+              staff_id: inv.id,
               first_name: inv.name || 'Staff Invitado',
               last_name: '(Pendiente de registro)',
               email: `${window.location.origin}/register/staff/${inv.token}`,
               role: inv.role || 'entrenador',
+              roles: [inv.role || 'entrenador'],
               team_id: inv.team_id,
               team_name: teamInfo?.name,
               team_color: teamInfo?.color,
@@ -1109,12 +1126,36 @@ function GlobalMembersContent() {
               playersCount++;
             }
 
+            const playerEmail = (p.email || '').toLowerCase().trim();
+            const matchingStaff = 
+              (p.user_auth_id && staffByProfileId.get(p.user_auth_id)) ||
+              staffByLinkedPlayerId.get(p.id) ||
+              (playerEmail && staffByEmail.get(playerEmail));
+
+            if (matchingStaff) {
+              matchingStaff.player_id = p.id;
+              if (matchingStaff.roles && !matchingStaff.roles.includes('jugador')) {
+                matchingStaff.roles.push('jugador');
+              }
+              if (!matchingStaff.team_name && p.equipos?.name) {
+                matchingStaff.team_id = p.team_id;
+                matchingStaff.team_name = p.equipos?.name;
+                matchingStaff.team_color = p.equipos?.color;
+              }
+              if (!matchingStaff.avatar_url && p.avatar_url) {
+                matchingStaff.avatar_url = p.avatar_url;
+              }
+              return;
+            }
+
             allMembers.push({
               id: p.id,
+              player_id: p.id,
               first_name: p.first_name || '',
               last_name: p.last_name || '',
               email: p.email,
               role: determinedRole,
+              roles: [determinedRole],
               team_id: p.team_id,
               team_name: p.equipos?.name,
               team_color: p.equipos?.color,
@@ -1222,7 +1263,8 @@ function GlobalMembersContent() {
     let roleMatch = false;
     if (roleFilter === 'all') roleMatch = true;
     else if (roleFilter === 'staff') roleMatch = m.type === 'staff';
-    else roleMatch = m.role === roleFilter;
+    else if (roleFilter === 'jugador') roleMatch = m.type === 'player' || Boolean(m.roles && m.roles.includes('jugador'));
+    else roleMatch = m.role === roleFilter || Boolean(m.roles && m.roles.includes(roleFilter));
 
     let teamMatch = false;
     if (teamFilter === 'all') teamMatch = true;
@@ -1254,15 +1296,45 @@ function GlobalMembersContent() {
   const getRoleBadge = (role: string) => {
     switch (role.toLowerCase()) {
       case 'admin':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">Administrador</span>
+      case 'administrador':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">Administrador</span>
+      case 'coordinador':
+      case 'coordinador_general':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">Coordinador</span>
       case 'coach':
       case 'entrenador':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">Entrenador</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">Entrenador</span>
       case 'jugador':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">Jugador</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Jugador</span>
+      case 'secretario':
+      case 'secretaria':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 border border-teal-200">Secretario</span>
+      case 'tesorero':
+      case 'tesoreria':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">Tesorero</span>
+      case 'directivo':
+      case 'director':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300">Directivo</span>
+      case 'delegado':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">Delegado</span>
+      case 'tutor':
+      case 'familiar':
+      case 'familia':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Familiar</span>
       default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 capitalize">{role}</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200 capitalize">{role}</span>
     }
+  }
+
+  const renderRoleBadges = (member: Member) => {
+    const rolesToShow = (member.roles && member.roles.length > 0) ? member.roles : [member.role];
+    return (
+      <div className="flex flex-wrap gap-1.5 items-center">
+        {rolesToShow.map((r, idx) => (
+          <span key={idx}>{getRoleBadge(r)}</span>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -1410,8 +1482,9 @@ function GlobalMembersContent() {
                 key={member.id} 
                 className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 relative overflow-hidden cursor-pointer transition-all"
                 onClick={() => {
-                  if (member.type === 'staff') router.push(`/dashboard/club/miembros/staff/${member.id}`)
-                  else if (member.type === 'player') router.push(`/dashboard/club/jugador/${member.id}`)
+                  if (member.type === 'staff' && !member.player_id) router.push(`/dashboard/club/miembros/staff/${member.id}`)
+                  else if (member.player_id) router.push(`/dashboard/club/jugador/${member.player_id}`)
+                  else router.push(`/dashboard/club/miembros/staff/${member.id}`)
                 }}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -1434,7 +1507,7 @@ function GlobalMembersContent() {
                       )}
                     </div>
                   </div>
-                  <div>{getRoleBadge(member.role)}</div>
+                  <div>{renderRoleBadges(member)}</div>
                 </div>
                 <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-50">
                   <div className="text-sm">
@@ -1461,12 +1534,22 @@ function GlobalMembersContent() {
                           {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4" /> Cancelar</>}
                         </button>
                       ) : member.type === 'staff' ? (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
-                          className="text-blue-600 font-medium text-sm px-2 py-1 rounded-md hover:bg-blue-50"
-                        >
-                          Gestionar
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                            className="text-blue-600 font-medium text-xs px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200"
+                          >
+                            Rol
+                          </button>
+                          {member.player_id && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.player_id}`); }}
+                              className="text-emerald-700 font-medium text-xs px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200"
+                            >
+                              Ficha
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center gap-1">
                           <button 
@@ -1532,10 +1615,12 @@ function GlobalMembersContent() {
                     key={member.id} 
                     className="bg-white shadow-sm hover:shadow-md transition-all group cursor-pointer"
                     onClick={() => {
-                      if (member.type === 'staff') {
+                      if (member.type === 'staff' && !member.player_id) {
                         router.push(`/dashboard/club/miembros/staff/${member.id}`)
-                      } else if (member.type === 'player') {
-                        router.push(`/dashboard/club/jugador/${member.id}`)
+                      } else if (member.player_id) {
+                        router.push(`/dashboard/club/jugador/${member.player_id}`)
+                      } else {
+                        router.push(`/dashboard/club/miembros/staff/${member.id}`)
                       }
                     }}
                   >
@@ -1561,7 +1646,7 @@ function GlobalMembersContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">
-                      {getRoleBadge(member.role)}
+                      {renderRoleBadges(member)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap border-y border-gray-200 group-hover:border-gray-300">
                       {member.teams && member.teams.length > 1 ? (
@@ -1618,12 +1703,22 @@ function GlobalMembersContent() {
                             {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4" /> Cancelar Invitación</>}
                           </button>
                         ) : member.type === 'staff' ? (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
-                            className="text-blue-600 hover:text-blue-800 font-medium text-sm px-3 py-1 rounded-md hover:bg-blue-50 transition-colors"
-                          >
-                            Gestionar
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
+                            >
+                              Gestionar Rol
+                            </button>
+                            {member.player_id && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.player_id}`); }}
+                                className="text-emerald-700 hover:text-emerald-900 font-medium text-xs px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 transition-colors border border-emerald-200"
+                              >
+                                Ficha Jugador
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <div className="flex items-center gap-1">
                             <button 
@@ -1634,7 +1729,7 @@ function GlobalMembersContent() {
                               Cambiar Rol
                             </button>
                             <button 
-                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.id}`); }}
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.player_id || member.id}`); }}
                               className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2.5 py-1 rounded-md hover:bg-blue-50 transition-colors"
                             >
                               Ficha

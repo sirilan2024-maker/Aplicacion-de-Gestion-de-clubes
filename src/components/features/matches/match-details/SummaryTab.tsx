@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { LayoutGrid, List, Lock, Unlock, Check, X } from "lucide-react"
+import { useState, useTransition, useRef } from "react"
+import { LayoutGrid, List, Lock, Unlock, Camera, Upload, Eye, Loader2, Image as ImageIcon } from "lucide-react"
+import { uploadTeamPhotoAction } from "@/app/actions/match-actions"
+import { toast } from "react-hot-toast"
 import { useUserRole } from "@/hooks/useUserRole"
 import { useParams } from "next/navigation"
 import Link from "next/link"
@@ -14,6 +16,8 @@ interface PlayerRow {
   name: string
   pos: string
   titular: boolean
+  tactical_x?: number | null
+  tactical_y?: number | null
   coachRating: number
   actitud: number
   assists: number
@@ -149,6 +153,8 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
       avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
       pos: p.posicion_principal || "Jugador",
       titular: conv?.titular || false,
+      tactical_x: conv?.tactical_x,
+      tactical_y: conv?.tactical_y,
       coachRating: conv?.coach_rating || 0,
       actitud: conv?.actitud || 0,
       goals: conv?.goals || 0,
@@ -160,12 +166,61 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
     };
   })
 
-  const [playerList, setPlayerList] = useState<PlayerRow[]>(mappedPlayers.length > 0 ? mappedPlayers : MOCK_SUMMARY_PLAYERS)
+  // Identificar titulares asignados por el entrenador
+  const explicitStarters = mappedPlayers.filter(p => p.titular);
+  const explicitBench = mappedPlayers.filter(p => !p.titular);
+
+  // Si el entrenador ha guardado titulares, los usamos directamente; sino, fallback
+  const startersList = explicitStarters.length > 0 
+    ? explicitStarters 
+    : (mappedPlayers.length > 0 ? mappedPlayers.slice(0, 11) : MOCK_SUMMARY_PLAYERS.slice(0, 11));
+
+  const benchList = explicitStarters.length > 0 
+    ? explicitBench 
+    : (mappedPlayers.length > 0 ? mappedPlayers.slice(11) : MOCK_SUMMARY_PLAYERS.slice(11));
+
+  const playerList = [...startersList, ...benchList];
   const [tactic, setTactic] = useState("4-3-3")
   const [isPrivate, setIsPrivate] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  
   const [isPending, startTransition] = useTransition()
+
+  const [teamPhotoUrl, setTeamPhotoUrl] = useState<string | null>(
+    match?.coach_report?.team_photo_url || null
+  )
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor selecciona una imagen válida (JPG, PNG, WebP)")
+      return
+    }
+
+    setIsUploadingPhoto(true)
+    const toastId = toast.loading("Subiendo foto del equipo...")
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const res = await uploadTeamPhotoAction(matchId, formData)
+      if (res.success && res.teamPhotoUrl) {
+        setTeamPhotoUrl(res.teamPhotoUrl)
+        toast.success("Foto del equipo guardada con éxito", { id: toastId })
+      } else {
+        toast.error(res.error || "Error al subir la imagen", { id: toastId })
+      }
+    } catch (err: any) {
+      toast.error("Error al procesar la foto", { id: toastId })
+    } finally {
+      setIsUploadingPhoto(false)
+      if (photoInputRef.current) photoInputRef.current.value = ""
+    }
+  }
 
   const mvpPlayers = players.map(p => {
     const conv = convocatorias.find((c: any) => c.player_id === p.id);
@@ -188,7 +243,7 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
       
       {/* ── Columna Izquierda: Informe del Cuerpo Técnico ── */}
       <div className="lg:col-span-7 space-y-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4 h-full">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
             Informe del Cuerpo Técnico
           </h3>
@@ -229,6 +284,119 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
             </div>
           </div>
         </div>
+
+        {/* ── Sección: Foto del Equipo ── */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Camera className="w-4 h-4 text-blue-600" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                Foto del Equipo
+              </h3>
+            </div>
+            {!isFamilyView && (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200 transition-colors disabled:opacity-50"
+              >
+                {isUploadingPhoto ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                <span>{teamPhotoUrl ? "Cambiar foto" : "Subir foto"}</span>
+              </button>
+            )}
+          </div>
+
+          {teamPhotoUrl ? (
+            <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-900 aspect-video max-h-[320px] flex items-center justify-center">
+              <img
+                src={teamPhotoUrl}
+                alt="Foto del equipo del partido"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
+                <span className="text-xs font-bold text-white tracking-wide">
+                  Foto oficial del partido
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoModal(true)}
+                  className="p-2 bg-white/90 hover:bg-white text-slate-900 rounded-lg text-xs font-bold shadow-md flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ampliar</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div 
+              onClick={() => !isFamilyView && photoInputRef.current?.click()}
+              className={`p-8 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center transition-colors ${
+                !isFamilyView 
+                  ? "border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer" 
+                  : "border-slate-200 bg-slate-50/50 cursor-default"
+              }`}
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                <ImageIcon className="w-6 h-6" />
+              </div>
+              <p className="text-xs font-bold text-slate-700">
+                {isFamilyView ? "Sin foto de equipo disponible para este partido" : "Aún no se ha añadido la foto del equipo"}
+              </p>
+              {!isFamilyView && (
+                <p className="text-[11px] font-medium text-slate-400 mt-0.5">
+                  Haz clic aquí o pulsa en "Subir foto" para guardar el recuerdo del once
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Vista Ampliada de la Foto */}
+        {showPhotoModal && teamPhotoUrl && (
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => setShowPhotoModal(false)}
+          >
+            <div 
+              className="relative max-w-4xl w-full max-h-[90vh] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-3 bg-slate-900 flex items-center justify-between text-white border-b border-slate-800">
+                <span className="text-xs font-bold flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-blue-400" />
+                  Foto del Equipo del Partido
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoModal(false)}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
+                >
+                  Cerrar ✕
+                </button>
+              </div>
+              <div className="flex-1 flex items-center justify-center p-2 bg-black/60 overflow-hidden">
+                <img
+                  src={teamPhotoUrl}
+                  alt="Foto del equipo ampliada"
+                  className="max-h-[80vh] w-auto object-contain rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Columna Derecha: Alineación Modo Lectura ── */}
@@ -256,36 +424,31 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                 </div>
 
                 {/* Renderizado de jugadores con notas en badges naranjas */}
-                {FORMATIONS["4-3-3"].map((slot, idx) => {
-                  const titularPlayers = playerList.filter(p => p.titular);
-                  const player = titularPlayers[idx];
-                  if (!player) return null;
+                {startersList.map((player, idx) => {
+                  const fallbackSlot = FORMATIONS["4-3-3"][idx];
+                  const posX = (player.tactical_x != null) ? player.tactical_x : (fallbackSlot?.x ?? 50);
+                  const posY = (player.tactical_y != null) ? player.tactical_y : (fallbackSlot?.y ?? 50);
                   
                   return (
                     <div
-                      key={slot.id}
+                      key={player.id}
                       className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none md:origin-center transition-all"
-                      style={{ 
-                        left: `calc(100% * var(--x))`, 
-                        top: `calc(100% * var(--y))`,
-                        // En desktop (md), rotamos las posiciones matemáticamente o rotamos visualmente
-                      }}
                       ref={(el) => {
                          if(el) {
-                           // Responsivo: x/y vertical -> y/x horizontal inverso
+                           // Responsivo: x/y vertical -> y/x horizontal inverso en desktop
                            if (window.innerWidth >= 768) {
-                             el.style.left = `${slot.y}%`;
-                             el.style.top = `${100 - slot.x}%`;
+                             el.style.left = `${posY}%`;
+                             el.style.top = `${100 - posX}%`;
                            } else {
-                             el.style.left = `${slot.x}%`;
-                             el.style.top = `${slot.y}%`;
+                             el.style.left = `${posX}%`;
+                             el.style.top = `${posY}%`;
                            }
                          }
                       }}
                     >
                       {/* Node circle */}
                       <div className="relative w-8 h-8 rounded-full bg-slate-900 border border-white flex items-center justify-center text-[10px] font-black text-white shadow-md">
-                        {player.avatar}
+                        {player.number || player.avatar}
                         
                         {/* Orange Rating Badge */}
                         <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[7px] font-extrabold px-1 rounded-full border border-white shadow-sm">
@@ -395,7 +558,7 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
             {/* Soccer Field or List depending on viewMode (always static) */}
             {viewMode === "list" ? (
               <div className="space-y-2 py-2">
-                {playerList.slice(0, 11).map((player, idx) => (
+                {startersList.map((player, idx) => (
                   <div key={player.id} className="flex items-center justify-between p-2.5 border border-slate-100 rounded-xl bg-slate-50/50">
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[9px] font-black text-blue-700">
@@ -427,15 +590,17 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                   <div className="absolute bottom-0 left-1/4 right-1/4 h-10 border-t border-x border-white/20" />
                 </div>
 
-                {/* Renderizado de jugadores */}
-                {playerList.slice(0, 11).map((player, idx) => {
-                  const node = FORMATIONS[tactic] ? FORMATIONS[tactic][idx] : FORMATIONS["4-3-3"][idx];
+                {/* Renderizado de jugadores con sus posiciones tácticas */}
+                {startersList.map((player, idx) => {
+                  const fallbackNode = FORMATIONS[tactic] ? FORMATIONS[tactic][idx] : FORMATIONS["4-3-3"][idx];
+                  const posX = (player.tactical_x != null) ? player.tactical_x : (fallbackNode?.x ?? 50);
+                  const posY = (player.tactical_y != null) ? player.tactical_y : (fallbackNode?.y ?? 50);
                   const number = player.number || (idx + 1);
                   return (
                   <div
                     key={player.id}
                     className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none transition-all duration-500"
-                    style={{ left: `${node?.x || 50}%`, top: `${node?.y || 50}%` }}
+                    style={{ left: `${posX}%`, top: `${posY}%` }}
                   >
                     {/* Node circle */}
                     <div className="relative w-9 h-9 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-[11px] font-black text-white shadow-md">
@@ -453,9 +618,9 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
 
             {/* Zona inferior de suplentes */}
             <div className="border-t border-slate-100 pt-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Banquillo de suplentes</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Banquillo de suplentes ({benchList.length})</p>
               <div className="flex flex-wrap gap-2">
-                {playerList.slice(11).map(supl => (
+                {benchList.map(supl => (
                   <div key={supl.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-lg">
                     <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
                       {supl.avatar}

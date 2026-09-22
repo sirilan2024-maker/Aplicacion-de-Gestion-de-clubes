@@ -110,7 +110,17 @@ export const DEFAULT_FORMATIONS: Record<string, { id: string; label: string; x: 
   ]
 }
 
-export function LineupTab({ matchId, players = [], convocatorias = [] }: { matchId?: string, players?: any[], convocatorias?: any[] }) {
+export function LineupTab({ 
+  matchId, 
+  players = [], 
+  convocatorias = [],
+  onLineupSaved
+}: { 
+  matchId?: string
+  players?: any[]
+  convocatorias?: any[]
+  onLineupSaved?: (updatedConvocatorias: any[]) => void
+}) {
   const { rol } = useUserRole()
   const [isPending, startTransition] = useTransition()
   
@@ -208,6 +218,41 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
     setTimeout(() => setLimitWarning(null), 4000)
   }
 
+  // Función de un toque para añadir jugador al campo en el primer slot libre
+  const handleQuickAddPlayer = (playerId: string) => {
+    if (isFamilyView) return
+    if (pitchPlayers[playerId]) return
+
+    if (Object.keys(pitchPlayers).length >= 11) {
+      showLimitError()
+      return
+    }
+
+    const currentSlots = allFormations[tactic] || DEFAULT_FORMATIONS["4-3-3"]
+    
+    // Buscar un slot libre de la formación actual
+    const freeSlot = currentSlots.find(slot => {
+      return !Object.values(pitchPlayers).some(
+        coords => Math.abs(coords.x - slot.x) < 4 && Math.abs(coords.y - slot.y) < 4
+      )
+    })
+
+    if (freeSlot) {
+      setPitchPlayers(prev => ({
+        ...prev,
+        [playerId]: { x: freeSlot.x, y: freeSlot.y }
+      }))
+    } else {
+      // Si no hay slot exacto de la formación libre, colocar en el siguiente índice libre o centro
+      const assignedCount = Object.keys(pitchPlayers).length
+      const fallbackSlot = currentSlots[assignedCount] || { x: 50, y: 50 }
+      setPitchPlayers(prev => ({
+        ...prev,
+        [playerId]: { x: fallbackSlot.x, y: fallbackSlot.y }
+      }))
+    }
+  }
+
   const handleTacticChange = (newTactic: string) => {
     setTactic(newTactic);
     const newPitchPlayers: Record<string, { x: number, y: number }> = {};
@@ -272,6 +317,36 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
         y: pitchPlayers[playerId].y
       }));
       await saveLineup(matchId, assigned, tactic)
+
+      if (onLineupSaved) {
+        // Generar lista actualizada de convocatorias con los titulares y sus coordenadas
+        const updated = convocatorias.map(c => {
+          const isTitular = !!pitchPlayers[c.player_id];
+          const coords = pitchPlayers[c.player_id];
+          return {
+            ...c,
+            titular: isTitular,
+            tactical_x: isTitular ? coords?.x : null,
+            tactical_y: isTitular ? coords?.y : null
+          };
+        });
+
+        // Asegurar que jugadores en pitchPlayers que no estuvieran en convocatorias también se incluyan
+        for (const [playerId, coords] of Object.entries(pitchPlayers)) {
+          if (!updated.some(c => c.player_id === playerId)) {
+            updated.push({
+              partido_id: matchId,
+              player_id: playerId,
+              titular: true,
+              tactical_x: coords.x,
+              tactical_y: coords.y,
+              status: 'convocado'
+            });
+          }
+        }
+        onLineupSaved(updated);
+      }
+
       setSavedAlert(true)
       setTimeout(() => setSavedAlert(false), 3000)
     })
@@ -555,19 +630,6 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
                       }}
                     >
                       {player.number || "?"}
-
-                      {!isFamilyView && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFromPitch(player.id);
-                          }}
-                          className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 border border-white shadow-md items-center justify-center transition-all hidden md:flex md:opacity-0 md:group-hover:opacity-100 z-30 active:scale-95"
-                          title="Quitar del campo"
-                        >
-                          <X className="w-3 h-3 stroke-[3]" />
-                        </button>
-                      )}
                     </div>
                     <span className="text-[9px] font-black text-white mt-1 bg-slate-950/80 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
                       {player.name.split(" ")[0]}
@@ -628,6 +690,45 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
             </div>
           )}
 
+          {/* Mobile Direct Player Buttons Dock (sin scroll molesto en móvil) */}
+          {!isFamilyView && (
+            <div className="block lg:hidden border-t border-slate-100 pt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                  Toca para añadir ({availablePlayers.length} disponibles)
+                </span>
+                {limitWarning && (
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Máximo 11 jugadores
+                  </span>
+                )}
+              </div>
+
+              {availablePlayers.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80">
+                  {availablePlayers.map(player => (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => handleQuickAddPlayer(player.id)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-bold text-slate-800 shadow-2xs active:scale-95 transition-all"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center">
+                        {player.number || "?"}
+                      </span>
+                      <span className="truncate max-w-[90px]">{player.name}</span>
+                      <Plus className="w-3.5 h-3.5 text-blue-600 ml-0.5 stroke-[2.5]" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 text-center">
+                  ✅ Todos los jugadores han sido colocados en el campo
+                </p>
+              )}
+            </div>
+          )}
+
           {!isFamilyView && (
             <div className="flex justify-end pt-2">
               <button
@@ -647,9 +748,9 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
         </div>
       </div>
 
-      {/* ── Columna Derecha: Banquillo / Lista (Oculta si familiar) ── */}
+      {/* ── Columna Derecha: Banquillo / Lista (Sólo en Desktop lg:block, sin scroll en móvil) ── */}
       {!isFamilyView && (
-        <div className="space-y-4">
+        <div className="hidden lg:block space-y-4">
           {/* Alerta de límite de 11 jugadores */}
           {limitWarning && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
@@ -678,7 +779,7 @@ export function LineupTab({ matchId, players = [], convocatorias = [] }: { match
               Toca o arrastra un jugador para colocarlo en el campo
             </p>
 
-            <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+            <div className="space-y-2 pr-1">
               {availablePlayers.map(player => (
                 <div
                   key={player.id}

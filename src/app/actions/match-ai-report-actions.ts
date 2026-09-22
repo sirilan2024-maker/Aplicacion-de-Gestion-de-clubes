@@ -104,6 +104,7 @@ export async function generateMatchAIReportAction(matchId: string) {
         rival: match.resultado_rival ?? 0
       },
       coachValuation: match.coach_summary || '',
+      rivalAnalysis: match.coach_report?.rival_analysis || null,
       eventsTimeline,
       anonymousPlayers
     }

@@ -1,4 +1,6 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
@@ -11,7 +13,7 @@ import type { EmailOtpType } from '@supabase/supabase-js'
  * y redirige al usuario a la página de actualización de contraseña (/actualizar-password) o al dashboard.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams, origin: requestOrigin } = new URL(request.url)
 
   const code        = searchParams.get('code')
   const token_hash  = searchParams.get('token_hash')
@@ -20,6 +22,13 @@ export async function GET(request: NextRequest) {
   const errorParam  = searchParams.get('error')
   const errorDesc   = searchParams.get('error_description')
 
+  // Obtener origen confiable detrás de proxies (Vercel, CDN, etc.)
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  const origin = forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || requestOrigin)
+
   const isRecovery = type === 'recovery' || (rawNext ? rawNext.includes('actualizar-password') : false)
   const next = isRecovery ? '/actualizar-password' : (rawNext ?? '/dashboard')
 
@@ -27,12 +36,42 @@ export async function GET(request: NextRequest) {
   if (errorParam) {
     console.error('[AuthCallback] Error from Supabase:', errorParam, errorDesc)
     const message = errorDesc ?? 'Error al verificar el correo electrónico.'
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(message)}`
-    )
+    const errorRedirect = isRecovery
+      ? `${origin}/actualizar-password?error=${encodeURIComponent(message)}`
+      : `${origin}/login?error=${encodeURIComponent(message)}`
+    return NextResponse.redirect(errorRedirect)
   }
 
-  const supabase = await createClient()
+  // Preparamos la URL final de redirección
+  const redirectUrl = isRecovery
+    ? `${origin}/actualizar-password`
+    : `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`
+
+  // IMPORTANTE: En Next.js Route Handlers, NextResponse.redirect debe llevar las cookies explícitamente
+  const response = NextResponse.redirect(redirectUrl)
+  const cookieStore = await cookies()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+              response.cookies.set(name, value, options)
+            })
+          } catch {
+            // Ignorar en componentes que no permiten set
+          }
+        },
+      },
+    }
+  )
 
   let authError = null
   if (token_hash && type) {
@@ -43,6 +82,9 @@ export async function GET(request: NextRequest) {
     authError = error
   } else {
     if (isRecovery) {
+      // Supabase pudo haber devuelto el token en el fragmento hash (#access_token=...),
+      // el cual no llega al servidor HTTP. Redirigimos a /actualizar-password para que
+      // el cliente procese el hash fragment.
       return NextResponse.redirect(`${origin}/actualizar-password`)
     }
     return NextResponse.redirect(
@@ -52,36 +94,37 @@ export async function GET(request: NextRequest) {
 
   if (authError) {
     console.error('[AuthCallback] Auth error:', authError.message)
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent('El enlace de verificación ha expirado o ya fue usado.')}`
-    )
+    const errorMsg = 'El enlace de recuperación ha expirado o ya fue usado.'
+    const failUrl = isRecovery
+      ? `${origin}/actualizar-password?error=${encodeURIComponent(errorMsg)}`
+      : `${origin}/login?error=${encodeURIComponent(errorMsg)}`
+    return NextResponse.redirect(failUrl)
   }
 
   // Sesión creada / verificada correctamente
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    const adminSupabase = await createAdminClient()
-    
-    // Asegurar que email_verified esté marcado como true sin sobreescribir roles existentes
-    const { data: existingProfile } = await adminSupabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const adminSupabase = await createAdminClient()
+      
+      // Asegurar que email_verified esté marcado como true sin sobreescribir roles existentes
+      const { data: existingProfile } = await adminSupabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
 
-    const profileUpdate: Record<string, any> = { email_verified: true };
-    if (!existingProfile?.role) {
-      profileUpdate.role = 'family';
-      profileUpdate.rol = 'familia';
+      const profileUpdate: Record<string, any> = { email_verified: true };
+      if (!existingProfile?.role) {
+        profileUpdate.role = 'family';
+        profileUpdate.rol = 'familia';
+      }
+
+      await adminSupabase.from('profiles').update(profileUpdate).eq('id', user.id);
     }
-
-    await adminSupabase.from('profiles').update(profileUpdate).eq('id', user.id);
+  } catch (userErr) {
+    console.warn('[AuthCallback] Error actualizando perfil post-auth:', userErr)
   }
 
-  // Redirigir a next (ej. /actualizar-password o /dashboard)
-  const redirectUrl = isRecovery
-    ? `${origin}/actualizar-password`
-    : `${origin}${next}?message=${encodeURIComponent('¡Cuenta verificada! Bienvenido/a al equipo.')}`;
-
-  return NextResponse.redirect(redirectUrl);
+  return response
 }

@@ -169,7 +169,8 @@ export function PayFeeModal({ isOpen, onClose, fee, onPaymentSuccess }: PayFeeMo
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Opción 1: Tarjeta */}
+                {/* Opción 1: Tarjeta (Oculta temporalmente hasta que se decida habilitar la pasarela online) */}
+                {/* 
                 <div
                   onClick={() => setSelectedMethod("card")}
                   className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
@@ -209,6 +210,7 @@ export function PayFeeModal({ isOpen, onClose, fee, onPaymentSuccess }: PayFeeMo
                     </div>
                   </div>
                 </div>
+                */}
 
                 {/* Opción 2: Transferencia */}
                 <div

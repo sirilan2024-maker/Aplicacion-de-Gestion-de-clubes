@@ -33,7 +33,9 @@ export async function login(formData: FormData) {
   const role = (profile?.role as string) ?? 'coach';
   let destination = '/dashboard';
   if (role === 'admin') destination = '/admin/inicio';
+  else if (role === 'coordinador') destination = '/dashboard/equipos';
   else if (role === 'coach' || role === 'entrenador') destination = '/dashboard/mis-equipos';
+  else if (role === 'jugador') destination = '/dashboard';
   else if (role === 'tutor' || role === 'familia' || role === 'family') {
     // Check if they have linked children to redirect them straight into the context
     const { data: tutors } = await supabase
@@ -508,6 +510,28 @@ export async function acceptStaffInviteExistingUserAction(
         console.error('[StaffInviteExisting] Error assigning staff to team_coaches:', teamAssignError.message)
       }
     }
+  }
+
+  return { success: true }
+}
+
+// ─── Update Password (Password Recovery) ────────────────────────────────────
+export async function updatePasswordServerAction(password: string): Promise<{ success: boolean; error?: string }> {
+  if (!password || password.length < 8) {
+    return { success: false, error: 'La contraseña debe tener al menos 8 caracteres.' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return { success: false, error: 'No hay una sesión activa o el enlace ha expirado. Solicita un nuevo enlace.' }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) {
+    console.error('[updatePasswordServerAction] Error:', error.message)
+    return { success: false, error: error.message }
   }
 
   return { success: true }

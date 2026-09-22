@@ -30,6 +30,12 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
   const initialTab = (searchParams.get("tab") as TabType) || "resumen";
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
+  const [currentConvocatorias, setCurrentConvocatorias] = useState<any[]>(convocatorias)
+
+  const handleLineupSaved = (updatedConvocatorias: any[]) => {
+    setCurrentConvocatorias(updatedConvocatorias)
+  }
+
   // Filtrar entrenadores y delegados
   const activePlayers = players.filter(p => {
     const pos = p.posicion?.toLowerCase() || '';
@@ -94,13 +100,13 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
         <div className="bg-white rounded-xl border border-slate-150 p-6 shadow-sm min-h-[400px]">
           
           {/* TAB: RESUMEN */}
-          {activeTab === "resumen" && <SummaryTab matchId={matchId} match={match} players={activePlayers} convocatorias={convocatorias} />}
+          {activeTab === "resumen" && <SummaryTab matchId={matchId} match={match} players={activePlayers} convocatorias={currentConvocatorias} />}
 
           {/* TAB: ALINEACIÓN (Modo Edición Interactiva) */}
-          {activeTab === "alineacion" && <LineupTab matchId={matchId} players={activePlayers} convocatorias={convocatorias} />}
+          {activeTab === "alineacion" && <LineupTab matchId={matchId} players={activePlayers} convocatorias={currentConvocatorias} onLineupSaved={handleLineupSaved} />}
 
           {/* TAB: ESTADÍSTICAS */}
-          {activeTab === "estadisticas" && <StatsTab players={activePlayers} convocatorias={convocatorias} matchEvents={matchEvents} />}
+          {activeTab === "estadisticas" && <StatsTab players={activePlayers} convocatorias={currentConvocatorias} matchEvents={matchEvents} />}
 
           {/* TAB: EN DIRECTO */}
           {activeTab === "live" && (

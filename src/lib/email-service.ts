@@ -764,3 +764,100 @@ export function getGeneralAlertEmailHtml(params: {
   </html>
   `;
 }
+
+export interface PlayerPinEmailParams {
+  playerName: string;
+  pinCode: string;
+  clubName?: string;
+  teamName?: string;
+  loginUrl?: string;
+}
+
+/**
+ * Plantilla de email para enviar el PIN individual de acceso a un jugador o familia
+ */
+export function getPlayerPinEmailHtml({
+  playerName,
+  pinCode,
+  clubName = 'Sporting Saladar',
+  teamName,
+  loginUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/login` : 'https://app.clubsportingsaladar.com/login',
+}: PlayerPinEmailParams): string {
+  const registerUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/register` : 'https://app.clubsportingsaladar.com/register';
+
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Tu PIN de Acceso - ${clubName}</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
+      .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); border: 1px solid #e2e8f0; }
+      .header { background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%); color: #ffffff; padding: 32px 28px; text-align: center; }
+      .header h1 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
+      .badge { display: inline-block; background: rgba(59, 130, 246, 0.25); color: #93c5fd; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; border: 1px solid rgba(147, 197, 253, 0.3); }
+      .content { padding: 32px 28px; }
+      .welcome-text { font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px; }
+      .pin-box { background: #f8fafc; border: 2px dashed #3b82f6; border-radius: 16px; padding: 24px 20px; text-align: center; margin: 24px 0; }
+      .pin-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
+      .pin-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 36px; font-weight: 900; letter-spacing: 6px; color: #1e3a8a; background: #eff6ff; display: inline-block; padding: 8px 24px; border-radius: 12px; border: 1px solid #bfdbfe; }
+      .steps { background: #f8fafc; border-radius: 14px; padding: 20px; margin: 24px 0; border: 1px solid #e2e8f0; }
+      .step-item { display: flex; align-items: flex-start; margin-bottom: 12px; font-size: 13.5px; line-height: 1.5; color: #475569; }
+      .step-item:last-child { margin-bottom: 0; }
+      .step-number { background: #1e3a8a; color: #ffffff; font-weight: 800; font-size: 11px; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; margin-top: 1px; }
+      .button-container { text-align: center; margin: 28px 0 16px; }
+      .button { display: inline-block; background: #1e3a8a; color: #ffffff !important; text-decoration: none; font-weight: 800; font-size: 14px; padding: 13px 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25); }
+      .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <span class="badge">🔐 Credenciales de Acceso</span>
+        <h1>Tu PIN de Registro Familiar</h1>
+      </div>
+      <div class="content">
+        <p class="welcome-text">
+          Hola, te enviamos el código <strong>PIN personal</strong> asignado a <strong>${playerName}</strong>${teamName ? ` del equipo <strong>${teamName}</strong>` : ''} para vincular su ficha al portal del club <strong>${clubName}</strong>.
+        </p>
+
+        <div class="pin-box">
+          <div class="pin-label">Código PIN de Registro</div>
+          <div class="pin-code">${pinCode}</div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 10px;">
+            Este código es exclusivo para la ficha de ${playerName}.
+          </div>
+        </div>
+
+        <div class="steps">
+          <div style="font-weight: 800; font-size: 13px; color: #1e293b; margin-bottom: 12px; text-transform: uppercase;">
+            ¿Cómo utilizar este PIN?
+          </div>
+          <div class="step-item">
+            <span class="step-number">1</span>
+            <span>Accede al portal del club desde el enlace inferior.</span>
+          </div>
+          <div class="step-item">
+            <span class="step-number">2</span>
+            <span>Si aún no tienes cuenta familiar, regístrate seleccionando la opción de vincular jugador mediante PIN.</span>
+          </div>
+          <div class="step-item">
+            <span class="step-number">3</span>
+            <span>Introduce el PIN <strong>${pinCode}</strong> para que la ficha deportiva, convocatorias, asistencias y cuotas se asocien de inmediato a tu área familiar.</span>
+          </div>
+        </div>
+
+        <div class="button-container">
+          <a href="${registerUrl}" class="button" target="_blank">Vincular con mi PIN 📲</a>
+        </div>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} ${clubName}. Si no reconoces esta solicitud o ya tienes tu cuenta configurada, puedes ignorar este correo.
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+}
+

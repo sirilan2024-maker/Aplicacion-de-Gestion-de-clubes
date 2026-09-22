@@ -483,6 +483,7 @@ export async function getClubStaffAction(clubId: string) {
         birth_date,
         license_number,
         avatar_url,
+        linked_player_id,
         team_coaches(teams(id, name, color))
       `)
       .eq('club_id', clubId)

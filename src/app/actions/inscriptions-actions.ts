@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessPlayer, canUserManageRegistration, canUserUpdateRegistrationEmail } from "@/lib/auth-helpers";
 
 export async function getInscriptionsAction(targetSeasonId?: string) {
@@ -301,11 +302,30 @@ export async function updateRegistrationEmailAction(registrationId: string, newE
 }
 
 
-export async function resetPasswordAction(email: string) {
+export async function resetPasswordAction(email: string, clientOrigin?: string) {
   const supabase = await createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.clubsportingsaladar.com';
+
+  let siteUrl = clientOrigin;
+  if (!siteUrl) {
+    try {
+      const headerList = await headers();
+      const host = headerList.get('x-forwarded-host') || headerList.get('host');
+      const proto = headerList.get('x-forwarded-proto') || 'https';
+      if (host) {
+        siteUrl = `${proto}://${host}`;
+      }
+    } catch {
+      // Ignorar si headers() no está disponible
+    }
+  }
+
+  if (!siteUrl) {
+    siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.clubsportingsaladar.com';
+  }
+
+  const cleanSiteUrl = siteUrl.replace(/\/$/, '');
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: `${siteUrl}/auth/callback?next=/actualizar-password`,
+    redirectTo: `${cleanSiteUrl}/auth/callback?next=/actualizar-password`,
   });
   if (error) {
     console.error('[resetPasswordAction] Error:', error.message);

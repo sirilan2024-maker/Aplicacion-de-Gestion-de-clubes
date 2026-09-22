@@ -1,5 +1,5 @@
 import { useState, useTransition, useRef } from "react"
-import { Sparkles, Save, CheckCircle2, AlertCircle, Users, Star, BarChart2, FileText, Loader2, Mic, MicOff, Send, MessageSquare, TrendingUp } from "lucide-react"
+import { Sparkles, Save, CheckCircle2, AlertCircle, Users, Star, BarChart2, FileText, Loader2, Mic, MicOff, Send, MessageSquare, TrendingUp, Shield } from "lucide-react"
 import { saveMatchReport, sendMatchSummaryToCoordinatorsAction } from "@/app/actions/match-actions"
 import { generateMatchAIReportAction } from "@/app/actions/match-ai-report-actions"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,12 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
   const [positive, setPositive] = useState(initialData?.positive_aspects || "")
   const [improvement, setImprovement] = useState(initialData?.improvement_aspects || "")
   const [attitude, setAttitude] = useState(initialData?.attitude_notes || "")
+
+  const initialRival = initialData?.coach_report?.rival_analysis || {}
+  const [rivalSystem, setRivalSystem] = useState(initialRival.system || "")
+  const [rivalGoalsDesc, setRivalGoalsDesc] = useState(initialRival.goals_description || "")
+  const [rivalKeyPlayers, setRivalKeyPlayers] = useState(initialRival.key_players || "")
+  const [rivalNotableData, setRivalNotableData] = useState(initialRival.notable_data || "")
 
   // Dictado por Voz (SpeechRecognition API)
   const [isRecording, setIsRecording] = useState(false);
@@ -91,7 +97,15 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
         coach_summary: summary,
         positive_aspects: positive,
         improvement_aspects: improvement,
-        attitude_notes: attitude
+        attitude_notes: attitude,
+        coach_report: {
+          rival_analysis: {
+            system: rivalSystem,
+            goals_description: rivalGoalsDesc,
+            key_players: rivalKeyPlayers,
+            notable_data: rivalNotableData
+          }
+        }
       })
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
@@ -325,6 +339,73 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
               placeholder="Resumen general del partido generado por la IA basándose en los datos recabados en vivo y las observaciones del entrenador..."
               className="w-full h-36 resize-none rounded-xl border border-indigo-200 bg-indigo-50/30 p-4 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
             />
+          </div>
+
+          {/* ── Bloque Análisis Detallado del Rival ── */}
+          <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200 space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+              <Shield className="w-4 h-4 text-slate-700" />
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Informe y Datos del Rival
+                </h3>
+                <p className="text-[11px] font-medium text-slate-500">
+                  Completa la información táctica para enriquecer el historial y análisis del equipo rival.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Sistema de Juego del Rival
+                </label>
+                <input 
+                  type="text"
+                  value={rivalSystem}
+                  onChange={(e) => setRivalSystem(e.target.value)}
+                  placeholder="Ej. 4-3-3 bloque medio, 5-3-2 repliegue intensivo..."
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-800 shadow-2xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Jugadores Destacados del Rival
+                </label>
+                <input 
+                  type="text"
+                  value={rivalKeyPlayers}
+                  onChange={(e) => setRivalKeyPlayers(e.target.value)}
+                  placeholder="Ej. #10 Mediapunta zurdo muy rápido, #9 fuerte de cabeza..."
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-800 shadow-2xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  ¿Cómo fueron los Goles?
+                </label>
+                <textarea 
+                  value={rivalGoalsDesc}
+                  onChange={(e) => setRivalGoalsDesc(e.target.value)}
+                  placeholder="Detalla cómo se produjeron los goles a favor y en contra (balón parado, contragolpe, fallo en salida, centro lateral...)"
+                  className="w-full h-20 resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs font-medium text-slate-800 shadow-2xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Otros Datos Destacables del Rival
+                </label>
+                <textarea 
+                  value={rivalNotableData}
+                  onChange={(e) => setRivalNotableData(e.target.value)}
+                  placeholder="Puntos débiles a explotar, agresividad, comportamiento arbitral, estado del césped, etc."
+                  className="w-full h-20 resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs font-medium text-slate-800 shadow-2xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end pt-4">

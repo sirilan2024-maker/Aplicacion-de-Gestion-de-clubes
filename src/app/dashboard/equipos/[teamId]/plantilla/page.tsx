@@ -8,6 +8,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { updatePlayerPositionAction } from "@/app/actions/player-actions";
 import { getTeamCoachesProfilesAction } from "@/app/actions/team-actions";
 import { useExport } from "@/components/providers/ExportContext";
+import { ExportPinsModal } from "@/components/features/teams/ExportPinsModal";
 
 interface Player {
   id: string;
@@ -16,6 +17,8 @@ interface Player {
   posicion: string;
   birth_date: string;
   email: string | null;
+  parent1_email?: string | null;
+  parent2_email?: string | null;
   parent_contact: string | null;
   dorsal: number | null;
   height: number | null;
@@ -39,6 +42,7 @@ export default function PlantillaEquipoPage() {
   // Edit Modal State
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isExportPinsModalOpen, setIsExportPinsModalOpen] = useState(false);
 
   const { setExportData } = useExport();
 
@@ -74,7 +78,7 @@ export default function PlantillaEquipoPage() {
           .from("player_season_history")
           .select(`
             status,
-            players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
+            players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent1_email, parent2_email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
           `)
           .eq("team_id", teamId)
         .neq("status", "inactive");
@@ -226,18 +230,7 @@ export default function PlantillaEquipoPage() {
           {(!userRole || !['entrenador', 'coach', 'coordinador'].includes(userRole.toLowerCase())) && (
             <>
               <button 
-                onClick={() => {
-                  const csvContent = "data:text/csv;charset=utf-8," 
-                    + "Jugador,PIN de Registro\n"
-                    + players.filter(p => p.posicion !== 'Entrenador').map(e => `${e.first_name} ${e.last_name},${e.link_code || 'SIN PIN'}`).join("\n");
-                  const encodedUri = encodeURI(csvContent);
-                  const link = document.createElement("a");
-                  link.setAttribute("href", encodedUri);
-                  link.setAttribute("download", "PINs_Registro_Familiares.csv");
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
+                onClick={() => setIsExportPinsModalOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-xl border border-indigo-200 transition-colors shadow-sm text-sm"
               >
                 <FileText className="w-4 h-4" />
@@ -611,6 +604,15 @@ export default function PlantillaEquipoPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE EXPORTACIÓN Y ENVÍO DE PINS */}
+      <ExportPinsModal
+        isOpen={isExportPinsModalOpen}
+        onClose={() => setIsExportPinsModalOpen(false)}
+        teamId={teamId}
+        players={players}
+        onPinsUpdated={fetchData}
+      />
     </div>
   );
 }

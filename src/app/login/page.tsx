@@ -25,9 +25,10 @@ function LoginForm() {
     }
     
     setIsResetting(true);
-    const res = await resetPasswordAction(emailValue);
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const res = await resetPasswordAction(emailValue, origin);
     if (res.success) {
-      setResetMessage({ text: "Te hemos enviado un enlace. Revisa tu correo.", type: "success" });
+      setResetMessage({ text: "Te hemos enviado un enlace a tu correo. Revisa tu bandeja de entrada y la carpeta de spam.", type: "success" });
     } else {
       setResetMessage({ text: "Error al enviar. Comprueba el correo o contacta con el club.", type: "error" });
     }

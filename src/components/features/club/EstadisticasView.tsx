@@ -18,6 +18,7 @@ interface RawData {
   events: any[];
   perf: any[];
   matchStats: any[];
+  mvpVotes: any[];
   metricMap: Map<string, string>;
 }
 
@@ -139,6 +140,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
       // 6. Fetch Match Data (From partidos, convocatorias and match_events)
       let matchStats: any[] = []
+      let mvpData: any[] = []
       if (teamIds.length > 0) {
         const { data: teamMatches } = await supabase
           .from('partidos')
@@ -179,6 +181,15 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             team_id: matchTeamMap.get(c.partido_id) || null
           }));
         }
+
+        // Fetch MVP votes for all matches
+        if (matchIds.length > 0) {
+          const { data: votesData } = await supabase
+            .from('mvp_votes')
+            .select('match_id, player_id')
+            .in('match_id', matchIds);
+          mvpData = votesData || [];
+        }
       }
 
       setRawData({
@@ -189,6 +200,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         attendance: attendance || [],
         perf: perf || [],
         matchStats: matchStats || [],
+        mvpVotes: mvpData || [],
         metricMap
       })
       
@@ -289,7 +301,8 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         sumRen: 0,
         countRen: 0,
         avgRendimiento: 0,
-        disciplinaPuntos: 0
+        disciplinaPuntos: 0,
+        mvpCount: 0
       });
     });
     
@@ -361,6 +374,32 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       }
     });
 
+    // Calculate MVP winners per match
+    const matchVotesMap = new Map<string, Map<string, number>>();
+    (rawData.mvpVotes || []).forEach(vote => {
+      if (!vote.match_id || !vote.player_id) return;
+      if (!matchVotesMap.has(vote.match_id)) {
+        matchVotesMap.set(vote.match_id, new Map());
+      }
+      const pVotes = matchVotesMap.get(vote.match_id)!;
+      pVotes.set(vote.player_id, (pVotes.get(vote.player_id) || 0) + 1);
+    });
+
+    matchVotesMap.forEach((pVotes) => {
+      let winningPlayerId: string | null = null;
+      let maxVotes = 0;
+      pVotes.forEach((cnt, pid) => {
+        if (cnt > maxVotes) {
+          maxVotes = cnt;
+          winningPlayerId = pid;
+        }
+      });
+      if (winningPlayerId && playerStatsMap.has(winningPlayerId)) {
+        const pStats = playerStatsMap.get(winningPlayerId)!;
+        pStats.mvpCount = (pStats.mvpCount || 0) + 1;
+      }
+    });
+
     // Complementar con índice de rendimiento por partidos y regularidad si no tienen evaluaciones directas
     filteredPlayers.forEach(p => {
       const pStats = playerStatsMap.get(p.id);
@@ -413,6 +452,10 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       .filter(p => p.disciplinaPuntos > 0)
       .sort((a, b) => b.disciplinaPuntos - a.disciplinaPuntos || b.amarillas - a.amarillas)
       .slice(0, 3);
+    const topMvp = [...playersStatsArray]
+      .filter(p => p.mvpCount > 0)
+      .sort((a, b) => b.mvpCount - a.mvpCount || b.goles - a.goles || b.avgRendimiento - a.avgRendimiento)
+      .slice(0, 3);
 
     return {
       totalJugadores: countJugadores,
@@ -430,7 +473,8 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       topGoles,
       topRendimiento,
       topMinutos,
-      topDisciplina
+      topDisciplina,
+      topMvp
     }
   }, [rawData, selectedTeamId]);
 
@@ -769,7 +813,36 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         </div>
 
         {/* RANKINGS TOP 3 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6 mt-6">
+          {/* Top MVP / Estrella del Partido */}
+          <div className="bg-white rounded-2xl border border-amber-200/80 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-amber-500/10 py-3 px-4 border-b border-amber-200/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy size={16} className="text-amber-500" />
+                <h3 className="font-bold text-amber-900 text-sm">Top MVP (Estrella)</h3>
+              </div>
+              <span className="text-[10px] font-extrabold text-amber-700 bg-amber-200/70 px-2 py-0.5 rounded-full">
+                Votos
+              </span>
+            </div>
+            <div className="p-4 flex-1 flex flex-col gap-3">
+              {stats.topMvp.length > 0 ? stats.topMvp.map((p: any, i: number) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <span className={`font-black text-sm w-4 text-center ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-amber-700'}`}>{i + 1}</span>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.name}</p>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase truncate">{p.teamName}</p>
+                    </div>
+                  </div>
+                  <span className="font-black text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg text-xs flex items-center gap-1">
+                    ⭐ {p.mvpCount} {p.mvpCount === 1 ? 'partido' : 'partidos'}
+                  </span>
+                </div>
+              )) : <p className="text-xs text-slate-400 text-center py-4">Sin votos MVP registrados</p>}
+            </div>
+          </div>
+
           {/* Top Goleadores */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div className="bg-emerald-50 py-3 px-4 border-b border-emerald-100 flex items-center gap-2">

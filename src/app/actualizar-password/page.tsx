@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { updatePasswordServerAction } from '@/lib/auth-actions';
+import { Eye, EyeOff, Lock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
-export default function ActualizarPasswordPage() {
+function ActualizarPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,6 +18,124 @@ export default function ActualizarPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Estados de verificación de sesión
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [isSessionValid, setIsSessionValid] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const supabase = createClient();
+
+    async function initSession() {
+      // 1. Comprobar si hay error en los parámetros de la URL
+      const urlError = searchParams.get('error') || searchParams.get('error_description');
+      if (urlError) {
+        if (isMounted) {
+          setErrorMessage(decodeURIComponent(urlError));
+          setCheckingSession(false);
+          setIsSessionValid(false);
+        }
+        return;
+      }
+
+      // 2. Comprobar si Supabase pasó el código en la query (?code=...)
+      const code = searchParams.get('code');
+      if (code) {
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error && data?.session) {
+            if (isMounted) {
+              setIsSessionValid(true);
+              setCheckingSession(false);
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn('[ActualizarPassword] Error intercambiando código:', err);
+        }
+      }
+
+      // 3. Comprobar si Supabase devolvió tokens en el hash fragment (#access_token=...)
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const hashError = params.get('error_description') || params.get('error');
+        if (hashError) {
+          if (isMounted) {
+            setErrorMessage(decodeURIComponent(hashError));
+            setCheckingSession(false);
+            setIsSessionValid(false);
+          }
+          return;
+        }
+
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken) {
+          try {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '',
+            });
+            if (!error && data?.session) {
+              if (isMounted) {
+                setIsSessionValid(true);
+                setCheckingSession(false);
+              }
+              return;
+            }
+          } catch (err) {
+            console.warn('[ActualizarPassword] Error estableciendo sesión desde hash:', err);
+          }
+        }
+      }
+
+      // 4. Comprobar si ya existe una sesión activa (ej. cookies establecidas por /auth/callback)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          if (isMounted) {
+            setIsSessionValid(true);
+            setCheckingSession(false);
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('[ActualizarPassword] Error comprobando sesión existente:', err);
+      }
+
+      // 5. Esperar brevemente por si onAuthStateChange se dispara (PASSWORD_RECOVERY)
+      const timeoutId = setTimeout(async () => {
+        if (!isMounted) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setIsSessionValid(true);
+        } else {
+          setIsSessionValid(false);
+        }
+        setCheckingSession(false);
+      }, 1200);
+
+      return () => clearTimeout(timeoutId);
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        if (isMounted) {
+          setIsSessionValid(true);
+          setCheckingSession(false);
+        }
+      }
+    });
+
+    initSession();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,17 +154,31 @@ export default function ActualizarPasswordPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({
+      
+      // Intento 1: Actualizar contraseña usando el cliente de navegador
+      const { error: clientError } = await supabase.auth.updateUser({
         password: password,
       });
 
-      if (error) {
-        setErrorMessage(error.message || 'Error al actualizar la contraseña. Por favor solicita un nuevo enlace.');
-      } else {
+      if (!clientError) {
         setSuccess(true);
         setTimeout(() => {
           router.push('/login?message=' + encodeURIComponent('Contraseña actualizada con éxito. Inicia sesión con tus nuevas credenciales.'));
         }, 2500);
+        return;
+      }
+
+      console.warn('[ActualizarPassword] Fallo cliente, probando acción de servidor:', clientError.message);
+
+      // Intento 2 (Fallback): Actualizar contraseña usando Server Action (lee cookies de sesión del servidor)
+      const serverRes = await updatePasswordServerAction(password);
+      if (serverRes.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/login?message=' + encodeURIComponent('Contraseña actualizada con éxito. Inicia sesión con tus nuevas credenciales.'));
+        }, 2500);
+      } else {
+        setErrorMessage(serverRes.error || clientError.message || 'Error al actualizar la contraseña. Por favor solicita un nuevo enlace.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Error inesperado al procesar la solicitud.');
@@ -65,7 +200,32 @@ export default function ActualizarPasswordPage() {
           </p>
         </div>
 
-        {success ? (
+        {checkingSession ? (
+          <div className="py-12 flex flex-col items-center justify-center space-y-3 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-sm font-medium">Verificando enlace de recuperación...</p>
+          </div>
+        ) : !isSessionValid ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-amber-100 text-amber-600 rounded-full">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-amber-900">Enlace no válido o expirado</h3>
+              <p className="text-xs text-amber-800 mt-1.5 leading-relaxed">
+                {errorMessage || 'El enlace para restablecer tu contraseña ha caducado o ya ha sido utilizado. Por favor, solicita uno nuevo desde el inicio de sesión.'}
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/login"
+                className="inline-block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-colors shadow-md"
+              >
+                Solicitar nuevo enlace
+              </Link>
+            </div>
+          </div>
+        ) : success ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-4">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full">
               <CheckCircle className="w-6 h-6" />
@@ -148,7 +308,10 @@ export default function ActualizarPasswordPage() {
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3 px-4 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
             >
               {loading ? (
-                <span>Guardando...</span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Guardando...</span>
+                </>
               ) : (
                 <span>Guardar Nueva Contraseña</span>
               )}
@@ -163,5 +326,17 @@ export default function ActualizarPasswordPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ActualizarPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <ActualizarPasswordForm />
+    </Suspense>
   );
 }

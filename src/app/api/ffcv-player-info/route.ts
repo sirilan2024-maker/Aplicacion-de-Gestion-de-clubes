@@ -15,6 +15,129 @@ function normalizeStr(str: string): string {
     .trim();
 }
 
+const NICKNAMES_MAP: Record<string, string[]> = {
+  francisco: ['fran', 'paco', 'curro'],
+  fran: ['francisco'],
+  paco: ['francisco'],
+  jose: ['pepe', 'pep'],
+  pepe: ['jose'],
+  antonio: ['toni', 'tono'],
+  toni: ['antonio'],
+  manuel: ['manu', 'manolo'],
+  manu: ['manuel'],
+  alejandro: ['alex', 'ale'],
+  alex: ['alejandro'],
+  javier: ['javi'],
+  javi: ['javier'],
+  ignacio: ['nacho'],
+  nacho: ['ignacio'],
+  roberto: ['rober'],
+  rober: ['roberto'],
+  mohamed: ['mohammed', 'mohamd', 'moha', 'med'],
+  mohammed: ['mohamed', 'mohamd', 'moha', 'med'],
+  mohamd: ['mohamed', 'mohammed', 'moha', 'med'],
+  atouzani: ['touzani'],
+  touzani: ['atouzani'],
+  khayefallah: ['khaef', 'allah', 'daghmani'],
+  khaefallah: ['khayefallah', 'khaef', 'allah'],
+  serna: ['ballesta'],
+  ballestaaa: ['ballesta', 'ballestas']
+};
+
+function matchFfcvPlayerInRoster(
+  firstName: string,
+  lastName: string,
+  dorsal: string | number | null | undefined,
+  ffcvRoster: any[]
+) {
+  const normFirst = normalizeStr(firstName);
+  const normLast = normalizeStr(lastName);
+  const dorsalStr = dorsal ? String(dorsal).trim() : '';
+
+  const firstTokens = normFirst.split(' ').filter(Boolean);
+  const lastTokens = normLast.split(' ').filter(Boolean);
+
+  let bestCandidate = null;
+  let bestScore = 0;
+
+  for (const j of ffcvRoster) {
+    const ffcvNorm = normalizeStr(j.nombre);
+    const ffcvTokens = ffcvNorm.split(' ').filter(Boolean);
+
+    // 1. Check surname matching (exact token, alias, or root similarity)
+    let surnameMatched = false;
+    for (const lt of lastTokens) {
+      if (lt.length <= 2) continue;
+      if (ffcvTokens.includes(lt) || ffcvNorm.includes(lt)) {
+        surnameMatched = true;
+        break;
+      }
+      const aliases = NICKNAMES_MAP[lt] || [];
+      if (aliases.some(a => ffcvTokens.includes(a) || ffcvNorm.includes(a))) {
+        surnameMatched = true;
+        break;
+      }
+      if (ffcvTokens.some(ft => ft.length > 4 && (lt.startsWith(ft.slice(0, 5)) || ft.startsWith(lt.slice(0, 5))))) {
+        surnameMatched = true;
+        break;
+      }
+    }
+
+    // 2. Check first name matching (exact token, alias, or root similarity)
+    let firstNameMatched = false;
+    for (const ft of firstTokens) {
+      if (ft.length <= 2) continue;
+      if (ffcvTokens.includes(ft) || ffcvNorm.includes(ft)) {
+        firstNameMatched = true;
+        break;
+      }
+      const aliases = NICKNAMES_MAP[ft] || [];
+      if (aliases.some(a => ffcvTokens.includes(a) || ffcvNorm.includes(a))) {
+        firstNameMatched = true;
+        break;
+      }
+      if (ffcvTokens.some(f => f.length > 4 && (ft.startsWith(f.slice(0, 4)) || f.startsWith(ft.slice(0, 4))))) {
+        firstNameMatched = true;
+        break;
+      }
+    }
+
+    if (!surnameMatched && !firstNameMatched) continue;
+
+    let score = 0;
+    if (surnameMatched) score += 4;
+    if (firstNameMatched) score += 3;
+
+    for (const t of [...firstTokens, ...lastTokens]) {
+      if (t.length > 2 && ffcvTokens.includes(t)) score += 1;
+    }
+
+    if (dorsalStr && String(j.dorsal).trim() === dorsalStr) {
+      score += 4;
+    }
+
+    if (surnameMatched && firstNameMatched && score > bestScore) {
+      bestScore = score;
+      bestCandidate = j;
+    }
+  }
+
+  // Fallback for players where official FFCV roster shortened to only First Name + Single Surname
+  if (!bestCandidate) {
+    for (const j of ffcvRoster) {
+      const ffcvNorm = normalizeStr(j.nombre);
+      const allTokens = [...firstTokens, ...lastTokens].filter(t => t.length > 3);
+      const matchCount = allTokens.filter(t => ffcvNorm.includes(t)).length;
+      if (matchCount >= 2) {
+        bestCandidate = j;
+        break;
+      }
+    }
+  }
+
+  return bestCandidate;
+}
+
 async function fetchFfcvJson(url: string) {
   try {
     const res = await fetch(url, {
@@ -96,45 +219,20 @@ export async function GET(req: Request) {
       }, { status: 502 });
     }
 
-    const normFirstName = normalizeStr(player.first_name);
-    const normLastName = normalizeStr(player.last_name);
-    const dorsalStr = player.dorsal ? String(player.dorsal) : '';
-
-    let matchedFfcvPlayer = null;
-
-    for (const j of plantillaData.jugadores_equipo) {
-      const ffcvNormName = normalizeStr(j.nombre);
-      const parts = normFirstName.split(' ').concat(normLastName.split(' ')).filter(Boolean);
-      const matchCount = parts.filter(p => ffcvNormName.includes(p)).length;
-
-      if (matchCount >= 2 || (parts.length === 1 && matchCount === 1)) {
-        if (dorsalStr && j.dorsal === dorsalStr) {
-          matchedFfcvPlayer = j;
-          break;
-        }
-        if (!matchedFfcvPlayer) {
-          matchedFfcvPlayer = j;
-        }
-      }
-    }
-
-    if (!matchedFfcvPlayer && dorsalStr) {
-      for (const j of plantillaData.jugadores_equipo) {
-        if (j.dorsal === dorsalStr) {
-          const ffcvNorm = normalizeStr(j.nombre);
-          const hasOneWord = normLastName.split(' ').some(w => w.length > 3 && ffcvNorm.includes(w));
-          if (hasOneWord) {
-            matchedFfcvPlayer = j;
-            break;
-          }
-        }
-      }
-    }
+    const matchedFfcvPlayer = matchFfcvPlayerInRoster(
+      player.first_name,
+      player.last_name,
+      player.dorsal,
+      plantillaData.jugadores_equipo
+    );
 
     if (!matchedFfcvPlayer || !matchedFfcvPlayer.codjugador) {
+      const rosterCount = plantillaData.jugadores_equipo.length;
       return NextResponse.json({
         found: false,
-        message: 'El jugador no figura en la plantilla oficial publicada en la FFCV para este equipo (puede estar en trámite de validación).'
+        message: rosterCount === 0
+          ? 'La FFCV aún no ha publicado la plantilla oficial validada para este equipo en la federación.'
+          : 'El jugador no figura en la plantilla oficial publicada en la FFCV para este equipo (puede estar en trámite de validación).'
       });
     }
 

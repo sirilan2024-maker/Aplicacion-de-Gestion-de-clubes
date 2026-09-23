@@ -26,6 +26,10 @@ export default async function PartidosPage() {
     .select("id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url")
     .order("name", { ascending: true })
 
+  if (profile?.club_id) {
+    matchesQuery = matchesQuery.eq("club_id", profile.club_id)
+    teamsQuery = teamsQuery.eq("club_id", profile.club_id)
+  }
 
   if (activeSeason?.id) {
     matchesQuery = matchesQuery.eq("season_id", activeSeason.id)

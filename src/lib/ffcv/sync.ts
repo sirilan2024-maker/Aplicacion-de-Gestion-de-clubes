@@ -255,6 +255,12 @@ export async function syncTeamFFCV(
       .from('teams')
       .update({ ffcv_last_synced_at: new Date().toISOString() })
       .eq('id', teamId);
+
+    try {
+      await propagateFfcvMatchesToClubPartidos(supabase);
+    } catch (e: any) {
+      console.warn('[syncTeamFFCV] Error propagating to club partidos:', e);
+    }
   }
 
   return result;
@@ -366,6 +372,13 @@ export async function syncAllConfiguredFFCVTeams(
     }
   }
 
+  // 3. Propagate updated scores, statuses, dates, and times to the application's 'partidos' table
+  try {
+    await propagateFfcvMatchesToClubPartidos(supabase);
+  } catch (bridgeErr: any) {
+    console.error('[syncAllConfiguredFFCVTeams] Error propagating to club partidos:', bridgeErr);
+  }
+
   return {
     success: groupsFailed === 0,
     timestamp: new Date().toISOString(),
@@ -378,4 +391,106 @@ export async function syncAllConfiguredFFCVTeams(
     totalMatchesUpdated: totalMatches,
     groupResults
   };
+}
+
+
+/**
+ * Propagates updated matches from ffcv_matches into the internal partidos table
+ * for the active season. This keeps family portals, calendar views, and match reports
+ * synchronized with official FFCV scores, statuses, dates, and kick-off times.
+ */
+export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: any): Promise<number> {
+  const supabase = customSupabaseClient || createAdminClient();
+
+  // 1. Get active season
+  const { data: activeSeason, error: seasonErr } = await supabase
+    .from('seasons')
+    .select('id, name')
+    .eq('is_active', true)
+    .single();
+
+  if (seasonErr || !activeSeason) {
+    console.warn('[propagateFfcvMatchesToClubPartidos] No active season found.');
+    return 0;
+  }
+
+  // 2. Fetch matches from 'partidos' for this active season
+  const { data: clubPartidos, error: cpErr } = await supabase
+    .from('partidos')
+    .select('id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival, acta_oficial_url, equipo_id, teams(name, ffcv_team_id, ffcv_group_id)')
+    .eq('season_id', activeSeason.id);
+
+  if (cpErr || !clubPartidos || clubPartidos.length === 0) {
+    return 0;
+  }
+
+  // 3. Fetch corresponding FFCV matches
+  const { data: ffcvMatches, error: fmErr } = await supabase
+    .from('ffcv_matches')
+    .select('ffcv_match_id, matchday, match_date, match_time, home_team_name, away_team_name, home_score, away_score, status');
+
+  if (fmErr || !ffcvMatches || ffcvMatches.length === 0) {
+    return 0;
+  }
+
+  let updatedCount = 0;
+
+  for (const pm of clubPartidos) {
+    // A. Match by acta_oficial_url containing ffcv_match_id
+    let fm = ffcvMatches.find(f => pm.acta_oficial_url && pm.acta_oficial_url.includes(String(f.ffcv_match_id)));
+
+    // B. Fallback: match by team and rival name similarity
+    if (!fm && (pm.teams as any)?.name) {
+      const pRival = (pm.rival_nombre || '').toLowerCase();
+      fm = ffcvMatches.find(f => {
+        const h = (f.home_team_name || '').toLowerCase();
+        const a = (f.away_team_name || '').toLowerCase();
+        const rivalName = h.includes('saladar') ? a : h;
+        const words = pRival.split(' ').filter(w => w.length > 3);
+        return words.some(w => rivalName.includes(w));
+      });
+    }
+
+    if (!fm) continue;
+
+    const isPlayed = fm.status === 'played' || (fm.home_score !== null && fm.away_score !== null);
+    const isSaladarHome = (fm.home_team_name || '').toLowerCase().includes('saladar');
+    const sportingScore = isSaladarHome ? fm.home_score : fm.away_score;
+    const rivalScore = isSaladarHome ? fm.away_score : fm.home_score;
+    const targetStatus = isPlayed ? 'Finalizado' : 'Programado';
+
+    const updates: Record<string, any> = {};
+
+    // Check status & score updates
+    if (isPlayed && (pm.estado !== 'Finalizado' || pm.resultado_propio !== sportingScore || pm.resultado_rival !== rivalScore)) {
+      updates.estado = targetStatus;
+      updates.resultado_propio = sportingScore;
+      updates.resultado_rival = rivalScore;
+    }
+
+    // Check date and time updates if published by FFCV
+    if (fm.match_date && fm.match_time) {
+      const ffcvIso = `${fm.match_date}T${fm.match_time}+02:00`;
+      const currentMs = new Date(pm.fecha_hora).getTime();
+      const ffcvMs = new Date(ffcvIso).getTime();
+      if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
+        updates.fecha_hora = ffcvIso;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const { error: upErr } = await supabase
+        .from('partidos')
+        .update(updates)
+        .eq('id', pm.id);
+
+      if (!upErr) {
+        updatedCount++;
+      } else {
+        console.warn(`[propagateFfcvMatchesToClubPartidos] Error updating partido ${pm.id}:`, upErr.message);
+      }
+    }
+  }
+
+  return updatedCount;
 }

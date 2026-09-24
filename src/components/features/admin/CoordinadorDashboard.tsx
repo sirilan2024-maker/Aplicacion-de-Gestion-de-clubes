@@ -77,6 +77,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
 
   // Referencia para evitar bucles infinitos de re-renderizado
   const lastLoadedSeasonRef = React.useRef<string | null>(initialResult.data?.activeSeason?.id || null)
+  const isInitialMount = React.useRef(true)
 
   const refresh = useCallback(async (overrideSeasonId?: string) => {
     setLoading(true)
@@ -85,8 +86,13 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
       const fresh = await getCoordinatorDashboardAction(seasonToFetch)
       if (fresh.success && fresh.data?.activeSeason?.id) {
         lastLoadedSeasonRef.current = fresh.data.activeSeason.id
+      } else if (overrideSeasonId) {
+        lastLoadedSeasonRef.current = overrideSeasonId
       }
       setResult(fresh)
+    } catch (err: any) {
+      if (overrideSeasonId) lastLoadedSeasonRef.current = overrideSeasonId
+      setResult({ success: false, error: err?.message || 'Error al actualizar el panel' })
     } finally {
       setLoading(false)
     }
@@ -94,11 +100,19 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
 
   // Reacción automática e inmediata al cambio de temporada en el selector global SIN bucles
   React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      if (initialResult.data?.activeSeason?.id) {
+        lastLoadedSeasonRef.current = initialResult.data.activeSeason.id
+      }
+      return
+    }
+
     if (selectedSeasonId && selectedSeasonId !== lastLoadedSeasonRef.current) {
       lastLoadedSeasonRef.current = selectedSeasonId
       refresh(selectedSeasonId)
     }
-  }, [selectedSeasonId])
+  }, [selectedSeasonId, refresh])
 
   const data = result.data
 

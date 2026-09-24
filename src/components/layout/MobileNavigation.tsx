@@ -111,31 +111,34 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
   const activeFamilyPlayerId = familyMatch ? familyMatch[1] : null
 
   useEffect(() => {
+    let isCancelled = false
+    const supabaseClient = createClient()
+
     const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
+      const { data: { user } } = await supabaseClient.auth.getUser()
+      if (user && !isCancelled) {
+        const { data: profile } = await supabaseClient
           .from("profiles")
           .select("role, roles, club_id")
           .eq("id", user.id)
           .single()
           
-        if (profile) {
+        if (profile && !isCancelled) {
           setUserRole(profile.role)
           setAvailableRoles(profile.roles && profile.roles.length > 0 ? profile.roles : [profile.role || 'usuario'])
           
           if (profile.club_id) {
-            const { data: club } = await supabase.from('clubs').select('id, name, logo_url').eq('id', profile.club_id).single()
-            if (club) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
+            const { data: club } = await supabaseClient.from('clubs').select('id, name, logo_url').eq('id', profile.club_id).single()
+            if (club && !isCancelled) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
-            let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id)
+            let query = supabaseClient.from('teams').select("id, name").eq("club_id", profile.club_id)
             if (selectedSeason?.id) {
               query = query.eq("season_id", selectedSeason.id)
             }
             query = query.order("name")
 
             if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-              const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
+              const { data: coachTeams } = await supabaseClient.from('team_coaches').select('team_id').eq('profile_id', user.id);
               const teamIds = coachTeams?.map(ct => ct.team_id) || [];
               if (teamIds.length > 0) {
                 query = query.or(`coach_id.eq.${user.id},id.in.(${teamIds.join(',')})`);
@@ -144,15 +147,15 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
               }
             }
             const { data: eqData } = await query
-            if (eqData) setEquipos(eqData)
+            if (eqData && !isCancelled) setEquipos(eqData)
 
             // Fetch dynamic navigation
-            const { data: navData } = await supabase
+            const { data: navData } = await supabaseClient
               .from('role_navigation')
               .select(`nav_id, app_navigation(label, path, icon_name, sort_order)`)
               .eq('role', profile.role)
             
-            if (navData) {
+            if (navData && !isCancelled) {
                const parsedNavs = navData
                  .filter((n: any) => n.app_navigation)
                  .map((n: any) => ({
@@ -170,7 +173,8 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       }
     }
     fetchData()
-  }, [supabase, selectedSeason?.id, userRole])
+    return () => { isCancelled = true }
+  }, [selectedSeason?.id])
 
   useEffect(() => {
     if (menuOpen) {

@@ -16,7 +16,9 @@ export function ImpersonationBanner() {
   useEffect(() => {
     async function checkStatus() {
       try {
-        const res = await getImpersonationStatusAction();
+        const response = await fetch('/api/auth/impersonation-status', { cache: 'no-store' });
+        if (!response.ok) return;
+        const res = await response.json();
         if (res.isImpersonating) {
           setStatus({
             isImpersonating: true,
@@ -27,7 +29,7 @@ export function ImpersonationBanner() {
           setStatus({ isImpersonating: false });
         }
       } catch (e) {
-        // ignore
+        // ignore safely without throwing
       }
     }
     checkStatus();

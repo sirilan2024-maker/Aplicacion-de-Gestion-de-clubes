@@ -112,7 +112,6 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
   const [showEditClub, setShowEditClub] = useState(false)
   const [showImpersonateModal, setShowImpersonateModal] = useState(false)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
-  const supabase = createClient()
 
   // SÓLO los administradores ven el fondo oscuro y el menú especial
   const isAdmin = userRole === "admin" || userRole === "superadmin";

@@ -24,9 +24,24 @@ export function NotificationBell() {
   }, [])
 
   const fetchNotifications = async () => {
-    const res = await getUnreadNotificationsAction()
-    if (res.success && res.data) {
-      setNotifications(res.data)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(25)
+
+      if (!error && data) {
+        setNotifications(data)
+      }
+    } catch (err) {
+      // Safe silent catch: best-effort polling should never throw or trigger reloads
     }
   }
 
@@ -105,27 +120,36 @@ export function NotificationBell() {
 
   const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const res = await markNotificationAsReadAction(id)
-    if (res.success) {
-      // Remove from state immediately (notification is deleted from DB)
-      setNotifications(prev => prev.filter(n => n.id !== id))
+    // Remove from state immediately (optimistic UI)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    try {
+      await markNotificationAsReadAction(id)
+    } catch (err) {
+      console.warn("Could not mark notification as read:", err)
     }
   }
 
   const handleMarkAllAsRead = async () => {
-    const res = await markAllNotificationsAsReadAction()
-    if (res.success) {
-      // Clear entire list
-      setNotifications([])
-      setIsOpen(false)
+    // Clear entire list immediately (optimistic UI)
+    setNotifications([])
+    setIsOpen(false)
+    try {
+      await markAllNotificationsAsReadAction()
+    } catch (err) {
+      console.warn("Could not mark all notifications as read:", err)
     }
   }
 
   const handleNotificationClick = async (notification: any) => {
-    // Delete the notification
-    await markNotificationAsReadAction(notification.id)
+    // Optimistic removal
     setNotifications(prev => prev.filter(n => n.id !== notification.id))
     setIsOpen(false)
+
+    try {
+      markNotificationAsReadAction(notification.id).catch(() => {})
+    } catch (err) {
+      // ignore
+    }
 
     // Navigate to the right place
     const url = getNavigationUrl(notification)

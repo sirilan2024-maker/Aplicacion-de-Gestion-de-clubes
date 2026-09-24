@@ -65,7 +65,7 @@ export default async function PartidosPage() {
         team_id,
         players!inner (id, first_name, last_name, posicion, status)
       `)
-      .eq("season_id", effectiveSeasonId)
+      .eq("season_id", targetSeasonId)
       .neq("status", "inactive");
       
     if (playersError) {

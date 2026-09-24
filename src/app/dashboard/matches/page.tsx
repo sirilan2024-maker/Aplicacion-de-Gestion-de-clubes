@@ -13,15 +13,22 @@ export default async function PartidosPage() {
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) return null
 
-  const { data: profile } = await supabase.from('profiles').select('club_id, role').eq('id', userData.user.id).single()
-  
-  // Resolver temporada seleccionada mediante cookie/contexto unificado
-  const { seasonId: effectiveSeasonId } = await getEffectiveSelectedSeasonId(
-    adminClient,
-    profile?.club_id || ''
-  );
+  // Obtener contexto de autenticación y club
+  const { data: profile } = await adminClient.from('profiles').select('club_id, role').eq('id', userData.user.id).single()
+  const clubId = profile?.club_id
 
-  let matchesQuery = supabase
+  // Obtener obligatoriamente la temporada activa del club (TEMPORADA 26/27)
+  const { data: activeSeason } = await adminClient
+    .from('seasons')
+    .select('id, name')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  // Para la vista principal de partidos en vivo y calendario, usar siempre la temporada activa
+  const targetSeasonId = activeSeason?.id || ''
+
+  let matchesQuery = adminClient
     .from("partidos")
     .select(`
       *,
@@ -29,26 +36,29 @@ export default async function PartidosPage() {
     `)
     .order("fecha_hora", { ascending: true })
 
-  let teamsQuery = supabase
+  let teamsQuery = adminClient
     .from("teams")
     .select("id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url")
     .order("name", { ascending: true })
 
-  if (profile?.club_id) {
-    matchesQuery = matchesQuery.eq("club_id", profile.club_id)
-    teamsQuery = teamsQuery.eq("club_id", profile.club_id)
+  if (clubId) {
+    matchesQuery = matchesQuery.eq("club_id", clubId)
+    teamsQuery = teamsQuery.eq("club_id", clubId)
   }
 
-  if (effectiveSeasonId) {
-    matchesQuery = matchesQuery.eq("season_id", effectiveSeasonId)
-    teamsQuery = teamsQuery.eq("season_id", effectiveSeasonId)
+  if (targetSeasonId) {
+    matchesQuery = matchesQuery.eq("season_id", targetSeasonId)
+    teamsQuery = teamsQuery.eq("season_id", targetSeasonId)
+  } else {
+    // Si por alguna razón no se encontró temporada activa, excluir estrictamente la temporada pasada 25/26
+    matchesQuery = matchesQuery.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
   }
 
   const { data: matches } = await matchesQuery
   const { data: teams } = await teamsQuery
 
   let players: any[] = [];
-  if (effectiveSeasonId) {
+  if (targetSeasonId) {
     const { data: historyData, error: playersError } = await supabase
       .from("player_season_history")
       .select(`

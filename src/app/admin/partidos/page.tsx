@@ -54,10 +54,14 @@ export default function AdminPartidosPage() {
         .eq('is_active', true)
         .single()
 
-      const targetSeasonId = selectedSeasonId || activeSeason?.id;
+      // En la vista de partidos, NUNCA cargar la temporada pasada 25/26
+      const PAST_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+      const targetSeasonId = (selectedSeasonId && selectedSeasonId !== PAST_SEASON_ID)
+        ? selectedSeasonId
+        : activeSeason?.id;
 
       if (teamsData) {
-        // Filtrar los equipos para el desplegable: por temporada o por presencia de partidos en la temporada seleccionada
+        // Filtrar los equipos para el desplegable: por temporada activa
         const filteredTeams = targetSeasonId 
           ? teamsData.filter(t => t.season_id === targetSeasonId)
           : teamsData;
@@ -75,7 +79,7 @@ export default function AdminPartidosPage() {
         setTeams(uniqueTeamsByName);
       }
 
-      // Buscar los partidos del club
+      // Buscar los partidos del club (excluyendo estrictamente la temporada pasada 25/26)
       let query = supabase
         .from("partidos")
         .select(`
@@ -83,6 +87,7 @@ export default function AdminPartidosPage() {
           equipo:teams(id, name, color, ffcv_url)
         `)
         .eq("club_id", profile.club_id)
+        .neq("season_id", PAST_SEASON_ID)
         
       if (targetSeasonId) {
         query = query.eq('season_id', targetSeasonId)

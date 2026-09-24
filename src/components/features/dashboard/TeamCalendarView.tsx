@@ -17,10 +17,11 @@ export function TeamCalendarView({ teamId }: { teamId: string }) {
       if (!teamId) return;
       const supabase = createClient();
       
-      // 1. Obtener el nombre del equipo desde 'equipos' (tabla del Coach Dashboard)
+      // 1. Obtener datos del equipo y temporada activa
+      const PAST_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
       const { data: equipoCoach } = await supabase
         .from('teams')
-        .select('name')
+        .select('name, club_id, season_id')
         .eq('id', teamId)
         .single();
         
@@ -32,23 +33,46 @@ export function TeamCalendarView({ teamId }: { teamId: string }) {
       const tName = equipoCoach.name;
       setTeamName(tName);
 
-      // 2. Buscar TODOS los equivalentes en tabla teams
-      const { data: globalTeams } = await supabase
+      // Obtener temporada activa
+      const { data: activeSeason } = await supabase
+        .from('seasons')
+        .select('id')
+        .eq('club_id', equipoCoach.club_id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const targetSeasonId = activeSeason?.id || equipoCoach.season_id;
+
+      // 2. Buscar equivalentes en la temporada activa únicamente
+      let teamsQuery = supabase
         .from('teams')
         .select('id')
-        .ilike('name', tName)
+        .ilike('name', tName);
+
+      if (targetSeasonId) {
+        teamsQuery = teamsQuery.eq('season_id', targetSeasonId);
+      }
+
+      const { data: globalTeams } = await teamsQuery;
 
       const globalTeamIds = globalTeams?.map(t => t.id) || [];
       if (!globalTeamIds.includes(teamId)) {
         globalTeamIds.push(teamId);
       }
 
-      // 3. Obtener los partidos
-      const { data: matches, error } = await supabase
+      // 3. Obtener los partidos de la temporada activa (NUNCA 25/26)
+      let matchesQuery = supabase
         .from('partidos')
         .select('*')
         .in('equipo_id', globalTeamIds)
+        .neq('season_id', PAST_SEASON_ID)
         .order('fecha_hora', { ascending: true });
+
+      if (targetSeasonId) {
+        matchesQuery = matchesQuery.eq('season_id', targetSeasonId);
+      }
+
+      const { data: matches, error } = await matchesQuery;
 
       if (!error && matches) {
         setPartidos(matches);

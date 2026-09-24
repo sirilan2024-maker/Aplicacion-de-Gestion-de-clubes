@@ -81,10 +81,10 @@ export function TeamMatchesView({
   }
 
   
-  const [ffcvUrl] = useState<string | null>(serverTeamData?.ffcv_url || null)
-  const [ffcvGroupId] = useState<string | null>(serverTeamData?.ffcv_group_id || null)
-  const [ffcvTeamId] = useState<string | null>(serverTeamData?.ffcv_team_id || null)
-  const [teamName] = useState<string>(serverTeamData?.name || "")
+  const [ffcvUrl, setFfcvUrl] = useState<string | null>(serverTeamData?.ffcv_url || null)
+  const [ffcvGroupId, setFfcvGroupId] = useState<string | null>(serverTeamData?.ffcv_group_id || null)
+  const [ffcvTeamId, setFfcvTeamId] = useState<string | null>(serverTeamData?.ffcv_team_id || null)
+  const [teamName, setTeamName] = useState<string>(serverTeamData?.name || "")
   const [editingMatch, setEditingMatch] = useState<any>(null)
 
   const [data, setData] = useState({
@@ -93,6 +93,19 @@ export function TeamMatchesView({
     players: serverPlayers,
     convocatorias: serverConvocatorias,
   })
+
+  useEffect(() => {
+    setFfcvUrl(serverTeamData?.ffcv_url || null);
+    setFfcvGroupId(serverTeamData?.ffcv_group_id || null);
+    setFfcvTeamId(serverTeamData?.ffcv_team_id || null);
+    setTeamName(serverTeamData?.name || "");
+    setData({
+      matches: serverMatches,
+      teams: serverTeams,
+      players: serverPlayers,
+      convocatorias: serverConvocatorias,
+    });
+  }, [serverTeamData, serverMatches, serverTeams, serverPlayers, serverConvocatorias]);
 
   const { setExportData } = useExport()
 

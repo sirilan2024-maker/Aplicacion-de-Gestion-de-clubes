@@ -102,7 +102,7 @@ function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[
 export function GlobalMatchesView({ initialMatches, teams: initialTeams, players: initialPlayers = [], convocatorias: initialConvocatorias = [], fixedTeamId, isReadOnly = false, userRole = '', userTeamIds = [] }: GlobalMatchesViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { selectedSeasonId } = useSeason()
+  const { selectedSeasonId, activeSeason } = useSeason()
   const initialView = fixedTeamId
     ? 'partidos'
     : ((searchParams.get('view') as 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo' | 'actas') || 'partidos')
@@ -122,7 +122,16 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
 
   // Recarga reactiva de partidos y equipos cuando cambia la temporada seleccionada
   useEffect(() => {
-    if (!selectedSeasonId) return;
+    const isArchivePage = typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard/archivo');
+    const PAST_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+    
+    // Si no estamos en el archivo histórico y la temporada seleccionada es la pasada 25/26, forzar temporada activa
+    const targetSeasonId = (!isArchivePage && selectedSeasonId === PAST_SEASON_ID)
+      ? (activeSeason?.id || '')
+      : (selectedSeasonId || activeSeason?.id || '');
+
+    if (!targetSeasonId) return;
+
     async function reloadSeasonData() {
       try {
         const supabase = createClient();
@@ -131,26 +140,44 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
         const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
         if (!profile?.club_id) return;
 
-        // Cargar partidos de la temporada seleccionada
-        const { data: mData } = await supabase
+        // Cargar partidos de la temporada seleccionada (excluyendo estrictamente la 25/26 fuera de archivo)
+        let mQuery = supabase
           .from('partidos')
           .select(`
             *,
             equipo:teams (id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url)
           `)
           .eq('club_id', profile.club_id)
-          .eq('season_id', selectedSeasonId)
           .order('fecha_hora', { ascending: true });
+
+        if (!isArchivePage) {
+          mQuery = mQuery.neq('season_id', PAST_SEASON_ID);
+        }
+
+        if (targetSeasonId) {
+          mQuery = mQuery.eq('season_id', targetSeasonId);
+        }
+
+        if (fixedTeamId) {
+          mQuery = mQuery.eq('equipo_id', fixedTeamId);
+        }
+
+        const { data: mData } = await mQuery;
 
         if (mData) setMatches(mData);
 
         // Cargar equipos de la temporada seleccionada
-        const { data: tData } = await supabase
+        let tQuery = supabase
           .from('teams')
           .select('id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url')
           .eq('club_id', profile.club_id)
-          .eq('season_id', selectedSeasonId)
           .order('name', { ascending: true });
+
+        if (targetSeasonId) {
+          tQuery = tQuery.eq('season_id', targetSeasonId);
+        }
+
+        const { data: tData } = await tQuery;
 
         if (tData) setTeams(tData);
 
@@ -172,7 +199,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
     }
 
     reloadSeasonData();
-  }, [selectedSeasonId]);
+  }, [selectedSeasonId, activeSeason?.id, fixedTeamId]);
 
   useEffect(() => {
     if (fixedTeamId) {

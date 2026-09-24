@@ -74,12 +74,14 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
           ? (document.cookie.split('; ').find(row => row.startsWith(`${STORAGE_KEY}=`))?.split('=')[1] || localStorage.getItem(STORAGE_KEY)) 
           : null;
         const matchingStored = storedId ? seasonsData.find((s) => s.id === storedId) : null;
-
-        if (matchingStored) {
+        // Only keep storedId if it is the currently ACTIVE season, OR if the user is explicitly on the historical archive page
+        const isArchivePage = typeof window !== "undefined" && window.location.pathname.startsWith('/dashboard/archivo');
+        if (matchingStored && (matchingStored.is_active || isArchivePage)) {
           setSelectedSeasonIdState(matchingStored.id);
         } else if (active) {
           setSelectedSeasonIdState(active.id);
           if (typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEY, active.id);
             document.cookie = `${STORAGE_KEY}=${active.id}; path=/; max-age=31536000; SameSite=Lax`;
           }
         }

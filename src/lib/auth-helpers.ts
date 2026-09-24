@@ -679,8 +679,8 @@ export async function getEffectiveSelectedSeasonId(
         .eq('id', cookieSeasonId)
         .maybeSingle();
 
-      if (s) {
-        return { seasonId: s.id, seasonName: s.name, isActive: Boolean(s.is_active) };
+      if (s && s.is_active) {
+        return { seasonId: s.id, seasonName: s.name, isActive: true };
       }
     }
   } catch (e) {

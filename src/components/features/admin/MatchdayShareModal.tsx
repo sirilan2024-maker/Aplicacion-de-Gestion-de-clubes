@@ -6,7 +6,7 @@ import {
   Copy, Download, Check, Sparkles, MessageCircle,
   Bell, ChevronDown, ChevronUp, AlertCircle, Shield
 } from "lucide-react"
-import html2canvas from "html2canvas"
+import { toPng } from "html-to-image"
 import toast from "react-hot-toast"
 import {
   getSeasonScheduledMatchesAction,
@@ -284,24 +284,21 @@ export function MatchdayShareModal({
     const toastId = toast.loading("Generando cartelera gráfica en alta resolución...")
 
     try {
-      // Ajustar temporalmente para que html2canvas capture todo con nitidez
-      const canvas = await html2canvas(posterRef.current, {
-        scale: 2.5,
-        useCORS: true,
-        backgroundColor: "#0f172a",
-        logging: false,
+      const dataUrl = await toPng(posterRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: "#020617",
       })
 
-      const image = canvas.toDataURL("image/png")
       const link = document.createElement("a")
-      link.href = image
+      link.href = dataUrl
       link.download = `Cartelera_Jornada_${clubName.replace(/\s+/g, "_")}.png`
       link.click()
 
       toast.success("¡Cartelera descargada con éxito!", { id: toastId })
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error generating matchday poster image:", err)
-      toast.error("Error al exportar la imagen", { id: toastId })
+      toast.error("Error al exportar la imagen. Inténtalo de nuevo.", { id: toastId })
     } finally {
       setIsDownloading(false)
     }
@@ -354,8 +351,15 @@ export function MatchdayShareModal({
         {/* Header Modal */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center shadow-inner">
-              <Trophy className="w-5 h-5 text-amber-400" />
+            <div className="w-12 h-12 rounded-2xl bg-white/10 p-1 border border-white/20 flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+              <img
+                src={clubLogoUrl || "/escudo-saladar.jpg"}
+                alt={clubName}
+                className="w-full h-full object-contain rounded-xl"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/escudo-saladar.jpg"
+                }}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -572,21 +576,28 @@ export function MatchdayShareModal({
                     {/* Contenedor Cartelera Oficial */}
                     <div
                       ref={posterRef}
-                      className="bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 space-y-6 relative overflow-hidden"
+                      className="bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-6 relative overflow-hidden"
                     >
                       {/* Fondo decorativo */}
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-                      <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                      <div className="absolute -top-10 -right-10 w-52 h-52 bg-blue-600/15 rounded-full pointer-events-none" />
+                      <div className="absolute -bottom-10 -left-10 w-52 h-52 bg-amber-500/15 rounded-full pointer-events-none" />
 
                       {/* Cabecera de la Cartelera */}
-                      <div className="text-center space-y-2 relative z-10 border-b border-slate-800/80 pb-5">
-                        <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-yellow-300 rounded-2xl mx-auto flex items-center justify-center p-2.5 shadow-lg shadow-amber-500/20">
-                          <Trophy className="w-8 h-8 text-slate-950 stroke-[2.2]" />
+                      <div className="text-center space-y-2 relative z-10 border-b border-slate-800 pb-5">
+                        <div className="w-20 h-20 rounded-full bg-white/15 border-2 border-amber-400/40 p-1 mx-auto flex items-center justify-center shadow-xl shadow-amber-500/10 overflow-hidden">
+                          <img
+                            src={clubLogoUrl || "/escudo-saladar.jpg"}
+                            alt={clubName}
+                            className="w-full h-full object-contain rounded-full"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/escudo-saladar.jpg"
+                            }}
+                          />
                         </div>
                         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase drop-shadow-sm">
                           {clubName}
                         </h2>
-                        <div className="inline-block bg-blue-600/30 border border-blue-400/30 px-3 py-1 rounded-full">
+                        <div className="inline-block bg-blue-600/40 border border-blue-400/30 px-3 py-1 rounded-full">
                           <p className="text-[11px] font-black tracking-wider text-blue-300 uppercase">
                             PARTIDOS DE LA JORNADA
                           </p>
@@ -615,7 +626,7 @@ export function MatchdayShareModal({
                             return (
                               <div
                                 key={m.id}
-                                className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-md backdrop-blur-xs transition-all"
+                                className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-md transition-all"
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 shrink-0 text-center">

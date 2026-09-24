@@ -72,7 +72,7 @@ export default function EntrenamientosListPage() {
 
     // 2. Calculate ACWR Manually
     try {
-      const { data: teamData } = await supabase.from('teams').select('club_id').eq('id', teamId).single();
+      const { data: teamData } = await supabase.from('teams').select('club_id, season_id').eq('id', teamId).single();
       if (teamData) {
         const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
         const rpeMetricId = metrics?.find(m => m.name.toLowerCase().includes('rpe'))?.id;
@@ -81,18 +81,21 @@ export default function EntrenamientosListPage() {
         if (rpeMetricId && minMetricId && evData) {
           const eventIds = evData.map(e => e.id);
           const { data: ptData } = await supabase.from('player_training_metrics').select('event_id, player_id, metric_id, value_number').in('event_id', eventIds).in('metric_id', [rpeMetricId, minMetricId]);
-          const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', teamData.club_id).eq('is_active', true).single();
+          
+          let pshQuery = supabase
+            .from('player_season_history')
+            .select('player_id, players(id, first_name, last_name)')
+            .eq('team_id', teamId)
+            .neq('status', 'inactive');
+          
+          if (teamData.season_id) {
+            pshQuery = pshQuery.eq('season_id', teamData.season_id);
+          }
+
+          const { data: historyData } = await pshQuery;
           let plData: any[] = [];
-          if (activeSeason?.id) {
-            const { data: historyData } = await supabase
-              .from('player_season_history')
-              .select('player_id, players(id, first_name, last_name)')
-              .eq('team_id', teamId)
-              .neq('status', 'inactive')
-              .or(`season_id.eq.${activeSeason.id},season_id.is.null`);
-            if (historyData) {
-              plData = historyData.map((h: any) => h.players);
-            }
+          if (historyData) {
+            plData = historyData.map((h: any) => h.players);
           }
 
           if (ptData && plData) {

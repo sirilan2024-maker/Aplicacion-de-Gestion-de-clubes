@@ -24,8 +24,10 @@ import {
   TeamStatDTO,
   PlayerStatDTO
 } from '@/app/actions/stats-actions'
+import { useSeason } from '@/components/providers/SeasonProvider'
 
 export default function AdminEstadisticasPage() {
+  const { selectedSeasonId } = useSeason()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [kpis, setKpis] = useState<GlobalStatsKPIs | null>(null)
@@ -34,11 +36,17 @@ export default function AdminEstadisticasPage() {
   const [teams, setTeams] = useState<Array<{ id: string; name: string; category: string }>>([])
   const [seasons, setSeasons] = useState<Array<{ id: string; name: string; isActive: boolean }>>([])
 
-  // Filtros — 'activa' es el valor inicial: se reemplaza al cargar con el id real de la temporada activa
-  const [selectedSeason, setSelectedSeason] = useState<string>('activa')
+  // Filtros
+  const [selectedSeason, setSelectedSeason] = useState<string>(selectedSeasonId || 'activa')
   const [selectedTeam, setSelectedTeam] = useState<string>('todos')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'equipos' | 'jugadores'>('equipos')
+
+  useEffect(() => {
+    if (selectedSeasonId) {
+      setSelectedSeason(selectedSeasonId)
+    }
+  }, [selectedSeasonId])
 
   const fetchData = async (seasonId?: string) => {
     setLoading(true)

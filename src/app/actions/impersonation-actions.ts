@@ -46,7 +46,7 @@ export async function startImpersonationAction(targetUserId: string) {
     // 2. Caso: Perfil de usuario existente en profiles
     const { data: targetProfile } = await adminClient
       .from('profiles')
-      .select('id, role, first_name, last_name, club_id')
+      .select('id, role, roles, first_name, last_name, club_id')
       .eq('id', targetUserId)
       .maybeSingle();
 
@@ -60,12 +60,13 @@ export async function startImpersonationAction(targetUserId: string) {
 
       let redirectUrl = '/dashboard';
       const role = targetProfile.role || 'family';
+      const targetRoles: string[] = targetProfile.roles || [];
 
-      if (role === 'admin' || role === 'superadmin') {
+      if (role === 'admin' || role === 'superadmin' || targetRoles.includes('admin') || targetRoles.includes('superadmin')) {
         redirectUrl = '/admin/inicio';
-      } else if (role === 'coordinador') {
-        redirectUrl = '/dashboard/equipos';
-      } else if (role === 'coach' || role === 'entrenador' || role === 'delegado') {
+      } else if (role === 'coordinador' || targetRoles.includes('coordinador')) {
+        redirectUrl = '/admin/coordinador';
+      } else if (role === 'coach' || role === 'entrenador' || role === 'delegado' || targetRoles.includes('coach') || targetRoles.includes('entrenador')) {
         redirectUrl = '/dashboard/mis-equipos';
       } else if (role === 'utillero') {
         redirectUrl = '/dashboard/utilleria';

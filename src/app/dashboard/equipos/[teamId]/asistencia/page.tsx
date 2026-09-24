@@ -65,16 +65,18 @@ export default function AsistenciaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
-      // 1. Get user profile and club
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
-      if (!profile?.club_id) return;
+      // 1. Get team season
+      const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
+      let targetSeasonId = teamData?.season_id;
 
-      // 2. Get active season
-      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile.club_id).eq('is_active', true).single();
-      if (!activeSeason?.id) return;
-      setActiveSeasonId(activeSeason.id);
+      if (!targetSeasonId) {
+        // Fallback to active season if team doesn't have season_id
+        const { data: activeSeason } = await supabase.from('seasons').select('id').eq('is_active', true).limit(1).single();
+        targetSeasonId = activeSeason?.id;
+      }
+
+      if (!targetSeasonId) return;
+      setActiveSeasonId(targetSeasonId);
 
       // 3. Fetch players via player_season_history
       const { data: playersData, error } = await supabase
@@ -86,7 +88,7 @@ export default function AsistenciaEquipoPage() {
           )
         `)
         .eq("team_id", teamId)
-        .eq("season_id", activeSeason.id);
+        .eq("season_id", targetSeasonId);
 
       if (error) throw error;
       

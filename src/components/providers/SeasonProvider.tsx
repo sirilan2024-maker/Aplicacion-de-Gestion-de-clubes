@@ -70,13 +70,18 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
         const active = seasonsData.find((s) => s.is_active) || seasonsData[0];
         setActiveSeason(active);
 
-        const storedId = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+        const storedId = typeof window !== "undefined" 
+          ? (document.cookie.split('; ').find(row => row.startsWith(`${STORAGE_KEY}=`))?.split('=')[1] || localStorage.getItem(STORAGE_KEY)) 
+          : null;
         const matchingStored = storedId ? seasonsData.find((s) => s.id === storedId) : null;
 
         if (matchingStored) {
           setSelectedSeasonIdState(matchingStored.id);
         } else if (active) {
           setSelectedSeasonIdState(active.id);
+          if (typeof window !== "undefined") {
+            document.cookie = `${STORAGE_KEY}=${active.id}; path=/; max-age=31536000; SameSite=Lax`;
+          }
         }
       }
     } catch (err) {
@@ -94,6 +99,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     setSelectedSeasonIdState(id);
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, id);
+      document.cookie = `${STORAGE_KEY}=${id}; path=/; max-age=31536000; SameSite=Lax`;
     }
   };
 

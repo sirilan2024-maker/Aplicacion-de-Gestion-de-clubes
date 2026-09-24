@@ -128,7 +128,12 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             const { data: club } = await supabase.from('clubs').select('id, name, logo_url').eq('id', profile.club_id).single()
             if (club) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
-            let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id).order("name")
+            let query = supabase.from('teams').select("id, name").eq("club_id", profile.club_id)
+            if (selectedSeason?.id) {
+              query = query.eq("season_id", selectedSeason.id)
+            }
+            query = query.order("name")
+
             if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
               const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
               const teamIds = coachTeams?.map(ct => ct.team_id) || [];
@@ -165,7 +170,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       }
     }
     fetchData()
-  }, [supabase])
+  }, [supabase, selectedSeason?.id, userRole])
 
   useEffect(() => {
     if (menuOpen) {
@@ -212,6 +217,14 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
         { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
       ]
+    } else if (userRole === 'coordinador') {
+      const hasPanelCoord = globalNavItems.some(item => item.href === '/admin/coordinador');
+      bottomLinks = [
+        ...(hasPanelCoord ? [{ name: "Mi Panel", href: "/admin/coordinador", icon: Compass }] : []),
+        { name: "Equipos", href: "/dashboard/equipos", icon: Shield },
+        { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
+        { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
+      ];
     } else if (userRole === 'tutor' || userRole === 'family') {
       bottomLinks = [
         { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },

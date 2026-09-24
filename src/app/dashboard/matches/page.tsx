@@ -1,17 +1,25 @@
 import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { getEffectiveSelectedSeasonId } from "@/lib/auth-helpers"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 export const dynamic = 'force-dynamic';
 
 export default async function PartidosPage() {
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
   // Obtener equipos a los que el usuario tiene acceso (o todos si es admin)
   const { data: userData } = await supabase.auth.getUser()
   if (!userData.user) return null
 
   const { data: profile } = await supabase.from('profiles').select('club_id, role').eq('id', userData.user.id).single()
-  const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile?.club_id).eq('is_active', true).single()
+  
+  // Resolver temporada seleccionada mediante cookie/contexto unificado
+  const { seasonId: effectiveSeasonId } = await getEffectiveSelectedSeasonId(
+    adminClient,
+    profile?.club_id || ''
+  );
 
   let matchesQuery = supabase
     .from("partidos")
@@ -31,23 +39,23 @@ export default async function PartidosPage() {
     teamsQuery = teamsQuery.eq("club_id", profile.club_id)
   }
 
-  if (activeSeason?.id) {
-    matchesQuery = matchesQuery.eq("season_id", activeSeason.id)
-    teamsQuery = teamsQuery.eq("season_id", activeSeason.id)
+  if (effectiveSeasonId) {
+    matchesQuery = matchesQuery.eq("season_id", effectiveSeasonId)
+    teamsQuery = teamsQuery.eq("season_id", effectiveSeasonId)
   }
 
   const { data: matches } = await matchesQuery
   const { data: teams } = await teamsQuery
 
   let players: any[] = [];
-  if (activeSeason?.id) {
+  if (effectiveSeasonId) {
     const { data: historyData, error: playersError } = await supabase
       .from("player_season_history")
       .select(`
         team_id,
         players!inner (id, first_name, last_name, posicion, status)
       `)
-      .eq("season_id", activeSeason.id)
+      .eq("season_id", effectiveSeasonId)
       .neq("status", "inactive");
       
     if (playersError) {

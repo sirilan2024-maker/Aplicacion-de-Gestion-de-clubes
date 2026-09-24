@@ -95,24 +95,27 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
       // 3. Fetch Events & Attendance
       let events: any[] = []
+      let eventIds: string[] = []
       if (teamIds.length > 0) {
-        const { data } = await supabase.from('team_events').select('id, team_id, event_type').in('team_id', teamIds).limit(5000)
+        let eventsQuery = supabase.from('team_events').select('id, team_id, event_type').in('team_id', teamIds)
+        if (targetSeasonId) eventsQuery = eventsQuery.eq('season_id', targetSeasonId)
+        const { data } = await eventsQuery.limit(5000)
         events = data || []
+        eventIds = events.map(e => e.id)
       }
       
       let attendance: any[] = []
-      if (teamIds.length > 0) {
-        let attPage = 0;
-        const attPageSize = 1000;
-        while (true) {
+      if (eventIds.length > 0) {
+        // Consultar asistencia asociada a los eventos de esta temporada
+        for (let i = 0; i < eventIds.length; i += 150) {
+          const chunk = eventIds.slice(i, i + 150)
           const { data: pageAtt, error } = await supabase
             .from('attendance')
             .select('status, event_id, player_id')
-            .range(attPage * attPageSize, (attPage + 1) * attPageSize - 1);
-          if (error || !pageAtt || pageAtt.length === 0) break;
-          attendance = attendance.concat(pageAtt);
-          if (pageAtt.length < attPageSize) break;
-          attPage++;
+            .in('event_id', chunk)
+          if (!error && pageAtt) {
+            attendance = attendance.concat(pageAtt)
+          }
         }
       }
 

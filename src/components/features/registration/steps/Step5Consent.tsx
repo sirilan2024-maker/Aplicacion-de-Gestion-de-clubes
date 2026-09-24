@@ -20,7 +20,6 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
         <strong>Email:</strong> csportingsaladar@gmail.com | <strong>Tel:</strong> 672463398</p>
         <p>De conformidad con el Reglamento (UE) 2016/679 (RGPD) y la LOPDGDD 3/2018, los datos personales recogidos serán tratados de forma estrictamente confidencial para la gestión deportiva, administrativa, federativa y contable del club.</p>
         <p>Los datos no serán cedidos a terceros salvo obligación legal (Federaciones deportivas, Mutuas o Seguros Médicos). Puede ejercer en cualquier momento sus derechos de acceso, rectificación, supresión, limitación y portabilidad escribiendo a nuestro email.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
       </div>
     )
   },
@@ -30,7 +29,6 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
       <div className="space-y-4 text-sm">
         <p>Declaro bajo mi responsabilidad que soy mayor de edad y ostento la patria potestad o tutela legal del menor inscrito, o bien soy el propio jugador mayor de edad.</p>
         <p>Solicito formalmente la inscripción en el CLUB SPORTING SALADAR para la temporada en vigor. Al realizar esta solicitud, declaro conocer y aceptar íntegramente los estatutos, el reglamento de régimen interno y las normativas deportivas y disciplinarias del club.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
       </div>
     )
   },
@@ -40,7 +38,6 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
       <div className="space-y-4 text-sm">
         <p>Otorgo mi consentimiento expreso para que el club trate los datos de salud (alergias, enfermedades crónicas, lesiones) declarados, con la única finalidad de proteger la integridad física del jugador durante la práctica deportiva.</p>
         <p>Asimismo, autorizo al cuerpo técnico y responsables del club a realizar el traslado urgente a un centro médico en caso de accidente o lesión, así como a consentir intervenciones médicas de urgencia extrema si no fuera posible localizar a los familiares de manera inmediata.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
       </div>
     )
   },
@@ -51,7 +48,6 @@ const LEGAL_TEXTS: Record<LegalItem, { title: string; content: React.ReactNode }
         <p>De acuerdo con la Ley Orgánica 1/1982 sobre protección del derecho al honor, a la intimidad personal y familiar y a la propia imagen, <strong>autorizo</strong> al Club a la captación de fotografías y vídeos del jugador durante la actividad deportiva oficial (entrenamientos, partidos, torneos).</p>
         <p>Dichas imágenes podrán ser publicadas en los medios de comunicación oficiales del club (página web, redes sociales institucionales y cartelería) con el <strong>único y exclusivo fin de promocionar las actividades deportivas y sociales del club</strong>, sin fines lucrativos ni comerciales hacia terceros.</p>
         <p>Este consentimiento es revocable en cualquier momento desde su perfil de usuario.</p>
-        <p className="pt-32 text-xs text-gray-400 text-center">-- Fin del documento legal --</p>
       </div>
     )
   }
@@ -75,10 +71,10 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
     if (activeLegalModal) {
       setLegalRead(prev => ({...prev, [activeLegalModal]: true}));
       // Enlazar con React Hook Form
-      if (activeLegalModal === 'rgpd') setValue("consentRgpd", true, { shouldValidate: true });
-      if (activeLegalModal === 'tutela') setValue("consentTutela", true, { shouldValidate: true });
-      if (activeLegalModal === 'medical') setValue("consentMedical", true, { shouldValidate: true });
-      if (activeLegalModal === 'imagen') setValue("consentImage", true, { shouldValidate: true });
+      if (activeLegalModal === 'rgpd') setValue("consentRgpd", true, { shouldValidate: true, shouldDirty: true });
+      if (activeLegalModal === 'tutela') setValue("consentTutela", true, { shouldValidate: true, shouldDirty: true });
+      if (activeLegalModal === 'medical') setValue("consentMedical", true, { shouldValidate: true, shouldDirty: true });
+      if (activeLegalModal === 'imagen') setValue("consentImage", true, { shouldValidate: true, shouldDirty: true });
       setActiveLegalModal(null);
     }
   };
@@ -116,10 +112,10 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
             id={fieldName}
             checked={isChecked}
             onCheckedChange={(checked) => {
-              if (legalRead[id]) {
-                setValue(fieldName, checked === true, { shouldValidate: true, shouldDirty: true });
-              } else {
-                setActiveLegalModal(id);
+              const val = checked === true;
+              setValue(fieldName, val, { shouldValidate: true, shouldDirty: true });
+              if (val) {
+                setLegalRead(prev => ({ ...prev, [id]: true }));
               }
             }}
             className="checked:bg-green-600 checked:border-green-600 cursor-pointer" 
@@ -130,15 +126,13 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
             <label htmlFor={fieldName} className="cursor-pointer">
               {title} {!optional && <span className="text-red-500">*</span>}
             </label>
-            {!legalRead[id] && (
-              <button 
-                type="button" 
-                onClick={() => setActiveLegalModal(id)} 
-                className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors"
-              >
-                📖 Leer y Aceptar
-              </button>
-            )}
+            <button 
+              type="button" 
+              onClick={() => setActiveLegalModal(id)} 
+              className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-md font-semibold transition-colors"
+            >
+              📖 Leer texto
+            </button>
           </div>
           <p className="text-xs text-gray-500">{subtitle}</p>
           {error && <p className="text-xs text-red-600 font-semibold mt-1">{error}</p>}

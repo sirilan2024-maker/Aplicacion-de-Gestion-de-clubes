@@ -15,6 +15,9 @@ export interface BaseSystemRole {
 }
 
 export const SYSTEM_MODULES: AppNavModule[] = [
+  // ── 0. Panel específico del Coordinador ──
+  { id: 'panel_coordinador', label: 'Panel del Coordinador', path: '/admin/coordinador', icon_name: 'Compass', sort_order: 0, category: 'General / Club' },
+
   // ── 1. General & Club ──
   { id: 'centro_control', label: 'Centro de Control', path: '/admin/inicio', icon_name: 'Home', sort_order: 1, category: 'General / Club' },
   { id: 'club', label: 'Directorio de Miembros', path: '/dashboard/club/miembros', icon_name: 'Users', sort_order: 2, category: 'General / Club' },

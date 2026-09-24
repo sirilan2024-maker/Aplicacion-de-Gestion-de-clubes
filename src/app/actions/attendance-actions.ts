@@ -130,13 +130,19 @@ export async function getGlobalAttendanceAction(
 
     // 2. Obtener jugadores del club (filtrados por player_season_history si se especifica seasonId)
     let seasonalPlayerIds: string[] | null = null
+    const playerSeasonalTeamMap = new Map<string, string>()
     if (params?.seasonId) {
       const { data: pshRows } = await supabase
         .from('player_season_history')
-        .select('player_id')
+        .select('player_id, team_id')
         .eq('season_id', params.seasonId)
 
-      seasonalPlayerIds = (pshRows || []).map(r => r.player_id).filter(Boolean)
+      seasonalPlayerIds = (pshRows || []).map(r => {
+        if (r.player_id && r.team_id) {
+          playerSeasonalTeamMap.set(r.player_id, r.team_id)
+        }
+        return r.player_id
+      }).filter(Boolean)
 
       if (seasonalPlayerIds.length === 0) {
         return {
@@ -200,11 +206,12 @@ export async function getGlobalAttendanceAction(
     const playerMap = new Map<string, { name: string; dorsal: number | null; avatar: string | null; teamId: string | null }>()
     players.forEach(p => {
       const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador sin nombre'
+      const seasonalTeamId = playerSeasonalTeamMap.get(p.id) || p.team_id
       playerMap.set(p.id, {
         name: fullName,
         dorsal: p.dorsal,
         avatar: p.avatar_url,
-        teamId: p.team_id,
+        teamId: seasonalTeamId,
       })
     })
 
@@ -213,7 +220,10 @@ export async function getGlobalAttendanceAction(
     if (params?.playerId) {
       targetPlayerIds = [params.playerId]
     } else if (params?.teamId) {
-      const teamPlayers = players.filter(p => p.team_id === params.teamId).map(p => p.id)
+      const teamPlayers = players.filter(p => {
+        const tId = playerSeasonalTeamMap.get(p.id) || p.team_id
+        return tId === params.teamId
+      }).map(p => p.id)
       if (teamPlayers.length > 0) {
         targetPlayerIds = teamPlayers
       }

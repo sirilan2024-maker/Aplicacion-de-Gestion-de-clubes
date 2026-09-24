@@ -11,15 +11,16 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, roles")
     .eq("id", authData.user.id)
     .single();
 
   const role = profile?.role;
-  if (role === 'admin') redirect('/admin/inicio');
-  else if (role === 'coordinador') redirect('/dashboard/equipos');
-  else if (role === 'coach' || role === 'entrenador') redirect('/dashboard/mis-equipos');
-  else if (role === 'tutor' || role === 'familia' || role === 'family') redirect('/dashboard/family');
+  const userRoles: string[] = profile?.roles || [];
+  if (role === 'admin' || role === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin')) redirect('/admin/inicio');
+  else if (role === 'coordinador' || userRoles.includes('coordinador')) redirect('/admin/coordinador');
+  else if (role === 'coach' || role === 'entrenador' || userRoles.includes('coach') || userRoles.includes('entrenador')) redirect('/dashboard/mis-equipos');
+  else if (role === 'tutor' || role === 'familia' || role === 'family' || userRoles.includes('tutor') || userRoles.includes('family')) redirect('/dashboard/family');
   else if (role === 'jugador') {
     const { data: playerRec } = await supabase
       .from('players')

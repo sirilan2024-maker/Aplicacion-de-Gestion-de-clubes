@@ -149,11 +149,11 @@ export const registrationSchema = z.object({
 
 }).superRefine((data, ctx) => {
   const year = data.birthDate ? new Date(data.birthDate).getFullYear() : 9999;
-  const isSenior = data.isSeniorTeam === true || data.isSeniorSelection === "senior";
-  const isAdult = isSenior || year <= 2007;
+  const isSenior = data.isSeniorTeam === true || data.isSeniorTeam === "true" || data.isSeniorSelection === "senior";
+  const isAdult = isSenior || (year !== 9999 && !isNaN(year) && year <= 2007);
 
   if (!data.tutor1Email) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El email es requerido", path: ["tutor1Email"] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El email de contacto es requerido", path: ["tutor1Email"] });
   }
 
   if (!isAdult) {
@@ -162,8 +162,8 @@ export const registrationSchema = z.object({
       }
   }
 
-  // Si no es senior, obligamos la fecha de nacimiento
-  if (!isSenior && (!data.birthDate || data.birthDate.length < 4)) {
+  // Si no es senior y no viene de ficha existente precargada, obligamos la fecha de nacimiento
+  if (!isSenior && !data.existingPlayerId && (!data.birthDate || data.birthDate.length < 4)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La fecha de nacimiento es requerida", path: ["birthDate"] });
   }
 

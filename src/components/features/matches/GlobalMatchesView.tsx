@@ -6,6 +6,7 @@ import { Swords, Calendar, Clock, MapPin, User, Pencil, Trash2, Plus, Users, Ale
 
 import { createClient } from "@/lib/supabase/client"
 import { deleteMatchAction } from "@/app/actions/match-actions"
+import { useSeason } from "@/components/providers/SeasonProvider"
 import { ManageMatchModal } from "./ManageMatchModal"
 import { QuickConvocatoriaModal } from "./QuickConvocatoriaModal"
 import { FFCVStandings } from "./FFCVStandings"
@@ -98,19 +99,80 @@ function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[
   return bestMatch;
 }
 
-export function GlobalMatchesView({ initialMatches, teams, players = [], convocatorias = [], fixedTeamId, isReadOnly = false, userRole = '', userTeamIds = [] }: GlobalMatchesViewProps) {
+export function GlobalMatchesView({ initialMatches, teams: initialTeams, players: initialPlayers = [], convocatorias: initialConvocatorias = [], fixedTeamId, isReadOnly = false, userRole = '', userTeamIds = [] }: GlobalMatchesViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { selectedSeasonId } = useSeason()
   const initialView = fixedTeamId
     ? 'partidos'
     : ((searchParams.get('view') as 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo' | 'actas') || 'partidos')
   const [matches, setMatches] = useState(initialMatches)
+  const [teams, setTeams] = useState(initialTeams)
+  const [players, setPlayers] = useState(initialPlayers)
+  const [convocatorias, setConvocatorias] = useState(initialConvocatorias)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(fixedTeamId || "all")
   const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'en-directo' | 'actas'>(initialView)
 
   useEffect(() => {
     setMatches(initialMatches)
-  }, [initialMatches])
+    setTeams(initialTeams)
+    setPlayers(initialPlayers)
+    setConvocatorias(initialConvocatorias)
+  }, [initialMatches, initialTeams, initialPlayers, initialConvocatorias])
+
+  // Recarga reactiva de partidos y equipos cuando cambia la temporada seleccionada
+  useEffect(() => {
+    if (!selectedSeasonId) return;
+    async function reloadSeasonData() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
+        if (!profile?.club_id) return;
+
+        // Cargar partidos de la temporada seleccionada
+        const { data: mData } = await supabase
+          .from('partidos')
+          .select(`
+            *,
+            equipo:teams (id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url)
+          `)
+          .eq('club_id', profile.club_id)
+          .eq('season_id', selectedSeasonId)
+          .order('fecha_hora', { ascending: true });
+
+        if (mData) setMatches(mData);
+
+        // Cargar equipos de la temporada seleccionada
+        const { data: tData } = await supabase
+          .from('teams')
+          .select('id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url')
+          .eq('club_id', profile.club_id)
+          .eq('season_id', selectedSeasonId)
+          .order('name', { ascending: true });
+
+        if (tData) setTeams(tData);
+
+        // Cargar convocatorias de los partidos de la temporada seleccionada
+        const mIds = (mData || []).map(m => m.id);
+        if (mIds.length > 0) {
+          const { data: convData } = await supabase
+            .from('convocatorias')
+            .select('*')
+            .in('partido_id', mIds)
+            .limit(5000);
+          if (convData) setConvocatorias(convData);
+        } else {
+          setConvocatorias([]);
+        }
+      } catch (err) {
+        console.error('Error reloading matches for selected season:', err);
+      }
+    }
+
+    reloadSeasonData();
+  }, [selectedSeasonId]);
 
   useEffect(() => {
     if (fixedTeamId) {

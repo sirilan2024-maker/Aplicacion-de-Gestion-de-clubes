@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Trophy, Clock, CalendarDays, AlertCircle } from "lucide-react";
+import { useSeason } from "@/components/providers/SeasonProvider";
 
 // Types
 interface Match {
@@ -24,6 +25,7 @@ interface Match {
 }
 
 export default function GlobalClubPage() {
+  const { selectedSeasonId } = useSeason();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
@@ -50,13 +52,17 @@ export default function GlobalClubPage() {
         
       if (!profile?.club_id) { setMatches([]); setLoading(false); return; }
 
-      // Fetch the active season to filter matches correctly
-      const { data: activeSeason } = await supabase
-        .from('seasons')
-        .select('id')
-        .eq('club_id', profile.club_id)
-        .eq('is_active', true)
-        .single();
+      // Resolver temporada objetivo
+      let targetSeasonId = selectedSeasonId;
+      if (!targetSeasonId) {
+        const { data: activeSeason } = await supabase
+          .from('seasons')
+          .select('id')
+          .eq('club_id', profile.club_id)
+          .eq('is_active', true)
+          .single();
+        targetSeasonId = activeSeason?.id || null;
+      }
 
       let query = supabase
         .from('partidos')
@@ -69,8 +75,8 @@ export default function GlobalClubPage() {
         .neq("estado", "Cancelado")
         .order("fecha_hora", { ascending: true });
 
-      if (activeSeason?.id) {
-        query = query.eq("season_id", activeSeason.id);
+      if (targetSeasonId) {
+        query = query.eq("season_id", targetSeasonId);
       }
 
       const { data, error } = await query;
@@ -101,7 +107,7 @@ export default function GlobalClubPage() {
     return () => {
       supabase.removeChannel(channel);
     }
-  }, []);
+  }, [selectedSeasonId]);
 
   // Helper to calculate live match time
   const getLiveTimerDisplay = (match: Match) => {

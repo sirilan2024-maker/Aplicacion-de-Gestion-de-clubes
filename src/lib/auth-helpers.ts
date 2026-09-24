@@ -642,3 +642,103 @@ export async function canUserManageRegistration(
 
   return { allowed: true, registration };
 }
+
+/**
+ * Resuelve la temporada estacional efectiva para Server Actions y Server Components.
+ * Regla de Oro:
+ * 1. Si se pasa overrideSeasonId explícito, se respeta estrictamente.
+ * 2. Si no, se comprueba la cookie 'sporting_selected_season_id'.
+ * 3. Si no existe, se obtiene la temporada con is_active = true de la base de datos.
+ */
+export async function getEffectiveSelectedSeasonId(
+  adminClient: ReturnType<typeof createAdminClient>,
+  clubId: string,
+  overrideSeasonId?: string | null
+): Promise<{ seasonId: string; seasonName?: string; isActive: boolean }> {
+  if (overrideSeasonId && overrideSeasonId.trim() !== '') {
+    const { data: s } = await adminClient
+      .from('seasons')
+      .select('id, name, is_active')
+      .eq('id', overrideSeasonId)
+      .maybeSingle();
+
+    if (s) {
+      return { seasonId: s.id, seasonName: s.name, isActive: Boolean(s.is_active) };
+    }
+  }
+
+  // Comprobar cookie en Server Components / Server Actions
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const cookieSeasonId = cookieStore.get('sporting_selected_season_id')?.value;
+    if (cookieSeasonId && cookieSeasonId.trim() !== '') {
+      const { data: s } = await adminClient
+        .from('seasons')
+        .select('id, name, is_active')
+        .eq('id', cookieSeasonId)
+        .maybeSingle();
+
+      if (s) {
+        return { seasonId: s.id, seasonName: s.name, isActive: Boolean(s.is_active) };
+      }
+    }
+  } catch (e) {
+    // Si cookies() no está disponible fuera de contexto de petición
+  }
+
+  // Fallback: temporada activa en base de datos
+  const { data: activeSeason } = await adminClient
+    .from('seasons')
+    .select('id, name, is_active')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (activeSeason) {
+    return { seasonId: activeSeason.id, seasonName: activeSeason.name, isActive: true };
+  }
+
+  return { seasonId: '', seasonName: undefined, isActive: false };
+}
+
+/**
+ * Comprueba si el usuario autenticado tiene un rol específico (directo o en su array de roles secundarios).
+ */
+export function hasUserRole(ctx: AuthenticatedContext, targetRole: string): boolean {
+  const effectiveRole = ctx.realAdminRole || ctx.profile.role;
+  if (effectiveRole === targetRole) return true;
+  const userRoles = ctx.profile.roles || [];
+  return userRoles.includes(targetRole);
+}
+
+/**
+ * Verifica si un usuario tiene acceso a un módulo específico del sistema según role_navigation y su jerarquía de roles.
+ */
+export async function canUserAccessModule(
+  adminClient: ReturnType<typeof createAdminClient>,
+  ctx: AuthenticatedContext,
+  moduleId: string
+): Promise<{ allowed: boolean; reason?: string }> {
+  const effectiveRole = ctx.realAdminRole || ctx.profile.role;
+  const userRoles = ctx.profile.roles || [];
+  const allRoles = Array.from(new Set([effectiveRole, ...userRoles].filter(Boolean)));
+
+  // Superadmins y Admins generales del club tienen acceso total
+  if (allRoles.includes('admin') || allRoles.includes('superadmin') || allRoles.includes('administrador') || allRoles.includes('admin_club')) {
+    return { allowed: true };
+  }
+
+  // Verificar si alguno de los roles del usuario tiene habilitado el módulo en role_navigation
+  const { data: permissions } = await adminClient
+    .from('role_navigation')
+    .select('nav_id')
+    .in('role', allRoles)
+    .eq('nav_id', moduleId);
+
+  if (permissions && permissions.length > 0) {
+    return { allowed: true };
+  }
+
+  return { allowed: false, reason: `No tienes permisos configurados para acceder al módulo '${moduleId}'` };
+}

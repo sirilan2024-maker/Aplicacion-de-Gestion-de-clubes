@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle, CreditCard, Lock } from "lucide-react";
+import { User, Users, HeartPulse, Shirt, ShieldCheck, Save, Loader2, ArrowRight, ArrowLeft, CheckCircle, CreditCard, Lock, AlertCircle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ export function RegistrationWizard({
   const [stripeModalOpen, setStripeModalOpen] = useState(false);
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
   const [stripeAmountFormatted, setStripeAmountFormatted] = useState<string | null>(null);
+  const [formErrorSummary, setFormErrorSummary] = useState<string[]>([]);
 
   const methods = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema) as any,
@@ -78,9 +79,20 @@ export function RegistrationWizard({
   useEffect(() => {
     methods.register("isSeniorTeam");
     methods.register("isSeniorSelection");
-    methods.setValue("isSeniorTeam", isSeniorTeam);
-    methods.setValue("isSeniorSelection", isSeniorTeam ? "senior" : "minor");
+    if (isSeniorTeam) {
+      methods.setValue("isSeniorTeam", true);
+      methods.setValue("isSeniorSelection", "senior");
+    }
   }, [isSeniorTeam, methods]);
+
+  const watchedIsSeniorTeam = useWatch({ control: methods.control, name: 'isSeniorTeam' });
+  const watchedIsSeniorSelection = useWatch({ control: methods.control, name: 'isSeniorSelection' });
+  const isSeniorEffective = Boolean(
+    isSeniorTeam || 
+    watchedIsSeniorTeam === true || 
+    watchedIsSeniorTeam === "true" || 
+    watchedIsSeniorSelection === "senior"
+  );
 
   const birthDateValue = useWatch({ control: methods.control, name: 'birthDate' });
   const wasInClub = useWatch({ control: methods.control, name: 'wasInClub' });
@@ -99,9 +111,11 @@ export function RegistrationWizard({
   const formattedChargeAmount = `${chargeAmount.toFixed(2)} €`;
 
   // Consider adult if playing for senior team or born in 2007 or earlier
-  const isAdult = isSeniorTeam || (birthDateValue ? new Date(birthDateValue).getFullYear() <= 2007 : false);
+  const birthYear = birthDateValue ? new Date(birthDateValue).getFullYear() : null;
+  const isAdult = isSeniorEffective || (birthYear !== null && !isNaN(birthYear) && birthYear <= 2007);
 
   const nextStep = async () => {
+    setFormErrorSummary([]);
     // Validate current step fields before proceeding
     let fieldsToValidate: (keyof RegistrationFormData)[] = [];
     
@@ -109,17 +123,21 @@ export function RegistrationWizard({
       fieldsToValidate = ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode'];
       if (!isAdult) {
         fieldsToValidate.push('tutor1Name', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation');
+      } else {
+        fieldsToValidate.push('tutor1Email', 'tutor1Phone');
       }
     } else if (currentStep === 3) {
-      fieldsToValidate = ['paymentMethod'];
+      if (!isSeniorEffective) {
+        fieldsToValidate = ['paymentMethod'];
+      }
     } else if (currentStep === 4) {
       fieldsToValidate = ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo', 'sizeMedias'];
     }
     
     const isStepValid = await trigger(fieldsToValidate);
     if (isStepValid) {
-      // Si el paso siguiente es el 3 (Cuotas) y es isSeniorTeam, nos lo saltamos y vamos al 4
-      if (currentStep === 2 && isSeniorTeam) {
+      // Si el paso siguiente es el 3 (Cuotas) y es senior, nos lo saltamos y vamos al 4
+      if (currentStep === 2 && isSeniorEffective) {
         setCurrentStep(prev => prev + 2);
       } else {
         setCurrentStep(prev => prev + 1);
@@ -129,8 +147,9 @@ export function RegistrationWizard({
   };
 
   const prevStep = () => {
+    setFormErrorSummary([]);
     // Si estamos en el paso 4 y venimos del 2 porque somos senior, volvemos al 2
-    if (currentStep === 4 && isSeniorTeam) {
+    if (currentStep === 4 && isSeniorEffective) {
       setCurrentStep(prev => prev - 2);
     } else {
       setCurrentStep(prev => prev - 1);
@@ -211,23 +230,40 @@ export function RegistrationWizard({
   };
 
   const onError = (errors: any) => {
+    const errorFields = Object.keys(errors);
+    const messages = errorFields
+      .map(field => {
+        const msg = errors[field]?.message;
+        if (msg) return String(msg);
+        return null;
+      })
+      .filter((m): m is string => Boolean(m));
+    
+    setFormErrorSummary(messages.length > 0 ? messages : ["Revisa los campos requeridos marcados en rojo."]);
+
     // Definimos qué campos pertenecen a qué paso
     const stepFields: Record<number, string[]> = {
       1: ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode', 'tutor1Name', 'tutor1LastName', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation', 'isSeniorSelection'],
       2: ['docsUploaded', 'escolarizacion'],
-      3: isSeniorTeam ? [] : ['paymentMethod', 'paymentPlan', 'wasInClub', 'paidReservation'],
+      3: isSeniorEffective ? [] : ['paymentMethod', 'paymentPlan', 'wasInClub', 'paidReservation'],
       4: ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo', 'sizeMedias', 'sizeMochila'],
       5: !isAdult ? ['consentRgpd', 'consentTutela', 'consentMedical', 'consentImage', 'password', 'confirmPassword'] : ['consentRgpd', 'consentMedical', 'consentImage', 'password', 'confirmPassword']
     };
 
-    const errorFields = Object.keys(errors);
-    
-    // Buscar el primer paso que tenga un error y saltar a él
+    // Buscar el primer paso que tenga un error y saltar a él si es diferente
     for (let step = 1; step <= 5; step++) {
       if (stepFields[step].some(field => errorFields.includes(field))) {
-        setCurrentStep(step);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        toast.error(`Revisa los campos marcados en rojo en el Paso ${step}.`);
+        if (currentStep !== step) {
+          setCurrentStep(step);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          // Si ya estamos en el paso, hacer scroll suave al primer campo con error
+          const firstErrElement = document.querySelector('.border-red-500, [aria-invalid="true"]');
+          if (firstErrElement) {
+            firstErrElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        toast.error(`Revisa los campos requeridos en el Paso ${step}.`);
         return;
       }
     }
@@ -235,7 +271,6 @@ export function RegistrationWizard({
     // Si no mapeó a ningún paso (safety net)
     if (errorFields.length > 0) {
       console.warn("Form errors that didn't match any step:", errors);
-      alert("CAMPOS QUE FALLAN: " + errorFields.join(", "));
       toast.error(`Revisa los campos con error: ${errorFields.join(", ")}`);
     }
   };
@@ -387,7 +422,6 @@ export function RegistrationWizard({
 
       <FormProvider {...methods}>
         <form onSubmit={methods.handleSubmit(onSubmit, onError)} className="space-y-8">
-          <input type="hidden" value={isSeniorTeam ? "true" : "false"} {...methods.register("isSeniorTeam")} />
           <Card className="shadow-2xl border-0 overflow-hidden rounded-2xl">
             <CardContent className="p-0">
               <div className="p-6 md:p-10">
@@ -408,6 +442,20 @@ export function RegistrationWizard({
                 </div>
               </div>
             </CardContent>
+
+            {formErrorSummary.length > 0 && (
+              <div className="p-4 mx-6 mb-2 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm animate-in fade-in">
+                <div className="flex items-center gap-2 font-bold mb-1.5 text-red-900">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 shrink-0" />
+                  <span>Por favor, revisa o completa los siguientes campos:</span>
+                </div>
+                <ul className="list-disc pl-5 space-y-0.5 text-red-700">
+                  {formErrorSummary.map((msg, idx) => (
+                    <li key={idx}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             
             <CardFooter className="bg-gray-50 border-t p-6 rounded-b-xl">
               <div className="flex justify-between items-center w-full">

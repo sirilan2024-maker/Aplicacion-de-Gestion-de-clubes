@@ -11,6 +11,7 @@ import { SPORTS, GENDERS, AGE_GROUPS, FORMATS, COLORS } from "@/lib/constants";
 import { importSportingSaladarData } from "@/lib/import-actions";
 import { getAvailableCoachesAction, getTeamCoachesAction, toggleCoachTeamAssignmentAction } from "@/app/actions/team-actions";
 import SeasonAlertBanner from "@/components/season/SeasonAlertBanner";
+import { useSeason } from "@/components/providers/SeasonProvider";
 
 // Types
 interface Team {
@@ -530,6 +531,7 @@ function AssignCoachModal({
 /*  Main page */
 export default function EquiposPage() {
   const router = useRouter();
+  const { selectedSeasonId, selectedSeason } = useSeason();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false); // Show modal for creating a team
@@ -562,13 +564,17 @@ export default function EquiposPage() {
         
       if (!profile?.club_id) { setTeams([]); setLoading(false); return; }
 
-      // Fetch the active season to filter teams correctly (avoid duplicates from old seasons)
-      const { data: activeSeason } = await supabase
-        .from('seasons')
-        .select('id')
-        .eq('club_id', profile.club_id)
-        .eq('is_active', true)
-        .single();
+      // Resolver temporada objetivo: seleccionada del context o activa como fallback
+      let targetSeasonId = selectedSeasonId;
+      if (!targetSeasonId) {
+        const { data: activeSeason } = await supabase
+          .from('seasons')
+          .select('id')
+          .eq('club_id', profile.club_id)
+          .eq('is_active', true)
+          .single();
+        targetSeasonId = activeSeason?.id || null;
+      }
 
       let query = supabase
         .from('teams')
@@ -582,8 +588,8 @@ export default function EquiposPage() {
         `)
         .eq("club_id", profile.club_id);
 
-      if (activeSeason?.id) {
-        query = query.eq("season_id", activeSeason.id);
+      if (targetSeasonId) {
+        query = query.eq("season_id", targetSeasonId);
       }
       
       query = query.order("name");
@@ -611,9 +617,9 @@ export default function EquiposPage() {
           let membersCount = 0;
           let coachesCount = t.team_coaches?.[0]?.count || 0;
           
-          // Filter history manually (allow null season_id or matching active season)
+          // Filtrar historial de la temporada consultada
           const activeHistory = t.player_season_history?.filter((h: any) => 
-            (!h.season_id || h.season_id === activeSeason?.id) && h.status !== 'inactive'
+            (!targetSeasonId || h.season_id === targetSeasonId) && h.status !== 'inactive'
           ) || [];
           
           activeHistory.forEach((h: any) => {
@@ -640,6 +646,10 @@ export default function EquiposPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTeams();
+  }, [selectedSeasonId]);
 
   const handleDeleteTeam = async (teamId: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este equipo por completo? ¡También se eliminarán del sistema todos los jugadores asignados a él de forma permanente!')) return;

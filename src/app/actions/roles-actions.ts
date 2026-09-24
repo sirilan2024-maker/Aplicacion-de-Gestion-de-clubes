@@ -137,11 +137,13 @@ export async function updateRoleNavigationAction(role: string, navIds: string[])
   const adminSupabase = await createAdminClient()
   const { data: profile } = await adminSupabase
     .from("profiles")
-    .select("role")
+    .select("role, roles")
     .eq("id", user.id)
     .single()
 
-  if (profile?.role !== 'admin' && profile?.role !== 'superadmin') {
+  const userRoles = profile?.roles || []
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin')
+  if (!isAdmin) {
     return { success: false, error: 'No tienes permisos para realizar esta acción' }
   }
 
@@ -185,11 +187,13 @@ export async function createCustomRoleAction(roleName: string, navIds: string[])
   const adminSupabase = await createAdminClient()
   const { data: profile } = await adminSupabase
     .from("profiles")
-    .select("role")
+    .select("role, roles")
     .eq("id", user.id)
     .single()
 
-  if (profile?.role !== 'admin' && profile?.role !== 'superadmin') {
+  const userRoles = profile?.roles || []
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin')
+  if (!isAdmin) {
     return { success: false, error: 'No tienes permisos de administrador' }
   }
 
@@ -225,11 +229,13 @@ export async function deleteCustomRoleAction(roleKey: string) {
   const adminSupabase = await createAdminClient()
   const { data: profile } = await adminSupabase
     .from("profiles")
-    .select("role")
+    .select("role, roles")
     .eq("id", user.id)
     .single()
 
-  if (profile?.role !== 'admin' && profile?.role !== 'superadmin') {
+  const userRoles = profile?.roles || []
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin')
+  if (!isAdmin) {
     return { success: false, error: 'No tienes permisos de administrador' }
   }
 

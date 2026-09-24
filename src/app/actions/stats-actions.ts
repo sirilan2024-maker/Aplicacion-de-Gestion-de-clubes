@@ -105,17 +105,54 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
     teams.forEach(t => teamMap.set(t.id, { name: t.name, category: t.category }))
     const teamIds = teams.map(t => t.id)
 
-    // 3. Obtener jugadores del club
-    const { data: playersData, error: playersError } = await supabase
-      .from('players')
-      .select('id, first_name, last_name, dorsal, team_id')
-      .eq('club_id', clubId)
+    // 3. Obtener jugadores del club (filtrando por temporada si se especifica vía player_season_history)
+    let players: any[] = []
+    if (seasonFilterId && seasonFilterId !== 'todas') {
+      const { data: pshData, error: pshError } = await supabase
+        .from('player_season_history')
+        .select(`
+          player_id,
+          team_id,
+          dorsal,
+          players (
+            id,
+            first_name,
+            last_name,
+            dorsal,
+            team_id
+          )
+        `)
+        .eq('season_id', seasonFilterId)
 
-    if (playersError) {
-      return { success: false, error: playersError.message }
+      if (pshError) {
+        return { success: false, error: pshError.message }
+      }
+
+      players = (pshData || [])
+        .map(h => {
+          const p = h.players as any
+          if (!p) return null
+          return {
+            id: p.id,
+            first_name: p.first_name,
+            last_name: p.last_name,
+            dorsal: h.dorsal ?? p.dorsal,
+            team_id: h.team_id ?? p.team_id
+          }
+        })
+        .filter(Boolean)
+    } else {
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, dorsal, team_id')
+        .eq('club_id', clubId)
+
+      if (playersError) {
+        return { success: false, error: playersError.message }
+      }
+      players = playersData || []
     }
 
-    const players = playersData || []
     const playerMap = new Map<string, { name: string; dorsal: number | null; teamId: string | null }>()
     players.forEach(p => {
       const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador'

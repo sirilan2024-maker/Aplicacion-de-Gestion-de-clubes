@@ -1,6 +1,6 @@
 "use client";
 
-import { login } from '@/lib/auth-actions';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -13,6 +13,9 @@ function LoginForm() {
   const urlError = searchParams.get('error');
   const [showPassword, setShowPassword] = useState(false);
   const [emailValue, setEmailValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(urlError ? (urlError.includes('Invalid login credentials') ? 'Credenciales incorrectas. Comprueba tu correo y contraseña.' : decodeURIComponent(urlError)) : "");
   const [isResetting, setIsResetting] = useState(false);
   const [resetMessage, setResetMessage] = useState({ text: "", type: "" });
 
@@ -33,6 +36,36 @@ function LoginForm() {
       setResetMessage({ text: "Error al enviar. Comprueba el correo o contacta con el club.", type: "error" });
     }
     setIsResetting(false);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailValue.trim(),
+        password: passwordValue,
+      });
+
+      if (error) {
+        setErrorMessage(
+          error.message.includes('Invalid login credentials')
+            ? 'Credenciales incorrectas. Comprueba tu correo y contraseña.'
+            : error.message
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Login exitoso: navegación completa a /dashboard para inicializar contexto según rol
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Error al iniciar sesión.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -110,21 +143,21 @@ function LoginForm() {
             <p className="text-xs text-slate-500 font-medium mt-0.5">Acceso a la Plataforma</p>
           </div>
 
-          {urlError && (
+          {(errorMessage || urlError) && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-start space-x-3 text-sm animate-in fade-in">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold">Error al iniciar sesión</p>
                 <p className="text-xs text-red-600 mt-0.5">
-                  {urlError.includes('Invalid login credentials')
+                  {errorMessage || (urlError?.includes('Invalid login credentials')
                     ? 'Credenciales incorrectas. Comprueba tu correo y contraseña.'
-                    : decodeURIComponent(urlError)}
+                    : decodeURIComponent(urlError || ''))}
                 </p>
               </div>
             </div>
           )}
 
-          <form action={login} className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
                 Correo electrónico
@@ -154,6 +187,8 @@ function LoginForm() {
                   name="password"
                   type={showPassword ? "text" : "password"}
                   required
+                  value={passwordValue}
+                  onChange={(e) => setPasswordValue(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white text-slate-900 px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
                 <button
@@ -176,9 +211,10 @@ function LoginForm() {
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors"
+              disabled={isSubmitting}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Iniciar sesión
+              {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
             </button>
             <div className="pt-3 text-center border-t border-slate-100">
               <p className="text-sm text-slate-600">

@@ -436,10 +436,18 @@ export default function ConfigRolesPage() {
                         const isChecked = rolePermissions[activeRoleObj.key]?.includes(item.id) || false
 
                         return (
-                          <label
+                          <div
                             key={item.id}
                             onClick={() => handleToggle(activeRoleObj.key, item.id)}
-                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === ' ' || e.key === 'Enter') {
+                                e.preventDefault()
+                                handleToggle(activeRoleObj.key, item.id)
+                              }
+                            }}
+                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer select-none transition-all ${
                               isChecked
                                 ? "bg-blue-50/70 border-blue-200 text-blue-950 shadow-xs"
                                 : "bg-slate-50/50 border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
@@ -453,10 +461,11 @@ export default function ConfigRolesPage() {
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {}}
-                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+                              readOnly
+                              tabIndex={-1}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0 pointer-events-none"
                             />
-                          </label>
+                          </div>
                         )
                       })}
                     </div>

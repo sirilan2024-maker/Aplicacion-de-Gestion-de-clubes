@@ -226,16 +226,25 @@ export function FFCVActaModal({
                     <div className="space-y-1.5">
                       <span className="text-[11px] font-bold text-slate-500 uppercase block">{data.equipo_local || "Local"}</span>
                       {data.goles_equipo_local && data.goles_equipo_local.length > 0 ? (
-                        data.goles_equipo_local.map((g: any, idx: number) => (
-                          <div key={idx} className="p-2 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-semibold text-emerald-900 flex justify-between items-center">
-                            <div className="flex items-center gap-1.5">
-                              <span>⚽</span>
-                              <span>{g.nombre_jugador || g.jugador || g.nombre || "Gol"}</span>
-                              {g.tipo_gol && <span className="text-[10px] text-emerald-700 italic">({g.tipo_gol})</span>}
+                        data.goles_equipo_local.map((g: any, idx: number) => {
+                          const isPP = g.tipo_gol === '102' || (g.tipo_gol || '').toLowerCase().includes('propia') || (g.tipo_gol || '').toLowerCase().includes('pp');
+                          return (
+                            <div key={idx} className={`p-2 rounded-lg text-xs font-semibold flex justify-between items-center ${isPP ? 'bg-amber-50 border border-amber-200 text-amber-950' : 'bg-emerald-50 border border-emerald-100 text-emerald-900'}`}>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{isPP ? '⚠️' : '⚽'}</span>
+                                <span>{g.nombre_jugador || g.jugador || g.nombre || "Gol"}</span>
+                                {isPP ? (
+                                  <span className="text-[10px] font-bold bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded">
+                                    (PP - En propia puerta)
+                                  </span>
+                                ) : (
+                                  g.tipo_gol && <span className="text-[10px] text-emerald-700 italic">({g.tipo_gol === '100' ? 'Gol' : g.tipo_gol})</span>
+                                )}
+                              </div>
+                              <span className={`${isPP ? 'text-amber-800' : 'text-emerald-700'} font-bold`}>{g.minuto ? `${g.minuto}'` : ""}</span>
                             </div>
-                            <span className="text-emerald-700 font-bold">{g.minuto ? `${g.minuto}'` : ""}</span>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <span className="text-xs text-slate-400 italic">Sin goles</span>
                       )}
@@ -245,16 +254,25 @@ export function FFCVActaModal({
                     <div className="space-y-1.5">
                       <span className="text-[11px] font-bold text-slate-500 uppercase block">{data.equipo_visitante || "Visitante"}</span>
                       {data.goles_equipo_visitante && data.goles_equipo_visitante.length > 0 ? (
-                        data.goles_equipo_visitante.map((g: any, idx: number) => (
-                          <div key={idx} className="p-2 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-semibold text-emerald-900 flex justify-between items-center">
-                            <div className="flex items-center gap-1.5">
-                              <span>⚽</span>
-                              <span>{g.nombre_jugador || g.jugador || g.nombre || "Gol"}</span>
-                              {g.tipo_gol && <span className="text-[10px] text-emerald-700 italic">({g.tipo_gol})</span>}
+                        data.goles_equipo_visitante.map((g: any, idx: number) => {
+                          const isPP = g.tipo_gol === '102' || (g.tipo_gol || '').toLowerCase().includes('propia') || (g.tipo_gol || '').toLowerCase().includes('pp');
+                          return (
+                            <div key={idx} className={`p-2 rounded-lg text-xs font-semibold flex justify-between items-center ${isPP ? 'bg-amber-50 border border-amber-200 text-amber-950' : 'bg-emerald-50 border border-emerald-100 text-emerald-900'}`}>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{isPP ? '⚠️' : '⚽'}</span>
+                                <span>{g.nombre_jugador || g.jugador || g.nombre || "Gol"}</span>
+                                {isPP ? (
+                                  <span className="text-[10px] font-bold bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded">
+                                    (PP - En propia puerta)
+                                  </span>
+                                ) : (
+                                  g.tipo_gol && <span className="text-[10px] text-emerald-700 italic">({g.tipo_gol === '100' ? 'Gol' : g.tipo_gol})</span>
+                                )}
+                              </div>
+                              <span className={`${isPP ? 'text-amber-800' : 'text-emerald-700'} font-bold`}>{g.minuto ? `${g.minuto}'` : ""}</span>
                             </div>
-                            <span className="text-emerald-700 font-bold">{g.minuto ? `${g.minuto}'` : ""}</span>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <span className="text-xs text-slate-400 italic">Sin goles</span>
                       )}

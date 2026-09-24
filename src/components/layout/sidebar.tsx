@@ -87,6 +87,7 @@ type NavItem = {
   icon: React.ComponentType<any>;
   children?: NavItem[];
   action?: 'logout';
+  category?: string;
 };
 
 type NavGroup = {
@@ -94,6 +95,7 @@ type NavGroup = {
   items: NavItem[];
 };
 
+import { SYSTEM_MODULES } from "@/lib/roles-config"
 import { useSeason } from "@/components/providers/SeasonProvider"
 
 export function Sidebar({ signOutAction }: { signOutAction?: any }) {
@@ -153,7 +155,12 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
 
             // Fetch equipos
             if (profile.role === 'admin' || profile.role === 'coordinador' || profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-              let query = supabase.from('teams').select("id, name, category").eq("club_id", profile.club_id).order("name")
+              let query = supabase.from('teams').select("id, name, category").eq("club_id", profile.club_id)
+              if (selectedSeason?.id) {
+                query = query.eq("season_id", selectedSeason.id)
+              }
+              query = query.order("name")
+
               if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
                 const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
                 const teamIds = coachTeams?.map(ct => ct.team_id) || [];
@@ -217,18 +224,22 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
             // Fetch dynamic navigation
             const { data: navData } = await supabase
               .from('role_navigation')
-              .select(`nav_id, app_navigation(label, path, icon_name, sort_order)`)
+              .select(`nav_id, app_navigation(id, label, path, icon_name, sort_order)`)
               .eq('role', profile.role)
             
             if (navData) {
                const parsedNavs = navData
                  .filter((n: any) => n.app_navigation)
-                 .map((n: any) => ({
-                   name: n.app_navigation.label,
-                   href: n.app_navigation.path,
-                   icon: IconMap[n.app_navigation.icon_name] || LayoutDashboard,
-                   sortOrder: n.app_navigation.sort_order
-                 }))
+                 .map((n: any) => {
+                   const sysMod = SYSTEM_MODULES.find(m => m.id === n.nav_id || m.id === n.app_navigation.id || m.path === n.app_navigation.path);
+                   return {
+                     name: n.app_navigation.label,
+                     href: n.app_navigation.path,
+                     icon: IconMap[n.app_navigation.icon_name] || LayoutDashboard,
+                     sortOrder: n.app_navigation.sort_order,
+                     category: sysMod?.category || "General / Club"
+                   };
+                 })
                  .sort((a, b) => a.sortOrder - b.sortOrder)
                
                setGlobalNavItems(parsedNavs)
@@ -240,7 +251,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
       }
     }
     fetchData()
-  }, [supabase])
+  }, [supabase, selectedSeason?.id, userRole])
 
   // Effect to handle Admin impersonation of Family View
   // If the URL has a player ID that isn't in linkedPlayers, fetch it directly
@@ -425,17 +436,68 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
       return true;
     });
     
-    navGroups = [
-      {
-        label: "General / Club",
-        items: [
-          ...filteredNavItems,
-          ...(isCoach && !hasMisEquipos ? [{ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield }] : []),
-          { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
-          { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
-        ],
+    // Group items by category
+    const categoryOrder = [
+      "General / Club",
+      "Metodología",
+      "Gestión y Finanzas",
+      "IA y Conexiones",
+      "Personal"
+    ];
+
+    const itemsByCategory: Record<string, NavItem[]> = {};
+
+    filteredNavItems.forEach(item => {
+      const cat = item.category || "General / Club";
+      if (!itemsByCategory[cat]) {
+        itemsByCategory[cat] = [];
       }
-    ]
+      itemsByCategory[cat].push(item);
+    });
+
+    if (isCoach && !hasMisEquipos) {
+      if (!itemsByCategory["General / Club"]) itemsByCategory["General / Club"] = [];
+      itemsByCategory["General / Club"].push({ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield });
+    }
+
+    navGroups = [];
+
+    // Add ordered known categories first
+    categoryOrder.forEach(cat => {
+      if (itemsByCategory[cat] && itemsByCategory[cat].length > 0) {
+        navGroups.push({
+          label: cat,
+          items: itemsByCategory[cat]
+        });
+      }
+    });
+
+    // Add any other categories that might exist
+    Object.keys(itemsByCategory).forEach(cat => {
+      if (!categoryOrder.includes(cat) && itemsByCategory[cat].length > 0) {
+        navGroups.push({
+          label: cat,
+          items: itemsByCategory[cat]
+        });
+      }
+    });
+
+    // Fallback if no categories or empty
+    if (navGroups.length === 0) {
+      navGroups.push({
+        label: "General / Club",
+        items: []
+      });
+    }
+
+    // Always add Sistema at the bottom
+    navGroups.push({
+      label: "SISTEMA",
+      items: [
+        { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+        { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
+      ]
+    });
 
     // Provide the link for metodologo to access the ERP
     if (userRole === 'metodologo') {
@@ -449,6 +511,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
   }
 
   return (
+
     <>
     <aside
       className={cn(
@@ -529,8 +592,10 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                   const res = await switchActiveRoleAction(newRole);
                   if (res.success) {
                     let targetUrl = '/dashboard';
-                    if (newRole === 'admin' || newRole === 'coordinador') {
-                      targetUrl = '/dashboard/equipos';
+                    if (newRole === 'admin') {
+                      targetUrl = '/admin/inicio';
+                    } else if (newRole === 'coordinador') {
+                      targetUrl = '/admin/coordinador';
                     } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
                       targetUrl = '/dashboard/mis-equipos';
                     } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 
 process.env.SERWIST_SUPPRESS_TURBOPACK_WARNING = "1";
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",

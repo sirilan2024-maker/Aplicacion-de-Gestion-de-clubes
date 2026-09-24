@@ -83,7 +83,11 @@ export default function PlayerDashboardPage() {
 
     filteredConv.forEach((c: any) => {
       const mEvs = (rawMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
-      const g = (c.goals ?? c.goles) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+      const isLegitGoal = (e: any) => {
+        const ev = (e.tipo_evento || '').toLowerCase();
+        return ev.includes('gol') && !ev.includes('propia') && !ev.includes('pp');
+      };
+      const g = (c.goals ?? c.goles) || mEvs.filter(isLegitGoal).length;
       const y = (c.yellow_cards ?? c.tarjetas_amarillas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
       const r = (c.red_cards ?? c.tarjetas_rojas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
       const m = (c.minutes_played ?? c.minutos_jugados) || (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
@@ -247,10 +251,15 @@ export default function PlayerDashboardPage() {
         const detectedTeams = Array.from(teamsMap.entries()).map(([id, name]) => ({ id, name }));
         setAvailableTeams(detectedTeams);
 
+        const isLegitGoal = (e: any) => {
+          const ev = (e.tipo_evento || '').toLowerCase();
+          return ev.includes('gol') && !ev.includes('propia') && !ev.includes('pp');
+        };
+
         if (convData && convData.length > 0) {
           convData.forEach((c: any) => {
             const mEvs = (matchEventsData || []).filter((e: any) => e.partido_id === c.partido_id);
-            const g = (c.goals ?? c.goles) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+            const g = (c.goals ?? c.goles) || mEvs.filter(isLegitGoal).length;
             const y = (c.yellow_cards ?? c.tarjetas_amarillas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
             const r = (c.red_cards ?? c.tarjetas_rojas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
             const m = (c.minutes_played ?? c.minutos_jugados) || (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
@@ -264,7 +273,7 @@ export default function PlayerDashboardPage() {
             }
           });
         } else if (matchEventsData && matchEventsData.length > 0) {
-          goals = matchEventsData.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('gol')).length;
+          goals = matchEventsData.filter(isLegitGoal).length;
           yellowCards = matchEventsData.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
           redCards = matchEventsData.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
         }

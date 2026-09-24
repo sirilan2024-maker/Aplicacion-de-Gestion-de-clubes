@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { getAuthenticatedContext, ADMIN_ROLES, canUserManageClubStaff, canUserUpdateStaffProfile } from "@/lib/auth-helpers"
+import { getAuthenticatedContext, ADMIN_ROLES, canUserManageClubStaff, canUserUpdateStaffProfile, getEffectiveSelectedSeasonId } from "@/lib/auth-helpers"
 
 export async function updateUserRoleAction(userId: string, newRole: string) {
   const { context, error: authError } = await getAuthenticatedContext()
@@ -726,26 +726,17 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .eq('id', clubId)
       .single();
 
-    // 2. Temporada dinámica (targetSeasonId o is_active = true)
-    let seasonQuery = adminClient
-      .from('seasons')
-      .select('id, name, is_active')
-      .eq('club_id', clubId);
-
-    if (targetSeasonId) {
-      seasonQuery = seasonQuery.eq('id', targetSeasonId);
-    } else {
-      seasonQuery = seasonQuery.eq('is_active', true);
-    }
-
-    const { data: activeSeasonRow } = await seasonQuery.maybeSingle();
-
-    const resolvedSeasonId = targetSeasonId || activeSeasonRow?.id || '';
+    // 2. Temporada dinámica (targetSeasonId ?? cookie 'sporting_selected_season_id' ?? is_active = true)
+    const { seasonId: resolvedSeasonId, seasonName: resolvedSeasonName, isActive: resolvedIsActive } = await getEffectiveSelectedSeasonId(
+      adminClient,
+      clubId,
+      targetSeasonId
+    );
 
     const activeSeason = {
       id: resolvedSeasonId,
-      name: activeSeasonRow?.name || 'Temporada 2026/27',
-      isActive: activeSeasonRow?.is_active ?? true,
+      name: resolvedSeasonName || 'Temporada 2026/27',
+      isActive: resolvedIsActive,
     };
 
     // Obtenemos los player_id pertenecientes a la temporada consultada
@@ -815,7 +806,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const teamIds = teams.map(t => t.id);
     const { data: rawPartidos } = await adminClient
       .from('partidos')
-      .select('id, estado, resultado_propio, resultado_rival, equipo_id, es_local, rival_nombre, lugar, fecha_hora')
+      .select('id, estado, resultado_propio, resultado_rival, equipo_id, rival_nombre, lugar, fecha_hora')
       .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
       .order('fecha_hora', { ascending: false });
 
@@ -1140,7 +1131,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const { data: rawMatches } = await adminClient
       .from('partidos')
       .select(`
-        id, fecha_hora, rival_nombre, lugar, jornada, es_local, estado,
+        id, fecha_hora, rival_nombre, lugar, estado,
         resultado_propio, resultado_rival,
         teams:equipo_id (name, category, color)
       `)
@@ -1163,8 +1154,8 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         fechaHora: m.fecha_hora,
         rivalNombre: m.rival_nombre || 'Rival por definir',
         lugar: m.lugar || 'Por determinar',
-        jornada: m.jornada || undefined,
-        esLocal: m.es_local ?? true,
+        jornada: undefined,
+        esLocal: true,
         estado: m.estado || 'Programado',
         resultadoPropio: m.resultado_propio,
         resultadoRival: m.resultado_rival,
@@ -1293,8 +1284,9 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         upcomingMatches,
       },
     };
-  } catch {
-    return { success: false, error: 'Error al recuperar datos del panel ejecutivo' };
+  } catch (err: any) {
+    console.error('Error in getExecutiveDashboardAction:', err);
+    return { success: false, error: err?.message || 'Error al recuperar datos del panel ejecutivo' };
   }
 }
 

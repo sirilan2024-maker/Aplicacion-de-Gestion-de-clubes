@@ -10,6 +10,7 @@ import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction,
 import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
+import { useSeason } from "@/components/providers/SeasonProvider"
 
 // --- Modal para Invitar Miembro (Jugador) ---
 function InviteMemberModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -918,6 +919,7 @@ interface Member {
 function GlobalMembersContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { selectedSeasonId } = useSeason()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -995,33 +997,41 @@ function GlobalMembersContent() {
         
         console.log("[Miembros] staffData:", staffData?.length, "profiles found, error:", staffRes.error || "none")
 
-        // Get Active Season
-        const { data: activeSeason } = await supabase
-          .from("seasons")
-          .select("id")
-          .eq("club_id", profile.club_id)
-          .eq("is_active", true)
-          .single()
+        // Resolver temporada objetivo (seleccionada en UI o activa de la BD como fallback)
+        let targetSeasonId = selectedSeasonId;
+        if (!targetSeasonId) {
+          const { data: activeSeason } = await supabase
+            .from("seasons")
+            .select("id")
+            .eq("club_id", profile.club_id)
+            .eq("is_active", true)
+            .single()
+          targetSeasonId = activeSeason?.id || null;
+        }
 
         // 2. Fetch all players for this club directly from players table
         let playersData: any[] = []
         
-        // Fetch all teams for the club to pass to the modal
-        const { data: clubTeams } = await supabase
+        // Fetch all teams for the club to pass to the modal (filtrados por temporada si aplica)
+        let clubTeamsQuery = supabase
           .from("teams")
           .select("id, name")
           .eq("club_id", profile.club_id)
           .order("name")
+        if (targetSeasonId) {
+          clubTeamsQuery = clubTeamsQuery.eq("season_id", targetSeasonId);
+        }
+        const { data: clubTeams } = await clubTeamsQuery;
         
         if (clubTeams) setAllTeams(clubTeams)
 
-        // Fetch players for active season (via player_season_history)
+        // Fetch players for selected season (via player_season_history)
         let activePlayerIds: string[] = []
-        if (activeSeason?.id) {
+        if (targetSeasonId) {
           const { data: pshData } = await supabase
             .from("player_season_history")
             .select("player_id")
-            .eq("season_id", activeSeason.id)
+            .eq("season_id", targetSeasonId)
 
           if (pshData) {
             activePlayerIds = pshData.map((p: any) => p.player_id).filter(Boolean)
@@ -1165,15 +1175,27 @@ function GlobalMembersContent() {
           })
         }
 
-        // Sort: Members without a team first, then alphabetical by last name
+        // Función de prioridad jerárquica de roles
+        const getMemberPriority = (m: Member): number => {
+          const allRoles = [(m.role || ''), ...(m.roles || [])].map(r => r.toLowerCase().trim())
+          if (allRoles.some(r => r === 'admin' || r === 'administrador')) return 1
+          if (allRoles.some(r => r === 'coach' || r === 'entrenador')) return 2
+          if (allRoles.some(r => r === 'coordinador' || r === 'coordinador_general')) return 3
+          if (allRoles.some(r => r === 'secretario' || r === 'secretaria' || r === 'tesorero' || r === 'tesoreria' || r === 'directivo')) return 4
+          if (allRoles.some(r => r === 'delegado' || r === 'utillero' || r === 'staff')) return 5
+          if (m.type === 'staff') return 6
+          return 10 // Jugadores y otros miembros
+        }
+
+        // Ordenar con prioridad jerárquica: Admin > Entrenadores > Coordinadores > Resto Staff > Jugadores
         allMembers.sort((a, b) => {
-          const aNoTeam = !a.team_id;
-          const bNoTeam = !b.team_id;
-          
-          if (aNoTeam && !bNoTeam) return -1;
-          if (!aNoTeam && bNoTeam) return 1;
-          
-          return a.last_name.localeCompare(b.last_name);
+          const prioA = getMemberPriority(a)
+          const prioB = getMemberPriority(b)
+          if (prioA !== prioB) return prioA - prioB
+
+          const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim()
+          const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim()
+          return nameA.localeCompare(nameB)
         })
         setMembers(allMembers)
         
@@ -1193,7 +1215,7 @@ function GlobalMembersContent() {
 
   useEffect(() => {
     fetchMembers()
-  }, [])
+  }, [selectedSeasonId])
 
   const handleRoleChange = async (member: Member, newRole: string) => {
     if (member.role === newRole) return;
@@ -1274,20 +1296,35 @@ function GlobalMembersContent() {
     return searchMatch && roleMatch && teamMatch;
   })
 
-  // Sort so Staff is always at the top, then players without team, then alphabetically by first name
+  // Función de prioridad jerárquica para la vista filtrada
+  const getMemberPriority = (m: Member): number => {
+    const allRoles = [(m.role || ''), ...(m.roles || [])].map(r => r.toLowerCase().trim())
+    if (allRoles.some(r => r === 'admin' || r === 'administrador')) return 1
+    if (allRoles.some(r => r === 'coach' || r === 'entrenador')) return 2
+    if (allRoles.some(r => r === 'coordinador' || r === 'coordinador_general')) return 3
+    if (allRoles.some(r => r === 'secretario' || r === 'secretaria' || r === 'tesorero' || r === 'tesoreria' || r === 'directivo')) return 4
+    if (allRoles.some(r => r === 'delegado' || r === 'utillero' || r === 'staff')) return 5
+    if (m.type === 'staff') return 6
+    return 10 // Jugadores y resto de miembros
+  }
+
+  // Orden: Administradores > Entrenadores > Coordinadores > Resto Staff > Jugadores (sin equipo primero dentro de jugadores) > Alfabético
   filteredMembers.sort((a, b) => {
-    if (a.type === 'staff' && b.type !== 'staff') return -1;
-    if (a.type !== 'staff' && b.type === 'staff') return 1;
+    const prioA = getMemberPriority(a)
+    const prioB = getMemberPriority(b)
+    if (prioA !== prioB) return prioA - prioB
     
     if (a.type === 'player' && b.type === 'player') {
-      const aSinEquipo = !a.team_name;
-      const bSinEquipo = !b.team_name;
-      if (aSinEquipo && !bSinEquipo) return -1;
-      if (!aSinEquipo && bSinEquipo) return 1;
+      const aSinEquipo = !a.team_name
+      const bSinEquipo = !b.team_name
+      if (aSinEquipo && !bSinEquipo) return -1
+      if (!aSinEquipo && bSinEquipo) return 1
     }
 
-    return (a.first_name || '').localeCompare(b.first_name || '');
-  });
+    const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim()
+    const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim()
+    return nameA.localeCompare(nameB)
+  })
 
   // Extract unique teams for the dropdown
   const uniqueTeams = Array.from(new Set(members.map(m => m.team_name).filter(Boolean))) as string[];

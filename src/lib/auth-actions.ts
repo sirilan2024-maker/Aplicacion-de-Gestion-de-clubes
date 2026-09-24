@@ -26,14 +26,15 @@ export async function login(formData: FormData) {
   // Fetch the user's profile to obtain the role
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, roles')
     .eq('id', user.id)
     .single();
 
   const role = (profile?.role as string) ?? 'coach';
+  const roles: string[] = profile?.roles || [];
   let destination = '/dashboard';
-  if (role === 'admin') destination = '/admin/inicio';
-  else if (role === 'coordinador') destination = '/dashboard/equipos';
+  if (role === 'admin' || roles.includes('admin')) destination = '/admin/inicio';
+  else if (role === 'coordinador' || roles.includes('coordinador')) destination = '/admin/coordinador';
   else if (role === 'coach' || role === 'entrenador') destination = '/dashboard/mis-equipos';
   else if (role === 'jugador') destination = '/dashboard';
   else if (role === 'tutor' || role === 'familia' || role === 'family') {

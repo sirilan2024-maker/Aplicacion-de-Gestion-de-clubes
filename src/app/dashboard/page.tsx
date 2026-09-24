@@ -17,11 +17,15 @@ export default async function DashboardPage() {
 
   const role = profile?.role;
   const userRoles: string[] = profile?.roles || [];
-  if (role === 'admin' || role === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin')) redirect('/admin/inicio');
-  else if (role === 'coordinador' || userRoles.includes('coordinador')) redirect('/admin/coordinador');
-  else if (role === 'coach' || role === 'entrenador' || userRoles.includes('coach') || userRoles.includes('entrenador')) redirect('/dashboard/mis-equipos');
-  else if (role === 'tutor' || role === 'familia' || role === 'family' || userRoles.includes('tutor') || userRoles.includes('family')) redirect('/dashboard/family');
-  else if (role === 'jugador') {
+
+  // 1. Respetar PRIMERO el rol activo seleccionado (profile.role)
+  if (role === 'admin' || role === 'superadmin') {
+    redirect('/admin/inicio');
+  } else if (role === 'coordinador') {
+    redirect('/admin/coordinador');
+  } else if (role === 'coach' || role === 'entrenador') {
+    redirect('/dashboard/mis-equipos');
+  } else if (role === 'jugador') {
     const { data: playerRec } = await supabase
       .from('players')
       .select('id')
@@ -32,8 +36,6 @@ export default async function DashboardPage() {
     if (playerRec) {
       redirect(`/dashboard/family/e/${playerRec.id}/perfil`);
     } else {
-      // Fallback: If no player record matches the user_auth_id (e.g. testing with tutor account),
-      // redirect to the first linked tutor player to show the Cadet view.
       const { data: tutorLink } = await supabase
         .from('player_tutors')
         .select('player_id')
@@ -45,9 +47,27 @@ export default async function DashboardPage() {
         redirect(`/dashboard/family/e/${tutorLink.player_id}/perfil`);
       }
     }
+    redirect('/dashboard/family');
+  } else if (role === 'tutor' || role === 'familia' || role === 'family') {
+    redirect('/dashboard/family');
+  } else if (role === 'utillero') {
+    redirect('/dashboard/utilleria');
   }
-  else if (role === 'utillero') redirect('/dashboard/utilleria');
-  
-  // Para directivo, secretario, tesorero, delegado, socio, etc.
+
+  // 2. Si no hay rol activo o no coincide, evaluar roles secundarios en profile.roles por jerarquía
+  if (userRoles.includes('admin') || userRoles.includes('superadmin')) redirect('/admin/inicio');
+  else if (userRoles.includes('coordinador')) redirect('/admin/coordinador');
+  else if (userRoles.includes('coach') || userRoles.includes('entrenador')) redirect('/dashboard/mis-equipos');
+  else if (userRoles.includes('jugador')) {
+    const { data: playerRec } = await supabase
+      .from('players')
+      .select('id')
+      .eq('user_auth_id', authData.user.id)
+      .neq('status', 'inactive')
+      .maybeSingle();
+    if (playerRec) redirect(`/dashboard/family/e/${playerRec.id}/perfil`);
+  }
+  else if (userRoles.includes('tutor') || userRoles.includes('family')) redirect('/dashboard/family');
+
   redirect("/dashboard/global-club");
 }

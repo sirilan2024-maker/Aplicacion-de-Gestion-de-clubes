@@ -431,12 +431,16 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                         const res = await switchActiveRoleAction(newRole);
                         if (res.success) {
                           let targetUrl = '/dashboard';
-                          if (newRole === 'admin' || newRole === 'coordinador') {
-                            targetUrl = '/dashboard/equipos';
+                          if (newRole === 'admin') {
+                            targetUrl = '/admin/inicio';
+                          } else if (newRole === 'coordinador') {
+                            targetUrl = '/admin/coordinador';
                           } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
                             targetUrl = '/dashboard/mis-equipos';
                           } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {
                             targetUrl = '/dashboard/family';
+                          } else if (newRole === 'jugador') {
+                            targetUrl = '/dashboard';
                           } else {
                             targetUrl = '/dashboard/mi-perfil';
                           }

@@ -608,7 +608,12 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                         targetUrl = '/dashboard/family';
                       }
                     } else if (newRole === 'jugador') {
-                      targetUrl = '/dashboard';
+                      if (linkedPlayers && linkedPlayers.length > 0) {
+                        const pid = linkedPlayers[0].player_id || linkedPlayers[0].id;
+                        targetUrl = `/dashboard/family/e/${pid}/perfil`;
+                      } else {
+                        targetUrl = '/dashboard';
+                      }
                     } else {
                       targetUrl = '/dashboard/mi-perfil';
                     }

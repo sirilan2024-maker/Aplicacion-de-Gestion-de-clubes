@@ -57,6 +57,46 @@ export function MatchdayShareModal({
 
   const posterRef = useRef<HTMLDivElement>(null)
 
+  // Funciones de cálculo de fin de semana
+  const getCurrentWeekendRange = () => {
+    const now = new Date()
+    const dayOfWeek = now.getDay() // 0 = dom, 1 = lun, ..., 5 = vie, 6 = sab
+    const start = new Date(now)
+
+    if (dayOfWeek === 5) {
+      // Viernes
+      start.setHours(0, 0, 0, 0)
+    } else if (dayOfWeek === 6) {
+      // Sábado
+      start.setDate(now.getDate() - 1)
+      start.setHours(0, 0, 0, 0)
+    } else if (dayOfWeek === 0) {
+      // Domingo
+      start.setDate(now.getDate() - 2)
+      start.setHours(0, 0, 0, 0)
+    } else {
+      // Lunes a jueves -> próximo viernes
+      const daysToFriday = 5 - dayOfWeek
+      start.setDate(now.getDate() + daysToFriday)
+      start.setHours(0, 0, 0, 0)
+    }
+
+    const end = new Date(start)
+    end.setDate(start.getDate() + 3) // hasta lunes noche
+    end.setHours(23, 59, 59, 999)
+
+    return { start, end }
+  }
+
+  const getNextWeekendRange = () => {
+    const curr = getCurrentWeekendRange()
+    const start = new Date(curr.start)
+    start.setDate(start.getDate() + 7)
+    const end = new Date(curr.end)
+    end.setDate(end.getDate() + 7)
+    return { start, end }
+  }
+
   // 1. Cargar todos los partidos programados de la temporada
   useEffect(() => {
     if (!isOpen) return
@@ -70,38 +110,28 @@ export function MatchdayShareModal({
           const list = res.data as MatchItem[]
           setAllMatches(list)
 
-          // Auto-seleccionar partidos del próximo fin de semana o los próximos 7 días
-          const now = new Date()
-          const dayOfWeek = now.getDay() // 0 = dom, 5 = vie, 6 = sab
-          
-          // Calcular el viernes y domingo más cercanos
-          const nextFriday = new Date(now)
-          const daysToFriday = (5 - dayOfWeek + 7) % 7
-          nextFriday.setDate(now.getDate() + (daysToFriday === 0 && now.getHours() > 22 ? 7 : daysToFriday))
-          nextFriday.setHours(0, 0, 0, 0)
-
-          const nextMonday = new Date(nextFriday)
-          nextMonday.setDate(nextFriday.getDate() + 3)
-          nextMonday.setHours(23, 59, 59, 999)
-
+          // Auto-seleccionar partidos del fin de semana actual/próximo
+          const { start, end } = getCurrentWeekendRange()
           const defaultSelection = new Set<string>()
 
           list.forEach(m => {
             if (!m.fecha_hora) return
             const mDate = new Date(m.fecha_hora)
-            // Si cae en el rango del próximo fin de semana
-            if (mDate >= nextFriday && mDate <= nextMonday) {
+            if (mDate >= start && mDate <= end) {
               defaultSelection.add(m.id)
             }
           })
 
-          // Si el fin de semana próximo no tiene partidos (ej. semana de descanso), seleccionar los próximos partidos programados más cercanos
+          // Si el fin de semana próximo no tiene partidos, seleccionar los más cercanos
           if (defaultSelection.size === 0 && list.length > 0) {
+            const now = new Date()
             const firstUpcoming = list.filter(m => new Date(m.fecha_hora) >= now).slice(0, 5)
             firstUpcoming.forEach(m => defaultSelection.add(m.id))
           }
 
           setSelectedMatchIds(defaultSelection)
+        } else if (!res.success && isMounted) {
+          toast.error(res.error || "No se pudieron cargar los partidos")
         }
       } catch (err) {
         console.error("Error al cargar partidos de la jornada:", err)
@@ -145,6 +175,34 @@ export function MatchdayShareModal({
       else next.add(id)
       return next
     })
+  }
+
+  const selectCurrentWeekend = () => {
+    const { start, end } = getCurrentWeekendRange()
+    const current = new Set<string>()
+    allMatches.forEach(m => {
+      if (!m.fecha_hora) return
+      const dt = new Date(m.fecha_hora)
+      if (dt >= start && dt <= end) current.add(m.id)
+    })
+    setSelectedMatchIds(current)
+    if (current.size === 0) {
+      toast("No hay partidos programados en este fin de semana", { icon: "ℹ️" })
+    }
+  }
+
+  const selectNextWeekend = () => {
+    const { start, end } = getNextWeekendRange()
+    const next = new Set<string>()
+    allMatches.forEach(m => {
+      if (!m.fecha_hora) return
+      const dt = new Date(m.fecha_hora)
+      if (dt >= start && dt <= end) next.add(m.id)
+    })
+    setSelectedMatchIds(next)
+    if (next.size === 0) {
+      toast("No hay partidos programados en el siguiente fin de semana", { icon: "ℹ️" })
+    }
   }
 
   const selectAll = () => {
@@ -366,19 +424,31 @@ export function MatchdayShareModal({
                     <div>
                       <h4 className="text-sm font-bold text-blue-950">Partidos para la Cartelera</h4>
                       <p className="text-xs text-blue-700">
-                        Marca los partidos que se disputarán en este fin de semana o añade partidos adelantados / retrasados.
+                        Selecciona los partidos de la jornada o utiliza los filtros rápidos.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                      <button
+                        onClick={selectCurrentWeekend}
+                        className="text-xs font-bold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-xs"
+                      >
+                        Esta Jornada
+                      </button>
+                      <button
+                        onClick={selectNextWeekend}
+                        className="text-xs font-bold px-3 py-1.5 bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        Próxima Jornada
+                      </button>
                       <button
                         onClick={selectAll}
-                        className="text-xs font-bold px-3 py-1.5 bg-white text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg transition-colors"
+                        className="text-xs font-bold px-2.5 py-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors"
                       >
-                        Marcar Todos
+                        Todos ({allMatches.length})
                       </button>
                       <button
                         onClick={clearSelection}
-                        className="text-xs font-bold px-3 py-1.5 bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-xs font-bold px-2.5 py-1.5 bg-white text-slate-500 border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         Limpiar
                       </button>
@@ -387,7 +457,13 @@ export function MatchdayShareModal({
 
                   {/* Lista de partidos */}
                   <div className="space-y-2">
-                    {allMatches.map(m => {
+                    {allMatches.length === 0 ? (
+                      <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-xs font-semibold">No se encontraron partidos programados en el calendario de esta temporada.</p>
+                      </div>
+                    ) : (
+                      allMatches.map(m => {
                       const isSelected = selectedMatchIds.has(m.id)
                       const dt = m.fecha_hora ? new Date(m.fecha_hora) : null
                       const dateStr = dt ? dt.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }) : ""
@@ -441,7 +517,7 @@ export function MatchdayShareModal({
                           </span>
                         </div>
                       )
-                    })}
+                    }))}
                   </div>
 
                   <div className="pt-4 flex justify-end">
@@ -461,10 +537,28 @@ export function MatchdayShareModal({
                   
                   {/* Columna Izquierda: Cartelera Gráfica (para descargar) */}
                   <div className="lg:col-span-7 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-500">
-                        Vista Previa de la Cartelera
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                          Cartelera Oficial
+                        </span>
+                        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={selectCurrentWeekend}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-blue-700 shadow-xs hover:bg-blue-50 transition-colors"
+                          >
+                            Esta Jornada
+                          </button>
+                          <button
+                            type="button"
+                            onClick={selectNextWeekend}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded text-slate-600 hover:text-slate-900 transition-colors"
+                          >
+                            Próxima Jornada
+                          </button>
+                        </div>
+                      </div>
                       <button
                         onClick={handleDownloadImage}
                         disabled={isDownloading || selectedMatches.length === 0}

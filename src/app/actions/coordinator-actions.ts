@@ -160,6 +160,7 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
 
     // 5. Jugadores por equipo (de player_season_history si hay temporada, sino de players.team_id)
     let playersByTeam = new Map<string, number>()
+    let playerToTeamMap = new Map<string, string>()
     if (seasonId) {
       const { data: pshRows } = await adminClient
         .from('player_season_history')
@@ -170,11 +171,12 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       ;(pshRows || []).forEach((r: any) => {
         const count = playersByTeam.get(r.team_id) || 0
         playersByTeam.set(r.team_id, count + 1)
+        playerToTeamMap.set(r.player_id, r.team_id)
       })
     } else {
       const { data: playersData } = await adminClient
         .from('players')
-        .select('team_id')
+        .select('id, team_id')
         .eq('club_id', clubId)
         .in('team_id', teamIds)
         .neq('status', 'inactive')
@@ -183,27 +185,34 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         if (!p.team_id) return
         const count = playersByTeam.get(p.team_id) || 0
         playersByTeam.set(p.team_id, count + 1)
+        playerToTeamMap.set(p.id, p.team_id)
       })
     }
 
     const totalPlayers = Array.from(playersByTeam.values()).reduce((s, v) => s + v, 0)
 
-    // 6. Lesiones activas
-    const { data: injuriesData } = await adminClient
-      .from('player_injuries')
-      .select('player_id, players:player_id(team_id)')
-      .eq('club_id', clubId)
-      .eq('status', 'activa')
-
+    // 6. Lesiones activas (estrictamente filtradas por los jugadores de los equipos de la temporada activa)
+    const activePlayerIds = Array.from(playerToTeamMap.keys())
     const injuredByTeam = new Map<string, number>()
-    ;(injuriesData || []).forEach((inj: any) => {
-      const tid = (inj.players as any)?.team_id
-      if (tid && teamIds.includes(tid)) {
-        const count = injuredByTeam.get(tid) || 0
-        injuredByTeam.set(tid, count + 1)
-      }
-    })
-    const activeInjuries = (injuriesData || []).length
+    let activeInjuries = 0
+
+    if (activePlayerIds.length > 0) {
+      const { data: injuriesData } = await adminClient
+        .from('player_injuries')
+        .select('player_id')
+        .eq('club_id', clubId)
+        .eq('status', 'activa')
+        .in('player_id', activePlayerIds)
+
+      ;(injuriesData || []).forEach((inj: any) => {
+        const tid = playerToTeamMap.get(inj.player_id)
+        if (tid && teamIds.includes(tid)) {
+          const count = injuredByTeam.get(tid) || 0
+          injuredByTeam.set(tid, count + 1)
+          activeInjuries++
+        }
+      })
+    }
 
     // 7. Próximos partidos (7 días)
     const now = new Date()
@@ -458,12 +467,12 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
  */
 export async function getSeasonScheduledMatchesAction(seasonId?: string) {
   try {
-    const authContext = await getAuthenticatedContext()
-    if (!authContext) return { success: false, error: "No autenticado" }
-    const { clubId } = authContext
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: authError || "No autenticado" }
+    const clubId = context.profile.club_id
 
-    const adminClient = await createAdminClient()
-    const targetSeasonId = seasonId || (await getEffectiveSelectedSeasonId())
+    const adminClient = createAdminClient()
+    const { seasonId: targetSeasonId } = await getEffectiveSelectedSeasonId(adminClient, clubId, seasonId)
 
     let query = adminClient
       .from('partidos')
@@ -495,12 +504,17 @@ export async function broadcastMatchdayToCoachesAction(params: {
   seasonId?: string;
 }) {
   try {
-    const authContext = await getAuthenticatedContext()
-    if (!authContext) return { success: false, error: "No autenticado" }
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: authError || "No autenticado" }
 
-    const { userId, role, clubId } = authContext
-    const allowed = ['coordinador', 'admin', 'superadmin', 'directivo']
-    if (!allowed.includes(role)) {
+    const userId = context.user.id
+    const role = context.realAdminRole || context.profile.role
+    const clubId = context.profile.club_id
+    const userRoles = context.profile.roles || []
+
+    const allowed = ['coordinador', 'admin', 'superadmin', 'directivo', 'coordinador_general']
+    const hasPermission = allowed.includes(role) || userRoles.some(r => allowed.includes(r))
+    if (!hasPermission) {
       return { success: false, error: "No tienes permisos para difundir la jornada" }
     }
 
@@ -508,7 +522,7 @@ export async function broadcastMatchdayToCoachesAction(params: {
       return { success: false, error: "No se han seleccionado partidos para la jornada" }
     }
 
-    const adminClient = await createAdminClient()
+    const adminClient = createAdminClient()
 
     // 1. Obtener los partidos seleccionados con sus equipos
     const { data: matches, error: mErr } = await adminClient

@@ -56,16 +56,40 @@ export async function proxy(request: NextRequest) {
 
   // 3. RBAC: Protect /admin routes specifically
   if (user && isAdminRoute) {
-    // In Edge runtime, we can still query the database using Supabase JS client
-    // because it uses standard fetch under the hood.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, roles')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'admin') {
-      // If a non-admin tries to access /admin, redirect to /dashboard
+    const role = profile?.role || ''
+    const roles: string[] = profile?.roles || []
+    const allRoles = [role, ...roles]
+
+    const allowedAdminRoles = [
+      'admin',
+      'administrador',
+      'admin_club',
+      'superadmin',
+      'coordinador',
+      'coordinador_general',
+      'secretario',
+      'secretaria',
+      'tesorero',
+      'tesoreria',
+      'directivo',
+      'director',
+      'directiva',
+      'metodologo',
+      'metodologia',
+      'staff',
+      'utillero'
+    ]
+
+    const hasAdminAccess = allRoles.some(r => allowedAdminRoles.includes(r))
+
+    if (!hasAdminAccess) {
+      // If a non-staff user tries to access /admin, redirect to /dashboard
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

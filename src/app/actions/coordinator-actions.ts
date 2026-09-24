@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthenticatedContext, ADMIN_ROLES, getEffectiveSelectedSeasonId, canUserAccessModule } from '@/lib/auth-helpers'
+import { NotificationService } from '@/lib/notifications/notification-service'
 
 export interface CoordinatorTeamSummary {
   teamId: string
@@ -451,3 +452,145 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     return { success: false, error: err?.message || 'Error al cargar el panel del coordinador' }
   }
 }
+
+/**
+ * Obtiene todos los partidos programados de la temporada activa (para el selector de la cartelera)
+ */
+export async function getSeasonScheduledMatchesAction(seasonId?: string) {
+  try {
+    const authContext = await getAuthenticatedContext()
+    if (!authContext) return { success: false, error: "No autenticado" }
+    const { clubId } = authContext
+
+    const adminClient = await createAdminClient()
+    const targetSeasonId = seasonId || (await getEffectiveSelectedSeasonId())
+
+    let query = adminClient
+      .from('partidos')
+      .select('id, fecha_hora, rival_nombre, lugar, estado, equipo_id, equipo:teams(id, name, category, color)')
+      .eq('club_id', clubId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .order('fecha_hora', { ascending: true })
+
+    if (targetSeasonId) {
+      query = query.eq('season_id', targetSeasonId)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (err: any) {
+    console.error("Error in getSeasonScheduledMatchesAction:", err)
+    return { success: false, error: err?.message || "Error al cargar partidos de la temporada" }
+  }
+}
+
+/**
+ * Difunde la cartelera oficial de la jornada a los entrenadores (campana de notificaciones y chat del club)
+ */
+export async function broadcastMatchdayToCoachesAction(params: {
+  matchIds: string[];
+  customNote?: string;
+  seasonId?: string;
+}) {
+  try {
+    const authContext = await getAuthenticatedContext()
+    if (!authContext) return { success: false, error: "No autenticado" }
+
+    const { userId, role, clubId } = authContext
+    const allowed = ['coordinador', 'admin', 'superadmin', 'directivo']
+    if (!allowed.includes(role)) {
+      return { success: false, error: "No tienes permisos para difundir la jornada" }
+    }
+
+    if (!params.matchIds || params.matchIds.length === 0) {
+      return { success: false, error: "No se han seleccionado partidos para la jornada" }
+    }
+
+    const adminClient = await createAdminClient()
+
+    // 1. Obtener los partidos seleccionados con sus equipos
+    const { data: matches, error: mErr } = await adminClient
+      .from('partidos')
+      .select('id, fecha_hora, rival_nombre, lugar, estado, equipo_id, equipo:teams(id, name, category, color)')
+      .in('id', params.matchIds)
+      .order('fecha_hora', { ascending: true })
+
+    if (mErr || !matches || matches.length === 0) {
+      return { success: false, error: "No se encontraron los partidos seleccionados" }
+    }
+
+    // 2. Obtener todos los entrenadores del club
+    const { data: coaches } = await adminClient
+      .from('profiles')
+      .select('id, email, first_name, last_name, role')
+      .eq('club_id', clubId)
+      .in('role', ['coach', 'entrenador'])
+
+    // 3. Construir texto resumen para la notificación y el chat
+    const matchesSummary = matches.map((m: any) => {
+      const dt = m.fecha_hora ? new Date(m.fecha_hora) : null
+      const dateStr = dt ? dt.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) : ''
+      const timeStr = dt ? dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''
+      const loc = m.lugar === 'Local' ? '🏠 Local' : '✈️ Visitante'
+      return `• ${m.equipo?.name || 'Equipo'}: vs ${m.rival_nombre} (${loc}) — ${dateStr} ${timeStr}`
+    }).join('\n')
+
+    const noteText = params.customNote?.trim() ? `\n\n💬 *Nota de Coordinación:*\n"${params.customNote.trim()}"` : ''
+    const fullNotificationContent = `Cartelera de la Jornada:\n\n${matchesSummary}${noteText}`
+
+    // 4. Crear notificaciones en la app para cada entrenador
+    let notifiedCount = 0
+    if (coaches && coaches.length > 0) {
+      for (const coach of coaches) {
+        try {
+          await NotificationService.dispatch({
+            userId: coach.id,
+            userEmail: coach.email,
+            clubId,
+            type: 'MATCH_REMINDER',
+            title: '📋 Horarios y Partidos de la Jornada',
+            content: fullNotificationContent,
+            link: '/dashboard/matches',
+            channels: ['IN_APP', 'PUSH'],
+            idempotencyKey: `matchday-broadcast-${coach.id}-${Date.now()}`
+          })
+          notifiedCount++
+        } catch (nErr) {
+          console.error(`Error notifying coach ${coach.id}:`, nErr)
+        }
+      }
+    }
+
+    // 5. Publicar en el canal general / chat del club si existe
+    try {
+      const { data: globalChannel } = await adminClient
+        .from('chat_channels')
+        .select('id')
+        .eq('club_id', clubId)
+        .eq('type', 'global')
+        .maybeSingle()
+
+      if (globalChannel) {
+        await adminClient.from('chat_messages').insert({
+          channel_id: globalChannel.id,
+          sender_id: userId,
+          content: `🏆 *CARTELERA OFICIAL DE LA JORNADA*\n\n${matchesSummary}${noteText}\n\n👉 Consulta todos los detalles en la app: /dashboard/matches`,
+        })
+      }
+    } catch (chatErr) {
+      console.error('Error posting matchday summary to chat_messages:', chatErr)
+    }
+
+    return {
+      success: true,
+      notifiedCoaches: notifiedCount,
+      matchesCount: matches.length,
+    }
+  } catch (err: any) {
+    console.error("Error in broadcastMatchdayToCoachesAction:", err)
+    return { success: false, error: err.message || "Error al difundir la jornada a los entrenadores" }
+  }
+}
+

@@ -7,10 +7,11 @@ import {
   Shield, Trophy, Users, AlertTriangle, Calendar, Activity,
   ChevronRight, RefreshCw, CheckCircle, Clock, Zap,
   TrendingUp, Heart, MessageSquare, ArrowRight, Compass,
-  Target, AlertCircle
+  Target, AlertCircle, Share2
 } from "lucide-react"
 import { getCoordinatorDashboardAction, CoordinatorDashboardData } from "@/app/actions/coordinator-actions"
 import { useSeason } from "@/components/providers/SeasonProvider"
+import { MatchdayShareModal } from "./MatchdayShareModal"
 
 type Props = {
   initialResult: { success: boolean; data?: CoordinatorDashboardData; error?: string }
@@ -69,6 +70,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
   const { selectedSeason } = useSeason()
   const [result, setResult] = useState(initialResult)
   const [loading, setLoading] = useState(false)
+  const [showMatchdayModal, setShowMatchdayModal] = useState(false)
   const router = useRouter()
 
   const selectedSeasonId = selectedSeason?.id
@@ -270,17 +272,26 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
 
         {/* ── Próximos Partidos ── */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-emerald-500" />
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Próximos partidos</h2>
             </div>
-            <Link
-              href="/admin/partidos"
-              className="text-xs text-indigo-600 font-semibold flex items-center gap-1 hover:underline"
-            >
-              Ver todos <ArrowRight className="w-3 h-3" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowMatchdayModal(true)}
+                className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                📋 Cartelera de la Jornada
+              </button>
+              <Link
+                href="/admin/partidos"
+                className="text-xs text-indigo-600 font-semibold flex items-center gap-1 hover:underline ml-1"
+              >
+                Ver todos <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
 
           {upcomingMatches.length === 0 ? (
@@ -463,6 +474,16 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Modal de Cartelera de la Jornada */}
+        <MatchdayShareModal
+          isOpen={showMatchdayModal}
+          onClose={() => setShowMatchdayModal(false)}
+          seasonId={result.data?.activeSeason?.id}
+          seasonName={result.data?.activeSeason?.name}
+          clubName={result.data?.club?.name}
+          clubLogoUrl={result.data?.club?.logoUrl}
+        />
 
       </div>
     </div>

@@ -164,9 +164,10 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     if (seasonId) {
       const { data: pshRows } = await adminClient
         .from('player_season_history')
-        .select('player_id, team_id')
+        .select('player_id, team_id, posicion')
         .eq('season_id', seasonId)
         .in('team_id', teamIds)
+        .neq('posicion', 'Entrenador')
 
       ;(pshRows || []).forEach((r: any) => {
         const count = playersByTeam.get(r.team_id) || 0
@@ -176,10 +177,11 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     } else {
       const { data: playersData } = await adminClient
         .from('players')
-        .select('id, team_id')
+        .select('id, team_id, posicion')
         .eq('club_id', clubId)
         .in('team_id', teamIds)
         .neq('status', 'inactive')
+        .neq('posicion', 'Entrenador')
 
       ;(playersData || []).forEach((p: any) => {
         if (!p.team_id) return

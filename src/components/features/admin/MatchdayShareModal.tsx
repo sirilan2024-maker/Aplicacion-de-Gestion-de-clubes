@@ -351,7 +351,7 @@ export function MatchdayShareModal({
         {/* Header Modal */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 p-1 border border-white/20 flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+            <div className="w-12 h-12 rounded-2xl bg-white p-1 shadow-md flex items-center justify-center shrink-0 overflow-hidden border border-white/80">
               <img
                 src={clubLogoUrl || "/escudo-saladar.jpg"}
                 alt={clubName}
@@ -584,7 +584,7 @@ export function MatchdayShareModal({
 
                       {/* Cabecera de la Cartelera */}
                       <div className="text-center space-y-2 relative z-10 border-b border-slate-800 pb-5">
-                        <div className="w-20 h-20 rounded-full bg-white/15 border-2 border-amber-400/40 p-1 mx-auto flex items-center justify-center shadow-xl shadow-amber-500/10 overflow-hidden">
+                        <div className="w-20 h-20 rounded-full bg-white border-2 border-amber-400 p-2 mx-auto flex items-center justify-center shadow-2xl shadow-black/40 overflow-hidden">
                           <img
                             src={clubLogoUrl || "/escudo-saladar.jpg"}
                             alt={clubName}

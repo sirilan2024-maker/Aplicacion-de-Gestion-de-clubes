@@ -495,6 +495,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
     navGroups.push({
       label: "SISTEMA",
       items: [
+        { name: "Tutorial Inscripción", href: "/tutorial-inscripcion", icon: BookOpen },
         { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
         { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
       ]

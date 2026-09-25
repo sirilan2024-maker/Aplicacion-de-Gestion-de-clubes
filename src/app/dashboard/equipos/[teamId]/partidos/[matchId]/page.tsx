@@ -38,13 +38,12 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
   let playersQuery = supabase
     .from("players")
     .select("id, first_name, last_name, dorsal, status, medical_notes, posicion")
-    .neq("status", "inactive")
     .order("first_name");
 
   if (convPlayerIds.length > 0) {
-    playersQuery = playersQuery.or(`team_id.eq.${teamId},id.in.(${convPlayerIds.join(',')})`);
+    playersQuery = playersQuery.or(`and(team_id.eq.${teamId},status.neq.inactive),id.in.(${convPlayerIds.join(',')})`);
   } else {
-    playersQuery = playersQuery.eq("team_id", teamId);
+    playersQuery = playersQuery.eq("team_id", teamId).neq("status", "inactive");
   }
 
   const { data: playersData } = await playersQuery;

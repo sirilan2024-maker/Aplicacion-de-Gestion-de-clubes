@@ -67,20 +67,28 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
   const [
     { data: matches },
     { data: allTeams },
-    { data: players },
     { data: convocatorias },
   ] = await Promise.all([
     matchesQuery,
     teamsQuery,
     adminClient
-      .from('players')
-      .select('*')
-      .eq('team_id', currentTeamId)
-      .neq('status', 'inactive'),
-    adminClient
       .from('convocatorias')
       .select('*'),
   ]);
+
+  const convPlayerIds = [...new Set((convocatorias || []).map((c: any) => c.player_id).filter(Boolean))];
+
+  let playersQuery = adminClient
+    .from('players')
+    .select('*');
+
+  if (convPlayerIds.length > 0) {
+    playersQuery = playersQuery.or(`and(team_id.eq.${currentTeamId},status.neq.inactive),id.in.(${convPlayerIds.join(',')})`);
+  } else {
+    playersQuery = playersQuery.eq('team_id', currentTeamId).neq('status', 'inactive');
+  }
+
+  const { data: players } = await playersQuery;
 
   // 5. Cargar información de la competición/grupo FFCV oficial
   let groupInfo = null;

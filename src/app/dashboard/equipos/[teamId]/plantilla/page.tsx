@@ -74,21 +74,24 @@ export default function PlantillaEquipoPage() {
       }
 
       // 1. Fetch players via history
-        const { data: historyData, error: playersError } = await supabase
-          .from("player_season_history")
-          .select(`
-            status,
-            players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent1_email, parent2_email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
-          `)
-          .eq("team_id", teamId)
+      const { data: historyData, error: playersError } = await supabase
+        .from("player_season_history")
+        .select(`
+          status,
+          players!inner (id, first_name, last_name, posicion, posicion_principal, status, birth_date, email, parent1_email, parent2_email, parent_contact, dorsal, height, weight, phone, link_code, avatar_url)
+        `)
+        .eq("team_id", teamId)
         .neq("status", "inactive");
 
       if (playersError) throw playersError;
 
-      const playersData = historyData?.map((h: any) => ({
+      const playersData = (historyData?.map((h: any) => ({
         ...h.players,
-        posicion: h.players.posicion_principal
-      })) || [];
+        posicion: h.players.posicion_principal || h.players.posicion
+      })) || []).filter((p: any) => {
+        const pos = (p.posicion || p.posicion_principal || '').toLowerCase();
+        return !['entrenador', 'delegado', 'técnico', 'cuerpo técnico'].includes(pos) && p.status !== 'inactive';
+      });
 
       // 2. Fetch assigned coaches from team_coaches using the server action to bypass RLS
       const coachesData = await getTeamCoachesProfilesAction(teamId);
@@ -101,23 +104,31 @@ export default function PlantillaEquipoPage() {
           id: p.id,
           first_name: p.first_name || "Entrenador",
           last_name: p.last_name || "",
-          posicion: "Entrenador", // Usamos "Entrenador" para que el sort lo identifique
-          posicion_principal: "-",
+          posicion: tc.role || "Entrenador",
+          posicion_principal: "Entrenador",
           status: "active",
-          birth_date: "",
+          birth_date: p.birth_date || "",
           email: p.email,
           parent_contact: null,
           dorsal: null,
           height: null,
           weight: null,
-          phone: null,
+          phone: p.phone || null,
+          avatar_url: p.avatar_url || null,
         };
       });
 
-      console.log("Coaches fetched from DB:", coachesData);
-      console.log("Mapped Coaches:", mappedCoaches);
+      // Deduplicate: remove any player record that matches coach email or full name
+      const coachEmails = new Set(mappedCoaches.map(c => c.email?.toLowerCase()).filter(Boolean));
+      const coachNames = new Set(mappedCoaches.map(c => `${c.first_name?.trim()} ${c.last_name?.trim()}`.toLowerCase()));
+      const filteredPlayersData = playersData.filter((p: any) => {
+        const fullName = `${p.first_name?.trim()} ${p.last_name?.trim()}`.toLowerCase();
+        if (p.email && coachEmails.has(p.email.toLowerCase())) return false;
+        if (coachNames.has(fullName)) return false;
+        return true;
+      });
 
-      const combined = [...(playersData || []), ...mappedCoaches];
+      const combined = [...mappedCoaches, ...filteredPlayersData];
       
       const sorted = combined.sort((a, b) => {
         const isCoachA = a.posicion?.toLowerCase().includes('entrenador') || a.posicion?.toLowerCase().includes('delegado') || a.posicion?.toLowerCase().includes('técnico');
@@ -166,6 +177,21 @@ export default function PlantillaEquipoPage() {
     } catch (error: any) {
       toast.error(error.message, { id: toastId });
     }
+  };
+
+  const isCoachMember = (player: Player) => {
+    const p = (player.posicion || '').toLowerCase();
+    const pp = (player.posicion_principal || '').toLowerCase();
+    return (
+      p.includes('entrenador') ||
+      p.includes('delegado') ||
+      p.includes('técnico') ||
+      p.includes('míster') ||
+      pp.includes('entrenador') ||
+      pp.includes('delegado') ||
+      pp.includes('técnico') ||
+      pp.includes('míster')
+    );
   };
 
   const calcularEdad = (fechaNacimiento: string) => {
@@ -284,7 +310,7 @@ export default function PlantillaEquipoPage() {
                 </tr>
               ) : (
                 players.map((player) => {
-                  const esEntrenador = (player.posicion_principal || player.posicion)?.toLowerCase().includes('entrenador') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('delegado') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('técnico');
+                  const esEntrenador = isCoachMember(player);
                   return (
                     <tr 
                       key={player.id} 
@@ -323,17 +349,19 @@ export default function PlantillaEquipoPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">
-                        <span className="capitalize font-bold text-slate-700">{player.posicion_principal || '-'}</span>
+                        <span className="capitalize font-bold text-slate-700">
+                          {esEntrenador ? (player.posicion || 'Cuerpo Técnico') : (player.posicion_principal || '-')}
+                        </span>
                       </td>
                       <td className="px-6 py-4 border-y border-gray-200 group-hover:border-gray-300">
                         <span
                           className={`text-xs font-semibold px-3 py-1.5 rounded-full inline-flex items-center capitalize ${
-                            esEntrenador ? 'bg-emerald-50 text-emerald-700' :
+                            esEntrenador ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                             ['admin', 'coordinador'].includes(player.posicion?.toLowerCase() || '') ? 'bg-purple-50 text-purple-700' :
                             'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {player.posicion ? player.posicion : 'Jugador'}
+                          {esEntrenador ? (player.posicion || 'Entrenador') : (player.posicion ? player.posicion : 'Jugador')}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-900 border-y border-gray-200 group-hover:border-gray-300">
@@ -389,7 +417,7 @@ export default function PlantillaEquipoPage() {
           </div>
         ) : (
           players.map((player) => {
-            const esEntrenador = (player.posicion_principal || player.posicion)?.toLowerCase().includes('entrenador') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('delegado') || (player.posicion_principal || player.posicion)?.toLowerCase().includes('técnico');
+            const esEntrenador = isCoachMember(player);
             return (
               <div 
                 key={player.id}
@@ -428,18 +456,21 @@ export default function PlantillaEquipoPage() {
                         {player.first_name} {player.last_name}
                       </h3>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="text-emerald-700 text-xs font-semibold capitalize bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
-                          {player.posicion_principal || 'Sin posición'}
-                        </span>
-                        {player.posicion && player.posicion.toLowerCase() !== 'jugador' && !esEntrenador && (
-                          <span className="text-purple-700 text-xs font-semibold capitalize bg-purple-50 border border-purple-100 px-2 py-0.5 rounded">
-                            {player.posicion}
-                          </span>
-                        )}
-                        {esEntrenador && (
+                        {esEntrenador ? (
                           <span className="text-blue-700 text-xs font-semibold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
-                            Míster
+                            {player.posicion || 'Entrenador'}
                           </span>
+                        ) : (
+                          <>
+                            <span className="text-emerald-700 text-xs font-semibold capitalize bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
+                              {player.posicion_principal || 'Sin posición'}
+                            </span>
+                            {player.posicion && player.posicion.toLowerCase() !== 'jugador' && (
+                              <span className="text-purple-700 text-xs font-semibold capitalize bg-purple-50 border border-purple-100 px-2 py-0.5 rounded">
+                                {player.posicion}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

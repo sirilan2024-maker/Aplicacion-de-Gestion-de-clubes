@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Users, Pencil, X, UserPlus } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
@@ -24,6 +25,7 @@ interface Player {
 import { useIsActiveSeason } from "@/hooks/useIsActiveSeason";
 
 export function TeamPlayersView({ teamId }: { teamId: string }) {
+  const router = useRouter();
   const { rol } = useUserRole();
 
   const [players, setPlayers] = useState<Player[]>([]);
@@ -69,7 +71,10 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
           playersData = historyData.map((h: any) => ({
             ...h.players,
             posicion: h.players.posicion_principal
-          }));
+          })).filter((p: any) => {
+            const pos = (p.posicion || p.posicion_principal || '').toLowerCase();
+            return !['entrenador', 'delegado', 'técnico', 'cuerpo técnico'].includes(pos) && p.status !== 'inactive';
+          });
         }
       }
 
@@ -81,18 +86,28 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
           id: p.id,
           first_name: p.first_name || "Entrenador",
           last_name: p.last_name || "",
-          posicion: "Entrenador",
-          birth_date: "",
+          posicion: tc.role || "Entrenador",
+          birth_date: p.birth_date || "",
           email: p.email,
           parent_contact: null,
           dorsal: null,
           height: null,
           weight: null,
-          phone: null,
+          phone: p.phone || null,
         };
       });
 
-      const combined = [...playersData, ...mappedCoaches];
+      // Deduplicate: filter out any player from playersData that matches coach email or full name
+      const coachEmails = new Set(mappedCoaches.map(c => c.email?.toLowerCase()).filter(Boolean));
+      const coachNames = new Set(mappedCoaches.map(c => `${c.first_name?.trim()} ${c.last_name?.trim()}`.toLowerCase()));
+      const filteredPlayersData = playersData.filter((p: any) => {
+        const fullName = `${p.first_name?.trim()} ${p.last_name?.trim()}`.toLowerCase();
+        if (p.email && coachEmails.has(p.email.toLowerCase())) return false;
+        if (coachNames.has(fullName)) return false;
+        return true;
+      });
+
+      const combined = [...mappedCoaches, ...filteredPlayersData];
       const sorted = combined.sort((a, b) => {
         const isCoachA = a.posicion?.toLowerCase().includes('entrenador') || a.posicion?.toLowerCase().includes('delegado');
         const isCoachB = b.posicion?.toLowerCase().includes('entrenador') || b.posicion?.toLowerCase().includes('delegado');
@@ -110,6 +125,16 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
       setLoading(false);
     }
   }
+
+  const isCoachMember = (player: Player) => {
+    const p = (player.posicion || '').toLowerCase();
+    return (
+      p.includes('entrenador') ||
+      p.includes('delegado') ||
+      p.includes('técnico') ||
+      p.includes('míster')
+    );
+  };
 
   const calcularEdad = (fechaNacimiento: string) => {
     if (!fechaNacimiento) return "N/A";
@@ -233,9 +258,19 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                 </tr>
               ) : (
                 players.map((player) => {
-                  const esEntrenador = player.posicion?.toLowerCase() === 'entrenador';
+                  const esEntrenador = isCoachMember(player);
                   return (
-                    <tr key={player.id} className="bg-white shadow-sm hover:shadow-md transition-all group cursor-pointer">
+                    <tr 
+                      key={player.id} 
+                      onClick={() => {
+                        if (esEntrenador) {
+                          router.push(`/dashboard/club/miembros/staff/${player.id}`);
+                        } else {
+                          router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
+                        }
+                      }}
+                      className="bg-white shadow-sm hover:shadow-md transition-all group cursor-pointer"
+                    >
                       <td className="px-6 py-4 rounded-l-xl border-y border-l border-gray-200 group-hover:border-gray-300">
                         {player.dorsal ? (
                           <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold shadow-sm text-sm border-2 border-gray-700">
@@ -259,7 +294,7 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                       <td className="px-6 py-4 hidden sm:table-cell border-y border-gray-200 group-hover:border-gray-300">
                         {esEntrenador ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 shadow-sm border border-blue-200">
-                            Entrenador
+                            {player.posicion || 'Entrenador'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
@@ -290,9 +325,16 @@ export function TeamPlayersView({ teamId }: { teamId: string }) {
                       {canEdit && (
                         <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300">
                           <button
-                            onClick={() => setEditingPlayer(player)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (esEntrenador) {
+                                router.push(`/dashboard/club/miembros/staff/${player.id}`);
+                              } else {
+                                setEditingPlayer(player);
+                              }
+                            }}
                             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex bg-gray-50 border border-gray-200"
-                            title="Editar Jugador"
+                            title={esEntrenador ? "Ver/Editar Ficha de Técnico" : "Editar Jugador"}
                           >
                             <Pencil size={18} />
                           </button>

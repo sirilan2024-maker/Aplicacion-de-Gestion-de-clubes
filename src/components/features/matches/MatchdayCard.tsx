@@ -33,8 +33,8 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
       if (!rName) return;
       try {
         const [sRes, mRes] = await Promise.all([
-          supabase.from('ffcv_standings').select('team_name, shield_url, raw_data').limit(400),
-          supabase.from('ffcv_matches').select('home_team_name, home_shield_url, away_team_name, away_shield_url').limit(400)
+          supabase.from('ffcv_standings').select('team_name, shield_url, raw_data').neq('ffcv_season_id', '21').limit(400),
+          supabase.from('ffcv_matches').select('home_team_name, home_shield_url, away_team_name, away_shield_url').neq('ffcv_season_id', '21').limit(400)
         ]);
         const found = findRivalShield(rName, mRes.data || [], sRes.data || []);
         if (found) setRivalShield(found);

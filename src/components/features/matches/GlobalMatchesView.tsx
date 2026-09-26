@@ -259,8 +259,8 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
         if (groupIds.length === 0) return;
         const supabase = createClient();
         const [mRes, sRes] = await Promise.all([
-          supabase.from('ffcv_matches').select('*').in('ffcv_group_id', groupIds),
-          supabase.from('ffcv_standings').select('*').in('ffcv_group_id', groupIds)
+          supabase.from('ffcv_matches').select('*').in('ffcv_group_id', groupIds).neq('ffcv_season_id', '21'),
+          supabase.from('ffcv_standings').select('*').in('ffcv_group_id', groupIds).neq('ffcv_season_id', '21')
         ]);
         if (!mRes.error && mRes.data) {
           setFfcvMatches(mRes.data);

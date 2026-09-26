@@ -13,6 +13,7 @@ interface FFCVMatchesSectionProps {
   teamName: string;
   initialMatches?: FFCVMatchRecord[];
   groupInfo?: FFCVGroupRecord | null;
+  ffcvSeasonId?: string | null;
 }
 
 export function FFCVMatchesSection({
@@ -22,6 +23,7 @@ export function FFCVMatchesSection({
   teamName,
   initialMatches = [],
   groupInfo,
+  ffcvSeasonId,
 }: FFCVMatchesSectionProps) {
 
   const [matches, setMatches] = useState<FFCVMatchRecord[]>(initialMatches);
@@ -45,10 +47,18 @@ export function FFCVMatchesSection({
       setLoading(true);
       try {
         const supabase = createClient();
-        const { data, error } = await supabase
+        let q = supabase
           .from("ffcv_matches")
           .select("*")
-          .eq("ffcv_group_id", ffcvGroupId)
+          .eq("ffcv_group_id", ffcvGroupId);
+
+        if (ffcvSeasonId) {
+          q = q.eq("ffcv_season_id", ffcvSeasonId);
+        } else if (typeof window !== "undefined" && !window.location.pathname.includes('/archivo')) {
+          q = q.neq("ffcv_season_id", "21");
+        }
+
+        const { data, error } = await q
           .order("matchday", { ascending: true })
           .order("match_date", { ascending: true })
           .order("match_time", { ascending: true });

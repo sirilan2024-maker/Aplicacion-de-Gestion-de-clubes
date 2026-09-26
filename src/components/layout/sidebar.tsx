@@ -99,7 +99,7 @@ import { SYSTEM_MODULES } from "@/lib/roles-config"
 import { useSeason } from "@/components/providers/SeasonProvider"
 
 export function Sidebar({ signOutAction }: { signOutAction?: any }) {
-  const { selectedSeason, isViewingHistorical } = useSeason();
+  const { selectedSeason, activeSeason, isViewingHistorical } = useSeason();
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
@@ -155,11 +155,14 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
               
             if (club && !isCancelled) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
-            // Fetch equipos
+            // Fetch equipos strictly for the active/selected season (never past 25/26 unless in archive)
             if (profile.role === 'admin' || profile.role === 'coordinador' || profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
               let query = supabaseClient.from('teams').select("id, name, category").eq("club_id", profile.club_id)
-              if (selectedSeason?.id) {
-                query = query.eq("season_id", selectedSeason.id)
+              const effectiveSeasonId = selectedSeason?.id || activeSeason?.id
+              if (effectiveSeasonId) {
+                query = query.eq("season_id", effectiveSeasonId)
+              } else {
+                query = query.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
               }
               query = query.order("name")
 
@@ -250,7 +253,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
     }
     fetchData()
     return () => { isCancelled = true }
-  }, [selectedSeason?.id])
+  }, [selectedSeason?.id, activeSeason?.id])
 
   // Effect to handle Admin impersonation of Family View
   useEffect(() => {

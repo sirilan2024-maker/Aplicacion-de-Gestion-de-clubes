@@ -227,6 +227,7 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       .select('id, equipo_id, rival_nombre, fecha_hora, lugar, estado')
       .eq('club_id', clubId)
       .in('equipo_id', teamIds)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .gte('fecha_hora', yesterday)
       .lte('fecha_hora', sevenDaysLater)
       .order('fecha_hora', { ascending: true })
@@ -254,6 +255,7 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       .select('id, equipo_id, rival_nombre, resultado_propio, resultado_rival, fecha_hora')
       .eq('club_id', clubId)
       .in('equipo_id', teamIds)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .not('resultado_propio', 'is', null)
       .order('fecha_hora', { ascending: false })
       .limit(teamIds.length * 2)
@@ -495,11 +497,13 @@ export async function getSeasonScheduledMatchesAction(seasonId?: string) {
     const { data: standings } = await adminClient
       .from('ffcv_standings')
       .select('team_name, shield_url, raw_data')
+      .neq('ffcv_season_id', '21')
       .limit(1000);
 
     const { data: ffcvMatches } = await adminClient
       .from('ffcv_matches')
       .select('home_team_name, home_shield_url, away_team_name, away_shield_url')
+      .neq('ffcv_season_id', '21')
       .limit(1000);
 
     const enriched = (data || []).map((m: any) => {

@@ -314,6 +314,7 @@ export function TeamMatchesView({
               ffcvTeamId={ffcvTeamId}
               teamName={teamName}
               groupInfo={serverGroupInfo}
+              ffcvSeasonId={serverTeamData?.ffcv_season_id || '22'}
             />
 
           )}

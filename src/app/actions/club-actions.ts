@@ -808,6 +808,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .from('partidos')
       .select('id, estado, resultado_propio, resultado_rival, equipo_id, rival_nombre, lugar, fecha_hora')
       .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .order('fecha_hora', { ascending: false });
 
     const allMatches = rawPartidos || [];
@@ -1137,6 +1138,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       `)
       .eq('club_id', clubId)
       .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .gte('fecha_hora', yesterday)
       .order('fecha_hora', { ascending: true })
       .limit(6);

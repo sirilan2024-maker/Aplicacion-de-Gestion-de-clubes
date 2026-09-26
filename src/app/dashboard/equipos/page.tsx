@@ -590,6 +590,8 @@ export default function EquiposPage() {
 
       if (targetSeasonId) {
         query = query.eq("season_id", targetSeasonId);
+      } else {
+        query = query.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c");
       }
       
       query = query.order("name");

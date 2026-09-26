@@ -65,15 +65,10 @@ export default function AsistenciaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
-      // 1. Get team season
+      // 1. Get team season or fallback to active season
+      const { data: activeSeason } = await supabase.from('seasons').select('id').eq('is_active', true).limit(1).maybeSingle();
       const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
-      let targetSeasonId = teamData?.season_id;
-
-      if (!targetSeasonId) {
-        // Fallback to active season if team doesn't have season_id
-        const { data: activeSeason } = await supabase.from('seasons').select('id').eq('is_active', true).limit(1).single();
-        targetSeasonId = activeSeason?.id;
-      }
+      let targetSeasonId = activeSeason?.id || (teamData?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' ? teamData?.season_id : null);
 
       if (!targetSeasonId) return;
       setActiveSeasonId(targetSeasonId);
@@ -126,8 +121,10 @@ export default function AsistenciaEquipoPage() {
         .order('date', { ascending: false })
         .limit(20);
 
-      if (teamSeasonId) {
+      if (teamSeasonId && teamSeasonId !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c') {
         eventsQuery = eventsQuery.eq('season_id', teamSeasonId);
+      } else {
+        eventsQuery = eventsQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
       }
 
       const { data: evs, error: err1 } = await eventsQuery;
@@ -138,11 +135,12 @@ export default function AsistenciaEquipoPage() {
         .from('partidos')
         .select('id, rival_nombre, fecha_hora')
         .eq('equipo_id', teamId)
+        .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
         .lte('fecha_hora', `${today}T23:59:59`)
         .order('fecha_hora', { ascending: false })
         .limit(20);
 
-      if (teamSeasonId) {
+      if (teamSeasonId && teamSeasonId !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c') {
         matchesQuery = matchesQuery.eq('season_id', teamSeasonId);
       }
 

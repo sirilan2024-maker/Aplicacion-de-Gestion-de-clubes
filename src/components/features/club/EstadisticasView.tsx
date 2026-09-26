@@ -48,7 +48,11 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
       // Fetch teams
       let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
-      if (targetSeasonId) teamsQuery = teamsQuery.eq('season_id', targetSeasonId)
+      if (targetSeasonId) {
+        teamsQuery = teamsQuery.eq('season_id', targetSeasonId)
+      } else {
+        teamsQuery = teamsQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      }
 
       const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
@@ -149,6 +153,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           .from('partidos')
           .select('id, equipo_id')
           .in('equipo_id', teamIds)
+          .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
           .eq('estado', 'Finalizado')
           .limit(5000);
 

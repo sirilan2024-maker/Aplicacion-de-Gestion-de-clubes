@@ -90,7 +90,7 @@ type NavItem = {
 import { useSeason } from "@/components/providers/SeasonProvider"
 
 export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
-  const { selectedSeason, isViewingHistorical } = useSeason()
+  const { selectedSeason, activeSeason, isViewingHistorical } = useSeason()
   const pathname = usePathname()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -132,8 +132,11 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             if (club && !isCancelled) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
             let query = supabaseClient.from('teams').select("id, name").eq("club_id", profile.club_id)
-            if (selectedSeason?.id) {
-              query = query.eq("season_id", selectedSeason.id)
+            const effectiveSeasonId = selectedSeason?.id || activeSeason?.id
+            if (effectiveSeasonId) {
+              query = query.eq("season_id", effectiveSeasonId)
+            } else {
+              query = query.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
             }
             query = query.order("name")
 
@@ -174,7 +177,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     }
     fetchData()
     return () => { isCancelled = true }
-  }, [selectedSeason?.id])
+  }, [selectedSeason?.id, activeSeason?.id])
 
   useEffect(() => {
     if (menuOpen) {

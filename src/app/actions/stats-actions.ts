@@ -169,6 +169,8 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
 
     if (seasonFilterId && seasonFilterId !== 'todas') {
       teamsFfcvQuery = teamsFfcvQuery.eq('season_id', seasonFilterId)
+    } else {
+      teamsFfcvQuery = teamsFfcvQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
     }
 
     const { data: teamsFfcvData } = await teamsFfcvQuery
@@ -209,6 +211,7 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
         .from('ffcv_matches')
         .select('*')
         .in('ffcv_group_id', groupIds)
+        .neq('ffcv_season_id', '21')
         .not('home_score', 'is', null)
 
       ffcvMatches = fData || []
@@ -228,6 +231,7 @@ function normalizeTeamMatchName(str: string): string {
         .from('ffcv_matches')
         .select('*')
         .eq('ffcv_group_id', team.ffcv_group_id)
+        .neq('ffcv_season_id', '21')
         .not('home_score', 'is', null)
 
       const tMatches = (gMatches || []).filter(m => {

@@ -32,7 +32,8 @@ export default async function AdminTeamMatchesPage({ params }: { params: Promise
       .select('id, name, club_id, season_id, ffcv_url, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_last_synced_at, color, category')
       .eq('club_id', requestedTeam.club_id)
       .eq('season_id', activeSeason.id)
-      .ilike('name', requestedTeam.name.trim())
+      .ilike('name', `%${requestedTeam.name.trim()}%`)
+      .limit(1)
       .maybeSingle();
 
     if (activeTeam) {
@@ -40,7 +41,7 @@ export default async function AdminTeamMatchesPage({ params }: { params: Promise
     }
   }
 
-  const targetSeasonId = activeSeason?.id || effectiveTeam?.season_id;
+  const targetSeasonId = activeSeason?.id || (effectiveTeam?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' ? effectiveTeam?.season_id : '');
   const currentTeamId = effectiveTeam?.id || teamId;
 
   // 4. Cargar partidos, equipos, jugadores y convocatorias de la temporada activa (NUNCA de la 25/26)

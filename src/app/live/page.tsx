@@ -11,11 +11,6 @@ export const revalidate = 0 // Opt out of caching for live route
 export default async function PublicLivePage() {
   const supabase = await createAdminClient()
   
-  // Fetch teams for realtime lookups
-  const { data: teamsData } = await supabase
-    .from('teams')
-    .select('id, name, category')
-
   // Fetch active season to show matches for the current active season
   const { data: activeSeason } = await supabase
     .from('seasons')
@@ -23,6 +18,19 @@ export default async function PublicLivePage() {
     .eq('is_active', true)
     .limit(1)
     .maybeSingle()
+
+  // Fetch teams for realtime lookups
+  let teamsQuery = supabase
+    .from('teams')
+    .select('id, name, category')
+
+  if (activeSeason?.id) {
+    teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+  } else {
+    teamsQuery = teamsQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+  }
+
+  const { data: teamsData } = await teamsQuery
 
   let matchesQuery = supabase
     .from('partidos')
@@ -36,6 +44,7 @@ export default async function PublicLivePage() {
         player:players (first_name, last_name, nickname)
       )
     `)
+    .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
 
   if (activeSeason?.id) {
     matchesQuery = matchesQuery.eq('season_id', activeSeason.id)

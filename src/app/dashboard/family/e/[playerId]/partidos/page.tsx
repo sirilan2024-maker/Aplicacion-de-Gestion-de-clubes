@@ -56,6 +56,7 @@ export default function FamilyMatchesPage() {
         let query = supabase
           .from('partidos')
           .select('*, equipo:teams(id, name, color, category), match_events(*, player:players(first_name, last_name))')
+          .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
           .order('fecha_hora', { ascending: true });
 
         if (convMatchIds.length > 0) {

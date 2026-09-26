@@ -69,19 +69,41 @@ export default function CalendarioEquipoPage() {
     const supabase = createClient();
     
     // 1. Obtener la temporada del equipo o activa para filtrar
-    const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
-    const teamSeasonId = teamData?.season_id;
+    const { data: teamData } = await supabase.from('teams').select('id, name, club_id, season_id').eq('id', teamId).single();
+    
+    // Obtener temporada activa del club
+    const { data: activeSeason } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    let effectiveTeamId = teamId;
+    if (teamData && activeSeason && teamData.season_id !== activeSeason.id) {
+      const { data: activeTeam } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('season_id', activeSeason.id)
+        .ilike('name', `%${teamData.name.trim()}%`)
+        .maybeSingle();
+      if (activeTeam) {
+        effectiveTeamId = activeTeam.id;
+      }
+    }
+
+    const effectiveSeasonId = activeSeason?.id || (teamData?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' ? teamData?.season_id : null);
 
     // 2. Cargar eventos manuales del equipo (entrenamientos, reuniones, etc.)
     let eventsQuery = supabase
       .from('team_events')
       .select('*')
-      .eq('team_id', teamId)
+      .eq('team_id', effectiveTeamId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .gte('date', start)
       .lte('date', end);
 
-    if (teamSeasonId) {
-      eventsQuery = eventsQuery.eq('season_id', teamSeasonId);
+    if (effectiveSeasonId) {
+      eventsQuery = eventsQuery.eq('season_id', effectiveSeasonId);
     }
 
     const { data: teamEvents, error: eventsError } = await eventsQuery;
@@ -90,10 +112,11 @@ export default function CalendarioEquipoPage() {
     let partidosQuery = supabase
       .from('partidos')
       .select('*')
-      .eq('equipo_id', teamId);
+      .eq('equipo_id', effectiveTeamId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
-    if (teamSeasonId) {
-      partidosQuery = partidosQuery.eq('season_id', teamSeasonId);
+    if (effectiveSeasonId) {
+      partidosQuery = partidosQuery.eq('season_id', effectiveSeasonId);
     }
 
     const { data: partidos, error: partidosError } = await partidosQuery;

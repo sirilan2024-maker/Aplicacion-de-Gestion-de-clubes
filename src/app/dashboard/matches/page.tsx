@@ -52,6 +52,7 @@ export default async function PartidosPage() {
   } else {
     // Si por alguna razón no se encontró temporada activa, excluir estrictamente la temporada pasada 25/26
     matchesQuery = matchesQuery.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
+    teamsQuery = teamsQuery.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
   }
 
   const { data: matches } = await matchesQuery

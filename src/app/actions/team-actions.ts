@@ -327,6 +327,7 @@ export async function getTeamAnalysisAction(teamId: string): Promise<{ success: 
         .from('ffcv_standings')
         .select('*')
         .eq('ffcv_group_id', team.ffcv_group_id)
+        .neq('ffcv_season_id', '21')
         .order('matchday', { ascending: true });
 
       const maxMatchday = (allStandings || []).reduce((max, s) => Math.max(max, s.matchday || 0), 0);
@@ -377,6 +378,7 @@ export async function getTeamAnalysisAction(teamId: string): Promise<{ success: 
         .from('ffcv_matches')
         .select('*')
         .eq('ffcv_group_id', team.ffcv_group_id)
+        .neq('ffcv_season_id', '21')
         .order('matchday', { ascending: true });
 
       const teamMatches = (gMatches || []).filter(m => {

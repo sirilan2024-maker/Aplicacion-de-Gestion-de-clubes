@@ -55,11 +55,26 @@ export async function getGlobalCalendarAction(params?: {
 
     const supabase = await createClient()
 
-    // 1. Obtener los equipos del club
-    const { data: teamsData, error: teamsError } = await supabase
+    // 1. Obtener la temporada activa y los equipos del club
+    const { data: activeSeason } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    let teamsQuery = supabase
       .from('teams')
       .select('id, name, category')
       .eq('club_id', clubId)
+
+    if (activeSeason?.id) {
+      teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+    } else {
+      teamsQuery = teamsQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+    }
+
+    const { data: teamsData, error: teamsError } = await teamsQuery
 
     if (teamsError) {
       return { success: false, error: teamsError.message }
@@ -89,6 +104,7 @@ export async function getGlobalCalendarAction(params?: {
       .from('team_events')
       .select('id, team_id, event_type, date, start_time, end_time, location, title, notes')
       .in('team_id', targetTeamIds)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
 
     if (params?.startDate) {
       eventsQuery = eventsQuery.gte('date', params.startDate)
@@ -108,6 +124,7 @@ export async function getGlobalCalendarAction(params?: {
       .select('id, equipo_id, rival_nombre, fecha_hora, lugar, estado, resultado_propio, resultado_rival')
       .eq('club_id', clubId)
       .in('equipo_id', targetTeamIds)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
 
     if (params?.startDate) {
       partidosQuery = partidosQuery.gte('fecha_hora', `${params.startDate}T00:00:00`)

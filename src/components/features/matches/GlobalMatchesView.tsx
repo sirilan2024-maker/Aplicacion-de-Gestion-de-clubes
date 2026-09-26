@@ -15,6 +15,8 @@ import { TeamDisciplineView } from "./TeamDisciplineView"
 import { MatchdayView } from "./MatchdayView"
 import { ActasView } from "./ActasView"
 import { ActaConciliationModal } from "./ActaConciliationModal"
+import { findRivalShield } from "@/lib/ffcv/rival-shields"
+import { normalizeImageUrl } from "@/lib/ffcv/parser"
 
 interface GlobalMatchesViewProps {
   initialMatches: any[];
@@ -240,6 +242,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
   const [filterResult, setFilterResult] = useState("all")
 
   const [ffcvMatches, setFfcvMatches] = useState<any[]>([])
+  const [ffcvStandings, setFfcvStandings] = useState<any[]>([])
   const [viewingFfcvActa, setViewingFfcvActa] = useState<{
     codacta: string;
     matchId?: string;
@@ -255,15 +258,18 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
         const groupIds = Array.from(new Set(teams.map(t => t.ffcv_group_id).filter(Boolean)));
         if (groupIds.length === 0) return;
         const supabase = createClient();
-        const { data, error } = await supabase
-          .from('ffcv_matches')
-          .select('*')
-          .in('ffcv_group_id', groupIds);
-        if (!error && data) {
-          setFfcvMatches(data);
+        const [mRes, sRes] = await Promise.all([
+          supabase.from('ffcv_matches').select('*').in('ffcv_group_id', groupIds),
+          supabase.from('ffcv_standings').select('*').in('ffcv_group_id', groupIds)
+        ]);
+        if (!mRes.error && mRes.data) {
+          setFfcvMatches(mRes.data);
+        }
+        if (!sRes.error && sRes.data) {
+          setFfcvStandings(sRes.data);
         }
       } catch (err) {
-        console.error('Error loading FFCV matches in GlobalMatchesView:', err);
+        console.error('Error loading FFCV matches/standings in GlobalMatchesView:', err);
       }
     }
     loadFfcvMatches();
@@ -686,6 +692,14 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
             const homeColor = isLocal ? (match.equipo?.color || '#22c55e') : '#94a3b8';
             const awayColor = isLocal ? '#94a3b8' : (match.equipo?.color || '#22c55e');
 
+            const resolvedRivalShield = findRivalShield(match.rival_nombre, ffcvMatches, ffcvStandings);
+            const homeShieldUrl = isLocal 
+              ? "/apple-icon.png" 
+              : (ffcvMatch?.home_shield_url ? normalizeImageUrl(ffcvMatch.home_shield_url) : resolvedRivalShield);
+            const awayShieldUrl = !isLocal 
+              ? "/apple-icon.png" 
+              : (ffcvMatch?.away_shield_url ? normalizeImageUrl(ffcvMatch.away_shield_url) : resolvedRivalShield);
+
             const hasInternalScore = internalHomeScore !== null && internalAwayScore !== null && match.estado !== 'Programado';
             const hasFfcvScore = ffcvMatch && ffcvMatch.status === 'played' && ffcvMatch.home_score !== null && ffcvMatch.away_score !== null;
 
@@ -754,12 +768,8 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                   {/* EQUIPO LOCAL (Columna 1) */}
                   <div className="flex flex-col items-center flex-1 text-center min-w-0">
                     <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-xs border border-slate-200 p-1.5 shrink-0 overflow-hidden">
-                      {isLocal ? (
-                        <img src="/apple-icon.png" alt="Sporting Saladar" className="w-full h-full object-contain drop-shadow-xs" onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }} />
-                      ) : ffcvMatch?.home_shield_url ? (
-                        <img src={ffcvMatch.home_shield_url} alt={homeTeamName} className="w-full h-full object-contain" onError={(e) => {
+                      {homeShieldUrl ? (
+                        <img src={homeShieldUrl} alt={homeTeamName} className="w-full h-full object-contain drop-shadow-xs" onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }} />
                       ) : (
@@ -793,12 +803,8 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                   {/* EQUIPO VISITANTE (Columna 2) */}
                   <div className="flex flex-col items-center flex-1 text-center min-w-0">
                     <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-2 shadow-xs border border-slate-200 p-1.5 shrink-0 overflow-hidden">
-                      {!isLocal ? (
-                        <img src="/apple-icon.png" alt="Sporting Saladar" className="w-full h-full object-contain drop-shadow-xs" onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }} />
-                      ) : ffcvMatch?.away_shield_url ? (
-                        <img src={ffcvMatch.away_shield_url} alt={awayTeamName} className="w-full h-full object-contain" onError={(e) => {
+                      {awayShieldUrl ? (
+                        <img src={awayShieldUrl} alt={awayTeamName} className="w-full h-full object-contain drop-shadow-xs" onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }} />
                       ) : (

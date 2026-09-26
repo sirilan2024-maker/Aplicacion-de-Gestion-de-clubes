@@ -2020,6 +2020,16 @@ export default function GlobalPlayerProfilePage() {
           </div>
         </div>
       )}
+
+      {/* MODAL FICHA FFCV */}
+      {player && (
+        <FfcvPlayerModal
+          playerId={player.id}
+          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+          isOpen={showFfcvModal}
+          onClose={() => setShowFfcvModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2210,16 +2220,6 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
-
-      {/* MODAL FICHA FFCV */}
-      {player && (
-        <FfcvPlayerModal
-          playerId={player.id}
-          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
-          isOpen={showFfcvModal}
-          onClose={() => setShowFfcvModal(false)}
-        />
-      )}
     </div>
   );
 }

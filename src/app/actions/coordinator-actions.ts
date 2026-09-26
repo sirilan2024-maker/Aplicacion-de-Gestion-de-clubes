@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthenticatedContext, ADMIN_ROLES, getEffectiveSelectedSeasonId, canUserAccessModule } from '@/lib/auth-helpers'
 import { NotificationService } from '@/lib/notifications/notification-service'
+import { findRivalShield } from '@/lib/ffcv/rival-shields'
 
 export interface CoordinatorTeamSummary {
   teamId: string
@@ -490,7 +491,26 @@ export async function getSeasonScheduledMatchesAction(seasonId?: string) {
     const { data, error } = await query
     if (error) throw error
 
-    return { success: true, data: data || [] }
+    // Preload rival shields from ffcv_standings and ffcv_matches to enrich matches
+    const { data: standings } = await adminClient
+      .from('ffcv_standings')
+      .select('team_name, shield_url, raw_data')
+      .limit(1000);
+
+    const { data: ffcvMatches } = await adminClient
+      .from('ffcv_matches')
+      .select('home_team_name, home_shield_url, away_team_name, away_shield_url')
+      .limit(1000);
+
+    const enriched = (data || []).map((m: any) => {
+      const shield = findRivalShield(m.rival_nombre, ffcvMatches || [], standings || []);
+      return {
+        ...m,
+        rival_escudo: shield || null
+      };
+    });
+
+    return { success: true, data: enriched }
   } catch (err: any) {
     console.error("Error in getSeasonScheduledMatchesAction:", err)
     return { success: false, error: err?.message || "Error al cargar partidos de la temporada" }

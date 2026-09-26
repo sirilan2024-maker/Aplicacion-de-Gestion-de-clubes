@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Shield, Clock, MapPin, User, Activity, CheckCircle } from "lucide-react"
+import { findRivalShield } from "@/lib/ffcv/rival-shields"
 
 interface MatchdayCardProps {
   match: any;
@@ -16,10 +17,31 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   const [events, setEvents] = useState<any[]>(match.match_events || [])
   const [showModal, setShowModal] = useState(false)
   const [elapsedString, setElapsedString] = useState("00:00")
+  const [rivalShield, setRivalShield] = useState<string | null>(match?.rival_escudo || null)
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (match?.rival_escudo) {
+      setRivalShield(match.rival_escudo);
+      return;
+    }
+    async function loadShield() {
+      const rName = match?.rival_nombre || match?.rival;
+      if (!rName) return;
+      try {
+        const [sRes, mRes] = await Promise.all([
+          supabase.from('ffcv_standings').select('team_name, shield_url, raw_data').limit(400),
+          supabase.from('ffcv_matches').select('home_team_name, home_shield_url, away_team_name, away_shield_url').limit(400)
+        ]);
+        const found = findRivalShield(rName, mRes.data || [], sRes.data || []);
+        if (found) setRivalShield(found);
+      } catch {}
+    }
+    loadShield();
+  }, [match?.rival_nombre, match?.rival, match?.rival_escudo]);
 
 
   const isFinished = match.estado === 'Finalizado'
@@ -258,11 +280,13 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           {/* Local Team */}
           <div className="flex flex-col items-center flex-1 w-1/3">
             <div className="w-12 h-12 md:w-14 md:h-14 mb-2 flex items-center justify-center">
-              {isLocal && clubLogoUrl ? (
-                <img src={clubLogoUrl} alt="Local" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
+              {isLocal ? (
+                <img src={clubLogoUrl || '/apple-icon.png'} alt="Local" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
+              ) : rivalShield ? (
+                <img src={rivalShield} alt="Local" className="max-w-full max-h-full object-contain drop-shadow-sm" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               ) : (
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-100 rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-200">
-                  {isLocal ? '🛡️' : '🏆'}
+                  🏆
                 </div>
               )}
             </div>
@@ -322,11 +346,13 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           {/* Away Team */}
           <div className="flex flex-col items-center flex-1 w-1/3">
             <div className="w-12 h-12 md:w-14 md:h-14 mb-2 flex items-center justify-center">
-              {!isLocal && clubLogoUrl ? (
-                <img src={clubLogoUrl} alt="Visitante" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
+              {!isLocal ? (
+                <img src={clubLogoUrl || '/apple-icon.png'} alt="Visitante" className="max-w-full max-h-full object-contain drop-shadow-sm scale-125" />
+              ) : rivalShield ? (
+                <img src={rivalShield} alt="Visitante" className="max-w-full max-h-full object-contain drop-shadow-sm" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               ) : (
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-100 rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-200">
-                  {!isLocal ? '🛡️' : '🏆'}
+                  🏆
                 </div>
               )}
             </div>

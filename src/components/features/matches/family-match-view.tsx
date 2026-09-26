@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, Clock, MapPin, Activity, CheckCircle2, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
+import { findRivalShield } from "@/lib/ffcv/rival-shields";
 
 function formatTime(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60);
@@ -22,9 +23,31 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   const router = useRouter();
   const [match, setMatch] = useState<any>(initialMatch);
   const [matchEvents, setMatchEvents] = useState<any[]>(initialMatchEvents);
+  const [rivalShield, setRivalShield] = useState<string | null>(initialMatch?.rival_escudo || null);
 
   const supabase = createClient();
   const matchId = match?.id;
+
+  useEffect(() => {
+    if (match?.rival_escudo) {
+      setRivalShield(match.rival_escudo);
+      return;
+    }
+    async function loadShield() {
+      if (!match?.rival_nombre) return;
+      try {
+        const [sRes, mRes] = await Promise.all([
+          supabase.from('ffcv_standings').select('team_name, shield_url, raw_data').limit(600),
+          supabase.from('ffcv_matches').select('home_team_name, home_shield_url, away_team_name, away_shield_url').limit(600)
+        ]);
+        const found = findRivalShield(match.rival_nombre, mRes.data || [], sRes.data || []);
+        if (found) setRivalShield(found);
+      } catch (err) {
+        console.error('Error finding rival shield in FamilyMatchView:', err);
+      }
+    }
+    loadShield();
+  }, [match?.rival_nombre, match?.rival_escudo]);
 
   // Real-time subscriptions
   useEffect(() => {
@@ -269,8 +292,19 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
           <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-white">
             {/* Local */}
             <div className="flex flex-col md:flex-row items-center gap-4 flex-1 text-center md:text-left">
-              <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
-                🛡️
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center p-2 shadow-xs shrink-0 overflow-hidden">
+                {(isLocal ? "/apple-icon.png" : rivalShield) ? (
+                  <img
+                    src={isLocal ? "/apple-icon.png" : rivalShield!}
+                    alt={localName}
+                    className="w-full h-full object-contain drop-shadow-xs"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span className="text-2xl">{isLocal ? "🛡️" : "🏆"}</span>
+                )}
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-950 leading-tight">{localName}</h2>
@@ -327,8 +361,19 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
 
             {/* Away */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-4 flex-1 text-center md:text-right">
-              <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shadow-sm shrink-0">
-                🏆
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center p-2 shadow-xs shrink-0 overflow-hidden">
+                {(!isLocal ? "/apple-icon.png" : rivalShield) ? (
+                  <img
+                    src={!isLocal ? "/apple-icon.png" : rivalShield!}
+                    alt={awayName}
+                    className="w-full h-full object-contain drop-shadow-xs"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span className="text-2xl">{!isLocal ? "🛡️" : "🏆"}</span>
+                )}
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-950 leading-tight">{awayName}</h2>

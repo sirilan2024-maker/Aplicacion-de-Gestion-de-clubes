@@ -72,6 +72,7 @@ interface PlayerData {
   clubes_anteriores: string | null;
   is_foreign: boolean;
   never_federated: boolean;
+  is_senior?: boolean | null;
 
   // Facturación e Inscripción
   payment_method: string | null;
@@ -1643,6 +1644,15 @@ export default function PlayerProfilePage() {
           />
         )}
 
+        {/* MODAL FICHA FFCV */}
+        {player && (
+          <FfcvPlayerModal
+            playerId={player.id}
+            playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+            isOpen={showFfcvModal}
+            onClose={() => setShowFfcvModal(false)}
+          />
+        )}
       </div>
     </div>
   );
@@ -1734,16 +1744,6 @@ function DisciplineTab({ playerId }: { playerId: string }) {
           </div>
         )}
       </div>
-
-      {/* MODAL FICHA FFCV */}
-      {player && (
-        <FfcvPlayerModal
-          playerId={player.id}
-          playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
-          isOpen={showFfcvModal}
-          onClose={() => setShowFfcvModal(false)}
-        />
-      )}
     </div>
   )
 }

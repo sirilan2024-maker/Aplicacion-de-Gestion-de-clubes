@@ -12,11 +12,13 @@ import {
   getSeasonScheduledMatchesAction,
   broadcastMatchdayToCoachesAction
 } from "@/app/actions/coordinator-actions"
+import { toProxyImageUrl } from "@/lib/ffcv/rival-shields"
 
 interface MatchItem {
   id: string
   fecha_hora: string
   rival_nombre: string
+  rival_escudo?: string | null
   lugar: string | null
   estado: string
   equipo_id: string
@@ -495,8 +497,22 @@ export function MatchdayShareModal({
                               style={{ backgroundColor: m.equipo?.color || "#3b82f6" }}
                             />
                             <div className="min-w-0">
-                              <p className="text-sm font-black text-slate-900 truncate">
-                                {m.equipo?.name || "Equipo"} <span className="text-xs font-normal text-slate-500">vs</span> {m.rival_nombre}
+                              <p className="text-sm font-black text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
+                                <span>{m.equipo?.name || "Equipo"}</span>
+                                <span className="text-xs font-normal text-slate-400">vs</span>
+                                {m.rival_escudo && (
+                                  <span className="w-4 h-4 rounded-full bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0 overflow-hidden border border-slate-200">
+                                    <img
+                                      src={toProxyImageUrl(m.rival_escudo) || m.rival_escudo}
+                                      alt={m.rival_nombre}
+                                      className="w-full h-full object-contain"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = 'none';
+                                      }}
+                                    />
+                                  </span>
+                                )}
+                                <span>{m.rival_nombre}</span>
                               </p>
                               <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                                 <span className="font-semibold text-slate-700">{m.lugar === "Local" ? "🏠 Local" : "✈️ Visitante"}</span>
@@ -622,6 +638,7 @@ export function MatchdayShareModal({
                             const dateFormatted = dt ? dt.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) : ""
                             const timeFormatted = dt ? dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""
                             const isHome = m.lugar === "Local"
+                            const rivalShieldUrl = m.rival_escudo ? toProxyImageUrl(m.rival_escudo) : null
 
                             return (
                               <div
@@ -639,9 +656,24 @@ export function MatchdayShareModal({
                                         {m.equipo?.name}
                                       </span>
                                       <span className="text-[10px] text-slate-400 font-semibold">vs</span>
-                                      <span className="text-sm font-bold text-slate-200 truncate">
-                                        {m.rival_nombre}
-                                      </span>
+                                      <div className="inline-flex items-center gap-1.5 min-w-0">
+                                        {rivalShieldUrl && (
+                                          <div className="w-5 h-5 rounded-md bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden shadow-xs">
+                                            <img
+                                              src={rivalShieldUrl}
+                                              alt={m.rival_nombre}
+                                              className="w-full h-full object-contain"
+                                              crossOrigin="anonymous"
+                                              onError={(e) => {
+                                                (e.target as HTMLElement).style.display = 'none';
+                                              }}
+                                            />
+                                          </div>
+                                        )}
+                                        <span className="text-sm font-bold text-slate-200 truncate">
+                                          {m.rival_nombre}
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
                                       <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${

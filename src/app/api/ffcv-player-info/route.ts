@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedContext } from '@/lib/auth-helpers';
+import { normalizeImageUrl } from '@/lib/ffcv/parser';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -249,85 +250,97 @@ export async function GET(req: Request) {
       });
     }
 
-    const listadoTemporadas = Array.isArray(fullPlayerData.listado_temporadas) ? fullPlayerData.listado_temporadas : [];
-    const historialTemporadas = [];
-    const temporadasToFetch = listadoTemporadas.slice(0, 7);
+    const listadoTemporadas = Array.isArray(fullPlayerData.listado_temporadas) ? [...fullPlayerData.listado_temporadas] : [];
+    
+    // Determine the lowest season code returned by default (usually 16)
+    const minCode = listadoTemporadas.length > 0
+      ? Math.min(...listadoTemporadas.map((t: any) => parseInt(t.codigo_temporada, 10)).filter((n: number) => !isNaN(n)))
+      : 22;
 
-    const historyPromises = temporadasToFetch.map(async (temp) => {
-      if (temp.codigo_temporada === fullPlayerData.codigo_temporada) {
-        // En temporada actual, buscar competición de liga preferentemente
-        const compList = fullPlayerData.competiciones_participa || [];
-        const comp = compList.find((c: any) => !c.nombre_competicion?.toLowerCase().includes('copa')) || compList[0];
+    // Probe older seasons backwards (from minCode - 1 down to 1) in parallel
+    const olderCodes: number[] = [];
+    for (let c = minCode - 1; c >= 1; c--) {
+      olderCodes.push(c);
+    }
 
-        const pj = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Jugados')?.valor || '0';
-        const goles = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Total Goles')?.valor || '0';
-        const tit = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Titular')?.valor || '0';
-        const sup = fullPlayerData.partidos && fullPlayerData.partidos.find(x => x.nombre === 'Suplente')?.valor || '0';
-
-        const clubName = comp?.nombre_club || comp?.nombre_equipo || fullPlayerData.equipo || 'Sporting Saladar';
-        const equipoName = comp?.nombre_equipo || fullPlayerData.equipo || clubName;
-
+    const olderPromises = olderCodes.map(async (c) => {
+      const pastUrl = `https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=${codJugador}&cod_temporada=${c}`;
+      const data = await fetchFfcvJson(pastUrl);
+      if (data && (data.equipo?.trim() || (Array.isArray(data.competiciones_participa) && data.competiciones_participa.length > 0))) {
         return {
-          temporada: temp.nombre_temporada,
-          codigo_temporada: temp.codigo_temporada,
-          club: clubName.trim(),
-          equipo: equipoName.trim(),
-          competicion: comp && comp.nombre_competicion ? comp.nombre_competicion.trim() : (fullPlayerData.categoria_equipo || 'Competición FFCV'),
-          grupo: comp && comp.nombre_grupo ? comp.nombre_grupo.trim() : '',
-          partidos_jugados: parseInt(pj, 10) || 0,
-          titular: parseInt(tit, 10) || 0,
-          suplente: parseInt(sup, 10) || 0,
-          goles: parseInt(goles, 10) || 0,
-          minutos: parseInt(fullPlayerData.minutos_totales_jugados, 10) || 0,
-          posicion_equipo: comp && comp.posicion_equipo ? comp.posicion_equipo : '',
-          puntos_equipo: comp && comp.puntos_equipo ? comp.puntos_equipo : ''
+          codigo_temporada: String(c),
+          nombre_temporada: data.nombre_temporada || `Temporada ${c}`,
+          preloadedData: data
         };
       }
+      return null;
+    });
 
-      const pastUrl = 'https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=' + codJugador + '&cod_temporada=' + temp.codigo_temporada;
-      const pastData = await fetchFfcvJson(pastUrl);
-      if (!pastData) return null;
+    const olderDiscovered = (await Promise.all(olderPromises)).filter(Boolean) as Array<{
+      codigo_temporada: string;
+      nombre_temporada: string;
+      preloadedData: any;
+    }>;
 
-      // Si tiene varias competiciones (ej. liga + copa), preferir la liga regular sobre copas
-      const compList = pastData.competiciones_participa || [];
+    // Combine all seasons (default + historical)
+    const allTemporadasToFetch = [...listadoTemporadas, ...olderDiscovered];
+
+    const historyPromises = allTemporadasToFetch.map(async (temp: any) => {
+      const isCurrentSeason = String(temp.codigo_temporada) === String(fullPlayerData.codigo_temporada);
+      let seasonData = isCurrentSeason ? fullPlayerData : temp.preloadedData;
+
+      if (!seasonData) {
+        const pastUrl = `https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=${codJugador}&cod_temporada=${temp.codigo_temporada}`;
+        seasonData = await fetchFfcvJson(pastUrl);
+      }
+
+      if (!seasonData) return null;
+
+      // Prefer regular league competition over tournament/cups
+      const compList = seasonData.competiciones_participa || [];
       const comp = compList.find((c: any) => !c.nombre_competicion?.toLowerCase().includes('copa')) || compList[0];
 
-      const pj = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Jugados')?.valor || '0';
-      const goles = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Total Goles')?.valor || '0';
-      const tit = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Titular')?.valor || '0';
-      const sup = pastData.partidos && pastData.partidos.find(x => x.nombre === 'Suplente')?.valor || '0';
+      const pj = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Jugados')?.valor || '0';
+      const goles = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Total Goles')?.valor || '0';
+      const tit = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Titular')?.valor || '0';
+      const sup = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Suplente')?.valor || '0';
 
       const clubName = comp?.nombre_club 
         || comp?.nombre_equipo 
-        || pastData.equipo 
+        || seasonData.equipo 
         || fullPlayerData.equipo 
         || 'Sporting Saladar';
 
       const equipoName = comp?.nombre_equipo 
-        || pastData.equipo 
+        || seasonData.equipo 
         || clubName;
 
+      const rawShield = comp?.escudo_equipo 
+        || seasonData.escudo_equipo 
+        || (isCurrentSeason ? fullPlayerData.escudo_equipo : null);
+
+      const escudo = normalizeImageUrl(rawShield);
+
       return {
-        temporada: temp.nombre_temporada,
+        temporada: temp.nombre_temporada || seasonData.nombre_temporada,
         codigo_temporada: temp.codigo_temporada,
         club: clubName.trim(),
         equipo: equipoName.trim(),
-        competicion: comp && comp.nombre_competicion ? comp.nombre_competicion.trim() : (pastData.categoria_equipo || 'Competición FFCV'),
+        escudo: escudo || null,
+        competicion: comp && comp.nombre_competicion ? comp.nombre_competicion.trim() : (seasonData.categoria_equipo || 'Competición FFCV'),
         grupo: comp && comp.nombre_grupo ? comp.nombre_grupo.trim() : '',
         partidos_jugados: parseInt(pj, 10) || 0,
         titular: parseInt(tit, 10) || 0,
         suplente: parseInt(sup, 10) || 0,
         goles: parseInt(goles, 10) || 0,
-        minutos: parseInt(pastData.minutos_totales_jugados, 10) || 0,
+        minutos: parseInt(seasonData.minutos_totales_jugados, 10) || 0,
         posicion_equipo: comp && comp.posicion_equipo ? comp.posicion_equipo : '',
         puntos_equipo: comp && comp.puntos_equipo ? comp.puntos_equipo : ''
       };
     });
 
     const settledHistory = await Promise.all(historyPromises);
-    settledHistory.forEach(h => {
-      if (h) historialTemporadas.push(h);
-    });
+    const historialTemporadas = settledHistory.filter(Boolean);
 
     // Formatear foto correctamente (detectar si ya viene con 'data:image' o si es base64 puro)
     const rawPhoto = fullPlayerData.foto || matchedFfcvPlayer.foto;

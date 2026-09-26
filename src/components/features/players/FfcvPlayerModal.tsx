@@ -215,8 +215,23 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
                     {data.historial_clubes.map((h: any, idx: number) => (
                       <div key={idx} className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 hover:bg-slate-50/60 transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 font-black text-xs flex items-center justify-center border border-blue-100 shrink-0">
-                            {idx + 1}
+                          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 shrink-0 p-1 flex items-center justify-center overflow-hidden shadow-2xs">
+                            {h.escudo ? (
+                              <img
+                                src={h.escudo}
+                                alt={h.club || 'Escudo'}
+                                className="w-full h-full object-contain drop-shadow-2xs"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                  const parent = (e.target as HTMLElement).parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = `<span class="text-xs font-black text-slate-500">${idx + 1}</span>`;
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span className="text-xs font-black text-slate-500">{idx + 1}</span>
+                            )}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">

@@ -5,18 +5,24 @@ import {
   FFCVMatchRecord
 } from './types';
 
-const FFCV_ORIGIN = 'https://ffcv.es';
+const FFCV_ASSET_ORIGIN = 'https://appwebffcv.novanet.es';
 
 /**
- * Normalize relative image URL to absolute URL
+ * Normalize relative image URL to absolute URL (hosted on appwebffcv.novanet.es)
  */
 export function normalizeImageUrl(url?: string | null): string | null {
   if (!url || typeof url !== 'string' || url.trim() === '') return null;
   const clean = url.trim();
+
+  // If already pointing to ffcv.es/pnfg/, rewrite to appwebffcv.novanet.es/pnfg/
+  if (/^https?:\/\/(?:www\.)?ffcv\.es\/pnfg\//i.test(clean)) {
+    return clean.replace(/^https?:\/\/(?:www\.)?ffcv\.es\/pnfg\//i, `${FFCV_ASSET_ORIGIN}/pnfg/`);
+  }
+
   if (clean.startsWith('http://') || clean.startsWith('https://')) {
     return clean;
   }
-  return `${FFCV_ORIGIN}${clean.startsWith('/') ? '' : '/'}${clean}`;
+  return `${FFCV_ASSET_ORIGIN}${clean.startsWith('/') ? '' : '/'}${clean}`;
 }
 
 /**

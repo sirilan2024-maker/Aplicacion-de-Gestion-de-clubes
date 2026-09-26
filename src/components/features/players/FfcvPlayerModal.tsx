@@ -241,21 +241,33 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 font-medium mt-0.5">
-                              {h.equipo} • {h.competicion} {h.grupo ? `(${h.grupo})` : ''}
+                              {h.equipo && h.club && h.equipo.trim().toLowerCase() !== h.club.trim().toLowerCase()
+                                ? `${h.equipo} • `
+                                : ''}
+                              {h.competicion || h.categoria || 'Competición FFCV'} {h.grupo ? `(${h.grupo})` : ''}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 self-end sm:self-auto text-xs font-bold text-slate-600">
-                          <span className="bg-slate-50 px-2 py-1 rounded-lg border border-slate-150">
-                            {h.partidos_jugados} partidos
-                          </span>
-                          <span className="bg-slate-50 px-2 py-1 rounded-lg border border-slate-150 text-blue-700">
-                            {h.minutos}' mins
-                          </span>
+                        <div className="flex items-center gap-2 self-end sm:self-auto text-xs font-bold text-slate-600">
+                          {h.partidos_jugados > 0 && (
+                            <span className="bg-slate-50 px-2 py-1 rounded-lg border border-slate-150">
+                              {h.partidos_jugados} {h.partidos_jugados === 1 ? 'partido' : 'partidos'}
+                            </span>
+                          )}
+                          {h.minutos > 0 && (
+                            <span className="bg-slate-50 px-2 py-1 rounded-lg border border-slate-150 text-blue-700">
+                              {h.minutos}' mins
+                            </span>
+                          )}
                           {h.goles > 0 && (
                             <span className="bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 text-emerald-700 font-black">
                               ⚽ {h.goles}
+                            </span>
+                          )}
+                          {(!h.partidos_jugados || h.partidos_jugados === 0) && (!h.minutos || h.minutos === 0) && (
+                            <span className="text-[11px] font-medium text-slate-400 bg-slate-50/80 px-2 py-0.5 rounded-md border border-slate-100">
+                              Historial FFCV
                             </span>
                           )}
                         </div>

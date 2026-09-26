@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedContext } from '@/lib/auth-helpers';
 import { normalizeImageUrl } from '@/lib/ffcv/parser';
+import { getVerifiedHistoryForPlayer, getRegistryShield } from '@/lib/ffcv/player-history-registry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -250,97 +251,149 @@ export async function GET(req: Request) {
       });
     }
 
+    // Check if player has verified official FFCV career trajectory
+    const fullName = `${player.first_name || ''} ${player.last_name || ''}`.trim();
+    const verifiedHistory = getVerifiedHistoryForPlayer(fullName);
+
     const listadoTemporadas = Array.isArray(fullPlayerData.listado_temporadas) ? [...fullPlayerData.listado_temporadas] : [];
-    
-    // Determine the lowest season code returned by default (usually 16)
-    const minCode = listadoTemporadas.length > 0
-      ? Math.min(...listadoTemporadas.map((t: any) => parseInt(t.codigo_temporada, 10)).filter((n: number) => !isNaN(n)))
-      : 22;
 
-    // Probe older seasons backwards (from minCode - 1 down to 1) in parallel
-    const olderCodes: number[] = [];
-    for (let c = minCode - 1; c >= 1; c--) {
-      olderCodes.push(c);
-    }
-
-    const olderPromises = olderCodes.map(async (c) => {
-      const pastUrl = `https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=${codJugador}&cod_temporada=${c}`;
-      const data = await fetchFfcvJson(pastUrl);
-      if (data && (data.equipo?.trim() || (Array.isArray(data.competiciones_participa) && data.competiciones_participa.length > 0))) {
-        return {
-          codigo_temporada: String(c),
-          nombre_temporada: data.nombre_temporada || `Temporada ${c}`,
-          preloadedData: data
-        };
-      }
-      return null;
-    });
-
-    const olderDiscovered = (await Promise.all(olderPromises)).filter(Boolean) as Array<{
-      codigo_temporada: string;
-      nombre_temporada: string;
-      preloadedData: any;
-    }>;
-
-    // Combine all seasons (default + historical)
-    const allTemporadasToFetch = [...listadoTemporadas, ...olderDiscovered];
-
-    const historyPromises = allTemporadasToFetch.map(async (temp: any) => {
+    // Extract live history from FFCV API for current and recent seasons
+    const seasonFetchPromises = listadoTemporadas.slice(0, 10).map(async (temp: any) => {
       const isCurrentSeason = String(temp.codigo_temporada) === String(fullPlayerData.codigo_temporada);
-      let seasonData = isCurrentSeason ? fullPlayerData : temp.preloadedData;
+      let seasonData = isCurrentSeason ? fullPlayerData : null;
 
       if (!seasonData) {
         const pastUrl = `https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=${codJugador}&cod_temporada=${temp.codigo_temporada}`;
         seasonData = await fetchFfcvJson(pastUrl);
       }
 
-      if (!seasonData) return null;
+      if (!seasonData) return [];
 
-      // Prefer regular league competition over tournament/cups
-      const compList = seasonData.competiciones_participa || [];
-      const comp = compList.find((c: any) => !c.nombre_competicion?.toLowerCase().includes('copa')) || compList[0];
+      const compList = Array.isArray(seasonData.competiciones_participa) ? seasonData.competiciones_participa : [];
+      const pjNum = parseInt(seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Jugados')?.valor || '0', 10) || 0;
+      const titNum = parseInt(seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Titular')?.valor || '0', 10) || 0;
+      const supNum = parseInt(seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Suplente')?.valor || '0', 10) || 0;
+      const golesNum = parseInt(seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Total Goles')?.valor || '0', 10) || 0;
+      const minNum = parseInt(seasonData.minutos_totales_jugados, 10) || 0;
 
-      const pj = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Jugados')?.valor || '0';
-      const goles = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Total Goles')?.valor || '0';
-      const tit = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Titular')?.valor || '0';
-      const sup = seasonData.partidos && seasonData.partidos.find((x: any) => x.nombre === 'Suplente')?.valor || '0';
+      const entries: any[] = [];
 
-      const clubName = comp?.nombre_club 
-        || comp?.nombre_equipo 
-        || seasonData.equipo 
-        || fullPlayerData.equipo 
-        || 'Sporting Saladar';
+      if (compList.length > 0) {
+        // Group by distinct club to prevent duplicate league+cup rows for the SAME club,
+        // while preserving DIFFERENT clubs within the same season (e.g. Almoradí + Sporting Saladar)
+        const clubMap = new Map<string, any>();
+        for (const comp of compList) {
+          const clubKey = (comp.nombre_club || comp.nombre_equipo || '').trim().toLowerCase();
+          if (!clubKey) continue;
+          if (!clubMap.has(clubKey)) {
+            clubMap.set(clubKey, comp);
+          } else {
+            const existing = clubMap.get(clubKey);
+            if (existing.nombre_competicion?.toLowerCase().includes('copa') && !comp.nombre_competicion?.toLowerCase().includes('copa')) {
+              clubMap.set(clubKey, comp);
+            }
+          }
+        }
 
-      const equipoName = comp?.nombre_equipo 
-        || seasonData.equipo 
-        || clubName;
+        for (const [_, comp] of clubMap) {
+          const clubName = comp.nombre_club?.trim() || comp.nombre_equipo?.trim() || seasonData.equipo?.trim() || '';
+          const equipoName = comp.nombre_equipo?.trim() || clubName;
+          const shieldUrl = comp.escudo_equipo || getRegistryShield(clubName) || (isCurrentSeason ? fullPlayerData.escudo_equipo : null);
+          const escudo = normalizeImageUrl(shieldUrl) || getRegistryShield(clubName);
 
-      const rawShield = comp?.escudo_equipo 
-        || seasonData.escudo_equipo 
-        || (isCurrentSeason ? fullPlayerData.escudo_equipo : null);
+          entries.push({
+            temporada: temp.nombre_temporada || seasonData.nombre_temporada,
+            codigo_temporada: String(temp.codigo_temporada),
+            club: clubName,
+            equipo: equipoName,
+            escudo: escudo || null,
+            competicion: comp.nombre_competicion?.trim() || seasonData.categoria_equipo || 'Competición FFCV',
+            grupo: comp.nombre_grupo?.trim() || '',
+            partidos_jugados: pjNum,
+            titular: titNum,
+            suplente: supNum,
+            goles: golesNum,
+            minutos: minNum,
+            posicion_equipo: comp.posicion_equipo || '',
+            puntos_equipo: comp.puntos_equipo || ''
+          });
+        }
+      } else if (pjNum > 0 || minNum > 0 || isCurrentSeason) {
+        // Only if player actually had activity or is current active season
+        const clubName = seasonData.equipo?.trim() || fullPlayerData.equipo?.trim() || '';
+        if (clubName) {
+          const rawShield = seasonData.escudo_equipo || (isCurrentSeason ? fullPlayerData.escudo_equipo : null);
+          const escudo = normalizeImageUrl(rawShield) || getRegistryShield(clubName);
 
-      const escudo = normalizeImageUrl(rawShield);
-
-      return {
-        temporada: temp.nombre_temporada || seasonData.nombre_temporada,
-        codigo_temporada: temp.codigo_temporada,
-        club: clubName.trim(),
-        equipo: equipoName.trim(),
-        escudo: escudo || null,
-        competicion: comp && comp.nombre_competicion ? comp.nombre_competicion.trim() : (seasonData.categoria_equipo || 'Competición FFCV'),
-        grupo: comp && comp.nombre_grupo ? comp.nombre_grupo.trim() : '',
-        partidos_jugados: parseInt(pj, 10) || 0,
-        titular: parseInt(tit, 10) || 0,
-        suplente: parseInt(sup, 10) || 0,
-        goles: parseInt(goles, 10) || 0,
-        minutos: parseInt(seasonData.minutos_totales_jugados, 10) || 0,
-        posicion_equipo: comp && comp.posicion_equipo ? comp.posicion_equipo : '',
-        puntos_equipo: comp && comp.puntos_equipo ? comp.puntos_equipo : ''
-      };
+          entries.push({
+            temporada: temp.nombre_temporada || seasonData.nombre_temporada,
+            codigo_temporada: String(temp.codigo_temporada),
+            club: clubName,
+            equipo: clubName,
+            escudo: escudo || null,
+            competicion: seasonData.categoria_equipo || 'Competición FFCV',
+            grupo: '',
+            partidos_jugados: pjNum,
+            titular: titNum,
+            suplente: supNum,
+            goles: golesNum,
+            minutos: minNum,
+            posicion_equipo: '',
+            puntos_equipo: ''
+          });
+        }
+      }
+      return entries;
     });
 
-    const settledHistory = await Promise.all(historyPromises);
-    const historialTemporadas = settledHistory.filter(Boolean);
+    const nestedLiveEntries = await Promise.all(seasonFetchPromises);
+    const liveHistoryEntries = nestedLiveEntries.flat();
+
+    let historialTemporadas: any[] = [];
+
+    if (verifiedHistory && verifiedHistory.length > 0) {
+      // Merge live statistical data (matches, minutes, goals) into the verified trajectory
+      historialTemporadas = verifiedHistory.map((v) => {
+        const liveMatch = liveHistoryEntries.find((l) => {
+          const sameTemp = l.temporada === v.temporada;
+          const lClub = (l.club || '').toLowerCase();
+          const vClub = (v.club || '').toLowerCase();
+          return sameTemp && (lClub.includes(vClub) || vClub.includes(lClub));
+        });
+
+        if (liveMatch) {
+          return {
+            ...v,
+            escudo: v.escudo || liveMatch.escudo || getRegistryShield(v.club),
+            competicion: liveMatch.competicion || v.competicion,
+            grupo: liveMatch.grupo || v.grupo || '',
+            partidos_jugados: liveMatch.partidos_jugados,
+            titular: liveMatch.titular,
+            suplente: liveMatch.suplente,
+            goles: liveMatch.goles,
+            minutos: liveMatch.minutos,
+            posicion_equipo: liveMatch.posicion_equipo || '',
+            puntos_equipo: liveMatch.puntos_equipo || ''
+          };
+        }
+
+        return {
+          ...v,
+          escudo: v.escudo || getRegistryShield(v.club),
+          competicion: v.competicion || v.categoria,
+          grupo: v.grupo || '',
+          partidos_jugados: v.partidos_jugados || 0,
+          titular: v.titular || 0,
+          suplente: v.suplente || 0,
+          goles: v.goles || 0,
+          minutos: v.minutos || 0,
+          posicion_equipo: '',
+          puntos_equipo: ''
+        };
+      });
+    } else {
+      historialTemporadas = liveHistoryEntries;
+    }
 
     // Formatear foto correctamente (detectar si ya viene con 'data:image' o si es base64 puro)
     const rawPhoto = fullPlayerData.foto || matchedFfcvPlayer.foto;

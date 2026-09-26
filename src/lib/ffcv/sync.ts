@@ -424,10 +424,12 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
     return 0;
   }
 
-  // 3. Fetch corresponding FFCV matches
+  // 3. Fetch corresponding FFCV matches for active season 26/27 (excluding historical season 21)
   const { data: ffcvMatches, error: fmErr } = await supabase
     .from('ffcv_matches')
-    .select('ffcv_match_id, matchday, match_date, match_time, home_team_name, away_team_name, home_score, away_score, status');
+    .select('ffcv_match_id, matchday, match_date, match_time, home_team_name, away_team_name, home_score, away_score, status')
+    .neq('ffcv_season_id', '21')
+    .eq('ffcv_season_id', '22');
 
   if (fmErr || !ffcvMatches || ffcvMatches.length === 0) {
     return 0;

@@ -175,6 +175,10 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
           .eq('club_id', profile.club_id)
           .order('name', { ascending: true });
 
+        if (!isArchivePage) {
+          tQuery = tQuery.neq('season_id', PAST_SEASON_ID);
+        }
+
         if (targetSeasonId) {
           tQuery = tQuery.eq('season_id', targetSeasonId);
         }

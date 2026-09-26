@@ -42,6 +42,7 @@ export function FFCVStandings({
             .from("ffcv_standings")
             .select("*")
             .eq("ffcv_group_id", ffcvGroupId)
+            .neq("ffcv_season_id", "21")
             .order("matchday", { ascending: true })
             .order("position", { ascending: true });
 

@@ -44,11 +44,22 @@ function normalizeTeamName(name: string): string {
 function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[]) {
   if (!partido || !ffcvMatches || ffcvMatches.length === 0) return null;
 
+  // 1. Direct match by ffcv_match_id or codacta
   if (partido.ffcv_match_id) {
-    const found = ffcvMatches.find(m => m.ffcv_match_id === partido.ffcv_match_id || m.codacta === partido.ffcv_match_id);
+    const found = ffcvMatches.find(m => String(m.ffcv_match_id) === String(partido.ffcv_match_id) || String(m.codacta) === String(partido.ffcv_match_id));
     if (found) return found;
   }
 
+  // 2. Extract CodPartido from official FFCV URL
+  if (partido.acta_oficial_url) {
+    const match = partido.acta_oficial_url.match(/CodPartido=(\d+)/);
+    if (match) {
+      const found = ffcvMatches.find(m => String(m.ffcv_match_id) === match[1] || String(m.codacta) === match[1]);
+      if (found) return found;
+    }
+  }
+
+  // 3. Fallback matching within same group with strict date and location criteria
   const team = teamsList.find(t => t.id === partido.equipo_id) || partido.equipo;
   if (!team || !team.ffcv_group_id) return null;
 
@@ -64,6 +75,16 @@ function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[
   for (const fm of groupMatches) {
     let score = 0;
     
+    // Strict date guard: fallback must NEVER cross-match matches further than 7 days apart
+    if (partidoDate && fm.match_date) {
+      const fmDate = new Date(fm.match_date);
+      const diffDays = Math.abs((partidoDate.getTime() - fmDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 7) continue;
+      if (diffDays <= 1) score += 4;
+      else if (diffDays <= 3) score += 2;
+      else score += 1;
+    }
+
     const isOurTeamHome = team.ffcv_team_id ? fm.home_team_ffcv_id === team.ffcv_team_id : normalizeTeamName(fm.home_team_name).includes('saladar');
     const isOurTeamAway = team.ffcv_team_id ? fm.away_team_ffcv_id === team.ffcv_team_id : normalizeTeamName(fm.away_team_name).includes('saladar');
 
@@ -84,15 +105,7 @@ function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[
       }
     }
 
-    if (partidoDate && fm.match_date) {
-      const fmDate = new Date(fm.match_date);
-      const diffDays = Math.abs((partidoDate.getTime() - fmDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays <= 1) score += 4;
-      else if (diffDays <= 4) score += 2;
-      else if (diffDays <= 10) score += 1;
-    }
-
-    if (score > bestScore && score >= 5) {
+    if (score > bestScore && score >= 7) {
       bestScore = score;
       bestMatch = fm;
     }

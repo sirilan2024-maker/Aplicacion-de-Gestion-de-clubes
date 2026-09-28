@@ -180,7 +180,7 @@ export async function POST(req: Request) {
       const normVisit = normalizeTeamName(equipoVisitante);
 
       function isOurClub(str: string) {
-        return str.includes("saladar") || str.includes("sporting");
+        return str.includes("saladar") || str.includes("sporting saladar");
       }
 
       const localIsUs = isOurClub(normLocal);
@@ -224,9 +224,8 @@ export async function POST(req: Request) {
         continue;
       }
 
-      const yaPaso = fechaHora < new Date();
       const tieneResultado = resultadoPropio !== null && resultadoRival !== null;
-      const estado = (yaPaso || tieneResultado) ? 'Finalizado' : 'Programado';
+      const estado = tieneResultado ? 'Finalizado' : 'Programado';
 
       partidosAInsertar.push({
         club_id: profile.club_id,

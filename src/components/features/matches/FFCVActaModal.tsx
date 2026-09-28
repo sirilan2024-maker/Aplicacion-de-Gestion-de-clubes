@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Trophy, ShieldCheck, User, AlertCircle, RefreshCw, Clock, MapPin, Award, ArrowRightLeft, ShieldAlert, FileText, ArrowRight, FolderOpen } from "lucide-react";
+import { X, Trophy, ShieldCheck, User, AlertCircle, RefreshCw, Clock, MapPin, Award, ArrowRightLeft, ShieldAlert, FileText, ArrowRight, FolderOpen, CheckCircle2 } from "lucide-react";
 import { getFFCVMatchReportAction } from "@/app/actions/ffcv-actions";
 import { FFCVRawMatchDetails } from "@/lib/ffcv/types";
 
@@ -27,6 +27,7 @@ export function FFCVActaModal({
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FFCVRawMatchDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSynced, setIsSynced] = useState(false);
 
   useEffect(() => {
     async function loadReport() {
@@ -41,6 +42,10 @@ export function FFCVActaModal({
         const res = await getFFCVMatchReportAction(codacta);
         if (res.success && res.data) {
           setData(res.data);
+          if (res.synced) {
+            setIsSynced(true);
+            router.refresh();
+          }
         } else {
           setError(res.error || "No se pudo obtener el acta oficial de la federación.");
         }
@@ -51,7 +56,7 @@ export function FFCVActaModal({
       }
     }
     loadReport();
-  }, [codacta]);
+  }, [codacta, router]);
 
   // Helper function to check if player is titular (handles "1", 1, true)
   const isTitular = (p: any) => {
@@ -104,6 +109,11 @@ export function FFCVActaModal({
                 ) : (
                   <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded">
                     Programado / Provisional
+                  </span>
+                )}
+                {isSynced && (
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-200 px-2 py-0.5 rounded flex items-center gap-1 border border-emerald-400/40">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Ficha Actualizada
                   </span>
                 )}
               </div>

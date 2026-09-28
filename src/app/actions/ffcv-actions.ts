@@ -1,6 +1,8 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { revalidatePath } from 'next/cache';
 import { syncTeamFFCV, syncGroupFFCV } from '@/lib/ffcv/sync';
 import { fetchMatchDetails } from '@/lib/ffcv/client';
 import { FFCVSyncResult, FFCVRawMatchDetails } from '@/lib/ffcv/types';
@@ -58,19 +60,96 @@ export async function syncTeamFFCVAction(
 
 /**
  * Server Action to fetch official match report details from FFCV
+ * Automatically synchronizes the official score and status to both
+ * ffcv_matches and the internal partidos table when the match is played/closed.
  */
 export async function getFFCVMatchReportAction(
   matchId: string
-): Promise<{ success: boolean; data?: FFCVRawMatchDetails; error?: string }> {
+): Promise<{ success: boolean; data?: FFCVRawMatchDetails; error?: string; synced?: boolean }> {
   try {
     if (!matchId) {
       return { success: false, error: 'Identificador de partido no especificado.' };
     }
 
     const details = await fetchMatchDetails({ matchId });
-    return { success: true, data: details };
+
+    let synced = false;
+    if (details) {
+      const isClosed = String(details.acta_cerrada) === '1';
+      const hasScores = details.goles_local !== undefined && details.goles_local !== null && details.goles_local !== '' &&
+                        details.goles_visitante !== undefined && details.goles_visitante !== null && details.goles_visitante !== '';
+
+      if (isClosed || hasScores) {
+        try {
+          const adminSupabase = createAdminClient();
+          const homeScore = Number(details.goles_local) || 0;
+          const awayScore = Number(details.goles_visitante) || 0;
+
+          // 1. Update ffcv_matches table
+          await adminSupabase
+            .from('ffcv_matches')
+            .update({
+              home_score: homeScore,
+              away_score: awayScore,
+              status: 'played',
+              is_closed: isClosed,
+              codacta: matchId
+            })
+            .eq('ffcv_match_id', matchId);
+
+          // 2. Find internal club matches linked to this official match in active season 26/27
+          const { data: matchedPartidos } = await adminSupabase
+            .from('partidos')
+            .select('id, lugar, rival_nombre, acta_oficial_url, season_id')
+            .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+            .or(`acta_oficial_url.ilike.%CodPartido=${matchId}%,acta_oficial_url.ilike.%${matchId}%`);
+
+          if (matchedPartidos && matchedPartidos.length > 0) {
+            for (const pm of matchedPartidos) {
+              const isLocal = pm.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(pm.lugar || '');
+              const ownScore = isLocal ? homeScore : awayScore;
+              const rivalScore = isLocal ? awayScore : homeScore;
+
+              await adminSupabase
+                .from('partidos')
+                .update({
+                  estado: 'Finalizado',
+                  resultado_propio: ownScore,
+                  resultado_rival: rivalScore
+                })
+                .eq('id', pm.id);
+            }
+
+            revalidatePath('/dashboard/matches');
+            revalidatePath('/dashboard', 'layout');
+            synced = true;
+          }
+        } catch (syncErr) {
+          console.error('[getFFCVMatchReportAction] Background sync error:', syncErr);
+        }
+      }
+    }
+
+    return { success: true, data: details, synced };
   } catch (err: any) {
     console.error('[getFFCVMatchReportAction] Error:', err);
     return { success: false, error: err.message || 'Error al obtener el acta oficial de la FFCV' };
+  }
+}
+
+/**
+ * Explicit Server Action to force synchronization of a match from its official FFCV report
+ */
+export async function syncSingleMatchFFCVAction(
+  matchId: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await getFFCVMatchReportAction(matchId);
+    if (!res.success || !res.data) {
+      return { success: false, error: res.error || 'No se pudo obtener el acta oficial' };
+    }
+    return { success: true, message: 'Partido y resultado federativo sincronizados correctamente.' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error sincronizando partido' };
   }
 }

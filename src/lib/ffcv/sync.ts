@@ -439,12 +439,25 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
   for (const pm of clubPartidos) {
     // A. Match by acta_oficial_url containing ffcv_match_id
-    let fm = ffcvMatches.find(f => pm.acta_oficial_url && pm.acta_oficial_url.includes(String(f.ffcv_match_id)));
+    let fm = ffcvMatches.find(f => pm.acta_oficial_url && (pm.acta_oficial_url.includes(String(f.ffcv_match_id)) || pm.acta_oficial_url.includes(`CodPartido=${f.ffcv_match_id}`)));
 
-    // B. Fallback: match by team and rival name similarity
+    // B. Fallback: match by team group and rival name similarity with strict date proximity
     if (!fm && (pm.teams as any)?.name) {
+      const teamGroupId = (pm.teams as any)?.ffcv_group_id;
       const pRival = (pm.rival_nombre || '').toLowerCase();
+      const pDate = pm.fecha_hora ? new Date(pm.fecha_hora) : null;
+
       fm = ffcvMatches.find(f => {
+        // Must belong to same group if group configured
+        if (teamGroupId && (f as any).ffcv_group_id && (f as any).ffcv_group_id !== teamGroupId) return false;
+
+        // Strict date guard: never match matches further than 7 days apart
+        if (pDate && f.match_date) {
+          const fDate = new Date(f.match_date);
+          const diffDays = Math.abs((pDate.getTime() - fDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays > 7) return false;
+        }
+
         const h = (f.home_team_name || '').toLowerCase();
         const a = (f.away_team_name || '').toLowerCase();
         const rivalName = h.includes('saladar') ? a : h;
@@ -478,6 +491,11 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
         updates.fecha_hora = ffcvIso;
       }
+    }
+
+    // Set acta_oficial_url if missing
+    if (!pm.acta_oficial_url && fm.ffcv_match_id) {
+      updates.acta_oficial_url = `https://ffcv.es/dep/actas?CodPartido=${fm.ffcv_match_id}`;
     }
 
     if (Object.keys(updates).length > 0) {

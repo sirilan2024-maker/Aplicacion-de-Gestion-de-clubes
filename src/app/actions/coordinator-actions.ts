@@ -159,38 +159,49 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       }
     })
 
-    // 5. Jugadores por equipo (de player_season_history si hay temporada, sino de players.team_id)
+    // 5. Jugadores por equipo (de player_season_history si hay temporada, con fallback/complemento a players.team_id)
     let playersByTeam = new Map<string, number>()
     let playerToTeamMap = new Map<string, string>()
+
+    // Consultamos los jugadores directos del club asignados a estos equipos
+    const { data: directPlayers } = await adminClient
+      .from('players')
+      .select('id, team_id, posicion, status')
+      .eq('club_id', clubId)
+      .in('team_id', teamIds)
+
+    const directPlayersMap = new Map((directPlayers || []).map(p => [p.id, p]))
+
     if (seasonId) {
       const { data: pshRows } = await adminClient
         .from('player_season_history')
         .select('player_id, team_id, posicion')
         .eq('season_id', seasonId)
         .in('team_id', teamIds)
-        .neq('posicion', 'Entrenador')
 
       ;(pshRows || []).forEach((r: any) => {
-        const count = playersByTeam.get(r.team_id) || 0
-        playersByTeam.set(r.team_id, count + 1)
-        playerToTeamMap.set(r.player_id, r.team_id)
-      })
-    } else {
-      const { data: playersData } = await adminClient
-        .from('players')
-        .select('id, team_id, posicion')
-        .eq('club_id', clubId)
-        .in('team_id', teamIds)
-        .neq('status', 'inactive')
-        .neq('posicion', 'Entrenador')
-
-      ;(playersData || []).forEach((p: any) => {
-        if (!p.team_id) return
-        const count = playersByTeam.get(p.team_id) || 0
-        playersByTeam.set(p.team_id, count + 1)
-        playerToTeamMap.set(p.id, p.team_id)
+        const p = directPlayersMap.get(r.player_id)
+        const isInactive = p?.status === 'inactive' || p?.status === 'inactivo' || p?.status === 'baja'
+        const isCoach = (r.posicion || p?.posicion || '').toLowerCase().includes('entrenador')
+        if (!isInactive && !isCoach && r.team_id) {
+          playerToTeamMap.set(r.player_id, r.team_id)
+        }
       })
     }
+
+    // Complementar con jugadores asignados directamente al equipo en players
+    ;(directPlayers || []).forEach((p: any) => {
+      const isInactive = p?.status === 'inactive' || p?.status === 'inactivo' || p?.status === 'baja'
+      const isCoach = (p.posicion || '').toLowerCase().includes('entrenador')
+      if (!isInactive && !isCoach && p.team_id && !playerToTeamMap.has(p.id)) {
+        playerToTeamMap.set(p.id, p.team_id)
+      }
+    })
+
+    playerToTeamMap.forEach((tid) => {
+      const count = playersByTeam.get(tid) || 0
+      playersByTeam.set(tid, count + 1)
+    })
 
     const totalPlayers = Array.from(playersByTeam.values()).reduce((s, v) => s + v, 0)
 
@@ -321,13 +332,20 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     })
 
     // 11. Apercibidos (con 4 amarillas acumuladas en la temporada disputada)
-    // Se consultan todos los partidos finalizados/disputados de la temporada para los equipos del club
-    const { data: seasonPlayedMatches } = await adminClient
+    // Se consultan todos los partidos finalizados/disputados de la temporada activa para los equipos del club
+    let seasonPlayedQuery = adminClient
       .from('partidos')
       .select('id')
       .eq('club_id', clubId)
       .in('equipo_id', teamIds)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .or('estado.eq.Finalizado,resultado_propio.not.is.null');
+
+    if (seasonId) {
+      seasonPlayedQuery = seasonPlayedQuery.eq('season_id', seasonId);
+    }
+
+    const { data: seasonPlayedMatches } = await seasonPlayedQuery;
 
     const playedMatchIds = (seasonPlayedMatches || []).map(m => m.id);
 

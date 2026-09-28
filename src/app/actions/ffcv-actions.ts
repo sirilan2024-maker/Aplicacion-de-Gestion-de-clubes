@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { syncTeamFFCV, syncGroupFFCV } from '@/lib/ffcv/sync';
 import { fetchMatchDetails } from '@/lib/ffcv/client';
 import { FFCVSyncResult, FFCVRawMatchDetails } from '@/lib/ffcv/types';
+import { syncFFCVActaToConvocatorias } from '@/lib/ffcv/acta-sync';
 
 /**
  * Server Action to manually sync FFCV data for a team in the club
@@ -119,9 +120,17 @@ export async function getFFCVMatchReportAction(
                 })
                 .eq('id', pm.id);
             }
+          }
 
-            revalidatePath('/dashboard/matches');
-            revalidatePath('/dashboard', 'layout');
+          // 3. Automatically synchronize official lineup, minutes played, cards and goals into convocatorias
+          const actaSyncRes = await syncFFCVActaToConvocatorias(matchId, details, adminSupabase);
+          if (actaSyncRes.success && actaSyncRes.syncedCount > 0) {
+            synced = true;
+          }
+
+          revalidatePath('/dashboard/matches');
+          revalidatePath('/dashboard', 'layout');
+          if (matchedPartidos && matchedPartidos.length > 0) {
             synced = true;
           }
         } catch (syncErr) {

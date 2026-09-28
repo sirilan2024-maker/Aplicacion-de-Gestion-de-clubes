@@ -16,6 +16,7 @@ import {
   FFCVStandingRecord,
   FFCVMatchRecord
 } from './types';
+import { syncFFCVActaToConvocatorias } from './acta-sync';
 
 /**
  * Synchronizes FFCV group data (calendar, standings, matches) into Supabase
@@ -508,6 +509,22 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
         updatedCount++;
       } else {
         console.warn(`[propagateFfcvMatchesToClubPartidos] Error updating partido ${pm.id}:`, upErr.message);
+      }
+    }
+
+    // Auto-sync acta details (cards, minutes, lineup) if match is played and has no convocatorias yet
+    if (isPlayed && fm.ffcv_match_id) {
+      try {
+        const { count } = await supabase
+          .from('convocatorias')
+          .select('id', { count: 'exact', head: true })
+          .eq('partido_id', pm.id);
+
+        if (!count || count === 0) {
+          await syncFFCVActaToConvocatorias(String(fm.ffcv_match_id), undefined, supabase);
+        }
+      } catch (actaErr) {
+        console.warn(`[propagateFfcvMatchesToClubPartidos] Error auto-syncing acta for ${fm.ffcv_match_id}:`, actaErr);
       }
     }
   }

@@ -12,6 +12,7 @@ import {
 import { getCoordinatorDashboardAction, CoordinatorDashboardData } from "@/app/actions/coordinator-actions"
 import { useSeason } from "@/components/providers/SeasonProvider"
 import { MatchdayShareModal } from "./MatchdayShareModal"
+import { SituacionDeportivaSection } from "./SituacionDeportivaSection"
 
 type Props = {
   initialResult: { success: boolean; data?: CoordinatorDashboardData; error?: string }
@@ -202,6 +203,21 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
             </div>
           ))}
         </div>
+
+        {/* ── Situación Deportiva ── */}
+        {data.sports && (
+          <SituacionDeportivaSection
+            sports={data.sports}
+            kpis={{
+              activePlayers: data.kpis.activePlayers || data.kpis.totalPlayers,
+              activeTeams: data.kpis.activeTeams || data.kpis.totalTeams,
+            }}
+            injuries={{
+              activeInjuriesCount: data.injuries?.activeInjuriesCount ?? data.kpis.activeInjuries ?? 0,
+              activeInjuriesList: data.injuries?.activeInjuriesList ?? [],
+            }}
+          />
+        )}
 
         {/* ── Alertas ── */}
         {alerts.length > 0 && (

@@ -49,6 +49,8 @@ export interface CoordinatorDashboardData {
   kpis: {
     totalTeams: number
     totalPlayers: number
+    activePlayers: number
+    activeTeams: number
     activeInjuries: number
     upcomingMatchesCount: number
     apercibidosCount: number
@@ -66,6 +68,69 @@ export interface CoordinatorDashboardData {
     teamName: string
     eventType: string
   }>
+  sports: {
+    totalPlayedMatches: number
+    wins: number
+    draws: number
+    losses: number
+    goalsFor: number
+    goalsAgainst: number
+    globalWinRate: number
+    points: number
+    possiblePoints: number
+    pointsPercentage: number
+    attendanceRate: number
+    topScorer?: {
+      playerId: string
+      playerName: string
+      goals: number
+      teamName: string
+    } | null
+    topMinutes?: {
+      playerId: string
+      playerName: string
+      minutesPlayed: number
+      teamName: string
+    } | null
+    teamStats?: Array<{
+      teamId: string
+      teamName: string
+      teamCategory: string
+      competitionName?: string
+      groupName?: string
+      currentPosition?: number
+      totalTeamsInGroup?: number
+      matchesPlayed: number
+      wins: number
+      draws: number
+      losses: number
+      goalsFor: number
+      goalsAgainst: number
+      goalDiff: number
+      points: number
+      winRate: number
+    }>
+  }
+  injuries: {
+    activeInjuriesCount: number
+    activeInjuriesList: Array<{
+      id: string
+      playerId: string
+      playerName: string
+      teamId?: string | null
+      teamName?: string
+      injuryType: string
+      injuryDate?: string
+      status: string
+      severity?: string
+      bodyRegion?: string
+      bodyStructure?: string
+      laterality?: string
+      rtsPhase?: string
+      daysInjured?: number
+      formattedRecoveryTime?: string
+    }>
+  }
 }
 
 /**
@@ -117,7 +182,7 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     // 3. Equipos del club en la temporada
     let teamsQuery = adminClient
       .from('teams')
-      .select('id, name, category, color')
+      .select('id, name, category, color, ffcv_group_id, ffcv_team_id, season_id')
       .eq('club_id', clubId)
 
     if (seasonId) {
@@ -209,22 +274,85 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     const activePlayerIds = Array.from(playerToTeamMap.keys())
     const injuredByTeam = new Map<string, number>()
     let activeInjuries = 0
+    const activeInjuriesList: Array<any> = []
 
     if (activePlayerIds.length > 0) {
-      const { data: injuriesData } = await adminClient
+      const { data: rawInjuries } = await adminClient
         .from('player_injuries')
-        .select('player_id')
+        .select(`
+          id, player_id, injury_type, diagnosis, start_date, expected_return_date,
+          severity, status, body_region, body_structure, laterality, rts_phase,
+          players:player_id ( first_name, last_name, team_id, teams:team_id(name) )
+        `)
         .eq('club_id', clubId)
         .eq('status', 'activa')
         .in('player_id', activePlayerIds)
 
-      ;(injuriesData || []).forEach((inj: any) => {
-        const tid = playerToTeamMap.get(inj.player_id)
+      ;(rawInjuries || []).forEach((inj: any) => {
+        const p = inj.players
+        const pName = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'Jugador'
+        const tName = p?.teams?.name || 'Equipo'
+        const tid = playerToTeamMap.get(inj.player_id) || p?.team_id
         if (tid && teamIds.includes(tid)) {
           const count = injuredByTeam.get(tid) || 0
           injuredByTeam.set(tid, count + 1)
           activeInjuries++
         }
+        const daysInjured = inj.start_date
+          ? Math.floor((Date.now() - new Date(inj.start_date).getTime()) / (1000 * 60 * 60 * 24))
+          : 0
+
+        activeInjuriesList.push({
+          id: inj.id,
+          playerId: inj.player_id,
+          playerName: pName,
+          teamId: tid,
+          teamName: tName,
+          injuryType: inj.injury_type || inj.diagnosis || 'Lesión activa',
+          injuryDate: inj.start_date || new Date().toISOString(),
+          status: 'active',
+          severity: inj.severity || 'Moderada',
+          bodyRegion: inj.body_region,
+          bodyStructure: inj.body_structure,
+          laterality: inj.laterality,
+          rtsPhase: inj.rts_phase,
+          daysInjured,
+          formattedRecoveryTime: inj.expected_return_date
+            ? `Estimado: ${new Date(inj.expected_return_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+            : 'En recuperación'
+        })
+      })
+
+      // Complementar con players.injury_description si hay alguno no registrado en player_injuries
+      const { data: playersWithNotes } = await adminClient
+        .from('players')
+        .select('id, first_name, last_name, injury_description, team_id, teams:team_id(name)')
+        .eq('club_id', clubId)
+        .in('id', activePlayerIds)
+        .not('injury_description', 'is', null)
+
+      ;(playersWithNotes || []).forEach((p: any) => {
+        if (!p.injury_description || p.injury_description.trim().length === 0) return
+        if (activeInjuriesList.some(i => i.playerId === p.id)) return
+
+        const tid = playerToTeamMap.get(p.id) || p.team_id
+        if (tid && teamIds.includes(tid)) {
+          const count = injuredByTeam.get(tid) || 0
+          injuredByTeam.set(tid, count + 1)
+          activeInjuries++
+        }
+        activeInjuriesList.push({
+          id: p.id,
+          playerId: p.id,
+          playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+          teamId: tid,
+          teamName: p.teams?.name || 'Equipo',
+          injuryType: p.injury_description,
+          injuryDate: new Date().toISOString(),
+          status: 'active',
+          severity: 'Leve',
+          formattedRecoveryTime: 'Seguimiento médico'
+        })
       })
     }
 
@@ -458,6 +586,233 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       }
     })
 
+    // 15. Motor deportivo consolidado (Situación Deportiva)
+    let allMatchesQuery = adminClient
+      .from('partidos')
+      .select('id, estado, resultado_propio, resultado_rival, equipo_id, rival_nombre, lugar, fecha_hora')
+      .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .order('fecha_hora', { ascending: false })
+
+    if (seasonId) {
+      allMatchesQuery = allMatchesQuery.eq('season_id', seasonId)
+    }
+
+    const { data: allSeasonMatches } = await allMatchesQuery
+    const playedMatchesList = (allSeasonMatches || []).filter(
+      p => p.estado === 'Finalizado' || (p.resultado_propio !== null && p.resultado_rival !== null)
+    )
+
+    let totalPlayed = playedMatchesList.length
+    let wins = 0
+    let draws = 0
+    let losses = 0
+    let goalsFor = 0
+    let goalsAgainst = 0
+    const teamMatchMap = new Map<string, typeof playedMatchesList>()
+
+    playedMatchesList.forEach(p => {
+      const list = teamMatchMap.get(p.equipo_id) || []
+      list.push(p)
+      teamMatchMap.set(p.equipo_id, list)
+
+      goalsFor += p.resultado_propio || 0
+      goalsAgainst += p.resultado_rival || 0
+      if ((p.resultado_propio || 0) > (p.resultado_rival || 0)) wins++
+      else if ((p.resultado_propio || 0) === (p.resultado_rival || 0)) draws++
+      else losses++
+    })
+
+    const federatedTeams = teams.filter(t => Boolean(t.ffcv_group_id))
+    const groupIds = federatedTeams.map(t => t.ffcv_group_id).filter(Boolean) as string[]
+
+    const { data: groupsData } = await adminClient
+      .from('ffcv_groups')
+      .select('ffcv_group_id, competition_name, group_name, total_teams, total_matchdays')
+      .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none'])
+
+    const groupMap = new Map<string, any>()
+    ;(groupsData || []).forEach(g => groupMap.set(g.ffcv_group_id, g))
+
+    const { data: allStandings } = await adminClient
+      .from('ffcv_standings')
+      .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id, played, won, drawn, lost, goals_for, goals_against')
+      .neq('ffcv_season_id', '21')
+      .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none'])
+      .order('matchday', { ascending: false })
+
+    const standingsByGroup = new Map<string, any[]>()
+    ;(allStandings || []).forEach(s => {
+      const list = standingsByGroup.get(s.ffcv_group_id) || []
+      list.push(s)
+      standingsByGroup.set(s.ffcv_group_id, list)
+    })
+
+    const teamStatsList: any[] = []
+    for (const team of federatedTeams) {
+      const groupInfo = team.ffcv_group_id ? groupMap.get(team.ffcv_group_id) : undefined
+      const tMatches = teamMatchMap.get(team.id) || []
+
+      let tWins = 0, tDraws = 0, tLosses = 0, tGf = 0, tGa = 0
+      tMatches.forEach(m => {
+        tGf += m.resultado_propio || 0
+        tGa += m.resultado_rival || 0
+        if ((m.resultado_propio || 0) > (m.resultado_rival || 0)) tWins++
+        else if ((m.resultado_propio || 0) === (m.resultado_rival || 0)) draws++
+        else losses++
+      })
+
+      let tPoints = (tWins * 3) + tDraws
+      let tPlayed = tMatches.length
+      let currentPos: number | undefined = undefined
+
+      const groupSt = standingsByGroup.get(team.ffcv_group_id || '')
+      if (groupSt && groupSt.length > 0) {
+        const teamIdStr = team.ffcv_team_id ? String(team.ffcv_team_id).trim() : ''
+        const clubRow = groupSt.find(r => 
+          (teamIdStr && String(r.team_ffcv_id || '').trim() === teamIdStr) ||
+          r.team_name.toLowerCase().includes('saladar') ||
+          r.team_name.toLowerCase().includes(team.name.toLowerCase().trim())
+        )
+        if (clubRow) {
+          currentPos = clubRow.position
+          if (clubRow.played !== undefined && clubRow.played !== null) {
+            tPlayed = Number(clubRow.played)
+            tWins = Number(clubRow.won ?? 0)
+            tDraws = Number(clubRow.drawn ?? 0)
+            tLosses = Number(clubRow.lost ?? 0)
+            tGf = Number(clubRow.goals_for ?? 0)
+            tGa = Number(clubRow.goals_against ?? 0)
+            tPoints = Number(clubRow.points ?? 0)
+          }
+        }
+      }
+
+      const tWinRate = tPlayed > 0 ? Math.round((tWins / tPlayed) * 100) : 0
+      teamStatsList.push({
+        teamId: team.id,
+        teamName: team.name,
+        teamCategory: team.category || 'Federado',
+        competitionName: groupInfo?.competition_name || 'Liga FFCV',
+        groupName: groupInfo?.group_name || 'Grupo Oficial',
+        currentPosition: currentPos,
+        totalTeamsInGroup: groupInfo?.total_teams,
+        matchesPlayed: tPlayed,
+        wins: tWins,
+        draws: tDraws,
+        losses: tLosses,
+        goalsFor: tGf,
+        goalsAgainst: tGa,
+        goalDiff: tGf - tGa,
+        points: tPoints,
+        winRate: tWinRate,
+      })
+    }
+
+    const nonFederatedTeams = teams.filter(t => !t.ffcv_group_id)
+    for (const team of nonFederatedTeams) {
+      const isLigaBrave = team.name.toLowerCase().includes('infantil') || team.category?.toLowerCase().includes('brave') || team.name.toLowerCase().includes('cadete')
+      teamStatsList.push({
+        teamId: team.id,
+        teamName: team.name,
+        teamCategory: team.category || (isLigaBrave ? 'Liga Brave' : 'No federado'),
+        competitionName: isLigaBrave ? 'Liga Brave' : 'No federado',
+        groupName: isLigaBrave ? 'Grupo Formativo' : '',
+        currentPosition: undefined,
+        totalTeamsInGroup: undefined,
+        matchesPlayed: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDiff: 0,
+        points: 0,
+        winRate: 0,
+      })
+    }
+
+    const teamHierarchy: Record<string, number> = {
+      'senior': 1,
+      'juvenil a': 2,
+      'juvenil b': 3,
+      'juvenil': 4,
+      'cadete a': 5,
+      'cadete b': 6,
+      'cadete': 7,
+      'infantil a': 8,
+      'infantil b': 9,
+      'infantil c': 10,
+      'infantil': 11,
+    }
+
+    teamStatsList.sort((a, b) => {
+      const isNonFedA = a.competitionName === 'No federado' || a.competitionName === 'Liga Brave' || a.teamCategory === 'Liga Brave' || a.teamCategory === 'No federado'
+      const isNonFedB = b.competitionName === 'No federado' || b.competitionName === 'Liga Brave' || b.teamCategory === 'Liga Brave' || b.teamCategory === 'No federado'
+      if (!isNonFedA && isNonFedB) return -1
+      if (isNonFedA && !isNonFedB) return 1
+      const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99
+      const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99
+      return rankA - rankB
+    })
+
+    const globalWinRate = totalPlayed > 0 ? Math.round((wins / totalPlayed) * 100) : 0
+    const points = (wins * 3) + draws
+    const possiblePoints = totalPlayed * 3
+    const pointsPercentage = possiblePoints > 0 ? Math.round((points / possiblePoints) * 100) : 0
+
+    // Top scorer & top minutes from convocatorias
+    let topScorer: { playerId: string; playerName: string; goals: number; teamName: string } | null = null
+    let topMinutes: { playerId: string; playerName: string; minutesPlayed: number; teamName: string } | null = null
+
+    const allMatchIds = (allSeasonMatches || []).map(m => m.id)
+    if (allMatchIds.length > 0) {
+      const { data: convData } = await adminClient
+        .from('convocatorias')
+        .select('id, player_id, goals, goles, minutes_played, minutos_jugados, players(id, first_name, last_name, team_id, teams:team_id(name))')
+        .in('partido_id', allMatchIds)
+        .or('goals.gt.0,goles.gt.0,minutes_played.gt.0,minutos_jugados.gt.0')
+
+      if (convData && convData.length > 0) {
+        const playerStatsMap = new Map<string, { id: string; name: string; teamName: string; goals: number; minutes: number }>()
+        convData.forEach((c: any) => {
+          const p = c.players
+          if (!p) return
+          const existing = playerStatsMap.get(p.id) || {
+            id: p.id,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+            teamName: p.teams?.name || 'Equipo',
+            goals: 0,
+            minutes: 0
+          }
+          existing.goals += Number(c.goals ?? c.goles ?? 0)
+          existing.minutes += Number(c.minutes_played ?? c.minutos_jugados ?? 0)
+          playerStatsMap.set(p.id, existing)
+        })
+
+        const pList = Array.from(playerStatsMap.values())
+        const scorers = [...pList].filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals)
+        if (scorers.length > 0) topScorer = scorers[0]
+
+        const minuteLeaders = [...pList].filter(p => p.minutes > 0).sort((a, b) => b.minutes - a.minutes)
+        if (minuteLeaders.length > 0) topMinutes = minuteLeaders[0]
+      }
+    }
+
+    // Attendance rate
+    let attendanceRate = 100
+    if (activePlayerIds.length > 0) {
+      const { data: attRows } = await adminClient
+        .from('attendance')
+        .select('status')
+        .in('player_id', activePlayerIds)
+
+      if (attRows && attRows.length > 0) {
+        const presentes = attRows.filter((r: any) => (r.status || '').toLowerCase().trim() === 'presente' || (r.status || '').toLowerCase().trim() === 'present').length
+        attendanceRate = Math.round((presentes / attRows.length) * 100)
+      }
+    }
+
     return {
       success: true,
       data: {
@@ -466,6 +821,8 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         kpis: {
           totalTeams: teams.length,
           totalPlayers,
+          activePlayers: totalPlayers,
+          activeTeams: teams.length,
           activeInjuries,
           upcomingMatchesCount: upcomingMatchesMapped.length,
           apercibidosCount,
@@ -477,6 +834,26 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         teams: teamSummaries,
         upcomingMatches: upcomingMatchesMapped,
         todayEvents,
+        sports: {
+          totalPlayedMatches: totalPlayed,
+          wins,
+          draws,
+          losses,
+          goalsFor,
+          goalsAgainst,
+          globalWinRate,
+          points,
+          possiblePoints,
+          pointsPercentage,
+          attendanceRate,
+          topScorer,
+          topMinutes,
+          teamStats: teamStatsList,
+        },
+        injuries: {
+          activeInjuriesCount: activeInjuriesList.length,
+          activeInjuriesList,
+        },
       }
     }
   } catch (err: any) {

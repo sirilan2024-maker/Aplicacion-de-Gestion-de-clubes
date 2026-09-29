@@ -36,11 +36,12 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
         setConvocados(new Set(convPlayerIds))
       }
 
-      // 3. Fetch all team players AND players already in convocatoria (juveniles)
+      // 3. Fetch all team players AND valid call-ups strictly in active season
       let query = supabase
         .from("players")
-        .select("id, first_name, last_name, dorsal, status, medical_notes, team_id, teams(name, category)")
+        .select("id, first_name, last_name, dorsal, status, medical_notes, team_id, teams:teams!inner(name, category, season_id)")
         .neq('status', 'inactive')
+        .neq('teams.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
         .order("first_name")
 
       if (convPlayerIds.length > 0) {
@@ -134,7 +135,7 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                       <h4 className={`font-bold text-sm sm:text-base truncate ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
                         {p.first_name} {p.last_name}
                       </h4>
-                      {(p.teams?.category?.toLowerCase().includes('juvenil') || (p.team_id !== teamId && p.team_id !== oldTeamId)) && (
+                      {(p.teams?.category?.toLowerCase().includes('juvenil') || p.team_id !== teamId) && (
                         <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
                           {p.teams?.name || 'Juvenil'}
                         </span>

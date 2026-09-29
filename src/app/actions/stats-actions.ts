@@ -144,8 +144,10 @@ export async function getGlobalStatsAction(seasonFilterId?: string): Promise<Glo
     } else {
       const { data: playersData, error: playersError } = await supabase
         .from('players')
-        .select('id, first_name, last_name, dorsal, team_id')
+        .select('id, first_name, last_name, dorsal, team_id, team:teams!inner(id, season_id)')
         .eq('club_id', clubId)
+        .neq('status', 'inactive')
+        .neq('team.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
 
       if (playersError) {
         return { success: false, error: playersError.message }
@@ -317,6 +319,8 @@ function normalizeTeamMatchName(str: string): string {
 
     if (seasonFilterId && seasonFilterId !== 'todas') {
       matchQuery = matchQuery.eq('season_id', seasonFilterId)
+    } else {
+      matchQuery = matchQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
     }
 
     const { data: clubPartidos } = await matchQuery

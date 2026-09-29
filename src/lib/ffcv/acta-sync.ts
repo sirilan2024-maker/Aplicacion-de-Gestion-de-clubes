@@ -29,16 +29,17 @@ function matchPlayer(
   teamPlayers: any[]
 ): any {
   const ffcvWords = normalizeNameWords(ffcvName);
+  if (ffcvWords.length === 0) return null;
 
   let bestPlayer = null;
   let bestScore = 0;
 
-  // 1. Try matching against team players first
+  // 1. Try matching against team players first (ACTIVE SEASON ONLY)
   for (const p of teamPlayers) {
     const dbWords = normalizeNameWords(`${p.first_name} ${p.last_name}`);
     const common = ffcvWords.filter(w => dbWords.includes(w)).length;
     let score = common * 3;
-    if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 2;
+    if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 3;
     if (score > bestScore && common >= 1) {
       bestScore = score;
       bestPlayer = p;
@@ -47,19 +48,24 @@ function matchPlayer(
 
   if (bestPlayer && bestScore >= 4) return bestPlayer;
 
-  // 2. Try matching against all club players (in case of call-ups from lower teams)
+  // 2. Try matching against all club players strictly in the active season (for lower/upper team call-ups)
+  // Require at least 2 common words or 1 common word + matching dorsal to prevent false positives
+  let bestClubPlayer = null;
+  let bestClubScore = 0;
   for (const p of allPlayers) {
     const dbWords = normalizeNameWords(`${p.first_name} ${p.last_name}`);
     const common = ffcvWords.filter(w => dbWords.includes(w)).length;
     let score = common * 3;
-    if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 2;
-    if (score > bestScore && common >= 1) {
-      bestScore = score;
-      bestPlayer = p;
+    if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 3;
+    if (score > bestClubScore && (common >= 2 || (common >= 1 && dorsal && String(p.dorsal) === String(dorsal)))) {
+      bestClubScore = score;
+      bestClubPlayer = p;
     }
   }
 
-  return bestPlayer;
+  if (bestClubPlayer && bestClubScore >= 6) return bestClubPlayer;
+
+  return null;
 }
 
 /**
@@ -144,7 +150,7 @@ export async function syncFFCVActaToConvocatorias(
             .eq('season_id', ACTIVE_SEASON_ID)
             .eq('equipo_id', team.id);
 
-          partido = (candidatePartidos || []).find(p => {
+          partido = (candidatePartidos || []).find((p: any) => {
             const pDate = p.fecha_hora.split('T')[0];
             const diffDays = Math.abs((new Date(pDate).getTime() - new Date(fmDate).getTime()) / (1000 * 60 * 60 * 24));
             return diffDays <= 4;
@@ -157,12 +163,21 @@ export async function syncFFCVActaToConvocatorias(
       return { success: false, syncedCount: 0, error: `No internal partido found for codacta ${codacta}` };
     }
 
-    // 2. Load club players for matching
+    // 2. Load club players for matching (ACTIVE SEASON ONLY, NEVER 25/26, NEVER INACTIVE)
+    const { data: activeTeams } = await supabase
+      .from('teams')
+      .select('id')
+      .neq('season_id', CLOSED_SEASON_ID)
+      .eq('season_id', ACTIVE_SEASON_ID);
+    const activeTeamIds = (activeTeams || []).map((t: any) => t.id);
+
     const { data: allPlayers } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, team_id');
+      .select('id, first_name, last_name, dorsal, team_id, status')
+      .in('team_id', activeTeamIds)
+      .neq('status', 'inactive');
 
-    const teamPlayers = (allPlayers || []).filter(p => p.team_id === partido.equipo_id);
+    const teamPlayers = (allPlayers || []).filter((p: any) => p.team_id === partido.equipo_id);
 
     // 3. Build convocatorias payload
     const rowsToUpsert: any[] = [];

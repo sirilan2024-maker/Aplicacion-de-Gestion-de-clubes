@@ -4,6 +4,8 @@ import { PremiumMatchManager } from "@/components/features/matches/premium-match
 import { FamilyMatchView } from "@/components/features/matches/family-match-view"
 export const dynamic = 'force-dynamic';
 
+const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+
 export default async function MatchPage({ params }: { params: Promise<{ teamId: string, matchId: string }> }) {
   const { teamId, matchId } = await params
   const supabase = await createClient()
@@ -12,21 +14,13 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .from("partidos")
     .select(`
       *,
-      equipo:teams(id, name, color),
+      equipo:teams(id, name, color, season_id),
       match_events(*, player:players(id, first_name, last_name, dorsal))
     `)
     .eq("id", matchId)
     .single()
 
   if (!matchData) redirect(`/dashboard/equipos/${teamId}/partidos`)
-
-  // Find matching team in the old 'equipos' table using the name from 'teams'
-  const { data: newTeamData } = await supabase.from("teams").select("name").eq("id", teamId).single()
-  let oldTeamId = teamId;
-  if (newTeamData) {
-    const { data: oldTeamData } = await supabase.from('teams').select("id").ilike("name", newTeamData.name).single()
-    if (oldTeamData) oldTeamId = oldTeamData.id;
-  }
 
   const { data: convocatoriasData } = await supabase
     .from("convocatorias")
@@ -35,15 +29,18 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
 
   const convPlayerIds = (convocatoriasData || []).map(c => c.player_id).filter(Boolean);
 
+  // Strictly enforce active season: players must belong to active season teams and never be inactive
   let playersQuery = supabase
     .from("players")
-    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion")
+    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion, team:teams!inner(id, season_id)")
+    .neq("status", "inactive")
+    .neq("team.season_id", CLOSED_SEASON_ID)
     .order("first_name");
 
   if (convPlayerIds.length > 0) {
-    playersQuery = playersQuery.or(`and(team_id.eq.${teamId},status.neq.inactive),id.in.(${convPlayerIds.join(',')})`);
+    playersQuery = playersQuery.or(`team_id.eq.${teamId},id.in.(${convPlayerIds.join(',')})`);
   } else {
-    playersQuery = playersQuery.eq("team_id", teamId).neq("status", "inactive");
+    playersQuery = playersQuery.eq("team_id", teamId);
   }
 
   const { data: playersData } = await playersQuery;
@@ -55,45 +52,13 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .order("minuto", { ascending: true })
     .order("created_at", { ascending: true })
 
-  const { data: equipoCoach } = await supabase
-    .from('teams')
-    .select("name")
-    .eq("id", teamId)
-    .single()
-    
-  let globalTeamIds = [teamId]
-  if (equipoCoach) {
-    const { data: globalTeams } = await supabase
-      .from("teams")
-      .select("id")
-      .ilike("name", equipoCoach.name)
-    if (globalTeams) {
-      globalTeamIds = [...new Set([...globalTeamIds, ...globalTeams.map(t => t.id)])]
-    }
-  }
-  
-  if (oldTeamId && !globalTeamIds.includes(oldTeamId)) {
-    globalTeamIds.push(oldTeamId);
-  }
-  if (matchData?.equipo_id && !globalTeamIds.includes(matchData.equipo_id)) {
-    globalTeamIds.push(matchData.equipo_id);
-  }
-
-  let { data: allMatchesData, error: matchesError } = await supabase
+  // All matches for this team strictly in the active season (never past 25/26)
+  const { data: allMatchesData } = await supabase
     .from("partidos")
     .select("id, competicion_nombre, fecha_hora, rival_nombre, resultado_propio, resultado_rival, estado")
-    .in("equipo_id", globalTeamIds)
+    .eq("equipo_id", matchData?.equipo_id || teamId)
+    .neq("season_id", CLOSED_SEASON_ID)
     .order("fecha_hora", { ascending: true })
-
-  if (matchesError || !allMatchesData || allMatchesData.length === 0) {
-    const { data: fallbackMatches } = await supabase
-      .from("partidos")
-      .select("id, competicion_nombre, fecha_hora, rival_nombre, resultado_propio, resultado_rival, estado")
-      .eq("equipo_id", matchData?.equipo_id || teamId)
-      .order("fecha_hora", { ascending: true })
-    
-    allMatchesData = fallbackMatches || [];
-  }
 
   const { data: userData } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData?.user?.id).single()
@@ -117,12 +82,12 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     <div className="w-full flex flex-col">
       <div className="w-full flex">
         <PremiumMatchManager
-        match={matchData as any}
-        players={playersData || []}
-        convocatorias={convocatoriasData || []}
-        matchEvents={eventsData || []}
-        allMatches={allMatchesData || []}
-      />
+          match={matchData as any}
+          players={playersData || []}
+          convocatorias={convocatoriasData || []}
+          matchEvents={eventsData || []}
+          allMatches={allMatchesData || []}
+        />
       </div>
     </div>
   )

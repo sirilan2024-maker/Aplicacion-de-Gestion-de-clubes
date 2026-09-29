@@ -1365,6 +1365,8 @@ export async function getFfcvIntegrationStatusAction(targetSeasonId?: string): P
 
     if (seasonId) {
       teamsQuery = teamsQuery.eq('season_id', seasonId);
+    } else {
+      teamsQuery = teamsQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
     }
 
     const { data: teams } = await teamsQuery;
@@ -1374,7 +1376,8 @@ export async function getFfcvIntegrationStatusAction(targetSeasonId?: string): P
     let matchesQuery = adminClient
       .from('partidos')
       .select('equipo_id', { count: 'exact' })
-      .eq('club_id', clubId);
+      .eq('club_id', clubId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
     if (teamIds.length > 0) {
       matchesQuery = matchesQuery.in('equipo_id', teamIds);

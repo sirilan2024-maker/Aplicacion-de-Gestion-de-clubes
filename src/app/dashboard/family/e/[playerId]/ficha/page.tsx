@@ -198,11 +198,12 @@ export default function PlayerProfilePage() {
       const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
       const teamId = pData?.team_id;
 
-      // Partidos y Convocatorias
+      // Partidos y Convocatorias (NUNCA de la temporada cerrada 25/26)
       const { data: convocatoriasData } = await supabase
         .from('convocatorias')
-        .select('*, partidos:partido_id(*)')
-        .eq('player_id', playerId);
+        .select('*, partidos:partido_id!inner(*)')
+        .eq('player_id', playerId)
+        .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
       const { data: pMatchEvents } = await supabase
         .from('match_events')
@@ -211,7 +212,11 @@ export default function PlayerProfilePage() {
 
       let teamMatches = [];
       if (teamId) {
-        const { data: tm } = await supabase.from('partidos').select('*').eq('equipo_id', teamId);
+        const { data: tm } = await supabase
+          .from('partidos')
+          .select('*')
+          .eq('equipo_id', teamId)
+          .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
         if (tm) teamMatches = tm;
       }
 

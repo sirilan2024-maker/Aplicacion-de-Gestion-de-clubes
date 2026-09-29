@@ -258,11 +258,12 @@ export default function GlobalPlayerProfilePage() {
         }
       });
 
-      // 2. Partidos, Convocatorias y Eventos de Acta
+      // 2. Partidos, Convocatorias y Eventos de Acta (NUNCA de la temporada cerrada 25/26)
       const { data: convocatoriasData } = await supabase
         .from('convocatorias')
-        .select('*, partidos:partido_id(*)')
-        .eq('player_id', playerId);
+        .select('*, partidos:partido_id!inner(*)')
+        .eq('player_id', playerId)
+        .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
       const { data: pMatchEvents } = await supabase
         .from('match_events')
@@ -271,7 +272,11 @@ export default function GlobalPlayerProfilePage() {
 
       let teamMatches: any[] = [];
       if (teamId) {
-        const { data: tm } = await supabase.from('partidos').select('*').eq('equipo_id', teamId);
+        const { data: tm } = await supabase
+          .from('partidos')
+          .select('*')
+          .eq('equipo_id', teamId)
+          .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
         if (tm) teamMatches = tm;
       }
 

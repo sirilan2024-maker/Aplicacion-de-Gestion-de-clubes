@@ -44,7 +44,7 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
   const targetSeasonId = activeSeason?.id || (effectiveTeam?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' ? effectiveTeam?.season_id : '');
   const currentTeamId = effectiveTeam?.id || teamId;
 
-  // 4. Cargar partidos, equipos, jugadores y convocatorias estrictamente de la temporada activa (NUNCA de la 25/26)
+  // 4. Cargar partidos y equipos estrictamente de la temporada activa (NUNCA de la 25/26)
   let matchesQuery = adminClient
     .from('partidos')
     .select('*, equipo:teams(id, name, color, ffcv_group_id, ffcv_team_id, ffcv_url)')
@@ -68,25 +68,32 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
   const [
     { data: matches },
     { data: allTeams },
-    { data: convocatorias },
   ] = await Promise.all([
     matchesQuery,
     teamsQuery,
-    adminClient
-      .from('convocatorias')
-      .select('*'),
   ]);
+
+  const matchIds = (matches || []).map((m: any) => m.id);
+  const { data: convocatorias } = matchIds.length > 0
+    ? await adminClient.from('convocatorias').select('*').in('partido_id', matchIds)
+    : { data: [] };
 
   const convPlayerIds = [...new Set((convocatorias || []).map((c: any) => c.player_id).filter(Boolean))];
 
   let playersQuery = adminClient
     .from('players')
-    .select('*');
+    .select('*, team:teams!inner(id, season_id)')
+    .neq('status', 'inactive')
+    .neq('team.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+
+  if (targetSeasonId) {
+    playersQuery = playersQuery.eq('team.season_id', targetSeasonId);
+  }
 
   if (convPlayerIds.length > 0) {
-    playersQuery = playersQuery.or(`and(team_id.eq.${currentTeamId},status.neq.inactive),id.in.(${convPlayerIds.join(',')})`);
+    playersQuery = playersQuery.or(`team_id.eq.${currentTeamId},id.in.(${convPlayerIds.join(',')})`);
   } else {
-    playersQuery = playersQuery.eq('team_id', currentTeamId).neq('status', 'inactive');
+    playersQuery = playersQuery.eq('team_id', currentTeamId);
   }
 
   const { data: players } = await playersQuery;

@@ -25,8 +25,10 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
 
-  // Filtrar jugadores convocados
-  const playerList = players.filter(p => convocatorias.some(c => c.player_id === p.id && c.status !== 'no_convocado'));
+  // Filtrar jugadores convocados (o plantilla activa del equipo si aún no se ha pasado convocatoria)
+  const playerList = convocatorias.length > 0 && convocatorias.some(c => c.status !== 'no_convocado')
+    ? players.filter(p => convocatorias.some(c => c.player_id === p.id && c.status !== 'no_convocado'))
+    : players;
 
   // Estado inicial desde convocatorias
   const initialReports: Record<string, {

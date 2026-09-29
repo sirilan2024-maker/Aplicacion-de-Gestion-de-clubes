@@ -119,7 +119,8 @@ export default function RendimientoGlobalPage() {
       const { data: teamOfficialMatches } = await supabase
         .from('partidos')
         .select('id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival')
-        .eq('equipo_id', teamId);
+        .eq('equipo_id', teamId)
+        .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
       const officialMatchIds = (teamOfficialMatches || []).map(m => m.id);
       let officialConvocatorias: any[] = [];

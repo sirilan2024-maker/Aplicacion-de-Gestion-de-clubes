@@ -97,13 +97,12 @@ export async function syncFFCVActaToConvocatorias(
     const isHome = localName.includes('saladar') || localName.includes('sporting');
     const isAway = awayName.includes('saladar') || awayName.includes('sporting');
 
-    // If neither side mentions saladar/sporting, verify if either matches club teams
-    let isSaladarHome = isHome;
+    // Strict guard: NEVER sync an acta if our club is neither home nor away
     if (!isHome && !isAway) {
-      // Default to checking home side
-      isSaladarHome = true;
+      return { success: false, syncedCount: 0, error: `Acta #${codacta} does not involve Sporting Saladar (${details.equipo_local} vs ${details.equipo_visitante})` };
     }
 
+    const isSaladarHome = isHome;
     const ourPlayers = isSaladarHome ? details.jugadores_equipo_local : details.jugadores_equipo_visitante;
     const ourCards = isSaladarHome ? (details.tarjetas_equipo_local || []) : (details.tarjetas_equipo_visitante || []);
     const ourSubs = isSaladarHome ? (details.sustituciones_equipo_local || []) : (details.sustituciones_equipo_visitante || []);
@@ -123,7 +122,7 @@ export async function syncFFCVActaToConvocatorias(
 
     let partido = matches?.[0];
 
-    // Fallback: match by team and date proximity if url not yet set
+    // Fallback: match by team, rival, and date proximity if url not yet set
     if (!partido) {
       const { data: fm } = await supabase
         .from('ffcv_matches')
@@ -132,7 +131,11 @@ export async function syncFFCVActaToConvocatorias(
         .eq('ffcv_match_id', codacta)
         .maybeSingle();
 
-      if (fm && fm.match_date) {
+      const fmHome = (fm?.home_team_name || '').toLowerCase();
+      const fmAway = (fm?.away_team_name || '').toLowerCase();
+      const fmInvolvesSaladar = fmHome.includes('saladar') || fmAway.includes('saladar');
+
+      if (fm && fmInvolvesSaladar && fm.match_date) {
         const { data: team } = await supabase
           .from('teams')
           .select('id, name')
@@ -143,6 +146,7 @@ export async function syncFFCVActaToConvocatorias(
 
         if (team) {
           const fmDate = new Date(fm.match_date).toISOString().split('T')[0];
+          const fmRival = fmHome.includes('saladar') ? fmAway : fmHome;
           const { data: candidatePartidos } = await supabase
             .from('partidos')
             .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar')
@@ -153,7 +157,10 @@ export async function syncFFCVActaToConvocatorias(
           partido = (candidatePartidos || []).find((p: any) => {
             const pDate = p.fecha_hora.split('T')[0];
             const diffDays = Math.abs((new Date(pDate).getTime() - new Date(fmDate).getTime()) / (1000 * 60 * 60 * 24));
-            return diffDays <= 4;
+            if (diffDays > 7) return false;
+            const pRival = (p.rival_nombre || '').toLowerCase();
+            const words = pRival.split(' ').filter((w: string) => w.length > 3 && !w.includes('c.f.') && !w.includes('c.d.'));
+            return words.some((w: string) => fmRival.includes(w));
           });
         }
       }

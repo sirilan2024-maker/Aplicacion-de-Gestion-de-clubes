@@ -395,6 +395,18 @@ export async function syncAllConfiguredFFCVTeams(
 }
 
 
+function normalizeMatchRivalName(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(c\.?d\.?|c\.?f\.?|u\.?d\.?|f\.?c\.?|a\.?d\.?|club|deportivo|deportiva|futbol|sad|s\.a\.d\.|at\.?|atletico|atletic)\b/gi, '')
+    .replace(/['"“”‘’]/g, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 /**
  * Propagates updated matches from ffcv_matches into the internal partidos table
  * for the active season. This keeps family portals, calendar views, and match reports
@@ -418,7 +430,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   // 2. Fetch matches from 'partidos' for this active season
   const { data: clubPartidos, error: cpErr } = await supabase
     .from('partidos')
-    .select('id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival, acta_oficial_url, equipo_id, teams(name, ffcv_team_id, ffcv_group_id)')
+    .select('id, rival_nombre, fecha_hora, lugar, estado, resultado_propio, resultado_rival, acta_oficial_url, equipo_id, teams(name, ffcv_team_id, ffcv_group_id)')
     .eq('season_id', activeSeason.id);
 
   if (cpErr || !clubPartidos || clubPartidos.length === 0) {
@@ -428,7 +440,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   // 3. Fetch corresponding FFCV matches for active season 26/27 (excluding historical season 21)
   const { data: ffcvMatches, error: fmErr } = await supabase
     .from('ffcv_matches')
-    .select('ffcv_match_id, matchday, match_date, match_time, home_team_name, away_team_name, home_score, away_score, status')
+    .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status')
     .neq('ffcv_season_id', '21')
     .eq('ffcv_season_id', '22');
 
@@ -439,18 +451,39 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   let updatedCount = 0;
 
   for (const pm of clubPartidos) {
-    // A. Match by acta_oficial_url containing ffcv_match_id
-    let fm = ffcvMatches.find(f => pm.acta_oficial_url && (pm.acta_oficial_url.includes(String(f.ffcv_match_id)) || pm.acta_oficial_url.includes(`CodPartido=${f.ffcv_match_id}`)));
+    const team = pm.teams as any;
+    const teamGroupId = team?.ffcv_group_id;
+    const teamFfcvId = team?.ffcv_team_id;
+
+    // Helper: verify that an FFCV match belongs to Sporting Saladar / our team
+    const isOurMatch = (f: any) => {
+      const h = (f.home_team_name || '').toLowerCase();
+      const a = (f.away_team_name || '').toLowerCase();
+      const isHome = (teamFfcvId && String(f.home_team_ffcv_id) === String(teamFfcvId)) || h.includes('saladar');
+      const isAway = (teamFfcvId && String(f.away_team_ffcv_id) === String(teamFfcvId)) || a.includes('saladar');
+      return isHome || isAway;
+    };
+
+    // A. Match by acta_oficial_url containing ffcv_match_id (STRICT: must involve our club)
+    let fm = ffcvMatches.find(f => {
+      if (!isOurMatch(f)) return false;
+      return pm.acta_oficial_url && (
+        pm.acta_oficial_url.includes(String(f.ffcv_match_id)) ||
+        pm.acta_oficial_url.includes(`CodPartido=${f.ffcv_match_id}`)
+      );
+    });
 
     // B. Fallback: match by team group and rival name similarity with strict date proximity
-    if (!fm && (pm.teams as any)?.name) {
-      const teamGroupId = (pm.teams as any)?.ffcv_group_id;
-      const pRival = (pm.rival_nombre || '').toLowerCase();
+    if (!fm && team?.name) {
+      const pRivalNorm = normalizeMatchRivalName(pm.rival_nombre || '');
       const pDate = pm.fecha_hora ? new Date(pm.fecha_hora) : null;
 
       fm = ffcvMatches.find(f => {
+        // CRITICAL GUARD: Never match a match between third-party clubs
+        if (!isOurMatch(f)) return false;
+
         // Must belong to same group if group configured
-        if (teamGroupId && (f as any).ffcv_group_id && (f as any).ffcv_group_id !== teamGroupId) return false;
+        if (teamGroupId && f.ffcv_group_id && f.ffcv_group_id !== teamGroupId) return false;
 
         // Strict date guard: never match matches further than 7 days apart
         if (pDate && f.match_date) {
@@ -459,18 +492,24 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
           if (diffDays > 7) return false;
         }
 
-        const h = (f.home_team_name || '').toLowerCase();
-        const a = (f.away_team_name || '').toLowerCase();
-        const rivalName = h.includes('saladar') ? a : h;
-        const words = pRival.split(' ').filter(w => w.length > 3);
-        return words.some(w => rivalName.includes(w));
+        const isSaladarHome = (teamFfcvId && String(f.home_team_ffcv_id) === String(teamFfcvId)) || (f.home_team_name || '').toLowerCase().includes('saladar');
+        const fRival = isSaladarHome ? f.away_team_name : f.home_team_name;
+        const fRivalNorm = normalizeMatchRivalName(fRival || '');
+        if (!pRivalNorm || !fRivalNorm) return false;
+
+        if (pRivalNorm === fRivalNorm) return true;
+        if (pRivalNorm.includes(fRivalNorm) || fRivalNorm.includes(pRivalNorm)) return true;
+
+        const wordsA = pRivalNorm.split(' ').filter((w: string) => w.length > 2 && !['del', 'los', 'las', 'san'].includes(w));
+        const wordsB = fRivalNorm.split(' ').filter((w: string) => w.length > 2 && !['del', 'los', 'las', 'san'].includes(w));
+        return wordsA.some((w: string) => wordsB.includes(w));
       });
     }
 
     if (!fm) continue;
 
+    const isSaladarHome = (teamFfcvId && String(fm.home_team_ffcv_id) === String(teamFfcvId)) || (fm.home_team_name || '').toLowerCase().includes('saladar');
     const isPlayed = fm.status === 'played' || (fm.home_score !== null && fm.away_score !== null);
-    const isSaladarHome = (fm.home_team_name || '').toLowerCase().includes('saladar');
     const sportingScore = isSaladarHome ? fm.home_score : fm.away_score;
     const rivalScore = isSaladarHome ? fm.away_score : fm.home_score;
     const targetStatus = isPlayed ? 'Finalizado' : 'Programado';

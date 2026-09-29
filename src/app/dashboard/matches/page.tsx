@@ -79,6 +79,21 @@ export default async function PartidosPage() {
     }
   }
 
+  // Also include staff members (entrenadores, delegados) so their cards appear in TeamDisciplineView
+  const { data: staffMembers } = await supabase
+    .from("players")
+    .select("id, first_name, last_name, posicion, status, team_id")
+    .or("posicion.ilike.%entrenador%,posicion.ilike.%delegado%,posicion.ilike.%tecnico%")
+    .neq("status", "inactive");
+
+  if (staffMembers && staffMembers.length > 0) {
+    for (const staff of staffMembers) {
+      if (!players.some(p => p.id === staff.id)) {
+        players.push(staff);
+      }
+    }
+  }
+
   if (players.length === 0) {
     const { data: directPlayers } = await supabase
       .from("players")

@@ -188,6 +188,7 @@ export async function syncFFCVActaToConvocatorias(
 
     // 3. Build convocatorias payload
     const rowsToUpsert: any[] = [];
+    const matchedCardIndices = new Set<number>();
 
     for (const fp of ourPlayers) {
       const matched = matchPlayer(fp.nombre_jugador, fp.dorsal, allPlayers || [], teamPlayers);
@@ -200,10 +201,11 @@ export async function syncFFCVActaToConvocatorias(
       // Cards parsing
       let yellows = 0;
       let reds = 0;
-      ourCards.forEach((c: any) => {
+      ourCards.forEach((c: any, cIdx: number) => {
         const matchByCode = c.codjugador && String(c.codjugador) === String(fp.codjugador);
         const matchByName = !c.codjugador && normalizeNameWords(c.nombre_jugador).filter(w => normalizeNameWords(fp.nombre_jugador).includes(w)).length >= 2;
         if (matchByCode || matchByName) {
+          matchedCardIndices.add(cIdx);
           if (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) {
             yellows += 1;
             reds += 1;
@@ -263,6 +265,54 @@ export async function syncFFCVActaToConvocatorias(
         goles: goals
       });
     }
+
+    // 3.2 Process any cards shown to coaching / technical staff (entrenadores, delegados, etc.)
+    const processedStaffIds = new Set<string>();
+    ourCards.forEach((c: any, cIdx: number) => {
+      if (matchedCardIndices.has(cIdx)) return;
+      if (!c.nombre_jugador) return;
+
+      const matchedStaff = matchPlayer(c.nombre_jugador, undefined, allPlayers || [], teamPlayers);
+      if (matchedStaff && !processedStaffIds.has(matchedStaff.id)) {
+        processedStaffIds.add(matchedStaff.id);
+
+        let staffYellows = 0;
+        let staffReds = 0;
+
+        ourCards.forEach((sc: any, scIdx: number) => {
+          if (matchedCardIndices.has(scIdx)) return;
+          const matchCode = sc.codjugador && c.codjugador && String(sc.codjugador) === String(c.codjugador);
+          const matchName = normalizeNameWords(sc.nombre_jugador).filter((w: string) => normalizeNameWords(`${matchedStaff.first_name} ${matchedStaff.last_name}`).includes(w)).length >= 2;
+
+          if (matchCode || matchName) {
+            matchedCardIndices.add(scIdx);
+            if (sc.segunda_amarilla === '1' || sc.segunda_amarilla === 1) {
+              staffYellows += 1;
+              staffReds += 1;
+            } else if (sc.codigo_tipo_amonestacion === '200' || sc.codigo_tipo_amonestacion === '2') {
+              staffReds += 1;
+            } else {
+              staffYellows += 1;
+            }
+          }
+        });
+
+        rowsToUpsert.push({
+          partido_id: partido.id,
+          player_id: matchedStaff.id,
+          status: 'convocado',
+          titular: false,
+          yellow_cards: staffYellows,
+          tarjetas_amarillas: staffYellows,
+          red_cards: staffReds,
+          tarjetas_rojas: staffReds,
+          minutes_played: 0,
+          minutos_jugados: 0,
+          goals: 0,
+          goles: 0
+        });
+      }
+    });
 
     if (rowsToUpsert.length === 0) {
       return { success: true, syncedCount: 0 };

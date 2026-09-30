@@ -94,6 +94,34 @@ export async function proxy(request: NextRequest) {
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
+
+    const currentPath = request.nextUrl.pathname;
+    const isSuperOrAdmin = allRoles.some(r => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+
+    // Aislamiento estricto de roles dentro de /admin:
+    if (!isSuperOrAdmin) {
+      const isCoord = role === 'coordinador' || role === 'coordinador_general' || allRoles.includes('coordinador');
+      if (isCoord) {
+        if (
+          currentPath === '/admin' ||
+          currentPath === '/admin/' ||
+          currentPath === '/admin/inicio' ||
+          currentPath.startsWith('/admin/tesoreria') ||
+          currentPath.startsWith('/admin/configuracion')
+        ) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/admin/coordinador'
+          return NextResponse.redirect(url)
+        }
+      }
+
+      const isMetodologo = role === 'metodologo' || role === 'metodologia' || allRoles.includes('metodologo');
+      if (isMetodologo && (currentPath === '/admin' || currentPath === '/admin/' || currentPath === '/admin/inicio')) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin/metodologia'
+        return NextResponse.redirect(url)
+      }
+    }
   }
 
   return supabaseResponse

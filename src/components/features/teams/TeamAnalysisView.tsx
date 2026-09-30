@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import {
   Trophy,
   TrendingUp,
@@ -45,6 +46,19 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
   const [data] = useState<TeamAnalysisData>(initialData);
   const [activeChartTab, setActiveChartTab] = useState<"posicion" | "puntos" | "goles">("posicion");
   const [matchFilter, setMatchFilter] = useState<"all" | "V" | "E" | "D" | "home" | "away">("all");
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (prof?.role) setUserRole(prof.role);
+      }
+    };
+    fetchUserRole();
+  }, []);
 
   const { team, club, competition, summary, standings, matches, evolution, historicalSeasons } = data;
 
@@ -99,11 +113,11 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
           <Link
-            href="/admin/inicio"
+            href={userRole === 'coordinador' || userRole === 'coordinador_general' ? '/admin/coordinador' : '/admin/inicio'}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Centro de Control</span>
+            <span>{userRole === 'coordinador' || userRole === 'coordinador_general' ? 'Panel Coordinador' : 'Centro de Control'}</span>
           </Link>
           <Link
             href={`/dashboard/equipos/${team.id}/partidos`}

@@ -495,13 +495,18 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
     }
 
     // Always add Sistema at the bottom
+    const systemItems: NavItem[] = [];
+    if (userRole === 'tutor' || userRole === 'familia' || userRole === 'family' || userRole === 'jugador') {
+      systemItems.push({ name: "Tutorial Inscripción", href: "/tutorial-inscripcion", icon: BookOpen });
+    }
+    systemItems.push(
+      { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
+      { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' as const }
+    );
+
     navGroups.push({
       label: "SISTEMA",
-      items: [
-        { name: "Tutorial Inscripción", href: "/tutorial-inscripcion", icon: BookOpen },
-        { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
-        { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
-      ]
+      items: systemItems
     });
 
     // Provide the link for metodologo to access the ERP
@@ -851,7 +856,8 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
         currentLogoUrl={clubInfo.logo_url}
         onSuccess={() => {
           // Refetch simple club info
-          supabase.from('clubs').select('id, name, logo_url').eq('id', clubInfo.id).single().then(({data}) => {
+          const supabase = createClient();
+          supabase.from('clubs').select('id, name, logo_url').eq('id', clubInfo.id).single().then(({data}: {data: any}) => {
             if (data) setClubInfo({ id: data.id, name: data.name, logo_url: data.logo_url });
           });
         }}

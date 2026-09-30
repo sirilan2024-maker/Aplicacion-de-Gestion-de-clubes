@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
-  eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO, getDay, addDays
+  eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO, getDay, addDays, subDays
 } from "date-fns";
 import { es } from "date-fns/locale";
 import toast, { Toaster } from "react-hot-toast";
@@ -51,6 +51,8 @@ export default function CalendarioEquipoPage() {
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [autoRsvp, setAutoRsvp] = useState(false);
+  const [rsvpTimingType, setRsvpTimingType] = useState<"relative" | "exact">("relative");
+  const [rsvpDaysBefore, setRsvpDaysBefore] = useState<number>(1);
   const [rsvpDate, setRsvpDate] = useState("");
   const [rsvpTime, setRsvpTime] = useState("19:00");
 
@@ -67,6 +69,11 @@ export default function CalendarioEquipoPage() {
     if (!teamId) return;
     setLoading(true);
     const supabase = createClient();
+
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const start = format(monthStart, "yyyy-MM-dd");
+    const end = format(monthEnd, "yyyy-MM-dd");
     
     // 1. Obtener la temporada del equipo o activa para filtrar
     const { data: teamData } = await supabase.from('teams').select('id, name, club_id, season_id').eq('id', teamId).single();
@@ -215,6 +222,8 @@ export default function CalendarioEquipoPage() {
     setLocation("Campo Principal");
     setNotes("");
     setAutoRsvp(false);
+    setRsvpTimingType("relative");
+    setRsvpDaysBefore(1);
     setRsvpDate("");
     setRsvpTime("19:00");
     setIsRecurring(false);
@@ -235,12 +244,19 @@ export default function CalendarioEquipoPage() {
     setEndTime(event.end_time ? event.end_time.substring(0, 5) : "19:30");
     setLocation(event.location || "");
     setNotes(event.notes || "");
-    
-    // For now we don't fetch rsvp_reminder_time from the API in this view, 
-    // but if we did, we would parse it here. We'll leave it as off for edits by default unless we add it to the fetch.
     setAutoRsvp(false);
     
     setShowModal(true);
+  };
+
+  const computeReminderTime = (eventDateStr: string) => {
+    if (!autoRsvp) return null;
+    if (rsvpTimingType === 'exact') {
+      return rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null;
+    }
+    const d = subDays(parseISO(eventDateStr), rsvpDaysBefore);
+    const dStr = format(d, 'yyyy-MM-dd');
+    return new Date(`${dStr}T${rsvpTime}:00`).toISOString();
   };
 
   const handleSaveEvent = async (e: React.FormEvent) => {
@@ -249,40 +265,52 @@ export default function CalendarioEquipoPage() {
     
     setSubmitting(true);
     const supabase = createClient();
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
     
-    const eventData = {
+    const baseEventData = {
       team_id: teamId,
       title,
       event_type: eventType,
-      date: format(selectedDate, "yyyy-MM-dd"),
       start_time: startTime,
       end_time: endTime || null,
       location: location || null,
       notes: notes || null,
-      rsvp_reminder_time: autoRsvp && rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null
     };
 
     let errorMsg = null;
     try {
       if (editingEventId) {
-        await updateTeamEventAction(editingEventId, teamId, eventData);
+        await updateTeamEventAction(editingEventId, teamId, {
+          ...baseEventData,
+          date: dateStr,
+          rsvp_reminder_time: computeReminderTime(dateStr)
+        });
       } else {
         if (!isRecurring) {
-          await createTeamEventAction(teamId, eventData);
+          await createTeamEventAction(teamId, {
+            ...baseEventData,
+            date: dateStr,
+            rsvp_reminder_time: computeReminderTime(dateStr)
+          });
         } else {
           if (!recurringEndDate || recurringDays.length === 0) {
             toast.error("Selecciona días y fecha fin para la recurrencia.");
             setSubmitting(false);
             return;
           }
-          let currentDate = parseISO(format(selectedDate, 'yyyy-MM-dd'));
+          let currentDate = parseISO(dateStr);
           const end = parseISO(recurringEndDate);
           let iterations = 0;
           let created = 0;
           
           while(currentDate <= end && iterations < 730) {
             if (recurringDays.includes(getDay(currentDate))) {
-              await createTeamEventAction(teamId, { ...eventData, date: format(currentDate, 'yyyy-MM-dd') });
+              const curDateStr = format(currentDate, 'yyyy-MM-dd');
+              await createTeamEventAction(teamId, { 
+                ...baseEventData, 
+                date: curDateStr,
+                rsvp_reminder_time: computeReminderTime(curDateStr)
+              });
               created++;
             }
             currentDate = addDays(currentDate, 1);
@@ -511,8 +539,8 @@ export default function CalendarioEquipoPage() {
       {/* CREATE / EDIT EVENT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="shrink-0 bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
                 <CalendarIcon className="text-blue-600" size={20} />
                 {editingEventId ? "Editar Evento" : "Nuevo Evento"} - {selectedDate && format(selectedDate, "d MMMM", { locale: es })}
@@ -522,178 +550,218 @@ export default function CalendarioEquipoPage() {
               </button>
             </div>
             
-            <form onSubmit={handleSaveEvent} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Título del Evento</label>
-                <input 
-                  required 
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="Ej. Entrenamiento Técnico, Partido vs Rival..."
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSaveEvent} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
-                  <select 
-                    value={eventType} 
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === 'Partido') {
-                        setShowModal(false);
-                        setEditingMatch({ id: 'new', fecha_hora: new Date(selectedDate || new Date()).toISOString() });
-                        setShowMatchModal(true);
-                        setEventType('Entrenamiento');
-                      } else {
-                        setEventType(val as any);
-                      }
-                    }}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="Entrenamiento">Entrenamiento</option>
-                    <option value="Partido">Partido</option>
-                    <option value="Reunión">Reunión</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Ubicación</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Título del Evento</label>
                   <input 
-                    value={location}
-                    onChange={e => setLocation(e.target.value)}
-                    placeholder="Ej. Campo 1"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Hora Inicio</label>
-                  <input 
-                    type="time" 
                     required 
-                    value={startTime}
-                    onChange={e => setStartTime(e.target.value)}
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="Ej. Entrenamiento Técnico, Partido vs Rival..."
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Hora Fin (Opcional)</label>
-                  <input 
-                    type="time" 
-                    value={endTime}
-                    onChange={e => setEndTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                  />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
+                    <select 
+                      value={eventType} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Partido') {
+                          setShowModal(false);
+                          setEditingMatch({ id: 'new', fecha_hora: new Date(selectedDate || new Date()).toISOString() });
+                          setShowMatchModal(true);
+                          setEventType('Entrenamiento');
+                        } else {
+                          setEventType(val as any);
+                        }
+                      }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="Entrenamiento">Entrenamiento</option>
+                      <option value="Partido">Partido</option>
+                      <option value="Reunión">Reunión</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Ubicación</label>
+                    <input 
+                      value={location}
+                      onChange={e => setLocation(e.target.value)}
+                      placeholder="Ej. Campo 1"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
                 </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Notas (Opcional)</label>
-                <textarea 
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  placeholder="Material necesario, tácticas a revisar..."
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none resize-none" 
-                />
-              </div>
 
-              {/* RECURRENCIA */}
-              {!editingEventId && (
-                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Hora Inicio</label>
+                    <input 
+                      type="time" 
+                      required 
+                      value={startTime}
+                      onChange={e => setStartTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Hora Fin (Opcional)</label>
+                    <input 
+                      type="time" 
+                      value={endTime}
+                      onChange={e => setEndTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Notas (Opcional)</label>
+                  <textarea 
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder="Material necesario, tácticas a revisar..."
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 min-h-[80px] focus:ring-2 focus:ring-blue-500 outline-none resize-none" 
+                  />
+                </div>
+
+                {/* RECURRENCIA */}
+                {!editingEventId && (
+                  <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isRecurring}
+                        onChange={e => setIsRecurring(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      />
+                      <span className="font-bold text-blue-900">Evento Recurrente</span>
+                    </label>
+                    
+                    {isRecurring && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
+                          <div className="flex flex-wrap gap-2">
+                            {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
+                              <button
+                                type="button"
+                                key={day.id}
+                                onClick={() => {
+                                  if (recurringDays.includes(day.id)) {
+                                    setRecurringDays(recurringDays.filter(d => d !== day.id));
+                                  } else {
+                                    setRecurringDays([...recurringDays, day.id]);
+                                  }
+                                }}
+                                className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                              >
+                                {day.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
+                          <input 
+                            type="date" 
+                            value={recurringEndDate}
+                            onChange={(e) => setRecurringEndDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                            required={isRecurring}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* PROGRAMACIÓN AUTOMÁTICA DE ASISTENCIA */}
+                <div className="bg-blue-50/70 p-4 rounded-xl border border-blue-100 mt-2 space-y-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
                       type="checkbox" 
-                      checked={isRecurring}
-                      onChange={e => setIsRecurring(e.target.checked)}
-                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      checked={autoRsvp}
+                      onChange={(e) => setAutoRsvp(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                     />
-                    <span className="font-bold text-blue-900">Evento Recurrente</span>
+                    <span className="font-bold text-blue-900 text-sm">Programar petición de asistencia automática</span>
                   </label>
                   
-                  {isRecurring && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
-                        <div className="flex flex-wrap gap-2">
-                          {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
-                            <button
-                              type="button"
-                              key={day.id}
-                              onClick={() => {
-                                if (recurringDays.includes(day.id)) {
-                                  setRecurringDays(recurringDays.filter(d => d !== day.id));
-                                } else {
-                                  setRecurringDays([...recurringDays, day.id]);
-                                }
-                              }}
-                              className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                            >
-                              {day.label}
-                            </button>
-                          ))}
+                  {autoRsvp && (
+                    <div className="space-y-3 pt-1 animate-in fade-in slide-in-from-top-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Cuándo avisar</label>
+                          <select
+                            value={rsvpTimingType === 'exact' ? 'exact' : String(rsvpDaysBefore)}
+                            onChange={(e) => {
+                              if (e.target.value === 'exact') {
+                                setRsvpTimingType('exact');
+                              } else {
+                                setRsvpTimingType('relative');
+                                setRsvpDaysBefore(Number(e.target.value));
+                              }
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium"
+                          >
+                            <option value="1">1 día antes (Recomendado)</option>
+                            <option value="0">El mismo día del evento</option>
+                            <option value="2">2 días antes</option>
+                            <option value="3">3 días antes</option>
+                            <option value="exact">Fecha fija específica</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Hora de aviso</label>
+                          <input 
+                            type="time" 
+                            required={autoRsvp}
+                            value={rsvpTime}
+                            onChange={e => setRsvpTime(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium" 
+                          />
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
-                        <input 
-                          type="date" 
-                          value={recurringEndDate}
-                          onChange={(e) => setRecurringEndDate(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                          required={isRecurring}
-                        />
-                      </div>
+
+                      {rsvpTimingType === 'exact' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Fecha fija de envío</label>
+                          <input 
+                            type="date" 
+                            required={autoRsvp && rsvpTimingType === 'exact'}
+                            value={rsvpDate}
+                            onChange={e => setRsvpDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs" 
+                          />
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-blue-700 font-medium bg-blue-100/60 p-2 rounded-lg">
+                        {rsvpTimingType === 'exact' 
+                          ? `Se solicitará la confirmación el ${rsvpDate || '...'} a las ${rsvpTime}.`
+                          : isRecurring
+                            ? `Para cada sesión generada, se enviará la petición automáticamente ${rsvpDaysBefore === 0 ? 'el mismo día' : `${rsvpDaysBefore} día${rsvpDaysBefore > 1 ? 's' : ''} antes`} a las ${rsvpTime}.`
+                            : selectedDate 
+                              ? `Se solicitará la confirmación el ${format(subDays(selectedDate, rsvpDaysBefore), "EEEE d 'de' MMMM", { locale: es })} a las ${rsvpTime}.`
+                              : `Se enviará la petición ${rsvpDaysBefore === 0 ? 'el mismo día' : `${rsvpDaysBefore} día(s) antes`} a las ${rsvpTime}.`
+                        }
+                      </p>
                     </div>
                   )}
                 </div>
-              )}
-
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer mb-2">
-                  <input 
-                    type="checkbox" 
-                    checked={autoRsvp}
-                    onChange={(e) => setAutoRsvp(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="font-bold text-blue-900 text-sm">Programar petición de asistencia automática</span>
-                </label>
-                
-                {autoRsvp && (
-                  <div className="grid grid-cols-2 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Día de envío</label>
-                      <input 
-                        type="date" 
-                        required={autoRsvp}
-                        value={rsvpDate}
-                        onChange={e => setRsvpDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
-                      <input 
-                        type="time" 
-                        required={autoRsvp}
-                        value={rsvpTime}
-                        onChange={e => setRsvpTime(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
               
-              <div className="pt-4 flex gap-3">
+              <div className="shrink-0 bg-gray-50 border-t border-gray-100 px-6 py-4 flex gap-3">
                 <button 
                   type="button" 
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -702,7 +770,7 @@ export default function CalendarioEquipoPage() {
                   disabled={submitting}
                   className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {submitting ? "Guardando..." : "Crear Evento"}
+                  {submitting ? "Guardando..." : (editingEventId ? "Guardar Cambios" : "Crear Evento")}
                 </button>
               </div>
             </form>

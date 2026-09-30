@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertCircle
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 import { useSeason } from "@/components/providers/SeasonProvider"
 import {
   getGlobalAttendanceAction,
@@ -35,6 +36,19 @@ export default function AdminAsistenciaPage() {
   const [error, setError] = useState<string | null>(null)
   const [records, setRecords] = useState<AttendanceRecordDTO[]>([])
   const [teams, setTeams] = useState<Array<{ id: string; name: string; category: string }>>([])
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (prof?.role) setUserRole(prof.role)
+      }
+    }
+    fetchUserRole()
+  }, [])
 
   // Vista activa (por defecto: Resumen por días)
   const [viewMode, setViewMode] = useState<ViewMode>("days")
@@ -228,6 +242,10 @@ export default function AdminAsistenciaPage() {
     setViewMode("days")
   }
 
+  const isCoordinator = userRole === 'coordinador' || userRole === 'coordinador_general'
+  const backHref = isCoordinator ? '/admin/coordinador' : '/admin/inicio'
+  const backLabel = isCoordinator ? 'Panel Coordinador' : 'Centro de Control'
+
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 overflow-x-hidden">
       {/* 1. CABECERA EJECUTIVA */}
@@ -235,12 +253,12 @@ export default function AdminAsistenciaPage() {
         <div>
           <div className="flex items-center gap-3">
             <Link
-              href="/admin/inicio"
+              href={backHref}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold shadow-2xs transition"
-              title="Volver al Centro de Control"
+              title={`Volver a ${backLabel}`}
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Centro de Control</span>
+              <span>{backLabel}</span>
             </Link>
             <span className="text-xs font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
               Supervisión 360°

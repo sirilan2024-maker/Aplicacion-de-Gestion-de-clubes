@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import { format, parseISO, differenceInDays, addDays, getDay } from "date-fns";
+import { format, parseISO, differenceInDays, addDays, getDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { createTeamEventAction } from "@/app/actions/event-actions";
 
@@ -45,6 +45,8 @@ export default function EntrenamientosListPage() {
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [recurringEndDate, setRecurringEndDate] = useState("");
   const [autoRsvp, setAutoRsvp] = useState(false);
+  const [rsvpTimingType, setRsvpTimingType] = useState<"relative" | "exact">("relative");
+  const [rsvpDaysBefore, setRsvpDaysBefore] = useState<number>(1);
   const [rsvpDate, setRsvpDate] = useState("");
   const [rsvpTime, setRsvpTime] = useState("19:00");
 
@@ -57,14 +59,14 @@ export default function EntrenamientosListPage() {
     setLoading(true);
     const supabase = createClient();
 
-    // 1. Fetch training sessions
+    // 1. Fetch training sessions (ordenados del más próximo al más lejano)
     const { data: evData, error: evError } = await supabase
       .from('team_events')
       .select('id, title, date, start_time')
       .eq('team_id', teamId)
       .eq('event_type', 'Entrenamiento')
-      .order('date', { ascending: false })
-      .order('start_time', { ascending: false });
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true });
 
     if (!evError && evData) {
       setSessions(evData);
@@ -160,6 +162,16 @@ export default function EntrenamientosListPage() {
       return;
     }
 
+    const computeReminderTime = (sessionDateStr: string) => {
+      if (!autoRsvp) return null;
+      if (rsvpTimingType === 'exact') {
+        return rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null;
+      }
+      const d = subDays(parseISO(sessionDateStr), rsvpDaysBefore);
+      const dStr = format(d, 'yyyy-MM-dd');
+      return new Date(`${dStr}T${rsvpTime}:00`).toISOString();
+    };
+
     const baseEvent = {
       team_id: teamId,
       title: newTitle || "Entrenamiento",
@@ -168,13 +180,16 @@ export default function EntrenamientosListPage() {
       end_time: newEndTime || null,
       location: newLocation || null,
       notes: newDescription || null,
-      rsvp_reminder_time: autoRsvp && rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null
     };
 
     const eventsToInsert = [];
 
     if (!isRecurring) {
-      eventsToInsert.push({ ...baseEvent, date: newDate });
+      eventsToInsert.push({ 
+        ...baseEvent, 
+        date: newDate,
+        rsvp_reminder_time: computeReminderTime(newDate)
+      });
     } else {
       let currentDate = parseISO(newDate);
       const end = parseISO(recurringEndDate);
@@ -184,7 +199,12 @@ export default function EntrenamientosListPage() {
       while (currentDate <= end && iterations < 730) {
         // getDay: 0=Dom, 1=Lun, 2=Mar, 3=Mie, 4=Jue, 5=Vie, 6=Sab
         if (recurringDays.includes(getDay(currentDate))) {
-          eventsToInsert.push({ ...baseEvent, date: format(currentDate, 'yyyy-MM-dd') });
+          const dStr = format(currentDate, 'yyyy-MM-dd');
+          eventsToInsert.push({ 
+            ...baseEvent, 
+            date: dStr,
+            rsvp_reminder_time: computeReminderTime(dStr)
+          });
         }
         currentDate = addDays(currentDate, 1);
         iterations++;
@@ -213,6 +233,8 @@ export default function EntrenamientosListPage() {
       setNewLocation("");
       setNewDescription("");
       setAutoRsvp(false);
+      setRsvpTimingType("relative");
+      setRsvpDaysBefore(1);
       setRsvpDate("");
       setRsvpTime("19:00");
       fetchData();
@@ -373,157 +395,197 @@ export default function EntrenamientosListPage() {
       {/* CREATE SESSION MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50/50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="shrink-0 flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50/50">
               <h3 className="font-bold text-lg text-gray-900">Programar Nueva Sesión</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-1.5 transition-colors">
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateSession} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Título (Opcional)</label>
-                <input 
-                  type="text" 
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  placeholder="Ej: Entrenamiento Táctico"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            
+            <form onSubmit={handleCreateSession} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Fecha Inicial</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Título (Opcional)</label>
                   <input 
-                    type="date" 
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
+                    type="text" 
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    placeholder="Ej: Entrenamiento Táctico"
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora Inicio</label>
+                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Fecha Inicial</label>
                     <input 
-                      type="time" 
-                      value={newTime}
-                      onChange={(e) => setNewTime(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+                      type="date" 
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                       required
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora Fin</label>
-                    <input 
-                      type="time" 
-                      value={newEndTime}
-                      onChange={(e) => setNewEndTime(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Ubicación</label>
-                <input 
-                  type="text" 
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  placeholder="Ej: Campo Norte"
-                />
-              </div>
-
-              {/* RECURRENCIA */}
-              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={isRecurring}
-                    onChange={e => setIsRecurring(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
-                  />
-                  <span className="font-bold text-blue-900">Entrenamiento Recurrente</span>
-                </label>
-                
-                {isRecurring && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
-                      <div className="flex flex-wrap gap-2">
-                        {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
-                          <button
-                            type="button"
-                            key={day.id}
-                            onClick={() => {
-                              if (recurringDays.includes(day.id)) {
-                                setRecurringDays(recurringDays.filter(d => d !== day.id));
-                              } else {
-                                setRecurringDays([...recurringDays, day.id]);
-                              }
-                            }}
-                            className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                          >
-                            {day.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
-                      <input 
-                        type="date" 
-                        value={recurringEndDate}
-                        onChange={(e) => setRecurringEndDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                        required={isRecurring}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* PROGRAMACIÓN AUTOMÁTICA DE ASISTENCIA */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer mb-2">
-                  <input 
-                    type="checkbox" 
-                    checked={autoRsvp}
-                    onChange={(e) => setAutoRsvp(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="font-bold text-slate-900 text-sm">Petición asistencia automática</span>
-                </label>
-                
-                {autoRsvp && (
-                  <div className="grid grid-cols-2 gap-4 mt-3 animate-in fade-in slide-in-from-top-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Día de envío</label>
-                      <input 
-                        type="date" 
-                        required={autoRsvp}
-                        value={rsvpDate}
-                        onChange={e => setRsvpDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
+                      <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora Inicio</label>
                       <input 
                         type="time" 
-                        required={autoRsvp}
-                        value={rsvpTime}
-                        onChange={e => setRsvpTime(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                        value={newTime}
+                        onChange={(e) => setNewTime(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1.5">Hora Fin</label>
+                      <input 
+                        type="time" 
+                        value={newEndTime}
+                        onChange={(e) => setNewEndTime(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm"
                       />
                     </div>
                   </div>
-                )}
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Ubicación</label>
+                  <input 
+                    type="text" 
+                    value={newLocation}
+                    onChange={(e) => setNewLocation(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    placeholder="Ej: Campo Norte"
+                  />
+                </div>
+
+                {/* RECURRENCIA */}
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isRecurring}
+                      onChange={e => setIsRecurring(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span className="font-bold text-blue-900">Entrenamiento Recurrente</span>
+                  </label>
+                  
+                  {isRecurring && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
+                            <button
+                              type="button"
+                              key={day.id}
+                              onClick={() => {
+                                if (recurringDays.includes(day.id)) {
+                                  setRecurringDays(recurringDays.filter(d => d !== day.id));
+                                } else {
+                                  setRecurringDays([...recurringDays, day.id]);
+                                }
+                              }}
+                              className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
+                        <input 
+                          type="date" 
+                          value={recurringEndDate}
+                          onChange={(e) => setRecurringEndDate(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          required={isRecurring}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* PROGRAMACIÓN AUTOMÁTICA DE ASISTENCIA */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-2 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={autoRsvp}
+                      onChange={(e) => setAutoRsvp(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="font-bold text-slate-900 text-sm">Petición asistencia automática</span>
+                  </label>
+                  
+                  {autoRsvp && (
+                    <div className="space-y-3 pt-1 animate-in fade-in slide-in-from-top-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Cuándo avisar</label>
+                          <select
+                            value={rsvpTimingType === 'exact' ? 'exact' : String(rsvpDaysBefore)}
+                            onChange={(e) => {
+                              if (e.target.value === 'exact') {
+                                setRsvpTimingType('exact');
+                              } else {
+                                setRsvpTimingType('relative');
+                                setRsvpDaysBefore(Number(e.target.value));
+                              }
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium"
+                          >
+                            <option value="1">1 día antes (Recomendado)</option>
+                            <option value="0">El mismo día del entrenamiento</option>
+                            <option value="2">2 días antes</option>
+                            <option value="3">3 días antes</option>
+                            <option value="exact">Fecha fija específica</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
+                          <input 
+                            type="time" 
+                            required={autoRsvp}
+                            value={rsvpTime}
+                            onChange={e => setRsvpTime(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium" 
+                          />
+                        </div>
+                      </div>
+
+                      {rsvpTimingType === 'exact' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Fecha fija de envío</label>
+                          <input 
+                            type="date" 
+                            required={autoRsvp && rsvpTimingType === 'exact'}
+                            value={rsvpDate}
+                            onChange={e => setRsvpDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs" 
+                          />
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-blue-700 font-medium bg-blue-100/60 p-2 rounded-lg">
+                        {rsvpTimingType === 'exact' 
+                          ? `Se solicitará la asistencia el ${rsvpDate || '...'} a las ${rsvpTime}.`
+                          : isRecurring
+                            ? `Para cada sesión generada, se enviará la petición automáticamente ${rsvpDaysBefore === 0 ? 'el mismo día' : `${rsvpDaysBefore} día${rsvpDaysBefore > 1 ? 's' : ''} antes`} a las ${rsvpTime}.`
+                            : newDate
+                              ? `Se solicitará la asistencia el ${format(subDays(parseISO(newDate), rsvpDaysBefore), "EEEE d 'de' MMMM", { locale: es })} a las ${rsvpTime}.`
+                              : `Se enviará la petición ${rsvpDaysBefore === 0 ? 'el mismo día' : `${rsvpDaysBefore} día(s) antes`} a las ${rsvpTime}.`
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="pt-4 flex gap-3">
+              <div className="shrink-0 bg-gray-50 border-t border-gray-100 p-4 px-6 flex gap-3">
                 <button 
                   type="button" 
                   onClick={() => setShowModal(false)}

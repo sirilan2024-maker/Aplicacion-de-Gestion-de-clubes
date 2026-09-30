@@ -25,7 +25,7 @@ import { createClient } from "@/lib/supabase/client"
 import toast, { Toaster } from "react-hot-toast"
 import { useRouter } from "next/navigation"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
-import { format, parseISO, addDays, getDay } from "date-fns"
+import { format, parseISO, addDays, getDay, subDays } from "date-fns"
 import { es } from "date-fns/locale"
 
 type ViewMode = "month" | "list"
@@ -76,6 +76,13 @@ export default function EventsPage() {
   const [recurringDays, setRecurringDays] = useState<number[]>([])
   const [recurringEndDate, setRecurringEndDate] = useState("")
   const [submitting, setSubmitting] = useState(false)
+
+  // Auto RSVP / Reminder states
+  const [autoRsvp, setAutoRsvp] = useState(false)
+  const [rsvpTimingType, setRsvpTimingType] = useState<"relative" | "exact">("relative")
+  const [rsvpDaysBefore, setRsvpDaysBefore] = useState<number>(1)
+  const [rsvpDate, setRsvpDate] = useState("")
+  const [rsvpTime, setRsvpTime] = useState("19:00")
 
   const supabase = createClient()
 
@@ -251,6 +258,11 @@ export default function EventsPage() {
     setIsRecurring(false)
     setRecurringDays([])
     setRecurringEndDate("")
+    setAutoRsvp(false)
+    setRsvpTimingType("relative")
+    setRsvpDaysBefore(1)
+    setRsvpDate("")
+    setRsvpTime("19:00")
     setShowModal(true)
   }
 
@@ -268,6 +280,7 @@ export default function EventsPage() {
     setModalType(ev.type as any)
     setModalLocation(ev.location || "")
     setModalSelectedTeams([ev.teamId]) // When editing, we only edit for ONE specific team (as discussed in plan)
+    setAutoRsvp(false)
     setShowModal(true)
   }
 
@@ -297,6 +310,16 @@ export default function EventsPage() {
     }
 
     setSubmitting(true)
+
+    const computeReminderTime = (eventDateStr: string) => {
+      if (!autoRsvp) return null
+      if (rsvpTimingType === 'exact') {
+        return rsvpDate && rsvpTime ? new Date(`${rsvpDate}T${rsvpTime}:00`).toISOString() : null
+      }
+      const d = subDays(parseISO(eventDateStr), rsvpDaysBefore)
+      const dStr = format(d, 'yyyy-MM-dd')
+      return new Date(`${dStr}T${rsvpTime}:00`).toISOString()
+    }
     
     if (editingEventId) {
       // Edit a single event
@@ -307,7 +330,7 @@ export default function EventsPage() {
         start_time: modalStartTime,
         end_time: modalEndTime,
         location: modalLocation,
-        // team_id is NOT updated, we keep it assigned to the original team
+        rsvp_reminder_time: computeReminderTime(modalDate)
       }
       const { error } = await supabase.from("team_events").update(eventData).eq("id", editingEventId)
       if (error) {
@@ -328,6 +351,7 @@ export default function EventsPage() {
       const eventsToInsert: any[] = []
       
       if (!isRecurring) {
+        const reminderTime = computeReminderTime(modalDate)
         modalSelectedTeams.forEach(tid => {
           eventsToInsert.push({
             team_id: tid,
@@ -337,7 +361,8 @@ export default function EventsPage() {
             date: modalDate,
             start_time: modalStartTime,
             end_time: modalEndTime,
-            location: modalLocation
+            location: modalLocation,
+            rsvp_reminder_time: reminderTime
           })
         })
       } else {
@@ -348,6 +373,7 @@ export default function EventsPage() {
         while (currentDate <= end && iterations < 730) {
           if (recurringDays.includes(getDay(currentDate))) {
             const dateStr = format(currentDate, 'yyyy-MM-dd')
+            const reminderTime = computeReminderTime(dateStr)
             modalSelectedTeams.forEach(tid => {
               eventsToInsert.push({
                 team_id: tid,
@@ -357,7 +383,8 @@ export default function EventsPage() {
                 date: dateStr,
                 start_time: modalStartTime,
                 end_time: modalEndTime,
-                location: modalLocation
+                location: modalLocation,
+                rsvp_reminder_time: reminderTime
               })
             })
           }
@@ -825,8 +852,8 @@ export default function EventsPage() {
       {/* CREATE / EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="shrink-0 bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
                 <CalendarDays className="text-blue-600 w-5 h-5" />
                 {editingEventId ? "Editar Evento" : "Nuevo Evento"}
@@ -836,168 +863,245 @@ export default function EventsPage() {
               </button>
             </div>
             
-            <form onSubmit={handleSaveEvent} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Título del Evento</label>
-                <input 
-                  required 
-                  value={modalTitle}
-                  onChange={e => setModalTitle(e.target.value)}
-                  placeholder="Ej. Entrenamiento Técnico..."
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSaveEvent} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
-                  <select 
-                    value={modalType} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === 'Partido') {
-                        setShowModal(false);
-                        setEditingMatch({ id: 'new', fecha_hora: new Date().toISOString() });
-                        setShowMatchModal(true);
-                        setModalType('Entrenamiento');
-                      } else {
-                        setModalType(val as any);
-                      }
-                    }}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="Entrenamiento">Entrenamiento</option>
-                    <option value="Partido">Partido</option>
-                    <option value="Reunión">Reunión</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Fecha</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Título del Evento</label>
                   <input 
-                    type="date" 
                     required 
-                    value={modalDate}
-                    onChange={e => setModalDate(e.target.value)}
+                    value={modalTitle}
+                    onChange={e => setModalTitle(e.target.value)}
+                    placeholder="Ej. Entrenamiento Técnico..."
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
-              </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tipo</label>
+                    <select 
+                      value={modalType} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === 'Partido') {
+                          setShowModal(false);
+                          setEditingMatch({ id: 'new', fecha_hora: new Date().toISOString() });
+                          setShowMatchModal(true);
+                          setModalType('Entrenamiento');
+                        } else {
+                          setModalType(val as any);
+                        }
+                      }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="Entrenamiento">Entrenamiento</option>
+                      <option value="Partido">Partido</option>
+                      <option value="Reunión">Reunión</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Fecha</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={modalDate}
+                      onChange={e => setModalDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Hora Inicio</label>
+                    <input 
+                      type="time" 
+                      required 
+                      value={modalStartTime}
+                      onChange={e => setModalStartTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Hora Fin (opcional)</label>
+                    <input 
+                      type="time" 
+                      value={modalEndTime}
+                      onChange={e => setModalEndTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Hora Inicio</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Ubicación</label>
                   <input 
-                    type="time" 
-                    required 
-                    value={modalStartTime}
-                    onChange={e => setModalStartTime(e.target.value)}
+                    value={modalLocation}
+                    onChange={e => setModalLocation(e.target.value)}
+                    placeholder="Ej. Campo Norte"
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Hora Fin (opcional)</label>
-                  <input 
-                    type="time" 
-                    value={modalEndTime}
-                    onChange={e => setModalEndTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                  />
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Equipos (Selecciona uno o más)</label>
+                  <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+                    {dbTeams.map(team => (
+                      <label key={team.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          disabled={!!editingEventId && !modalSelectedTeams.includes(team.id)}
+                          checked={modalSelectedTeams.includes(team.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setModalSelectedTeams([...modalSelectedTeams, team.id])
+                            } else {
+                              setModalSelectedTeams(modalSelectedTeams.filter(id => id !== team.id))
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-slate-700">{team.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {!!editingEventId && (
+                    <p className="text-[10px] text-gray-400 mt-1">Al editar un evento, solo puedes modificar el equipo asignado originalmente.</p>
+                  )}
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Ubicación</label>
-                <input 
-                  value={modalLocation}
-                  onChange={e => setModalLocation(e.target.value)}
-                  placeholder="Ej. Campo Norte"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Equipos (Selecciona uno o más)</label>
-                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                  {dbTeams.map(team => (
-                    <label key={team.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+                
+                {/* RECURRENCIA */}
+                {!editingEventId && (
+                  <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input 
-                        type="checkbox"
-                        disabled={!!editingEventId && !modalSelectedTeams.includes(team.id)}
-                        checked={modalSelectedTeams.includes(team.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setModalSelectedTeams([...modalSelectedTeams, team.id])
-                          } else {
-                            setModalSelectedTeams(modalSelectedTeams.filter(id => id !== team.id))
-                          }
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        type="checkbox" 
+                        checked={isRecurring}
+                        onChange={e => setIsRecurring(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
                       />
-                      <span className="text-sm font-medium text-slate-700">{team.name}</span>
+                      <span className="font-bold text-blue-900">Evento Recurrente</span>
                     </label>
-                  ))}
-                </div>
-                {!!editingEventId && (
-                  <p className="text-[10px] text-gray-400 mt-1">Al editar un evento, solo puedes modificar el equipo asignado originalmente.</p>
+                    
+                    {isRecurring && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
+                          <div className="flex flex-wrap gap-2">
+                            {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
+                              <button
+                                type="button"
+                                key={day.id}
+                                onClick={() => {
+                                  if (recurringDays.includes(day.id)) {
+                                    setRecurringDays(recurringDays.filter(d => d !== day.id));
+                                  } else {
+                                    setRecurringDays([...recurringDays, day.id]);
+                                  }
+                                }}
+                                className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                              >
+                                {day.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
+                          <input 
+                            type="date" 
+                            value={recurringEndDate}
+                            onChange={(e) => setRecurringEndDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                            required={isRecurring}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
-              
-              {/* RECURRENCIA */}
-              {!editingEventId && (
-                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 mt-4">
+
+                {/* PROGRAMACIÓN AUTOMÁTICA DE ASISTENCIA / RECORDATORIO */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 mt-2 space-y-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input 
                       type="checkbox" 
-                      checked={isRecurring}
-                      onChange={e => setIsRecurring(e.target.checked)}
-                      className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      checked={autoRsvp}
+                      onChange={(e) => setAutoRsvp(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                     />
-                    <span className="font-bold text-blue-900">Evento Recurrente</span>
+                    <span className="font-bold text-slate-900 text-sm">Petición de asistencia / Recordatorio automático</span>
                   </label>
                   
-                  {isRecurring && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 mt-2">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Días de la semana</label>
-                        <div className="flex flex-wrap gap-2">
-                          {[{id: 1, label: 'L'}, {id: 2, label: 'M'}, {id: 3, label: 'X'}, {id: 4, label: 'J'}, {id: 5, label: 'V'}, {id: 6, label: 'S'}, {id: 0, label: 'D'}].map(day => (
-                            <button
-                              type="button"
-                              key={day.id}
-                              onClick={() => {
-                                if (recurringDays.includes(day.id)) {
-                                  setRecurringDays(recurringDays.filter(d => d !== day.id));
-                                } else {
-                                  setRecurringDays([...recurringDays, day.id]);
-                                }
-                              }}
-                              className={`w-9 h-9 rounded-full font-bold flex items-center justify-center transition-colors ${recurringDays.includes(day.id) ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                            >
-                              {day.label}
-                            </button>
-                          ))}
+                  {autoRsvp && (
+                    <div className="space-y-3 pt-1 animate-in fade-in slide-in-from-top-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Cuándo avisar</label>
+                          <select
+                            value={rsvpTimingType === 'exact' ? 'exact' : String(rsvpDaysBefore)}
+                            onChange={(e) => {
+                              if (e.target.value === 'exact') {
+                                setRsvpTimingType('exact');
+                              } else {
+                                setRsvpTimingType('relative');
+                                setRsvpDaysBefore(Number(e.target.value));
+                              }
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium"
+                          >
+                            <option value="1">1 día antes (Recomendado)</option>
+                            <option value="0">El mismo día del evento</option>
+                            <option value="2">2 días antes</option>
+                            <option value="3">3 días antes</option>
+                            <option value="exact">Fecha fija específica</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Hora de envío</label>
+                          <input 
+                            type="time" 
+                            required={autoRsvp}
+                            value={rsvpTime}
+                            onChange={e => setRsvpTime(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs font-medium" 
+                          />
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">Repetir hasta (Fecha Fin)</label>
-                        <input 
-                          type="date" 
-                          value={recurringEndDate}
-                          onChange={(e) => setRecurringEndDate(e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                          required={isRecurring}
-                        />
-                      </div>
+
+                      {rsvpTimingType === 'exact' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">Fecha fija de envío</label>
+                          <input 
+                            type="date" 
+                            required={autoRsvp && rsvpTimingType === 'exact'}
+                            value={rsvpDate}
+                            onChange={e => setRsvpDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs" 
+                          />
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-blue-700 font-medium bg-blue-100/60 p-2 rounded-lg">
+                        {rsvpTimingType === 'exact' 
+                          ? `Se solicitará la confirmación el ${rsvpDate || '...'} a las ${rsvpTime}.`
+                          : isRecurring
+                            ? `Para cada sesión generada, se enviará la petición automáticamente ${rsvpDaysBefore === 0 ? 'el mismo día' : `${rsvpDaysBefore} día${rsvpDaysBefore > 1 ? 's' : ''} antes`} a las ${rsvpTime}.`
+                            : modalDate
+                              ? `Se solicitará la confirmación el ${format(subDays(parseISO(modalDate), rsvpDaysBefore), "EEEE d 'de' MMMM", { locale: es })} a las ${rsvpTime}.`
+                              : `Se enviará la petición ${rsvpDaysBefore === 0 ? 'el mismo día' : `${rsvpDaysBefore} día(s) antes`} a las ${rsvpTime}.`
+                        }
+                      </p>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
-              <div className="pt-4 flex items-center justify-between border-t border-gray-100 mt-4">
+              <div className="shrink-0 bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between">
                 {editingEventId ? (
                   <button 
-                    type="button"
+                    type="button" 
                     onClick={() => handleDeleteEvent(editingEventId)}
                     className="flex items-center gap-1.5 px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors"
                   >
@@ -1008,7 +1112,7 @@ export default function EventsPage() {
                   <button 
                     type="button" 
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg transition-colors"
+                    className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg transition-colors"
                   >
                     Cancelar
                   </button>
@@ -1017,7 +1121,7 @@ export default function EventsPage() {
                     disabled={submitting}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-sm disabled:opacity-50 transition-colors"
                   >
-                    {submitting ? "Guardando..." : "Guardar Evento"}
+                    {submitting ? "Guardando..." : (editingEventId ? "Guardar Cambios" : "Guardar Evento")}
                   </button>
                 </div>
               </div>

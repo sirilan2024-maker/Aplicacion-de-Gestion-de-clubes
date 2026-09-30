@@ -121,22 +121,53 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
       }
     })
 
-    // Ordenar cronológicamente para calcular ciclos
+    // Partidos finalizados del equipo ordenados cronológicamente
+    const teamIdToFilter = player.team_id || teamId;
+    const finishedTeamMatches = matches
+      .filter(m => (teamIdToFilter === 'all' || m.equipo_id === teamIdToFilter) && (m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date()))
+      .sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+
+    const lastFinishedMatchId = finishedTeamMatches[finishedTeamMatches.length - 1]?.id;
+
+    // Ordenar cronológicamente para calcular ciclos y sanciones
     const chronologicalEvents = [...rawEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
     let cycleCards = 0;
     let cyclesCompleted = 0;
+    let redSanctions = 0;
+    let pendingSanction = false;
+    let pendingReason = '';
 
     chronologicalEvents.forEach(evt => {
-      if (evt.yellow === 2) {
-        // Doble amarilla = Roja. No suma al ciclo.
+      const isLastFinished = evt.match.id === lastFinishedMatchId;
+
+      if (evt.yellow === 2 || (evt.red > 0 && evt.yellow > 0)) {
+        // Doble amarilla = Expulsión y 1 partido de sanción (Art. 113 FFCV/RFEF)
+        redSanctions += 1;
+        if (isLastFinished) {
+          pendingSanction = true;
+          pendingReason = 'Doble amarilla (1 partido)';
+        }
+      } else if (evt.red > 0 && evt.yellow === 0) {
+        // Roja directa = Expulsión y al menos 1 partido de sanción
+        redSanctions += 1;
+        if (isLastFinished) {
+          pendingSanction = true;
+          pendingReason = 'Roja directa (1 partido)';
+        }
       } else if (evt.yellow === 1) {
         cycleCards += 1;
         if (cycleCards === 5) {
           cyclesCompleted += 1;
           cycleCards = 0;
+          if (isLastFinished) {
+            pendingSanction = true;
+            pendingReason = 'Ciclo de 5 amarillas';
+          }
         }
       }
     });
+
+    const totalSanctions = cyclesCompleted + redSanctions;
 
     return {
       player,
@@ -144,12 +175,18 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
       totalRed,
       cycleCards,
       cyclesCompleted,
+      redSanctions,
+      totalSanctions,
+      pendingSanction,
+      pendingReason,
       cardEvents: rawEvents.sort((a, b) => new Date(b.match.fecha_hora).getTime() - new Date(a.match.fecha_hora).getTime())
     }
   })
 
-  // Ordenar estrictamente de mayor a menor por total de amarillas, luego rojas, luego nombre
+  // Ordenar: primero los que tienen sanción activa, luego apercibidos, luego por amarillas y rojas
   disciplineData.sort((a, b) => {
+    if (a.pendingSanction !== b.pendingSanction) return a.pendingSanction ? -1 : 1;
+    if ((b.cycleCards === 4) !== (a.cycleCards === 4)) return b.cycleCards === 4 ? 1 : -1;
     if (b.totalYellow !== a.totalYellow) return b.totalYellow - a.totalYellow;
     if (b.totalRed !== a.totalRed) return b.totalRed - a.totalRed;
     return a.player.first_name.localeCompare(b.player.first_name);
@@ -197,18 +234,47 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
         </div>
       </div>
 
+      {/* BANNER SANCIONADOS ACTIVOS */}
+      {disciplineData.filter(d => d.pendingSanction).length > 0 && (
+        <div className="bg-red-50 border-b border-red-200 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-600 mt-0.5 shrink-0" size={20} />
+            <div>
+              <h4 className="text-sm font-bold text-red-900">
+                Sancionados / Suspendidos para el Próximo Partido ({disciplineData.filter(d => d.pendingSanction).length})
+              </h4>
+              <p className="text-sm text-red-700 mt-0.5 mb-2">
+                Los siguientes miembros deben cumplir suspensión en el próximo encuentro por expulsión (doble amarilla / roja) o acumulación de tarjetas:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {disciplineData.filter(d => d.pendingSanction).map(a => (
+                  <button 
+                    key={a.player.id}
+                    onClick={() => handleOpenModal(a.player.id)}
+                    className="bg-white border border-red-300 text-red-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm hover:bg-red-100 transition-colors flex items-center gap-1.5"
+                  >
+                    <div className="w-2 h-3 bg-red-600 rounded-sm"></div>
+                    {a.player.first_name} {a.player.last_name} ({a.pendingReason})
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* BANNER APERCIBIDOS */}
-      {disciplineData.filter(d => d.cycleCards === 4).length > 0 && (
+      {disciplineData.filter(d => d.cycleCards === 4 && !d.pendingSanction).length > 0 && (
         <div className="bg-orange-50 border-b border-orange-200 px-5 py-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="text-orange-500 mt-0.5 shrink-0" size={20} />
             <div>
-              <h4 className="text-sm font-bold text-orange-800">Jugadores Apercibidos ({disciplineData.filter(d => d.cycleCards === 4).length})</h4>
+              <h4 className="text-sm font-bold text-orange-800">Jugadores Apercibidos ({disciplineData.filter(d => d.cycleCards === 4 && !d.pendingSanction).length})</h4>
               <p className="text-sm text-orange-700 mt-0.5 mb-2">
                 Los siguientes jugadores acumulan 4 tarjetas amarillas y serán suspendidos si reciben una tarjeta más:
               </p>
               <div className="flex flex-wrap gap-2">
-                {disciplineData.filter(d => d.cycleCards === 4).map(a => (
+                {disciplineData.filter(d => d.cycleCards === 4 && !d.pendingSanction).map(a => (
                   <div key={a.player.id} className="flex items-center gap-0">
                     <button 
                       onClick={() => handleOpenModal(a.player.id)}
@@ -241,14 +307,14 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
           <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap min-w-[500px]">
             <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500">
               <tr>
-                <th className="px-6 py-4">Jugador</th>
+                <th className="px-6 py-4">Jugador / Técnico</th>
                 <th className="px-5 py-4 text-center w-36">
                   <div className="flex justify-center items-center gap-1">
                     <div className="w-3 h-4 bg-amber-400 rounded-sm" />
                     <span>Amarillas Totales</span>
                   </div>
                 </th>
-                <th className="px-5 py-4 text-center w-36">Ciclos Cumplidos</th>
+                <th className="px-5 py-4 text-center w-40">Sanciones</th>
                 <th className="px-5 py-4 text-center w-44">Ciclo Actual</th>
                 <th className="px-5 py-4 text-center w-24">
                   <div className="flex justify-center items-center gap-1">
@@ -264,7 +330,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                 <tr 
                   key={d.player.id} 
                   onClick={() => handleOpenModal(d.player.id)}
-                  className={`transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50/80 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
+                  className={`transition-colors cursor-pointer group ${d.pendingSanction ? 'bg-red-50/70 hover:bg-red-100/80' : d.cycleCards === 4 ? 'bg-orange-50/80 hover:bg-orange-100' : 'hover:bg-slate-50'}`}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -278,7 +344,12 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                       <div>
                         <div className="font-bold text-slate-900 flex items-center gap-2">
                           {d.player.first_name} {d.player.last_name}
-                          {d.cycleCards === 4 && (
+                          {d.pendingSanction && (
+                            <span title="Sancionado para el próximo encuentro" className="flex items-center text-red-700 bg-red-100 font-bold border border-red-200 px-2 py-0.5 rounded-md text-[10px] uppercase">
+                              <AlertCircle size={10} className="mr-1"/> Sancionado
+                            </span>
+                          )}
+                          {d.cycleCards === 4 && !d.pendingSanction && (
                             <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-700 bg-orange-100 font-bold border border-orange-200 px-2 py-0.5 rounded-md text-[10px] uppercase">
                               <AlertCircle size={10} className="mr-1"/> Apercibido
                             </span>
@@ -292,9 +363,13 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                     {d.totalYellow > 0 ? d.totalYellow : '-'}
                   </td>
                   <td className="px-5 py-4 text-center">
-                    {d.cyclesCompleted > 0 ? (
-                      <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg text-xs font-black">
-                        {d.cyclesCompleted} {d.cyclesCompleted === 1 ? 'sanción' : 'sanciones'}
+                    {d.pendingSanction ? (
+                      <span className="px-2.5 py-1 bg-red-100 border border-red-300 text-red-800 rounded-lg text-xs font-black inline-flex items-center gap-1 shadow-xs animate-pulse">
+                        <AlertCircle size={12} className="text-red-600" /> Sanción Activa
+                      </span>
+                    ) : d.totalSanctions > 0 ? (
+                      <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-black" title="Sanción cumplida en jornada posterior">
+                        {d.totalSanctions} {d.totalSanctions === 1 ? 'sanción (cumplida)' : 'sanciones (cumplidas)'}
                       </span>
                     ) : (
                       <span className="text-slate-400 font-medium text-xs">0</span>
@@ -326,7 +401,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {canSendAlerts && d.cycleCards === 4 && (
+                      {canSendAlerts && (d.cycleCards === 4 || d.pendingSanction) && (
                         <button
                           onClick={(e) => handleAvisarEntrenador(e, d.player)}
                           disabled={alertingId === d.player.id}
@@ -360,7 +435,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
             <div 
               key={d.player.id} 
               onClick={() => handleOpenModal(d.player.id)}
-              className={`p-4 rounded-xl shadow-sm border transition-colors cursor-pointer group ${d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100 border-orange-200' : 'bg-white hover:bg-slate-50 border-slate-200'}`}
+              className={`p-4 rounded-xl shadow-sm border transition-colors cursor-pointer group ${d.pendingSanction ? 'bg-red-50 hover:bg-red-100 border-red-200' : d.cycleCards === 4 ? 'bg-orange-50 hover:bg-orange-100 border-orange-200' : 'bg-white hover:bg-slate-50 border-slate-200'}`}
             >
               <div className="flex items-center gap-3 mb-3">
                 {d.player.avatar_url ? (
@@ -373,7 +448,12 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                 <div className="flex-1">
                   <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
                     {d.player.first_name} {d.player.last_name}
-                    {d.cycleCards === 4 && (
+                    {d.pendingSanction && (
+                      <span title="Sancionado para el próximo encuentro" className="flex items-center text-red-700 bg-red-100 font-bold border border-red-200 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                        <AlertCircle size={10} className="mr-1"/> Sancionado
+                      </span>
+                    )}
+                    {d.cycleCards === 4 && !d.pendingSanction && (
                       <span title="Apercibido (Próxima amarilla conlleva sanción)" className="flex items-center text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
                         <AlertCircle size={10} className="mr-1"/> Apercibido
                       </span>
@@ -381,7 +461,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                   </div>
                   <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
                 </div>
-                {canSendAlerts && d.cycleCards === 4 && (
+                {canSendAlerts && (d.cycleCards === 4 || d.pendingSanction) && (
                   <button
                     onClick={(e) => handleAvisarEntrenador(e, d.player)}
                     disabled={alertingId === d.player.id}
@@ -404,9 +484,15 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
                 </div>
 
                 <div className="bg-white p-2 rounded-lg text-center border border-slate-200 flex flex-col items-center justify-center">
-                  <span className="text-[10px] font-bold text-indigo-700 uppercase mb-1">Ciclos Cumplidos</span>
-                  <div className="font-black text-indigo-900 text-sm">
-                    {d.cyclesCompleted}
+                  <span className="text-[10px] font-bold text-slate-700 uppercase mb-1">Sanciones</span>
+                  <div className="font-black text-sm">
+                    {d.pendingSanction ? (
+                      <span className="text-red-600">Activa (1p)</span>
+                    ) : d.totalSanctions > 0 ? (
+                      <span className="text-slate-700">{d.totalSanctions} cumplida{d.totalSanctions > 1 ? 's' : ''}</span>
+                    ) : (
+                      <span className="text-slate-400">0</span>
+                    )}
                   </div>
                 </div>
 

@@ -904,27 +904,45 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         );
         if (clubRow) {
           currentPos = clubRow.position;
-          // Si la clasificación oficial tiene datos registrados, priorizar los datos oficiales de la FFCV
+          // Si la clasificación oficial tiene datos registrados que superan los partidos internos, usar oficiales.
+          // Si internamente hay partidos jugados más recientes que la clasificación federativa, preservar los datos internos.
           if (clubRow.played !== undefined && clubRow.played !== null) {
-            tPlayed = Number(clubRow.played);
-            tWins = Number(clubRow.won ?? 0);
-            tDraws = Number(clubRow.drawn ?? 0);
-            tLosses = Number(clubRow.lost ?? 0);
-            tGf = Number(clubRow.goals_for ?? 0);
-            tGa = Number(clubRow.goals_against ?? 0);
-            tPoints = Number(clubRow.points ?? 0);
+            const fedPlayed = Number(clubRow.played);
+            if (fedPlayed > tMatches.length || (fedPlayed > 0 && tMatches.length === 0)) {
+              tPlayed = fedPlayed;
+              tWins = Number(clubRow.won ?? 0);
+              tDraws = Number(clubRow.drawn ?? 0);
+              tLosses = Number(clubRow.lost ?? 0);
+              tGf = Number(clubRow.goals_for ?? 0);
+              tGa = Number(clubRow.goals_against ?? 0);
+              tPoints = Number(clubRow.points ?? 0);
+            }
           }
         }
       }
 
       const tWinRate = tPlayed > 0 ? Math.round((tWins / tPlayed) * 100) : 0;
 
+      const defaultCompName = 
+        team.name.toUpperCase().includes('SENIOR') ? '3ª FFCV' :
+        team.name.toUpperCase().includes('JUVENIL A') ? '2ª Regional Juvenil' :
+        team.name.toUpperCase().includes('JUVENIL B') ? '3ª Regional Juvenil' :
+        team.name.toUpperCase().includes('CADETE A') ? '1ª Regional Cadete' :
+        team.name.toUpperCase().includes('INFANTIL A') ? '2ª Regional Infantil' :
+        'Liga FFCV';
+
+      const defaultGroupName = 
+        team.name.toUpperCase().includes('SENIOR') ? 'Grupo 14' :
+        team.name.toUpperCase().includes('JUVENIL A') ? 'Grupo 12' :
+        team.name.toUpperCase().includes('JUVENIL B') ? 'Grupo 11' :
+        'Grupo Oficial';
+
       teamStats.push({
         teamId: team.id,
         teamName: team.name,
         teamCategory: team.category || 'Federado',
-        competitionName: groupInfo?.competition_name || 'Liga FFCV',
-        groupName: groupInfo?.group_name || 'Grupo Oficial',
+        competitionName: groupInfo?.competition_name || defaultCompName,
+        groupName: groupInfo?.group_name || defaultGroupName,
         currentPosition: currentPos,
         totalTeamsInGroup: groupInfo?.total_teams,
         matchesPlayed: tPlayed,
@@ -942,7 +960,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     // Equipos no federados / formativos del club
     const nonFederatedTeams = teams.filter(t => !t.ffcv_group_id);
     for (const team of nonFederatedTeams) {
-      const isLigaBrave = team.name.toLowerCase().includes('infantil c') || team.category?.toLowerCase().includes('brave');
+      const isLigaBrave = team.name.toLowerCase().includes('infantil') || team.name.toLowerCase().includes('cadete') || team.category?.toLowerCase().includes('brave');
       const tMatches = teamMatchMap.get(team.id) || [];
       let tWins = 0, tDraws = 0, tLosses = 0, tGf = 0, tGa = 0;
       tMatches.forEach(m => {
@@ -1172,11 +1190,10 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const { data: rawTrainings } = await adminClient
       .from('team_events')
       .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name)')
-      .eq('club_id', clubId)
       .in('team_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
       .gte('date', todayDate)
       .order('date', { ascending: true })
-      .limit(4);
+      .limit(6);
 
     const upcomingTrainings = (rawTrainings || []).map((e: any) => ({
       id: e.id,

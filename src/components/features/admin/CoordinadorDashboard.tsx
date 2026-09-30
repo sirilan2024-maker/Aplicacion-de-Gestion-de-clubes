@@ -171,7 +171,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
             </div>
           </div>
           <button
-            onClick={refresh}
+            onClick={() => refresh()}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
@@ -186,22 +186,33 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: "Equipos", value: kpis.totalTeams, icon: Shield, color: "text-indigo-600", bg: "bg-indigo-50" },
-            { label: "Jugadores", value: kpis.totalPlayers, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Partidos próximos", value: kpis.upcomingMatchesCount, icon: Trophy, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Lesiones activas", value: kpis.activeInjuries, icon: Heart, color: "text-red-500", bg: "bg-red-50" },
-            { label: "Apercibidos", value: kpis.apercibidosCount, icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-50" },
-          ].map(({ label, value, icon: Icon, color, bg }) => (
-            <div key={label} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3 shadow-sm">
-              <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
-                <Icon className={`w-4.5 h-4.5 ${color}`} size={18} />
+            { label: "Equipos", value: kpis.totalTeams, icon: Shield, color: "text-indigo-600", bg: "bg-indigo-50", href: "/dashboard/equipos" },
+            { label: "Jugadores", value: kpis.totalPlayers, icon: Users, color: "text-blue-600", bg: "bg-blue-50", href: "/dashboard/club/miembros" },
+            { label: "Partidos próximos", value: kpis.upcomingMatchesCount, icon: Trophy, color: "text-emerald-600", bg: "bg-emerald-50", href: "/admin/partidos" },
+            { label: "Lesiones activas", value: kpis.activeInjuries, icon: Heart, color: "text-red-500", bg: "bg-red-50", href: undefined },
+            { label: "Apercibidos / Sanción", value: kpis.apercibidosCount, icon: AlertTriangle, color: kpis.apercibidosCount > 0 ? "text-amber-600" : "text-slate-400", bg: kpis.apercibidosCount > 0 ? "bg-amber-50" : "bg-slate-50", href: "/dashboard/matches" },
+          ].map(({ label, value, icon: Icon, color, bg, href }) => {
+            const inner = (
+              <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3 shadow-sm hover:border-indigo-100 transition-all h-full">
+                <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
+                  <Icon className={`w-4.5 h-4.5 ${color}`} size={18} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xl font-extrabold text-gray-900 leading-none">{value}</p>
+                  <p className="text-[11px] text-gray-500 font-medium leading-tight mt-0.5">{label}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-xl font-extrabold text-gray-900 leading-none">{value}</p>
-                <p className="text-[11px] text-gray-500 font-medium leading-tight mt-0.5">{label}</p>
+            );
+            return href ? (
+              <Link key={label} href={href} className="block transition-transform active:scale-[0.98]">
+                {inner}
+              </Link>
+            ) : (
+              <div key={label}>
+                {inner}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* ── Situación Deportiva ── */}

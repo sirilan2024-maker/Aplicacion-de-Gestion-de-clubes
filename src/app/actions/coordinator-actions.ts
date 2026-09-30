@@ -34,7 +34,7 @@ export interface CoordinatorUpcomingMatch {
 }
 
 export interface CoordinatorAlert {
-  type: 'sin_entrenador' | 'sin_convocatoria' | 'plantilla_corta' | 'jugador_apercibido' | 'lesion_activa'
+  type: 'sin_entrenador' | 'sin_convocatoria' | 'plantilla_corta' | 'jugador_apercibido' | 'lesion_activa' | 'jugador_sancionado'
   teamId?: string
   teamName?: string
   playerId?: string
@@ -199,11 +199,31 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         data: {
           club: { id: clubId, name: club?.name || 'Club', logoUrl: club?.logo_url || null },
           activeSeason: { id: seasonId, name: seasonName || 'Temporada', isActive },
-          kpis: { totalTeams: 0, totalPlayers: 0, activeInjuries: 0, upcomingMatchesCount: 0, apercibidosCount: 0 },
+          kpis: { totalTeams: 0, totalPlayers: 0, activePlayers: 0, activeTeams: 0, activeInjuries: 0, upcomingMatchesCount: 0, apercibidosCount: 0 },
           alerts: [],
           teams: [],
           upcomingMatches: [],
           todayEvents: [],
+          sports: {
+            totalPlayedMatches: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+            globalWinRate: 0,
+            points: 0,
+            possiblePoints: 0,
+            pointsPercentage: 0,
+            attendanceRate: 100,
+            topScorer: null,
+            topMinutes: null,
+            teamStats: [],
+          },
+          injuries: {
+            activeInjuriesCount: 0,
+            activeInjuriesList: [],
+          },
         }
       }
     }
@@ -459,59 +479,124 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       }
     })
 
-    // 11. Apercibidos (con 4 amarillas acumuladas en la temporada disputada)
-    // Se consultan todos los partidos finalizados/disputados de la temporada activa para los equipos del club
+    // 11. Disciplina: Sancionados y Apercibidos
     let seasonPlayedQuery = adminClient
       .from('partidos')
-      .select('id')
+      .select('id, equipo_id, fecha_hora')
       .eq('club_id', clubId)
       .in('equipo_id', teamIds)
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
-      .or('estado.eq.Finalizado,resultado_propio.not.is.null');
+      .or('estado.eq.Finalizado,resultado_propio.not.is.null')
+      .order('fecha_hora', { ascending: true });
 
     if (seasonId) {
       seasonPlayedQuery = seasonPlayedQuery.eq('season_id', seasonId);
     }
 
     const { data: seasonPlayedMatches } = await seasonPlayedQuery;
+    const playedMatchesListChronological = seasonPlayedMatches || [];
+    const playedMatchIds = playedMatchesListChronological.map(m => m.id);
 
-    const playedMatchIds = (seasonPlayedMatches || []).map(m => m.id);
+    // Identificar el último partido disputado por cada equipo
+    const lastPlayedMatchByTeam = new Map<string, string>();
+    playedMatchesListChronological.forEach(m => {
+      lastPlayedMatchByTeam.set(m.equipo_id, m.id);
+    });
 
     let apercibidosCount = 0;
     if (playedMatchIds.length > 0) {
-      const { data: yellConvData } = await adminClient
+      const { data: cardConvData } = await adminClient
         .from('convocatorias')
-        .select('player_id, yellow_cards, tarjetas_amarillas, players:player_id(id, first_name, last_name, team_id, teams:team_id(name))')
+        .select(`
+          player_id, partido_id, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas,
+          partidos:partido_id(id, fecha_hora, equipo_id),
+          players:player_id(id, first_name, last_name, team_id, teams:team_id(name))
+        `)
         .in('partido_id', playedMatchIds)
-        .or('yellow_cards.gt.0,tarjetas_amarillas.gt.0');
+        .or('yellow_cards.gt.0,tarjetas_amarillas.gt.0,red_cards.gt.0,tarjetas_rojas.gt.0');
 
-      const yellowsByPlayer = new Map<string, { id: string; name: string; teamName: string; yellows: number }>();
-      (yellConvData || []).forEach((c: any) => {
+      // Agrupar eventos por jugador cronológicamente
+      const eventsByPlayer = new Map<string, { player: any; events: any[] }>();
+      (cardConvData || []).forEach((c: any) => {
         const p = c.players;
         if (!p || !c.player_id) return;
         const pid = c.player_id;
-        const yellows = Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
-        if (yellows <= 0) return;
+        const yellow = Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
+        const red = Number(c.red_cards ?? c.tarjetas_rojas ?? 0);
+        if (yellow <= 0 && red <= 0) return;
 
-        const existing = yellowsByPlayer.get(pid) || {
-          id: pid,
-          name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-          teamName: (p.teams as any)?.name || 'Equipo',
-          yellows: 0
+        const existing = eventsByPlayer.get(pid) || {
+          player: {
+            id: pid,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+            teamId: p.team_id,
+            teamName: (p.teams as any)?.name || 'Equipo',
+          },
+          events: []
         };
-        existing.yellows += yellows;
-        yellowsByPlayer.set(pid, existing);
+        existing.events.push({
+          partido_id: c.partido_id,
+          fecha_hora: (c.partidos as any)?.fecha_hora,
+          equipo_id: (c.partidos as any)?.equipo_id || p.team_id,
+          yellow,
+          red,
+        });
+        eventsByPlayer.set(pid, existing);
       });
 
-      yellowsByPlayer.forEach((p) => {
-        if (p.yellows > 0 && p.yellows % 5 === 4) {
+      eventsByPlayer.forEach(({ player, events }) => {
+        const sortedEvents = events.sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+        const lastTeamMatchId = lastPlayedMatchByTeam.get(player.teamId);
+
+        let cycleCards = 0;
+        let isPendingSanction = false;
+        let sanctionReason = '';
+
+        sortedEvents.forEach(evt => {
+          const isLastMatch = evt.partido_id === lastTeamMatchId;
+
+          if (evt.yellow === 2 || (evt.red > 0 && evt.yellow > 0)) {
+            if (isLastMatch) {
+              isPendingSanction = true;
+              sanctionReason = 'Doble amarilla (1 partido)';
+            }
+          } else if (evt.red > 0 && evt.yellow === 0) {
+            if (isLastMatch) {
+              isPendingSanction = true;
+              sanctionReason = 'Roja directa (1 partido)';
+            }
+          } else if (evt.yellow === 1) {
+            cycleCards += 1;
+            if (cycleCards === 5) {
+              cycleCards = 0;
+              if (isLastMatch) {
+                isPendingSanction = true;
+                sanctionReason = 'Ciclo de 5 amarillas acumuladas';
+              }
+            }
+          }
+        });
+
+        if (isPendingSanction) {
+          apercibidosCount++;
+          alerts.push({
+            type: 'jugador_sancionado',
+            teamId: player.teamId,
+            teamName: player.teamName,
+            playerId: player.id,
+            playerName: player.name,
+            message: `${player.name} (${player.teamName}) está sancionado para el próximo partido (${sanctionReason})`,
+            severity: 'error'
+          });
+        } else if (cycleCards === 4) {
           apercibidosCount++;
           alerts.push({
             type: 'jugador_apercibido',
-            playerId: p.id,
-            playerName: p.name,
-            teamName: p.teamName,
-            message: `${p.name} (${p.teamName}) está apercibido (${p.yellows} amarillas acumuladas)`,
+            teamId: player.teamId,
+            teamName: player.teamName,
+            playerId: player.id,
+            playerName: player.name,
+            message: `${player.name} (${player.teamName}) está apercibido (${cycleCards} amarillas acumuladas)`,
             severity: 'warning'
           });
         }
@@ -676,25 +761,45 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         )
         if (clubRow) {
           currentPos = clubRow.position
+          // Si la clasificación oficial tiene datos registrados que superan los partidos internos, usar oficiales.
+          // Si internamente hay partidos jugados más recientes que la clasificación federativa, preservar los datos internos.
           if (clubRow.played !== undefined && clubRow.played !== null) {
-            tPlayed = Number(clubRow.played)
-            tWins = Number(clubRow.won ?? 0)
-            tDraws = Number(clubRow.drawn ?? 0)
-            tLosses = Number(clubRow.lost ?? 0)
-            tGf = Number(clubRow.goals_for ?? 0)
-            tGa = Number(clubRow.goals_against ?? 0)
-            tPoints = Number(clubRow.points ?? 0)
+            const fedPlayed = Number(clubRow.played)
+            if (fedPlayed > tMatches.length || (fedPlayed > 0 && tMatches.length === 0)) {
+              tPlayed = fedPlayed
+              tWins = Number(clubRow.won ?? 0)
+              tDraws = Number(clubRow.drawn ?? 0)
+              tLosses = Number(clubRow.lost ?? 0)
+              tGf = Number(clubRow.goals_for ?? 0)
+              tGa = Number(clubRow.goals_against ?? 0)
+              tPoints = Number(clubRow.points ?? 0)
+            }
           }
         }
       }
 
       const tWinRate = tPlayed > 0 ? Math.round((tWins / tPlayed) * 100) : 0
+
+      const defaultCompName = 
+        team.name.toUpperCase().includes('SENIOR') ? '3ª FFCV' :
+        team.name.toUpperCase().includes('JUVENIL A') ? '2ª Regional Juvenil' :
+        team.name.toUpperCase().includes('JUVENIL B') ? '3ª Regional Juvenil' :
+        team.name.toUpperCase().includes('CADETE A') ? '1ª Regional Cadete' :
+        team.name.toUpperCase().includes('INFANTIL A') ? '2ª Regional Infantil' :
+        'Liga FFCV';
+
+      const defaultGroupName = 
+        team.name.toUpperCase().includes('SENIOR') ? 'Grupo 14' :
+        team.name.toUpperCase().includes('JUVENIL A') ? 'Grupo 12' :
+        team.name.toUpperCase().includes('JUVENIL B') ? 'Grupo 11' :
+        'Grupo Oficial';
+
       teamStatsList.push({
         teamId: team.id,
         teamName: team.name,
         teamCategory: team.category || 'Federado',
-        competitionName: groupInfo?.competition_name || 'Liga FFCV',
-        groupName: groupInfo?.group_name || 'Grupo Oficial',
+        competitionName: groupInfo?.competition_name || defaultCompName,
+        groupName: groupInfo?.group_name || defaultGroupName,
         currentPosition: currentPos,
         totalTeamsInGroup: groupInfo?.total_teams,
         matchesPlayed: tPlayed,
@@ -792,10 +897,24 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
 
         const pList = Array.from(playerStatsMap.values())
         const scorers = [...pList].filter(p => p.goals > 0).sort((a, b) => b.goals - a.goals)
-        if (scorers.length > 0) topScorer = scorers[0]
+        if (scorers.length > 0) {
+          topScorer = {
+            playerId: scorers[0].id,
+            playerName: scorers[0].name,
+            goals: scorers[0].goals,
+            teamName: scorers[0].teamName,
+          }
+        }
 
         const minuteLeaders = [...pList].filter(p => p.minutes > 0).sort((a, b) => b.minutes - a.minutes)
-        if (minuteLeaders.length > 0) topMinutes = minuteLeaders[0]
+        if (minuteLeaders.length > 0) {
+          topMinutes = {
+            playerId: minuteLeaders[0].id,
+            playerName: minuteLeaders[0].name,
+            minutesPlayed: minuteLeaders[0].minutes,
+            teamName: minuteLeaders[0].teamName,
+          }
+        }
       }
     }
 

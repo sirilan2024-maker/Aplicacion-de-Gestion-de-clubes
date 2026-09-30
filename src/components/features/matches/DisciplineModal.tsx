@@ -61,12 +61,17 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
     setTimeout(() => setSavingCards(null), 500)
   }
 
-  // Calculate cycle status based on chronological events
+  // Calculate cycle status and sanctions based on chronological events
   const chronologicalEvents = [...cardEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
   let cycleCards = 0;
   let cyclesCompleted = 0;
+  let redSanctions = 0;
   chronologicalEvents.forEach(evt => {
-    if (evt.yellow === 1) {
+    if (evt.yellow === 2 || (evt.red > 0 && evt.yellow > 0)) {
+      redSanctions += 1;
+    } else if (evt.red > 0 && evt.yellow === 0) {
+      redSanctions += 1;
+    } else if (evt.yellow === 1) {
       cycleCards += 1;
       if (cycleCards === 5) {
         cyclesCompleted += 1;
@@ -74,6 +79,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
       }
     }
   });
+  const totalSanctions = cyclesCompleted + redSanctions;
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -106,7 +112,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
           {!isEditing && (
             <div className="bg-white border-b border-slate-100 p-5">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-bold text-slate-700 uppercase">Estado del Ciclo Actual</span>
+                <span className="text-sm font-bold text-slate-700 uppercase">Estado Disciplinario</span>
                 {cycleCards === 4 && <span className="text-xs font-bold text-orange-600 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded uppercase flex items-center gap-1"><AlertCircle size={12}/> Apercibido</span>}
               </div>
               <div className="flex gap-1.5 mb-2">
@@ -114,9 +120,12 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   <div key={i} className={`h-2.5 flex-1 rounded-sm ${i <= cycleCards ? (cycleCards === 4 ? 'bg-orange-400' : 'bg-amber-400') : 'bg-slate-100'}`}></div>
                 ))}
               </div>
-              <div className="flex justify-between text-xs text-slate-500 font-medium">
-                <span>{cycleCards} / 5 Tarjetas</span>
-                <span>{cyclesCompleted} {cyclesCompleted === 1 ? 'Sanción cumplida' : 'Sanciones cumplidas'}</span>
+              <div className="flex flex-col sm:flex-row justify-between text-xs text-slate-500 font-medium gap-1">
+                <span>{cycleCards} / 5 Tarjetas en ciclo actual</span>
+                <span>
+                  {totalSanctions} {totalSanctions === 1 ? 'Sanción registrada' : 'Sanciones registradas'}
+                  {redSanctions > 0 && ` (${redSanctions} por expulsión)`}
+                </span>
               </div>
             </div>
           )}
@@ -129,7 +138,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   <AlertCircle className="text-emerald-500" size={32} />
                 </div>
                 <h4 className="text-slate-900 font-bold text-lg mb-1">¡Historial Limpio!</h4>
-                <p className="text-slate-500 text-sm">Este jugador no ha recibido ninguna tarjeta en los partidos registrados.</p>
+                <p className="text-slate-500 text-sm">Este miembro no ha recibido ninguna tarjeta en los partidos registrados.</p>
               </div>
             ) : (
               <table className="w-full text-left text-sm text-slate-600">
@@ -137,7 +146,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   <tr>
                     <th className="px-6 py-3">Fecha</th>
                     <th className="px-6 py-3">Partido</th>
-                    <th className="px-6 py-3 text-center">Tarjetas</th>
+                    <th className="px-6 py-3 text-center">Tarjetas / Sanción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -151,16 +160,28 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                         <div className="text-xs text-slate-500 capitalize">{ev.match.lugar || 'Visitante'}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex justify-center items-center gap-2">
-                          {ev.yellow > 0 && (
-                            <div className="flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm"></div> {ev.yellow}
-                            </div>
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <div className="flex justify-center items-center gap-2">
+                            {ev.yellow > 0 && (
+                              <div className="flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm"></div> {ev.yellow}
+                              </div>
+                            )}
+                            {ev.red > 0 && (
+                              <div className="flex items-center gap-1 font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                                <div className="w-2.5 h-3.5 bg-red-500 rounded-sm"></div> {ev.red}
+                              </div>
+                            )}
+                          </div>
+                          {(ev.yellow === 2 || (ev.yellow > 0 && ev.red > 0)) && (
+                            <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded whitespace-nowrap">
+                              Doble Amarilla • 1 partido de sanción
+                            </span>
                           )}
-                          {ev.red > 0 && (
-                            <div className="flex items-center gap-1 font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                              <div className="w-2.5 h-3.5 bg-red-500 rounded-sm"></div> {ev.red}
-                            </div>
+                          {ev.red > 0 && ev.yellow === 0 && (
+                            <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded whitespace-nowrap">
+                              Roja Directa • 1 partido de sanción
+                            </span>
                           )}
                         </div>
                       </td>

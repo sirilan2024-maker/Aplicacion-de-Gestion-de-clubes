@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessModule } from "@/lib/auth-helpers"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getCoordinatorDashboardAction } from "@/app/actions/coordinator-actions"
+import { getCoordinatorFullDashboardAction } from "@/app/actions/coordinator-actions"
 import { CoordinadorDashboard } from "@/components/features/admin/CoordinadorDashboard"
 
 export const dynamic = "force-dynamic"
@@ -31,7 +31,7 @@ export default async function CoordinadorPage() {
     redirect("/dashboard/equipos")
   }
 
-  const result = await getCoordinatorDashboardAction()
+  const result = await getCoordinatorFullDashboardAction()
 
   return (
     <CoordinadorDashboard

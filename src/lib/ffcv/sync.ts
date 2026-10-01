@@ -439,11 +439,24 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   }
 
   // 3. Fetch corresponding FFCV matches for active season 26/27 (excluding historical season 21)
-  const { data: ffcvMatches, error: fmErr } = await supabase
+  const clubGroupIds = Array.from(new Set(
+    clubPartidos
+      .map(cp => (cp.teams as any)?.ffcv_group_id)
+      .filter(Boolean)
+  ));
+
+  let ffcvQuery = supabase
     .from('ffcv_matches')
-    .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status')
+    .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status, pitch_name')
     .neq('ffcv_season_id', '21')
-    .eq('ffcv_season_id', '22');
+    .eq('ffcv_season_id', '22')
+    .limit(5000);
+
+  if (clubGroupIds.length > 0) {
+    ffcvQuery = ffcvQuery.in('ffcv_group_id', clubGroupIds);
+  }
+
+  const { data: ffcvMatches, error: fmErr } = await ffcvQuery;
 
   if (fmErr || !ffcvMatches || ffcvMatches.length === 0) {
     return 0;

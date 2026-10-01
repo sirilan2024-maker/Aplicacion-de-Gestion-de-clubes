@@ -1172,16 +1172,9 @@ export async function getCoordinatorFullDashboardAction(params?: {
     }
 
     const { calculatePlayerFfcvDiscipline } = await import('@/lib/coordinator/discipline-engine');
-    const targetSeasonId = await getEffectiveSelectedSeasonId(adminClient, clubId, params?.seasonId);
-
-    // 1. Obtener temporada activa
-    const { data: activeSeason } = await adminClient
-      .from('seasons')
-      .select('id, name, is_active')
-      .eq('id', targetSeasonId)
-      .single();
-
-    const seasonName = activeSeason?.name || 'Temporada 26/27';
+    const effectiveSeason = await getEffectiveSelectedSeasonId(adminClient, clubId, params?.seasonId);
+    const targetSeasonId = effectiveSeason.seasonId;
+    const seasonName = effectiveSeason.seasonName || 'Temporada 26/27';
 
     // 2. Obtener equipos activos del club (excluyendo temporada archivada 25/26)
     let teamsQuery = adminClient
@@ -1377,45 +1370,77 @@ export async function getCoordinatorFullDashboardAction(params?: {
     const totalPlayed = finishedMatches.length;
     const winRate = totalPlayed > 0 ? Math.round((wins / totalPlayed) * 100) : 0;
 
-    // Mini-clasificaciones con datos reales de los 6 equipos
-    const { data: standingsRaw } = await adminClient
-      .from('ffcv_standings')
-      .select('ffcv_group_id, team_name, position, points, played, won, drawn, lost, goals_for, goals_against')
-      .ilike('team_name', '%saladar%')
-      .limit(100);
+    // Obtener datos deportivos base calculados (idénticos a Centro de Control de vista admin)
+    const baseDashboard = await getCoordinatorDashboardAction(targetSeasonId);
+    let sportsData = baseDashboard.data?.sports || {
+      totalPlayedMatches: totalPlayed,
+      wins,
+      draws,
+      losses,
+      goalsFor,
+      goalsAgainst,
+      globalWinRate: winRate,
+      points: (wins * 3) + draws,
+      possiblePoints: totalPlayed * 3,
+      pointsPercentage: totalPlayed > 0 ? Math.round(((wins * 3 + draws) / (totalPlayed * 3)) * 100) : 0,
+      attendanceRate: globalWeeklyRate,
+      topScorer: null,
+      topMinutes: null,
+      teamStats: [] as any[],
+    };
 
-    const teamStandings = filteredTeams.map((t, idx) => {
-      const matchInStandings = (standingsRaw || []).find(st =>
-        t.name.toLowerCase().includes(st.team_name.toLowerCase()) || st.team_name.toLowerCase().includes(t.name.toLowerCase())
-      );
+    if (params?.category && params.category !== 'todos' && sportsData.teamStats) {
+      sportsData = {
+        ...sportsData,
+        teamStats: (sportsData.teamStats as any[]).filter((ts: any) =>
+          (ts.teamCategory || '').toLowerCase().includes(params.category!.toLowerCase()) ||
+          ts.teamName.toLowerCase().includes(params.category!.toLowerCase())
+        ),
+      };
+    }
+    if (params?.teamId && params.teamId !== 'all' && sportsData.teamStats) {
+      sportsData = {
+        ...sportsData,
+        teamStats: (sportsData.teamStats as any[]).filter((ts: any) => ts.teamId === params.teamId),
+      };
+    }
 
-      const teamMatches = finishedMatches.filter(m => m.equipo_id === t.id);
-      let tWins = 0, tDraws = 0, tGf = 0, tGa = 0;
-      teamMatches.forEach(m => {
-        const gp = m.resultado_propio ?? 0;
-        const gr = m.resultado_rival ?? 0;
-        tGf += gp;
-        tGa += gr;
-        if (gp > gr) tWins++;
-        else if (gp === gr) tDraws++;
-      });
+    // 9. AGENDA: Consultar próximos entrenamientos de los equipos del club
+    const todayDate = new Date().toISOString().split('T')[0];
+    const { data: upcomingTrainingsRaw } = await adminClient
+      .from('team_events')
+      .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
+      .in('team_id', allClubTeams.map(t => t.id))
+      .eq('event_type', 'Entrenamiento')
+      .gte('date', todayDate)
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true })
+      .limit(15);
+
+    const upcomingTrainings = (upcomingTrainingsRaw || []).map((e: any) => {
+      const t = e.teams as any;
+      const rawCoach = t?.coach_id ? (allClubTeams.find(ct => ct.id === e.team_id) as any)?.coach : null;
+      const coach: any = Array.isArray(rawCoach) ? rawCoach[0] : rawCoach;
+      const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : null;
 
       return {
-        teamId: t.id,
-        teamName: t.name,
-        category: t.category,
-        position: matchInStandings?.position || (idx + 1),
-        played: matchInStandings?.played || teamMatches.length,
-        points: matchInStandings?.points || (tWins * 3 + tDraws),
-        goalsFor: matchInStandings?.goals_for || tGf,
-        goalsAgainst: matchInStandings?.goals_against || tGa,
+        id: e.id,
+        title: e.title || 'Entrenamiento',
+        date: e.date,
+        startTime: (e.start_time || '18:00').substring(0, 5),
+        endTime: e.end_time ? e.end_time.substring(0, 5) : null,
+        location: e.location || 'Polideportivo Municipal del Saladar',
+        teamName: t?.name || 'Equipo',
+        teamCategory: t?.category || '',
+        teamColor: t?.color || null,
+        coachName,
+        eventType: e.event_type || 'Entrenamiento',
       };
     });
 
-    // 9. AGENDA Y CUADRÍCULA DE CAMPOS REALES
-    const selectedDateStr = params?.date || now.toISOString().split('T')[0];
+    const selectedDateStr = params?.date || todayDate;
 
-    // Primero consultar eventos del día seleccionado
+    // Consultar eventos del día seleccionado para la cuadrícula de campos
     let { data: eventsRaw } = await adminClient
       .from('team_events')
       .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
@@ -1423,12 +1448,13 @@ export async function getCoordinatorFullDashboardAction(params?: {
       .in('team_id', allClubTeams.map(t => t.id))
       .order('start_time', { ascending: true });
 
-    // Si no hay eventos programados en esa fecha exacta, mostrar los entrenamientos reales más cercanos
     if (!eventsRaw || eventsRaw.length === 0) {
+      // Si el día exacto no tiene eventos, traer sesiones próximas de la semana
       const { data: nearbyEvents } = await adminClient
         .from('team_events')
         .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
         .in('team_id', allClubTeams.map(t => t.id))
+        .gte('date', todayDate)
         .order('date', { ascending: true })
         .limit(12);
       eventsRaw = nearbyEvents || [];
@@ -1438,7 +1464,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
       (eventsRaw || []).map(e => e.location || 'Polideportivo Municipal del Saladar')
     ));
     if (availablePitches.length === 0) {
-      availablePitches.push('Polideportivo Municipal del Saladar', 'Campo Principal', 'Campo Anexo');
+      availablePitches.push('Polideportivo Municipal del Saladar', 'Estadio Pepe Díaz, El Saladar', 'Campo Principal');
     }
 
     const slots = (eventsRaw || []).map(e => {
@@ -1531,22 +1557,16 @@ export async function getCoordinatorFullDashboardAction(params?: {
           categories: attendanceCategories,
           activeInjuries,
         },
-        sports: {
-          weekend: {
-            playedMatches: totalPlayed,
-            wins,
-            draws,
-            losses,
-            goalsFor,
-            goalsAgainst,
-            winRate,
-          },
-          teamStandings,
+        sports: sportsData,
+        injuries: {
+          activeInjuriesCount: baseDashboard.data?.injuries?.activeInjuriesCount ?? activeInjuries.length,
+          activeInjuriesList: baseDashboard.data?.injuries?.activeInjuriesList ?? activeInjuries,
         },
         schedule: {
           selectedDate: selectedDateStr,
           availablePitches,
           slots,
+          upcomingTrainings,
         },
       },
     };

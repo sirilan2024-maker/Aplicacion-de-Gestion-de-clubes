@@ -15,7 +15,7 @@ import { CoordinatorHeader } from "@/components/coordinator/CoordinatorHeader";
 import { CriticalAlertsBanner } from "@/components/coordinator/CriticalAlertsBanner";
 import { DisciplineSection } from "@/components/coordinator/DisciplineSection";
 import { AttendanceOperationsSection } from "@/components/coordinator/AttendanceOperationsSection";
-import { SportsPerformanceSection } from "@/components/coordinator/SportsPerformanceSection";
+import { SituacionDeportivaSection } from "@/components/features/admin/SituacionDeportivaSection";
 import { PitchesTimelineSection } from "@/components/coordinator/PitchesTimelineSection";
 import { FfcvCategory, CoordinatorDashboardFullData } from "@/types/coordinator";
 
@@ -122,10 +122,10 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
   }
 
   // Lista de equipos para el selector de cabecera
-  const teamsList = (data.sports.teamStandings || []).map((t) => ({
+  const teamsList = (((data.sports as any)?.teamStats || (data.sports as any)?.teamStandings || []) as any[]).map((t: any) => ({
     id: t.teamId,
     name: t.teamName,
-    category: t.category,
+    category: t.teamCategory || t.category || '',
     color: null,
   }));
 
@@ -232,15 +232,23 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           onPeriodChange={handleAttendancePeriodChange}
         />
 
-        {/* 6. Situación Deportiva (Resultados del fin de semana y clasificaciones) */}
-        <SportsPerformanceSection
-          weekend={sports.weekend}
-          teamStandings={sports.teamStandings}
+        {/* 6. Situación Deportiva (Exactamente igual al Centro de Control / Admin Inicio) */}
+        <SituacionDeportivaSection
+          sports={data.sports as any}
+          kpis={{
+            activePlayers: data.kpis.totalPlayers,
+            activeTeams: data.kpis.totalTeams,
+          }}
+          injuries={{
+            activeInjuriesCount: data.injuries?.activeInjuriesCount || 0,
+            activeInjuriesList: data.injuries?.activeInjuriesList || [],
+          }}
         />
 
         {/* 7. Agenda de Entrenamientos y Distribución de Campos */}
         <PitchesTimelineSection
           slots={schedule.slots}
+          upcomingTrainings={schedule.upcomingTrainings}
           availablePitches={schedule.availablePitches}
           selectedDate={selectedDate}
           onDateChange={handleDateChange}

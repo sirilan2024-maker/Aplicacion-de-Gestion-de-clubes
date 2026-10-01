@@ -84,6 +84,20 @@ export interface SportsWeekendSummary {
   };
 }
 
+export interface UpcomingTrainingItem {
+  id: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime?: string | null;
+  location: string;
+  teamName: string;
+  teamCategory?: string;
+  teamColor?: string | null;
+  coachName?: string | null;
+  eventType?: string;
+}
+
 export interface CoordinatorDashboardFullData {
   seasonId: string;
   seasonName: string;
@@ -120,23 +134,56 @@ export interface CoordinatorDashboardFullData {
     activeInjuries: ActiveInjuryItem[];
   };
   sports: {
-    weekend: SportsWeekendSummary;
-    teamStandings: Array<{
+    totalPlayedMatches: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    globalWinRate: number;
+    points: number;
+    possiblePoints: number;
+    pointsPercentage: number;
+    attendanceRate: number;
+    topScorer?: {
+      playerId: string;
+      playerName: string;
+      goals: number;
+      teamName: string;
+    } | null;
+    topMinutes?: {
+      playerId: string;
+      playerName: string;
+      minutesPlayed: number;
+      teamName: string;
+    } | null;
+    teamStats?: Array<{
       teamId: string;
       teamName: string;
-      category: string;
+      teamCategory: string;
       competitionName?: string;
-      position: number;
-      played: number;
-      points: number;
+      groupName?: string;
+      currentPosition?: number;
+      totalTeamsInGroup?: number;
+      matchesPlayed: number;
+      wins: number;
+      draws: number;
+      losses: number;
       goalsFor: number;
       goalsAgainst: number;
-      statusBadge?: string;
+      goalDiff: number;
+      points: number;
+      winRate: number;
     }>;
+  };
+  injuries: {
+    activeInjuriesCount: number;
+    activeInjuriesList?: any[];
   };
   schedule: {
     selectedDate: string;
     availablePitches: string[];
     slots: PitchTimelineSlot[];
+    upcomingTrainings: UpcomingTrainingItem[];
   };
 }

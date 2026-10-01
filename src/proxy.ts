@@ -96,18 +96,21 @@ export async function proxy(request: NextRequest) {
     }
 
     const currentPath = request.nextUrl.pathname;
-    const isSuperOrAdmin = allRoles.some(r => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+    const activeIsAdmin = role && ['admin', 'superadmin', 'administrador', 'admin_club'].includes(role);
+    const isSuperOrAdmin = role ? activeIsAdmin : allRoles.some(r => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
 
     // Aislamiento estricto de roles dentro de /admin:
     if (!isSuperOrAdmin) {
-      const isCoord = role === 'coordinador' || role === 'coordinador_general' || allRoles.includes('coordinador');
+      const isCoord = role === 'coordinador' || role === 'coordinador_general' || (!role && (allRoles.includes('coordinador') || allRoles.includes('coordinador_general')));
       if (isCoord) {
         if (
           currentPath === '/admin' ||
           currentPath === '/admin/' ||
           currentPath === '/admin/inicio' ||
           currentPath.startsWith('/admin/tesoreria') ||
-          currentPath.startsWith('/admin/configuracion')
+          currentPath.startsWith('/admin/configuracion') ||
+          currentPath.startsWith('/admin/temporadas') ||
+          currentPath.startsWith('/admin/ffcv-api')
         ) {
           const url = request.nextUrl.clone()
           url.pathname = '/admin/coordinador'
@@ -115,8 +118,8 @@ export async function proxy(request: NextRequest) {
         }
       }
 
-      const isMetodologo = role === 'metodologo' || role === 'metodologia' || allRoles.includes('metodologo');
-      if (isMetodologo && (currentPath === '/admin' || currentPath === '/admin/' || currentPath === '/admin/inicio')) {
+      const isMetodologo = role === 'metodologo' || role === 'metodologia' || (!role && (allRoles.includes('metodologo') || allRoles.includes('metodologia')));
+      if (isMetodologo && (currentPath === '/admin' || currentPath === '/admin/' || currentPath === '/admin/inicio' || currentPath.startsWith('/admin/tesoreria') || currentPath.startsWith('/admin/configuracion'))) {
         const url = request.nextUrl.clone()
         url.pathname = '/admin/metodologia'
         return NextResponse.redirect(url)

@@ -242,9 +242,9 @@ export default function AdminAsistenciaPage() {
     setViewMode("days")
   }
 
-  const isCoordinator = userRole === 'coordinador' || userRole === 'coordinador_general'
-  const backHref = isCoordinator ? '/admin/coordinador' : '/admin/inicio'
-  const backLabel = isCoordinator ? 'Panel Coordinador' : 'Centro de Control'
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const backHref = isAdmin ? '/admin/inicio' : '/admin/coordinador'
+  const backLabel = isAdmin ? 'Centro de Control' : 'Panel Coordinador'
 
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 overflow-x-hidden">

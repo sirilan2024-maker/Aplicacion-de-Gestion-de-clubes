@@ -434,10 +434,14 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                         const res = await switchActiveRoleAction(newRole);
                         if (res.success) {
                           let targetUrl = '/dashboard';
-                          if (newRole === 'admin') {
+                          if (newRole === 'admin' || newRole === 'superadmin') {
                             targetUrl = '/admin/inicio';
-                          } else if (newRole === 'coordinador') {
+                          } else if (newRole === 'coordinador' || newRole === 'coordinador_general') {
                             targetUrl = '/admin/coordinador';
+                          } else if (newRole === 'metodologo' || newRole === 'metodologia') {
+                            targetUrl = '/admin/metodologia';
+                          } else if (newRole === 'utillero') {
+                            targetUrl = '/dashboard/utilleria';
                           } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
                             targetUrl = '/dashboard/mis-equipos';
                           } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {

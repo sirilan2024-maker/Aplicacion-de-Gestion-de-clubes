@@ -113,11 +113,11 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
           <Link
-            href={userRole === 'coordinador' || userRole === 'coordinador_general' ? '/admin/coordinador' : '/admin/inicio'}
+            href={userRole === 'admin' || userRole === 'superadmin' ? '/admin/inicio' : '/admin/coordinador'}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{userRole === 'coordinador' || userRole === 'coordinador_general' ? 'Panel Coordinador' : 'Centro de Control'}</span>
+            <span>{userRole === 'admin' || userRole === 'superadmin' ? 'Centro de Control' : 'Panel Coordinador'}</span>
           </Link>
           <Link
             href={`/dashboard/equipos/${team.id}/partidos`}

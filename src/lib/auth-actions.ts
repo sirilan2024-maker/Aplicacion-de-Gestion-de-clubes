@@ -33,11 +33,19 @@ export async function login(formData: FormData) {
   const role = (profile?.role as string) ?? 'coach';
   const roles: string[] = profile?.roles || [];
   let destination = '/dashboard';
-  if (role === 'admin' || roles.includes('admin')) destination = '/admin/inicio';
-  else if (role === 'coordinador' || roles.includes('coordinador')) destination = '/admin/coordinador';
-  else if (role === 'coach' || role === 'entrenador') destination = '/dashboard/mis-equipos';
-  else if (role === 'jugador') destination = '/dashboard';
-  else if (role === 'tutor' || role === 'familia' || role === 'family') {
+  if (role === 'admin' || role === 'superadmin') {
+    destination = '/admin/inicio';
+  } else if (role === 'coordinador' || role === 'coordinador_general') {
+    destination = '/admin/coordinador';
+  } else if (role === 'coach' || role === 'entrenador') {
+    destination = '/dashboard/mis-equipos';
+  } else if (role === 'metodologo' || role === 'metodologia') {
+    destination = '/admin/metodologia';
+  } else if (role === 'utillero') {
+    destination = '/dashboard/utilleria';
+  } else if (role === 'jugador') {
+    destination = '/dashboard';
+  } else if (role === 'tutor' || role === 'familia' || role === 'family') {
     // Check if they have linked children to redirect them straight into the context
     const { data: tutors } = await supabase
       .from('player_tutors')
@@ -51,8 +59,15 @@ export async function login(formData: FormData) {
     } else {
       destination = '/dashboard/family';
     }
+  } else if (roles.includes('admin') || roles.includes('superadmin')) {
+    destination = '/admin/inicio';
+  } else if (roles.includes('coordinador') || roles.includes('coordinador_general')) {
+    destination = '/admin/coordinador';
+  } else if (roles.includes('coach') || roles.includes('entrenador')) {
+    destination = '/dashboard/mis-equipos';
+  } else {
+    destination = '/dashboard/mi-perfil';
   }
-  else destination = '/dashboard/mi-perfil';
 
   revalidatePath('/', 'layout');
   return redirect(destination);

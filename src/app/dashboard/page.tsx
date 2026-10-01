@@ -21,10 +21,14 @@ export default async function DashboardPage() {
   // 1. Respetar PRIMERO el rol activo seleccionado (profile.role)
   if (role === 'admin' || role === 'superadmin') {
     redirect('/admin/inicio');
-  } else if (role === 'coordinador') {
+  } else if (role === 'coordinador' || role === 'coordinador_general') {
     redirect('/admin/coordinador');
   } else if (role === 'coach' || role === 'entrenador') {
     redirect('/dashboard/mis-equipos');
+  } else if (role === 'metodologo' || role === 'metodologia') {
+    redirect('/admin/metodologia');
+  } else if (role === 'utillero') {
+    redirect('/dashboard/utilleria');
   } else if (role === 'jugador') {
     const { data: playerRec } = await supabase
       .from('players')
@@ -56,8 +60,10 @@ export default async function DashboardPage() {
 
   // 2. Si no hay rol activo o no coincide, evaluar roles secundarios en profile.roles por jerarquía
   if (userRoles.includes('admin') || userRoles.includes('superadmin')) redirect('/admin/inicio');
-  else if (userRoles.includes('coordinador')) redirect('/admin/coordinador');
+  else if (userRoles.includes('coordinador') || userRoles.includes('coordinador_general')) redirect('/admin/coordinador');
   else if (userRoles.includes('coach') || userRoles.includes('entrenador')) redirect('/dashboard/mis-equipos');
+  else if (userRoles.includes('metodologo') || userRoles.includes('metodologia')) redirect('/admin/metodologia');
+  else if (userRoles.includes('utillero')) redirect('/dashboard/utilleria');
   else if (userRoles.includes('jugador')) {
     const { data: playerRec } = await supabase
       .from('players')

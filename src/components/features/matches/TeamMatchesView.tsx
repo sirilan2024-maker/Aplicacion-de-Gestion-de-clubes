@@ -7,9 +7,11 @@ import { FFCVMatchesSection } from "@/components/features/matches/FFCVMatchesSec
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 import { TeamDisciplineView } from "@/components/features/matches/TeamDisciplineView"
 import { ActasView } from "@/components/features/matches/ActasView"
-import { AlertCircle, FileText, Trophy, Calendar } from "lucide-react"
+import { AlertCircle, FileText, Trophy, Calendar, RefreshCw } from "lucide-react"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
 import { useExport } from "@/components/providers/ExportContext"
+import { createClient } from "@/lib/supabase/client"
+import { syncTeamFFCVAction } from "@/app/actions/ffcv-actions"
 
 interface TeamMatchesViewProps {
   teamId: string;
@@ -108,6 +110,40 @@ export function TeamMatchesView({
   }, [serverTeamData, serverMatches, serverTeams, serverPlayers, serverConvocatorias]);
 
   const { setExportData } = useExport()
+
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [syncRefreshTrigger, setSyncRefreshTrigger] = useState(0)
+
+  const handleSyncFFCV = async () => {
+    if (!teamId || isSyncing) return
+    setIsSyncing(true)
+    setSyncMessage(null)
+    try {
+      const res = await syncTeamFFCVAction(teamId)
+      if (res.success) {
+        setSyncMessage("¡Sincronizado con éxito con la FFCV!")
+        setSyncRefreshTrigger(prev => prev + 1)
+        const supabase = createClient()
+        const { data: updatedMatches } = await supabase
+          .from("partidos")
+          .select("*, equipo:teams(name, category, color)")
+          .eq("equipo_id", teamId)
+          .neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
+          .order("fecha_hora", { ascending: true })
+        if (updatedMatches) {
+          setData(prev => ({ ...prev, matches: updatedMatches }))
+        }
+      } else {
+        setSyncMessage(`Error: ${res.error || "No se pudo sincronizar"}`)
+      }
+    } catch (err: any) {
+      setSyncMessage(`Error: ${err?.message || "Error de conexión"}`)
+    } finally {
+      setIsSyncing(false)
+      setTimeout(() => setSyncMessage(null), 5000)
+    }
+  }
 
   // Calculate apercibidos from server data
   const apercibidosCount = useMemo(() => {
@@ -272,30 +308,49 @@ export function TeamMatchesView({
         /* VISTA "PARTIDOS" (Doble Sección: Partidos del Club vs Calendario FFCV) */
         <div className="space-y-6 pt-2">
           {ffcvGroupId && (
-            <div className="flex items-center justify-start border-b border-slate-200 pb-3 gap-2">
-              <button
-                onClick={() => handleSubTabChange('club')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                  matchesSubTab === 'club'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                Partidos del Club
-              </button>
+            <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSubTabChange('club')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    matchesSubTab === 'club'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Partidos del Club
+                </button>
 
-              <button
-                onClick={() => handleSubTabChange('ffcv')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                  matchesSubTab === 'ffcv'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'
-                }`}
-              >
-                <Trophy className="w-3.5 h-3.5" />
-                Calendario Oficial FFCV
-              </button>
+                <button
+                  onClick={() => handleSubTabChange('ffcv')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    matchesSubTab === 'ffcv'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  Calendario Oficial FFCV
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {syncMessage && (
+                  <span className={`text-xs font-bold ${syncMessage.startsWith('Error') ? 'text-rose-600' : 'text-emerald-600'} animate-in fade-in`}>
+                    {syncMessage}
+                  </span>
+                )}
+                <button
+                  onClick={handleSyncFFCV}
+                  disabled={isSyncing}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs hover:shadow-xs transition-all flex items-center gap-2 disabled:opacity-50"
+                  title="Sincronizar horarios y resultados oficiales con la FFCV"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar FFCV'}</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -315,8 +370,8 @@ export function TeamMatchesView({
               teamName={teamName}
               groupInfo={serverGroupInfo}
               ffcvSeasonId={serverTeamData?.ffcv_season_id || '22'}
+              refreshTrigger={syncRefreshTrigger}
             />
-
           )}
         </div>
       )}

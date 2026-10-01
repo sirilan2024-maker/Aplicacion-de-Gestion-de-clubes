@@ -66,13 +66,33 @@ export function normalizeTime(timeStr?: string | null): string | null {
 }
 
 /**
+ * Format Spain date & time to ISO string with exact Europe/Madrid UTC offset (+01:00 in winter, +02:00 in summer)
+ */
+export function formatSpainDateTimeToIso(dateStr?: string | null, timeStr?: string | null): string | null {
+  const normDate = normalizeDate(dateStr);
+  if (!normDate) return null;
+  const normTime = normalizeTime(timeStr) || '12:00:00';
+  
+  // Calculate exact timezone offset for Europe/Madrid on that date
+  const d = new Date(`${normDate}T12:00:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Madrid',
+    timeZoneName: 'shortOffset'
+  }).formatToParts(d);
+  const tzPart = parts.find(p => p.type === 'timeZoneName');
+  const raw = tzPart ? tzPart.value.replace('GMT', '') : '+2';
+  const sign = raw.startsWith('-') ? '-' : '+';
+  const num = raw.replace(/[+-]/g, '').split(':')[0].padStart(2, '0');
+  const offset = `${sign}${num}:00`;
+  
+  return `${normDate}T${normTime}${offset}`;
+}
+
+/**
  * Combine date and time into ISO timestamp
  */
 export function combineDateTime(dateStr?: string | null, timeStr?: string | null): string | null {
-  const normDate = normalizeDate(dateStr);
-  if (!normDate) return null;
-  const normTime = normalizeTime(timeStr) || '00:00:00';
-  return `${normDate}T${normTime}+02:00`; // Europe/Madrid local offset
+  return formatSpainDateTimeToIso(dateStr, timeStr);
 }
 
 /**

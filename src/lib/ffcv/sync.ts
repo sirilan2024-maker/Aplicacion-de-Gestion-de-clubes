@@ -6,7 +6,8 @@ import {
 } from './client';
 import {
   normalizeStandingItem,
-  normalizeMatchItem
+  normalizeMatchItem,
+  formatSpainDateTimeToIso
 } from './parser';
 import {
   FFCVSyncOptions,
@@ -465,7 +466,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
     };
 
     // A. Match by acta_oficial_url containing ffcv_match_id (STRICT: must involve our club)
-    let fm = ffcvMatches.find(f => {
+    let fm = ffcvMatches.find((f: any) => {
       if (!isOurMatch(f)) return false;
       return pm.acta_oficial_url && (
         pm.acta_oficial_url.includes(String(f.ffcv_match_id)) ||
@@ -478,7 +479,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       const pRivalNorm = normalizeMatchRivalName(pm.rival_nombre || '');
       const pDate = pm.fecha_hora ? new Date(pm.fecha_hora) : null;
 
-      fm = ffcvMatches.find(f => {
+      fm = ffcvMatches.find((f: any) => {
         // CRITICAL GUARD: Never match a match between third-party clubs
         if (!isOurMatch(f)) return false;
 
@@ -525,11 +526,13 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
     // Check date and time updates if published by FFCV
     if (fm.match_date && fm.match_time) {
-      const ffcvIso = `${fm.match_date}T${fm.match_time}+02:00`;
-      const currentMs = new Date(pm.fecha_hora).getTime();
-      const ffcvMs = new Date(ffcvIso).getTime();
-      if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
-        updates.fecha_hora = ffcvIso;
+      const ffcvIso = formatSpainDateTimeToIso(fm.match_date, fm.match_time);
+      if (ffcvIso) {
+        const currentMs = new Date(pm.fecha_hora).getTime();
+        const ffcvMs = new Date(ffcvIso).getTime();
+        if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
+          updates.fecha_hora = ffcvIso;
+        }
       }
     }
 
@@ -546,6 +549,20 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
       if (!upErr) {
         updatedCount++;
+
+        // Keep linked team_events synchronized if date or time changed
+        if (updates.fecha_hora && fm.match_date && fm.match_time) {
+          const normTime = fm.match_time.length === 5 ? `${fm.match_time}:00` : fm.match_time;
+          await supabase
+            .from('team_events')
+            .update({
+              date: fm.match_date,
+              start_time: normTime
+            })
+            .eq('team_id', pm.equipo_id)
+            .eq('event_type', 'Partido')
+            .ilike('title', `%${pm.rival_nombre}%`);
+        }
       } else {
         console.warn(`[propagateFfcvMatchesToClubPartidos] Error updating partido ${pm.id}:`, upErr.message);
       }

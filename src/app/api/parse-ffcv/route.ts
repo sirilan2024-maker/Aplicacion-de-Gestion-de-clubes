@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import PDFParser from 'pdf2json';
+import { formatSpainDateTimeToIso } from '@/lib/ffcv/parser';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -15,23 +16,22 @@ function normalizeTeamName(name: string): string {
     .trim();
 }
 
-function safeParseDateTime(fechaHoraRaw: string, defaultDateStr?: string): Date | null {
+function safeParseDateTime(fechaHoraRaw: string, defaultDateStr?: string): string | null {
   let targetStr = fechaHoraRaw || defaultDateStr || "";
   if (!targetStr) return null;
 
   const match = targetStr.match(/(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\s*(?:-\s*|\s+)?(\d{1,2})?:?(\d{2})?/);
   if (match) {
-    const day = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10) - 1;
+    const day = String(parseInt(match[1], 10)).padStart(2, '0');
+    const month = String(parseInt(match[2], 10)).padStart(2, '0');
     let year = parseInt(match[3], 10);
     if (year < 100) year += 2000;
-    const hour = match[4] ? parseInt(match[4], 10) : 12;
-    const min = match[5] ? parseInt(match[5], 10) : 0;
+    const hour = match[4] ? String(parseInt(match[4], 10)).padStart(2, '0') : '12';
+    const min = match[5] ? String(parseInt(match[5], 10)).padStart(2, '0') : '00';
 
-    if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 2020 && year <= 2035) {
-      const d = new Date(year, month, day, hour, min);
-      if (!isNaN(d.getTime())) return d;
-    }
+    const dateStr = `${year}-${month}-${day}`;
+    const timeStr = `${hour}:${min}:00`;
+    return formatSpainDateTimeToIso(dateStr, timeStr);
   }
   return null;
 }
@@ -232,7 +232,7 @@ export async function POST(req: Request) {
         equipo_id: equipoId,
         rival_nombre: rivalNombre.substring(0, 80),
         lugar: lugar,
-        fecha_hora: fechaHora.toISOString(),
+        fecha_hora: fechaHora,
         resultado_propio: resultadoPropio,
         resultado_rival: resultadoRival,
         estado: estado,

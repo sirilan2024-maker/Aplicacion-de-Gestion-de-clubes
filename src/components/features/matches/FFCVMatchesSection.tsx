@@ -14,6 +14,7 @@ interface FFCVMatchesSectionProps {
   initialMatches?: FFCVMatchRecord[];
   groupInfo?: FFCVGroupRecord | null;
   ffcvSeasonId?: string | null;
+  refreshTrigger?: number;
 }
 
 export function FFCVMatchesSection({
@@ -24,6 +25,7 @@ export function FFCVMatchesSection({
   initialMatches = [],
   groupInfo,
   ffcvSeasonId,
+  refreshTrigger = 0,
 }: FFCVMatchesSectionProps) {
 
   const [matches, setMatches] = useState<FFCVMatchRecord[]>(initialMatches);
@@ -81,7 +83,7 @@ export function FFCVMatchesSection({
     }
 
     loadFFCVMatches();
-  }, [ffcvGroupId]);
+  }, [ffcvGroupId, refreshTrigger]);
 
   // Available matchdays in competition (e.g., 1 to 30)
   const availableJornadas = useMemo(() => {

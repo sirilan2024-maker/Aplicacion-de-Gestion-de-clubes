@@ -441,7 +441,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   // 3. Fetch corresponding FFCV matches for active season 26/27 (excluding historical season 21)
   const clubGroupIds = Array.from(new Set(
     clubPartidos
-      .map(cp => (cp.teams as any)?.ffcv_group_id)
+      .map((cp: any) => (cp.teams as any)?.ffcv_group_id)
       .filter(Boolean)
   ));
 

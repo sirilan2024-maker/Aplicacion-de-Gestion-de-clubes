@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Swords, Calendar, Clock, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck, ChevronRight, ClipboardCheck, FileText, CheckCircle2, Edit3 } from "lucide-react"
+import { Swords, Calendar, Clock, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck, ChevronRight, ClipboardCheck, FileText, CheckCircle2, Edit3, RefreshCw } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
 import { deleteMatchAction } from "@/app/actions/match-actions"
+import { syncTeamFFCVAction, syncAllFFCVAction } from "@/app/actions/ffcv-actions"
 import { useSeason } from "@/components/providers/SeasonProvider"
 import { ManageMatchModal } from "./ManageMatchModal"
 import { QuickConvocatoriaModal } from "./QuickConvocatoriaModal"
@@ -260,6 +261,58 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
 
   const [ffcvMatches, setFfcvMatches] = useState<any[]>([])
   const [ffcvStandings, setFfcvStandings] = useState<any[]>([])
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+
+  const handleSyncFFCV = async () => {
+    if (isSyncing) return
+    setIsSyncing(true)
+    setSyncMessage(null)
+    try {
+      let res
+      if (selectedTeamId && selectedTeamId !== "all") {
+        res = await syncTeamFFCVAction(selectedTeamId)
+      } else {
+        res = await syncAllFFCVAction()
+      }
+
+      if (res.success) {
+        setSyncMessage("¡Sincronizado con éxito con la FFCV!")
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single()
+          if (profile?.club_id) {
+            let mQuery = supabase
+              .from('partidos')
+              .select(`
+                *,
+                equipo:teams (id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url)
+              `)
+              .eq('club_id', profile.club_id)
+              .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+              .order('fecha_hora', { ascending: true })
+
+            if (fixedTeamId) {
+              mQuery = mQuery.eq('equipo_id', fixedTeamId)
+            }
+            const { data: updatedMatches } = await mQuery
+            if (updatedMatches) {
+              setMatches(updatedMatches)
+            }
+          }
+        }
+      } else {
+        setSyncMessage(`Error: ${res.error || "No se pudo sincronizar"}`)
+      }
+    } catch (err: any) {
+      setSyncMessage(`Error: ${err?.message || "Error de conexión"}`)
+    } finally {
+      setIsSyncing(false)
+      setTimeout(() => setSyncMessage(null), 5000)
+    }
+  }
+
   const [viewingFfcvActa, setViewingFfcvActa] = useState<{
     codacta: string;
     matchId?: string;
@@ -414,15 +467,32 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
           <p className="text-slate-500 mt-1">Aqui tienes toda la informacion de calendarios, partidos y clasificaciones de los equipos tu club.</p>
         </div>
         {!isReadOnly && (
-          <button
-            onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors self-start sm:self-auto shadow-sm"
-          >
-            <Plus className="w-5 h-5" />
-            Nuevo Partido
-          </button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={handleSyncFFCV}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
+              title="Sincronizar partidos con la FFCV"
+            >
+              <RefreshCw className={`w-4 h-4 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar FFCV'}</span>
+            </button>
+            <button
+              onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              Nuevo Partido
+            </button>
+          </div>
         )}
       </div>
+
+      {syncMessage && (
+        <div className={`p-3 rounded-lg text-sm font-medium ${syncMessage.startsWith('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+          {syncMessage}
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">

@@ -60,6 +60,31 @@ export async function syncTeamFFCVAction(
 }
 
 /**
+ * Server Action to manually sync all configured FFCV teams in the club
+ */
+export async function syncAllFFCVAction(
+  options?: { syncAllMatchdays?: boolean; specificMatchday?: number }
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return { success: false, error: 'No autorizado. Debes iniciar sesión.' };
+    }
+
+    const { syncAllConfiguredFFCVTeams } = await import('@/lib/ffcv/sync');
+    const result = await syncAllConfiguredFFCVTeams(options);
+    revalidatePath('/dashboard/matches');
+    revalidatePath('/admin/partidos');
+    return { success: true, data: result };
+  } catch (err: any) {
+    console.error('[syncAllFFCVAction] Error:', err);
+    return { success: false, error: err.message || 'Error durante la sincronización global FFCV' };
+  }
+}
+
+/**
  * Server Action to fetch official match report details from FFCV
  * Automatically synchronizes the official score and status to both
  * ffcv_matches and the internal partidos table when the match is played/closed.

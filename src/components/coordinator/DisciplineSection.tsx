@@ -139,96 +139,175 @@ export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionP
           No hay jugadores en seguimiento disciplinario con los filtros seleccionados.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200/80">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                <th className="py-2.5 px-3">Jugador</th>
-                <th className="py-2.5 px-3">Equipo</th>
-                <th className="py-2.5 px-3 text-center">Tarjetas (🟨 / 🟥)</th>
-                <th className="py-2.5 px-3 text-center">Ciclo FFCV</th>
-                <th className="py-2.5 px-3">Estado</th>
-                <th className="py-2.5 px-3 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {filteredRecords.map((r) => {
-                const isSuspended = r.status === "Sancionado";
-                const isApercibido = r.status === "Apercibido";
+        <>
+          {/* Vista Escritorio (Tabla completa md+) */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200/80">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-2.5 px-3">Jugador</th>
+                  <th className="py-2.5 px-3">Equipo</th>
+                  <th className="py-2.5 px-3 text-center">Tarjetas (🟨 / 🟥)</th>
+                  <th className="py-2.5 px-3 text-center">Ciclo FFCV</th>
+                  <th className="py-2.5 px-3">Estado</th>
+                  <th className="py-2.5 px-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {filteredRecords.map((r) => {
+                  const isSuspended = r.status === "Sancionado";
+                  const isApercibido = r.status === "Apercibido";
 
-                return (
-                  <tr
-                    key={r.playerId}
-                    onClick={() => onPlayerClick?.(r.playerId)}
-                    className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                  >
-                    <td className="py-2.5 px-3 font-bold text-slate-900">
-                      <div className="flex items-center gap-2">
+                  return (
+                    <tr
+                      key={r.playerId}
+                      onClick={() => onPlayerClick?.(r.playerId)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                    >
+                      <td className="py-2.5 px-3 font-bold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          {r.playerDorsal && (
+                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                              {r.playerDorsal}
+                            </span>
+                          )}
+                          <span className="group-hover:text-indigo-600 transition-colors">
+                            {r.playerName}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-3 text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: r.teamColor || "#6366f1" }}
+                          />
+                          <span className="font-semibold text-slate-800">{r.teamName}</span>
+                          <span className="text-[10px] text-slate-400">({r.teamCategory})</span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-3 text-center font-bold">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px]">
+                          🟨 {r.yellowCardsTotal}
+                        </span>
+                        {(r.directRedsCount > 0 || r.doubleYellowsCount > 0) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 text-[11px] ml-1">
+                            🟥 {r.directRedsCount + r.doubleYellowsCount}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {[1, 2, 3, 4, 5].map((step) => {
+                            const filled = r.currentCycleAccumulated >= step;
+                            return (
+                              <span
+                                key={step}
+                                className={`w-2 h-2 rounded-full ${
+                                  filled
+                                    ? step === 5
+                                      ? "bg-red-500"
+                                      : "bg-amber-400"
+                                    : "bg-slate-200"
+                                }`}
+                                title={`Amarilla ${step} del ciclo`}
+                              />
+                            );
+                          })}
+                          <span className="text-[10px] text-slate-400 ml-1">
+                            ({r.currentCycleAccumulated}/5)
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-3">
+                        {isSuspended ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
+                            <ShieldAlert className="w-3 h-3 text-red-600" />
+                            Sancionado
+                          </span>
+                        ) : isApercibido ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            Apercibido
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            OK
+                          </span>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5 max-w-[200px] truncate" title={r.statusReason}>
+                          {r.statusReason}
+                        </p>
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right">
+                        {(isSuspended || isApercibido) && (
+                          <button
+                            onClick={(e) => handleNotifyCoach(e, r)}
+                            disabled={alertingId === r.playerId}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                            title="Enviar aviso preventivo al entrenador del equipo"
+                          >
+                            <Bell className={`w-3 h-3 ${alertingId === r.playerId ? "animate-spin" : ""}`} />
+                            <span>{alertingId === r.playerId ? "Enviando..." : "Avisar"}</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Vista Móvil Touch SIN SCROLL HORIZONTAL (Tarjetas individuales en bloque) */}
+          <div className="block md:hidden space-y-2.5">
+            {filteredRecords.map((r) => {
+              const isSuspended = r.status === "Sancionado";
+              const isApercibido = r.status === "Apercibido";
+
+              return (
+                <div
+                  key={r.playerId}
+                  onClick={() => onPlayerClick?.(r.playerId)}
+                  className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5 active:bg-slate-50 transition-colors"
+                >
+                  {/* Fila 1: Jugador, Dorsal y Estado */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
                         {r.playerDorsal && (
-                          <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold flex items-center justify-center shrink-0">
+                          <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black flex items-center justify-center shrink-0">
                             {r.playerDorsal}
                           </span>
                         )}
-                        <span className="group-hover:text-indigo-600 transition-colors">
+                        <p className="text-xs font-black text-slate-900 truncate">
                           {r.playerName}
-                        </span>
+                        </p>
                       </div>
-                    </td>
-
-                    <td className="py-2.5 px-3 text-slate-600">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500">
                         <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          className="w-2 h-2 rounded-full shrink-0"
                           style={{ backgroundColor: r.teamColor || "#6366f1" }}
                         />
-                        <span className="font-semibold text-slate-800">{r.teamName}</span>
-                        <span className="text-[10px] text-slate-400">({r.teamCategory})</span>
+                        <span className="font-semibold">{r.teamName}</span>
+                        <span className="text-[10px] text-slate-400">· {r.teamCategory}</span>
                       </div>
-                    </td>
+                    </div>
 
-                    <td className="py-2.5 px-3 text-center font-bold">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px]">
-                        🟨 {r.yellowCardsTotal}
-                      </span>
-                      {(r.directRedsCount > 0 || r.doubleYellowsCount > 0) && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 text-[11px] ml-1">
-                          🟥 {r.directRedsCount + r.doubleYellowsCount}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-2.5 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {[1, 2, 3, 4, 5].map((step) => {
-                          const filled = r.currentCycleAccumulated >= step;
-                          return (
-                            <span
-                              key={step}
-                              className={`w-2 h-2 rounded-full ${
-                                filled
-                                  ? step === 5
-                                    ? "bg-red-500"
-                                    : "bg-amber-400"
-                                  : "bg-slate-200"
-                              }`}
-                              title={`Amarilla ${step} del ciclo`}
-                            />
-                          );
-                        })}
-                        <span className="text-[10px] text-slate-400 ml-1">
-                          ({r.currentCycleAccumulated}/5)
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="py-2.5 px-3">
+                    <div className="shrink-0">
                       {isSuspended ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200">
                           <ShieldAlert className="w-3 h-3 text-red-600" />
                           Sancionado
                         </span>
                       ) : isApercibido ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
                           <AlertTriangle className="w-3 h-3 text-amber-600" />
                           Apercibido
                         </span>
@@ -238,30 +317,65 @@ export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionP
                           OK
                         </span>
                       )}
-                      <p className="text-[10px] text-slate-400 mt-0.5 max-w-[200px] truncate" title={r.statusReason}>
-                        {r.statusReason}
-                      </p>
-                    </td>
+                    </div>
+                  </div>
 
-                    <td className="py-2.5 px-3 text-right">
-                      {(isSuspended || isApercibido) && (
-                        <button
-                          onClick={(e) => handleNotifyCoach(e, r)}
-                          disabled={alertingId === r.playerId}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                          title="Enviar aviso preventivo al entrenador del equipo"
-                        >
-                          <Bell className={`w-3 h-3 ${alertingId === r.playerId ? "animate-spin" : ""}`} />
-                          <span>{alertingId === r.playerId ? "Enviando..." : "Avisar"}</span>
-                        </button>
+                  {/* Fila 2: Tarjetas y Ciclo de 5 */}
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-amber-700">🟨 {r.yellowCardsTotal}</span>
+                      {(r.directRedsCount > 0 || r.doubleYellowsCount > 0) && (
+                        <span className="font-bold text-red-700">
+                          🟥 {r.directRedsCount + r.doubleYellowsCount}
+                        </span>
                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-400 font-semibold mr-1">Ciclo:</span>
+                      {[1, 2, 3, 4, 5].map((step) => {
+                        const filled = r.currentCycleAccumulated >= step;
+                        return (
+                          <span
+                            key={step}
+                            className={`w-2 h-2 rounded-full ${
+                              filled
+                                ? step === 5
+                                  ? "bg-red-500"
+                                  : "bg-amber-400"
+                                : "bg-slate-200"
+                            }`}
+                          />
+                        );
+                      })}
+                      <span className="text-[10px] font-bold text-slate-500 ml-0.5">
+                        {r.currentCycleAccumulated}/5
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Fila 3: Razón y Botón de Acción */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <p className="text-[10px] text-slate-500 leading-tight truncate flex-1" title={r.statusReason}>
+                      {r.statusReason}
+                    </p>
+
+                    {(isSuspended || isApercibido) && (
+                      <button
+                        onClick={(e) => handleNotifyCoach(e, r)}
+                        disabled={alertingId === r.playerId}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg shrink-0 disabled:opacity-50"
+                      >
+                        <Bell className={`w-3 h-3 ${alertingId === r.playerId ? "animate-spin" : ""}`} />
+                        <span>{alertingId === r.playerId ? "..." : "Avisar"}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

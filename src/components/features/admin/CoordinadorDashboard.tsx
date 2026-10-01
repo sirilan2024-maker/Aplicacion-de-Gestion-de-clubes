@@ -132,7 +132,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
   const { kpis, alerts, discipline, attendance, sports, schedule } = data;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16 overflow-x-hidden">
       {/* 1. Cabecera con Filtros Globales y Acciones */}
       <CoordinatorHeader
         userFirstName={userFirstName}
@@ -148,7 +148,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
         onShare={() => setShowMatchdayModal(true)}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6">
         {/* 2. Banner de Alertas Críticas (Sancionados, Apercibidos, Bajas) */}
         <CriticalAlertsBanner alerts={alerts} />
 

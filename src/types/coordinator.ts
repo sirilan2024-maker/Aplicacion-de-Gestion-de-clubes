@@ -8,10 +8,7 @@ export type FfcvCategory =
   | 'senior'
   | 'juvenil'
   | 'cadete'
-  | 'infantil'
-  | 'alevin'
-  | 'benjamin'
-  | 'prebenjamin';
+  | 'infantil';
 
 export type DisciplineStatus = 'Sancionado' | 'Apercibido' | 'OK';
 

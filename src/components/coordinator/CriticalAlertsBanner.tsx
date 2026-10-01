@@ -52,8 +52,8 @@ export function CriticalAlertsBanner({ alerts }: CriticalAlertsBannerProps) {
               className={`p-3 rounded-xl border flex items-start gap-2.5 shadow-xs transition-all ${bgClass}`}
             >
               <IconComponent className="w-4 h-4 mt-0.5 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold leading-tight truncate">{alert.title}</p>
+              <div className="min-w-0 flex-1 break-words">
+                <p className="text-xs font-bold leading-tight">{alert.title}</p>
                 <p className="text-[11px] leading-snug mt-0.5 opacity-90">{alert.message}</p>
               </div>
               {alert.teamId && (

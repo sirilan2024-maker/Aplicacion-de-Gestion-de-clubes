@@ -24,9 +24,6 @@ const CATEGORIES: { id: FfcvCategory; label: string }[] = [
   { id: "juvenil", label: "Juvenil" },
   { id: "cadete", label: "Cadete" },
   { id: "infantil", label: "Infantil" },
-  { id: "alevin", label: "Alevín" },
-  { id: "benjamin", label: "Benjamín" },
-  { id: "prebenjamin", label: "Prebenjamín" },
 ];
 
 export function CoordinatorHeader({
@@ -103,10 +100,10 @@ export function CoordinatorHeader({
         </div>
 
         {/* Fila Inferior: Filtros Rápidos de Categorías y Selector de Equipo */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1 border-t border-slate-100">
-          {/* Píldoras de categoría con scroll horizontal suave */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-            <span className="text-slate-400 font-semibold flex items-center gap-1 pr-1 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+          {/* Píldoras de categoría */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-slate-400 font-bold flex items-center gap-1 pr-1 shrink-0 text-[11px] uppercase tracking-wider">
               <Filter className="w-3 h-3" /> Categoría:
             </span>
             {CATEGORIES.map((cat) => {
@@ -118,7 +115,7 @@ export function CoordinatorHeader({
                     onSelectCategory(cat.id);
                     onSelectTeamId("all");
                   }}
-                  className={`px-3 py-1.5 rounded-full font-bold whitespace-nowrap transition-all text-xs cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-full font-bold transition-all text-xs cursor-pointer ${
                     active
                       ? "bg-indigo-600 text-white shadow-xs"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
@@ -132,13 +129,13 @@ export function CoordinatorHeader({
 
           {/* Desplegable de Equipo Específico */}
           {filteredTeams.length > 0 && (
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs text-slate-400 font-semibold">Equipo:</span>
-              <div className="relative">
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0">
+              <span className="text-xs text-slate-400 font-semibold shrink-0">Equipo:</span>
+              <div className="relative flex-1 sm:flex-initial">
                 <select
                   value={selectedTeamId}
                   onChange={(e) => onSelectTeamId(e.target.value)}
-                  className="appearance-none bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg pl-3 pr-8 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+                  className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg pl-3 pr-8 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
                 >
                   <option value="all">
                     {selectedCategory === "todos" ? "Todos los equipos" : `Todos en ${selectedCategory}`}

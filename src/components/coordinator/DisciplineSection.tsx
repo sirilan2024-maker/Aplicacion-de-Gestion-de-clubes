@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { AlertTriangle, ShieldAlert, CheckCircle2, Search, Bell, AlertCircle, Shield } from "lucide-react";
-import { PlayerDisciplineRecord, DisciplineStatus } from "@/types/coordinator";
+import { AlertTriangle, ShieldAlert, CheckCircle2, Search, Bell, AlertCircle, Shield, ChevronDown, ChevronUp, Clock, Flame } from "lucide-react";
+import { PlayerDisciplineRecord, DisciplineStatus, RecentMatchCardItem } from "@/types/coordinator";
 import { sendDisciplineAlertAction } from "@/app/actions/chat-actions";
 
 interface DisciplineSectionProps {
   records: PlayerDisciplineRecord[];
+  recentCards?: RecentMatchCardItem[];
   onPlayerClick?: (playerId: string) => void;
 }
 
-export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionProps) {
+export function DisciplineSection({ records, recentCards = [], onPlayerClick }: DisciplineSectionProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | DisciplineStatus>("ALL");
   const [alertingId, setAlertingId] = useState<string | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(true);
 
   const suspendedCount = useMemo(
     () => records.filter((r) => r.status === "Sancionado").length,
@@ -69,7 +71,7 @@ export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionP
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-      {/* Cabecera y Resumen de Contadores */}
+      {/* Cabecera, Contadores y Desplegable para esconder el informe */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
@@ -85,8 +87,8 @@ export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionP
           </div>
         </div>
 
-        {/* Badges de Contadores */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Badges de Contadores y Toggle para esconder el informe */}
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200/70 text-red-700 text-xs font-bold">
             <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
             <span>{suspendedCount} Sancionados</span>
@@ -100,38 +102,102 @@ export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionP
             <span className="text-slate-300">|</span>
             <span>🟥 {totalReds}</span>
           </div>
+
+          {/* Desplegable para esconder o mostrar el informe */}
+          <button
+            onClick={() => setIsReportOpen(!isReportOpen)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            title={isReportOpen ? "Esconder informe disciplinario" : "Mostrar informe disciplinario"}
+          >
+            {isReportOpen ? (
+              <>
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span>Esconder informe</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span>Mostrar informe</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Barra de Filtros y Búsqueda */}
-      <div className="flex flex-col sm:flex-row gap-2.5 items-center justify-between">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Buscar jugador o equipo..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+      {isReportOpen && (
+        <>
+          {/* Resumen de Últimas Tarjetas de la Jornada */}
+          {recentCards.length > 0 && (
+            <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <span>Últimas Tarjetas de la Jornada</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-semibold">Actas oficiales FFCV</span>
+              </div>
 
-        <div className="flex items-center gap-1 self-start sm:self-auto overflow-x-auto w-full sm:w-auto">
-          {(["ALL", "Sancionado", "Apercibido", "OK"] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                statusFilter === status
-                  ? "bg-slate-900 text-white shadow-xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {status === "ALL" ? "Todos" : status}
-            </button>
-          ))}
-        </div>
-      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {recentCards.slice(0, 6).map((card) => (
+                  <div
+                    key={card.id}
+                    className="p-2.5 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {card.playerName} {card.playerDorsal ? `(#${card.playerDorsal})` : ""}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {card.teamName} {card.rivalName ? `vs ${card.rivalName}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {card.yellowCards > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+                          {card.yellowCards} 🟨
+                        </span>
+                      )}
+                      {card.redCards > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800 border border-red-300">
+                          {card.redCards} 🟥
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Barra de Filtros y Búsqueda */}
+          <div className="flex flex-col sm:flex-row gap-2.5 items-center justify-between">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar jugador o equipo..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 self-start sm:self-auto overflow-x-auto w-full sm:w-auto">
+              {(["ALL", "Sancionado", "Apercibido", "OK"] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    statusFilter === status
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {status === "ALL" ? "Todos" : status}
+                </button>
+              ))}
+            </div>
+          </div>
 
       {/* Tabla Rápida de Disciplina */}
       {filteredRecords.length === 0 ? (
@@ -377,6 +443,8 @@ export function DisciplineSection({ records, onPlayerClick }: DisciplineSectionP
           </div>
         </>
       )}
-    </div>
-  );
+    </>
+  )}
+</div>
+);
 }

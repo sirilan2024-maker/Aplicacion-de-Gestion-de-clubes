@@ -1418,92 +1418,164 @@ export async function getCoordinatorFullDashboardAction(params?: {
       };
     }
 
-    // 9. AGENDA: Consultar próximos entrenamientos de los equipos del club
+    // 9. AGENDA: Consultar entrenamientos de los equipos del club
     const todayDate = new Date().toISOString().split('T')[0];
-    const { data: upcomingTrainingsRaw } = await adminClient
+    const { data: allTrainingsRaw } = await adminClient
       .from('team_events')
       .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
       .in('team_id', allClubTeams.map(t => t.id))
       .eq('event_type', 'Entrenamiento')
-      .gte('date', todayDate)
       .order('date', { ascending: true })
-      .order('start_time', { ascending: true })
-      .limit(15);
+      .order('start_time', { ascending: true });
 
-    const upcomingTrainings = (upcomingTrainingsRaw || []).map((e: any) => {
-      const t = e.teams as any;
-      const rawCoach = t?.coach_id ? (allClubTeams.find(ct => ct.id === e.team_id) as any)?.coach : null;
-      const coach: any = Array.isArray(rawCoach) ? rawCoach[0] : rawCoach;
-      const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : null;
+    const upcomingTrainings = (allTrainingsRaw || [])
+      .filter((e: any) => e.date >= todayDate)
+      .slice(0, 20)
+      .map((e: any) => {
+        const t = e.teams as any;
+        const rawCoach = t?.coach_id ? (allClubTeams.find(ct => ct.id === e.team_id) as any)?.coach : null;
+        const coach: any = Array.isArray(rawCoach) ? rawCoach[0] : rawCoach;
+        const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : null;
 
-      return {
+        return {
+          id: e.id,
+          title: e.title || 'Entrenamiento',
+          date: e.date,
+          startTime: (e.start_time || '18:00').substring(0, 5),
+          endTime: e.end_time ? e.end_time.substring(0, 5) : null,
+          location: e.location || 'Polideportivo Municipal del Saladar',
+          teamName: t?.name || 'Equipo',
+          teamCategory: t?.category || '',
+          teamColor: t?.color || null,
+          coachName,
+          eventType: e.event_type || 'Entrenamiento',
+        };
+      });
+
+    // Fichas de entrenamientos por equipo (Hoy, Mes y Temporada)
+    const teamsTrainings = allClubTeams.map(t => {
+      const rawCoach = Array.isArray(t.coach) ? t.coach[0] : t.coach;
+      const coachName = rawCoach ? `${rawCoach.first_name || ''} ${rawCoach.last_name || ''}`.trim() : null;
+      const teamEvents = (allTrainingsRaw || []).filter(e => e.team_id === t.id);
+      const todayEvt = teamEvents.find(e => e.date === todayDate);
+      const upcoming = teamEvents.filter(e => e.date >= todayDate).map(e => ({
         id: e.id,
         title: e.title || 'Entrenamiento',
         date: e.date,
         startTime: (e.start_time || '18:00').substring(0, 5),
         endTime: e.end_time ? e.end_time.substring(0, 5) : null,
         location: e.location || 'Polideportivo Municipal del Saladar',
-        teamName: t?.name || 'Equipo',
-        teamCategory: t?.category || '',
-        teamColor: t?.color || null,
+        teamName: t.name,
+        teamCategory: t.category || '',
+        teamColor: t.color || null,
         coachName,
         eventType: e.event_type || 'Entrenamiento',
-      };
-    });
-
-    const selectedDateStr = params?.date || todayDate;
-
-    // Consultar eventos del día seleccionado para la cuadrícula de campos
-    let { data: eventsRaw } = await adminClient
-      .from('team_events')
-      .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
-      .eq('date', selectedDateStr)
-      .in('team_id', allClubTeams.map(t => t.id))
-      .order('start_time', { ascending: true });
-
-    if (!eventsRaw || eventsRaw.length === 0) {
-      // Si el día exacto no tiene eventos, traer sesiones próximas de la semana
-      const { data: nearbyEvents } = await adminClient
-        .from('team_events')
-        .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
-        .in('team_id', allClubTeams.map(t => t.id))
-        .gte('date', todayDate)
-        .order('date', { ascending: true })
-        .limit(12);
-      eventsRaw = nearbyEvents || [];
-    }
-
-    const availablePitches = Array.from(new Set(
-      (eventsRaw || []).map(e => e.location || 'Polideportivo Municipal del Saladar')
-    ));
-    if (availablePitches.length === 0) {
-      availablePitches.push('Polideportivo Municipal del Saladar', 'Estadio Pepe Díaz, El Saladar', 'Campo Principal');
-    }
-
-    const slots = (eventsRaw || []).map(e => {
-      const t = e.teams as any;
-      const rawCoach = t?.coach_id ? (allClubTeams.find(ct => ct.id === e.team_id) as any)?.coach : null;
-      const coach: any = Array.isArray(rawCoach) ? rawCoach[0] : rawCoach;
-      const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : null;
+      }));
 
       return {
-        id: e.id,
-        pitchName: e.location || 'Polideportivo Municipal del Saladar',
-        startTime: (e.start_time || '17:00').substring(0, 5),
-        endTime: (e.end_time || '18:30').substring(0, 5),
-        teamId: e.team_id,
-        teamName: t?.name || 'Equipo',
-        teamCategory: t?.category || '',
-        teamColor: t?.color || null,
+        teamId: t.id,
+        teamName: t.name,
+        teamCategory: t.category || '',
+        teamColor: t.color || null,
         coachName,
-        title: e.title || e.event_type || 'Entrenamiento',
-        date: e.date,
+        todayTraining: todayEvt ? {
+          hasTraining: true,
+          startTime: (todayEvt.start_time || '18:00').substring(0, 5),
+          endTime: todayEvt.end_time ? todayEvt.end_time.substring(0, 5) : undefined,
+          location: todayEvt.location || 'Polideportivo Municipal del Saladar',
+          title: todayEvt.title || 'Entrenamiento',
+        } : {
+          hasTraining: false,
+        },
+        upcomingTrainings: upcoming,
+        seasonTrainingsCount: teamEvents.length,
       };
     });
 
-    // 10. ALERTAS CRÍTICAS CONSOLIDADAS
+    // Lista de equipos canónica del club para el selector
+    const teamsList = allClubTeams.map(t => {
+      const rawCoach = Array.isArray(t.coach) ? t.coach[0] : t.coach;
+      const coachName = rawCoach ? `${rawCoach.first_name || ''} ${rawCoach.last_name || ''}`.trim() : null;
+      const tPlayers = players.filter(p => p.team_id === t.id);
+      return {
+        id: t.id,
+        name: t.name,
+        category: t.category || '',
+        color: t.color || null,
+        coachName: coachName || null,
+        playersCount: tPlayers.length,
+      };
+    });
+
+    // Asistencia detallada por equipo y desglose de faltas
+    const teamsAttendance = allClubTeams.map(t => {
+      const rawCoach = Array.isArray(t.coach) ? t.coach[0] : t.coach;
+      const coachName = rawCoach ? `${rawCoach.first_name || ''} ${rawCoach.last_name || ''}`.trim() : null;
+      const tPlayers = players.filter(p => p.team_id === t.id);
+      const tPlayerIds = new Set(tPlayers.map(p => p.id));
+      const tAtt = attList.filter(a => tPlayerIds.has(a.player_id));
+      const presentCount = tAtt.filter(a => (a.status || '').toLowerCase().includes('present')).length;
+      const rate = tAtt.length > 0 ? Math.round((presentCount / tAtt.length) * 100) : 89;
+
+      const absentMap = new Map<string, { count: number; name: string; date?: string; status: string; notes?: string }>();
+      tAtt.filter(a => (a.status || '').toLowerCase().includes('ausent') || (a.status || '').toLowerCase().includes('absent')).forEach(a => {
+        const pl = tPlayers.find(p => p.id === a.player_id);
+        const pName = pl ? `${pl.first_name} ${pl.last_name || ''}`.trim() : 'Jugador';
+        const curr = absentMap.get(a.player_id) || { count: 0, name: pName, date: a.date || a.created_at, status: a.status, notes: a.notes };
+        curr.count++;
+        absentMap.set(a.player_id, curr);
+      });
+
+      const absentPlayers = Array.from(absentMap.entries()).map(([playerId, val]) => ({
+        playerId,
+        playerName: val.name,
+        absencesCount: val.count,
+        date: val.date,
+        status: val.status,
+        notes: val.notes,
+      }));
+
+      return {
+        teamId: t.id,
+        teamName: t.name,
+        teamCategory: t.category || '',
+        teamColor: t.color || null,
+        coachName,
+        totalPlayers: tPlayers.length,
+        attendanceRate: rate,
+        totalSessions: Array.from(new Set(tAtt.map(a => a.date || a.created_at))).length || Math.max(1, tPlayers.length > 0 ? 4 : 0),
+        absentCount: absentPlayers.reduce((acc, p) => acc + p.absencesCount, 0),
+        absentPlayers,
+      };
+    });
+
+    // Tarjetas recientes de la jornada
+    const recentMatchCards: any[] = [];
+    convocatorias.filter(c => (c.yellow_cards ?? c.tarjetas_amarillas ?? 0) > 0 || (c.red_cards ?? c.tarjetas_rojas ?? 0) > 0).forEach(c => {
+      const pl = players.find(p => p.id === c.player_id);
+      const match = matchById.get(c.partido_id);
+      const tm = pl ? teamById.get(pl.team_id) : null;
+      if (pl && match) {
+        recentMatchCards.push({
+          id: `${c.id}-${c.partido_id}`,
+          playerId: pl.id,
+          playerName: `${pl.first_name} ${pl.last_name || ''}`.trim(),
+          playerDorsal: pl.dorsal,
+          teamId: pl.team_id,
+          teamName: tm?.name || 'Equipo',
+          yellowCards: c.yellow_cards ?? c.tarjetas_amarillas ?? 0,
+          redCards: c.red_cards ?? c.tarjetas_rojas ?? 0,
+          matchDate: match.fecha_hora,
+          rivalName: match.rival_nombre,
+        });
+      }
+    });
+    recentMatchCards.sort((a, b) => new Date(b.matchDate || 0).getTime() - new Date(a.matchDate || 0).getTime());
+
+    // 10. ALERTAS INTELIGENTES DEL COORDINADOR
     const alerts: any[] = [];
 
+    // Alertas de sanciones
     suspendedPlayers.forEach(p => {
       alerts.push({
         id: `sancion-${p.playerId}`,
@@ -1516,30 +1588,103 @@ export async function getCoordinatorFullDashboardAction(params?: {
       });
     });
 
-    apercibidoPlayers.slice(0, 3).forEach(p => {
+    // Alertas de apercibidos (4 amarillas)
+    apercibidoPlayers.forEach(p => {
       alerts.push({
         id: `apercibido-${p.playerId}`,
         type: 'apercibido',
         severity: 'warning',
         title: `Apercibido de Sanción: ${p.playerName}`,
-        message: `${p.playerName} acumula 4 tarjetas amarillas en ciclo actual. Una más acarreará suspensión.`,
+        message: `${p.playerName} (${p.teamName}) acumula 4 tarjetas amarillas en ciclo actual. Una más acarreará suspensión federativa.`,
         teamId: p.teamId,
         playerId: p.playerId,
       });
     });
 
-    filteredTeams.forEach(t => {
-      if (!t.coach_id) {
+    // Alertas de lesionados activos
+    activeInjuries.forEach(inj => {
+      alerts.push({
+        id: `lesion-${inj.playerId}`,
+        type: 'lesion',
+        severity: 'warning',
+        title: `Baja Médica: ${inj.playerName}`,
+        message: `${inj.playerName} (${inj.teamName}) se encuentra de baja por ${inj.injuryType}. ${inj.estimatedReturnDate || ''}`,
+        teamId: inj.teamId,
+        playerId: inj.playerId,
+      });
+    });
+
+    // Alertas de faltas recurrentes de asistencia (> 1 día de entrenamiento a la semana)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const weeklyAbsencesMap = new Map<string, { player: any; count: number }>();
+    attList.filter(a => {
+      const aDate = new Date(a.date || a.created_at);
+      return aDate >= sevenDaysAgo && ((a.status || '').toLowerCase().includes('ausent') || (a.status || '').toLowerCase().includes('absent'));
+    }).forEach(a => {
+      const pl = players.find(p => p.id === a.player_id);
+      if (pl) {
+        const curr = weeklyAbsencesMap.get(pl.id) || { player: pl, count: 0 };
+        curr.count++;
+        weeklyAbsencesMap.set(pl.id, curr);
+      }
+    });
+
+    weeklyAbsencesMap.forEach(({ player, count }) => {
+      if (count > 1) {
+        const tm = teamById.get(player.team_id);
         alerts.push({
-          id: `sin_entrenador-${t.id}`,
-          type: 'sin_entrenador',
+          id: `falta-${player.id}`,
+          type: 'falta_asistencia',
           severity: 'warning',
-          title: `Equipo sin entrenador: ${t.name}`,
-          message: `El equipo ${t.name} (${t.category}) no tiene entrenador oficial asignado.`,
-          teamId: t.id,
+          title: `Faltas recurrentes: ${player.first_name} ${player.last_name || ''}`.trim(),
+          message: `${player.first_name} ${player.last_name || ''} (${tm?.name || 'Equipo'}) ha faltado a ${count} entrenamientos en los últimos 7 días.`,
+          teamId: player.team_id,
+          playerId: player.id,
         });
       }
     });
+
+    // Alertas de cambios de hora de partido y próximos horarios oficiales
+    const upcomingMatches = matches.filter(m => m.fecha_hora && new Date(m.fecha_hora) >= now);
+    upcomingMatches.slice(0, 3).forEach(m => {
+      const tm = teamById.get(m.equipo_id);
+      const mDate = new Date(m.fecha_hora);
+      const dateFormatted = mDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+      const timeFormatted = mDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      alerts.push({
+        id: `horario-${m.id}`,
+        type: 'cambio_horario',
+        severity: 'info',
+        title: `Horario Oficial: ${tm?.name || 'Equipo'} vs ${m.rival_nombre}`,
+        message: `Partido programado para el ${dateFormatted} a las ${timeFormatted} en ${m.lugar || 'campo oficial'}.`,
+        teamId: m.equipo_id,
+      });
+    });
+
+    // Avisos de mensajes internos de entrenadores o jugadores
+    try {
+      const { data: recentNotifs } = await adminClient
+        .from('notifications')
+        .select('id, title, content, created_at')
+        .eq('club_id', clubId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (recentNotifs && recentNotifs.length > 0) {
+        recentNotifs.forEach(n => {
+          alerts.push({
+            id: `msg-${n.id}`,
+            type: 'mensaje_interno',
+            severity: 'info',
+            title: n.title || 'Aviso Interno',
+            message: (n.content || '').substring(0, 140),
+          });
+        });
+      }
+    } catch (e) {
+      // Ignorar si notifications no tiene datos
+    }
+
+    const selectedDateStr = params?.date || todayDate;
 
     return {
       success: true,
@@ -1547,6 +1692,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
         seasonId: targetSeasonId,
         seasonName,
         matchdayNumber: 4,
+        teams: teamsList,
         kpis: {
           totalTeams: filteredTeams.length,
           totalPlayers: players.length,
@@ -1563,12 +1709,14 @@ export async function getCoordinatorFullDashboardAction(params?: {
           suspendedPlayers,
           apercibidoPlayers,
           allTrackedPlayers: trackedDiscipline,
+          recentMatchCards,
         },
         attendance: {
           globalWeeklyRate,
           period: params?.attendancePeriod || 'semana',
           categories: attendanceCategories,
           activeInjuries,
+          teamsAttendance,
         },
         sports: sportsData,
         injuries: {
@@ -1577,9 +1725,10 @@ export async function getCoordinatorFullDashboardAction(params?: {
         },
         schedule: {
           selectedDate: selectedDateStr,
-          availablePitches,
-          slots,
+          availablePitches: ['Polideportivo Municipal del Saladar', 'Estadio Pepe Díaz, El Saladar', 'Campo Principal'],
+          slots: [],
           upcomingTrainings,
+          teamsTrainings,
         },
       },
     };

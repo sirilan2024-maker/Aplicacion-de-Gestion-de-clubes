@@ -2,11 +2,11 @@
 
 import React from "react";
 import Link from "next/link";
-import { AlertCircle, AlertTriangle, Info, Zap, ShieldAlert } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, Zap, ShieldAlert, HeartPulse, UserX, Clock, MessageSquare } from "lucide-react";
 
 export interface CoordinatorBannerAlert {
   id: string;
-  type: "sancion" | "apercibido" | "sin_entrenador" | "lesion" | "horario_solapado";
+  type: "sancion" | "apercibido" | "lesion" | "falta_asistencia" | "cambio_horario" | "mensaje_interno" | "horario_solapado" | "sin_entrenador";
   severity: "error" | "warning" | "info";
   title: string;
   message: string;
@@ -21,16 +21,18 @@ interface CriticalAlertsBannerProps {
 export function CriticalAlertsBanner({ alerts }: CriticalAlertsBannerProps) {
   if (!alerts || alerts.length === 0) return null;
 
-  const errorAlerts = alerts.filter((a) => a.severity === "error");
-  const warningAlerts = alerts.filter((a) => a.severity === "warning");
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-        <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-          Alertas Críticas y Operativas ({alerts.length})
-        </h2>
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+          <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+            Alertas Críticas y Operativas ({alerts.length})
+          </h2>
+        </div>
+        <span className="text-[11px] font-semibold text-slate-400">
+          Supervisión en tiempo real
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -38,13 +40,34 @@ export function CriticalAlertsBanner({ alerts }: CriticalAlertsBannerProps) {
           const isError = alert.severity === "error";
           const isWarning = alert.severity === "warning";
 
-          const bgClass = isError
-            ? "bg-red-50/90 border-red-200 text-red-800"
-            : isWarning
-            ? "bg-amber-50/90 border-amber-200 text-amber-800"
-            : "bg-blue-50/90 border-blue-200 text-blue-800";
+          let bgClass = "bg-blue-50/90 border-blue-200 text-blue-900";
+          let IconComponent = Info;
 
-          const IconComponent = isError ? ShieldAlert : isWarning ? AlertTriangle : Info;
+          if (alert.type === "sancion") {
+            bgClass = "bg-red-50/90 border-red-200 text-red-900";
+            IconComponent = ShieldAlert;
+          } else if (alert.type === "apercibido") {
+            bgClass = "bg-amber-50/90 border-amber-200 text-amber-900";
+            IconComponent = AlertTriangle;
+          } else if (alert.type === "lesion") {
+            bgClass = "bg-rose-50/90 border-rose-200 text-rose-900";
+            IconComponent = HeartPulse;
+          } else if (alert.type === "falta_asistencia") {
+            bgClass = "bg-orange-50/90 border-orange-200 text-orange-900";
+            IconComponent = UserX;
+          } else if (alert.type === "cambio_horario") {
+            bgClass = "bg-indigo-50/90 border-indigo-200 text-indigo-900";
+            IconComponent = Clock;
+          } else if (alert.type === "mensaje_interno") {
+            bgClass = "bg-sky-50/90 border-sky-200 text-sky-900";
+            IconComponent = MessageSquare;
+          } else if (isError) {
+            bgClass = "bg-red-50/90 border-red-200 text-red-900";
+            IconComponent = ShieldAlert;
+          } else if (isWarning) {
+            bgClass = "bg-amber-50/90 border-amber-200 text-amber-900";
+            IconComponent = AlertTriangle;
+          }
 
           return (
             <div

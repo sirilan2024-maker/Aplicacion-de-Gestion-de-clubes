@@ -8,8 +8,8 @@ interface CoordinatorHeaderProps {
   userFirstName: string | null;
   seasonName: string;
   matchdayNumber?: number;
-  selectedCategory: FfcvCategory;
-  onSelectCategory: (category: FfcvCategory) => void;
+  selectedCategory?: FfcvCategory;
+  onSelectCategory?: (category: FfcvCategory) => void;
   selectedTeamId: string;
   onSelectTeamId: (teamId: string) => void;
   teams: Array<{ id: string; name: string; category: string; color: string | null }>;
@@ -18,20 +18,10 @@ interface CoordinatorHeaderProps {
   onShare: () => void;
 }
 
-const CATEGORIES: { id: FfcvCategory; label: string }[] = [
-  { id: "todos", label: "Todos los equipos" },
-  { id: "senior", label: "Senior" },
-  { id: "juvenil", label: "Juvenil" },
-  { id: "cadete", label: "Cadete" },
-  { id: "infantil", label: "Infantil" },
-];
-
 export function CoordinatorHeader({
   userFirstName,
   seasonName,
   matchdayNumber,
-  selectedCategory,
-  onSelectCategory,
   selectedTeamId,
   onSelectTeamId,
   teams,
@@ -39,9 +29,6 @@ export function CoordinatorHeader({
   onRefresh,
   onShare,
 }: CoordinatorHeaderProps) {
-  const filteredTeams = selectedCategory === "todos"
-    ? teams
-    : teams.filter((t) => t.category.toLowerCase().includes(selectedCategory.toLowerCase()));
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -99,57 +86,50 @@ export function CoordinatorHeader({
           </div>
         </div>
 
-        {/* Fila Inferior: Filtros Rápidos de Categorías y Selector de Equipo */}
+        {/* Fila Inferior: Selector Único Desplegable de Equipos */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-          {/* Píldoras de categoría */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-slate-400 font-bold flex items-center gap-1 pr-1 shrink-0 text-[11px] uppercase tracking-wider">
-              <Filter className="w-3 h-3" /> Categoría:
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Vista del Panel:</span>
             </span>
-            {CATEGORIES.map((cat) => {
-              const active = selectedCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    onSelectCategory(cat.id);
-                    onSelectTeamId("all");
-                  }}
-                  className={`px-2.5 py-1 rounded-full font-bold transition-all text-xs cursor-pointer ${
-                    active
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              );
-            })}
+            <div className="relative flex-1 sm:w-80">
+              <select
+                value={selectedTeamId}
+                onChange={(e) => onSelectTeamId(e.target.value)}
+                className="w-full appearance-none bg-slate-50 border border-slate-300 hover:border-indigo-400 text-slate-800 text-xs font-bold rounded-xl pl-3.5 pr-9 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer shadow-2xs transition-colors"
+              >
+                <option value="all">
+                  🌐 Todos los equipos (Resumen General)
+                </option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    ⚽ {team.name} ({team.category})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+            </div>
+
+            {selectedTeamId !== "all" && (
+              <button
+                onClick={() => onSelectTeamId("all")}
+                className="px-2.5 py-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                title="Volver a la visión global de todos los equipos"
+              >
+                Ver todos
+              </button>
+            )}
           </div>
 
-          {/* Desplegable de Equipo Específico */}
-          {filteredTeams.length > 0 && (
-            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0">
-              <span className="text-xs text-slate-400 font-semibold shrink-0">Equipo:</span>
-              <div className="relative flex-1 sm:flex-initial">
-                <select
-                  value={selectedTeamId}
-                  onChange={(e) => onSelectTeamId(e.target.value)}
-                  className="w-full sm:w-auto appearance-none bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg pl-3 pr-8 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
-                >
-                  <option value="all">
-                    {selectedCategory === "todos" ? "Todos los equipos" : `Todos en ${selectedCategory}`}
-                  </option>
-                  {filteredTeams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name} ({team.category})
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2 pointer-events-none" />
-              </div>
-            </div>
-          )}
+          <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5 self-start sm:self-auto">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span>
+              {selectedTeamId === "all"
+                ? `Supervisión activa de ${teams.length} equipos`
+                : `Subpanel específico: ${teams.find((t) => t.id === selectedTeamId)?.name || "Equipo"}`}
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -1,14 +1,13 @@
-"use client";
-
 import React, { useState } from "react";
-import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target } from "lucide-react";
-import { AttendanceCategoryStats, ActiveInjuryItem } from "@/types/coordinator";
+import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX } from "lucide-react";
+import { AttendanceCategoryStats, ActiveInjuryItem, TeamAttendanceSummary } from "@/types/coordinator";
 import { InjuryDetailsModal } from "./InjuryDetailsModal";
 
 interface AttendanceOperationsSectionProps {
   globalWeeklyRate: number;
   categories: AttendanceCategoryStats[];
   injuries: ActiveInjuryItem[];
+  teamsAttendance?: TeamAttendanceSummary[];
   currentPeriod: "semana" | "mes" | "temporada";
   onPeriodChange?: (period: "semana" | "mes" | "temporada") => void;
 }
@@ -17,11 +16,17 @@ export function AttendanceOperationsSection({
   globalWeeklyRate,
   categories,
   injuries,
+  teamsAttendance = [],
   currentPeriod = "semana",
   onPeriodChange,
 }: AttendanceOperationsSectionProps) {
   const [selectedInjury, setSelectedInjury] = useState<ActiveInjuryItem | null>(null);
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const targetRate = 85; // Objetivo de asistencia del club
+
+  const toggleTeamAbsences = (teamId: string) => {
+    setExpandedTeamId(expandedTeamId === teamId ? null : teamId);
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
@@ -36,7 +41,7 @@ export function AttendanceOperationsSection({
               Asistencia a Entrenamientos y Control Operativo
             </h2>
             <p className="text-xs text-slate-500">
-              Seguimiento por categorías vs objetivo del club ({targetRate}%) y parte médico activo
+              Seguimiento por equipos vs objetivo del club ({targetRate}%), avisos de faltas y parte médico
             </p>
           </div>
         </div>
@@ -62,7 +67,7 @@ export function AttendanceOperationsSection({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Lado Izquierdo: Barras comparativas por categoría (7 columnas) */}
+        {/* Lado Izquierdo: Asistencia por Equipos y Control de Faltas (7 columnas) */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -80,55 +85,118 @@ export function AttendanceOperationsSection({
             </div>
           </div>
 
-          {/* Barras de Asistencia por Categoría */}
+          {/* Listado de Asistencia por Equipos con Desplegable de Ausentes */}
           <div className="space-y-3">
-            {categories.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-4">No hay registros de asistencia en el período seleccionado.</p>
-            ) : (
-              categories.map((cat) => {
-                const isAboveTarget = cat.attendanceRate >= targetRate;
-                const isCritical = cat.attendanceRate < 75;
-
-                return (
+            {teamsAttendance.length === 0 ? (
+              <div className="space-y-2">
+                {categories.map((cat) => (
                   <div key={cat.category} className="space-y-1">
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="text-slate-700">{cat.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {cat.teamsCount} equipo{cat.teamsCount !== 1 ? "s" : ""}
-                        </span>
-                        <span
-                          className={`text-xs ${
-                            isAboveTarget
-                              ? "text-emerald-600"
-                              : isCritical
-                              ? "text-red-500"
-                              : "text-amber-600"
-                          }`}
-                        >
-                          {cat.attendanceRate}%
-                        </span>
+                      <span className={cat.attendanceRate >= targetRate ? "text-emerald-600" : "text-amber-600"}>
+                        {cat.attendanceRate}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          cat.attendanceRate >= targetRate ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, cat.attendanceRate))}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              teamsAttendance.map((tm) => {
+                const isAboveTarget = tm.attendanceRate >= targetRate;
+                const isExpanded = expandedTeamId === tm.teamId;
+
+                return (
+                  <div
+                    key={tm.teamId}
+                    className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/60 space-y-2 transition-colors hover:border-slate-300"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">{tm.teamName}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{tm.teamCategory}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          {tm.coachName ? `Entrenador: ${tm.coachName}` : "Plantilla federada"} · {tm.totalPlayers} jugadores
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <div className="text-right">
+                          <span
+                            className={`text-sm font-black ${
+                              isAboveTarget ? "text-emerald-600" : "text-amber-600"
+                            }`}
+                          >
+                            {tm.attendanceRate}%
+                          </span>
+                          <p className="text-[9px] text-slate-400 font-medium">Asistencia</p>
+                        </div>
+
+                        {tm.absentCount > 0 ? (
+                          <button
+                            onClick={() => toggleTeamAbsences(tm.teamId)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <UserX className="w-3 h-3" />
+                            <span>{tm.absentCount} falta{tm.absentCount !== 1 ? "s" : ""}</span>
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Sin faltas</span>
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden relative">
-                      {/* Línea de objetivo al 85% */}
+                    {/* Barra de progreso */}
+                    <div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
                       <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-indigo-400 z-10 opacity-70"
-                        style={{ left: `${targetRate}%` }}
-                        title={`Objetivo: ${targetRate}%`}
-                      />
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          isAboveTarget
-                            ? "bg-emerald-500"
-                            : isCritical
-                            ? "bg-red-500"
-                            : "bg-amber-400"
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          isAboveTarget ? "bg-emerald-500" : "bg-amber-500"
                         }`}
-                        style={{ width: `${Math.min(cat.attendanceRate, 100)}%` }}
+                        style={{ width: `${Math.min(100, Math.max(0, tm.attendanceRate))}%` }}
                       />
                     </div>
+
+                    {/* Desplegable de Jugadores que Han Faltado */}
+                    {isExpanded && tm.absentPlayers.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/80 space-y-1.5">
+                        <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                          Jugadores con faltas registradas ({tm.absentPlayers.length}):
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {tm.absentPlayers.map((p) => (
+                            <div
+                              key={p.playerId}
+                              className="p-1.5 bg-white rounded-lg border border-amber-200 text-xs flex items-center justify-between gap-1 shadow-2xs"
+                            >
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-800 block truncate">{p.playerName}</span>
+                                {p.date && (
+                                  <span className="text-[10px] text-slate-400 block truncate">
+                                    Fecha: {p.date}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 shrink-0 border border-amber-200">
+                                {p.absencesCount} falta{p.absencesCount !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })

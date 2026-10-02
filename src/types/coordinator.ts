@@ -98,10 +98,84 @@ export interface UpcomingTrainingItem {
   eventType?: string;
 }
 
+export interface CoordinatorBannerAlert {
+  id: string;
+  type: 'sancion' | 'apercibido' | 'lesion' | 'falta_asistencia' | 'cambio_horario' | 'mensaje_interno' | 'horario_solapado';
+  severity: 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  teamId?: string;
+  playerId?: string;
+}
+
+export interface CoordinatorTeamItem {
+  id: string;
+  name: string;
+  category: string;
+  color: string | null;
+  coachName: string | null;
+  playersCount?: number;
+}
+
+export interface RecentMatchCardItem {
+  id: string;
+  playerId: string;
+  playerName: string;
+  playerDorsal?: number | null;
+  teamId: string;
+  teamName: string;
+  yellowCards: number;
+  redCards: number;
+  matchDate?: string;
+  rivalName?: string;
+}
+
+export interface AbsentPlayerRecord {
+  playerId: string;
+  playerName: string;
+  absencesCount: number;
+  date?: string;
+  status: string;
+  notes?: string;
+}
+
+export interface TeamAttendanceSummary {
+  teamId: string;
+  teamName: string;
+  teamCategory: string;
+  teamColor: string | null;
+  coachName: string | null;
+  totalPlayers: number;
+  attendanceRate: number;
+  totalSessions: number;
+  absentCount: number;
+  absentPlayers: AbsentPlayerRecord[];
+}
+
+export interface TeamTodayTraining {
+  hasTraining: boolean;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  title?: string;
+}
+
+export interface TeamTrainingCard {
+  teamId: string;
+  teamName: string;
+  teamCategory: string;
+  teamColor: string | null;
+  coachName: string | null;
+  todayTraining: TeamTodayTraining | null;
+  upcomingTrainings: UpcomingTrainingItem[];
+  seasonTrainingsCount: number;
+}
+
 export interface CoordinatorDashboardFullData {
   seasonId: string;
   seasonName: string;
   matchdayNumber?: number;
+  teams: CoordinatorTeamItem[];
   kpis: {
     totalTeams: number;
     totalPlayers: number;
@@ -113,25 +187,19 @@ export interface CoordinatorDashboardFullData {
     weekendDraws: number;
     weekendLosses: number;
   };
-  alerts: Array<{
-    id: string;
-    type: 'sancion' | 'apercibido' | 'sin_entrenador' | 'lesion' | 'horario_solapado';
-    severity: 'error' | 'warning' | 'info';
-    title: string;
-    message: string;
-    teamId?: string;
-    playerId?: string;
-  }>;
+  alerts: CoordinatorBannerAlert[];
   discipline: {
     suspendedPlayers: PlayerDisciplineRecord[];
     apercibidoPlayers: PlayerDisciplineRecord[];
     allTrackedPlayers: PlayerDisciplineRecord[];
+    recentMatchCards?: RecentMatchCardItem[];
   };
   attendance: {
     globalWeeklyRate: number;
     period: 'semana' | 'mes' | 'temporada';
     categories: AttendanceCategoryStats[];
     activeInjuries: ActiveInjuryItem[];
+    teamsAttendance?: TeamAttendanceSummary[];
   };
   sports: {
     totalPlayedMatches: number;
@@ -185,5 +253,6 @@ export interface CoordinatorDashboardFullData {
     availablePitches: string[];
     slots: PitchTimelineSlot[];
     upcomingTrainings: UpcomingTrainingItem[];
+    teamsTrainings?: TeamTrainingCard[];
   };
 }

@@ -83,6 +83,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
   const router = useRouter();
   const [teamViewMode, setTeamViewMode] = useState<"table" | "cards">("table");
   const [showInjuriesModal, setShowInjuriesModal] = useState(false);
+  const [selectedTeamDetail, setSelectedTeamDetail] = useState<any | null>(null);
 
   const teamStats = sports?.teamStats || [];
   const ffcvCount = teamStats.filter(
@@ -344,8 +345,8 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                     return (
                       <tr
                         key={team.teamId}
-                        onClick={() => router.push(`/dashboard/equipos/${team.teamId}/analisis`)}
-                        className="hover:bg-indigo-50/40 transition-colors cursor-pointer group text-xs"
+                        onClick={() => setSelectedTeamDetail(team)}
+                        className="hover:bg-indigo-50/50 transition-colors cursor-pointer group text-xs"
                       >
                         <td className="py-2.5 px-3 whitespace-nowrap">
                           <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
@@ -383,7 +384,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                           {typeof team.winRate === "number" ? team.winRate.toFixed(1) : "0.0"}%
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <span className="text-xs font-bold text-indigo-600 group-hover:underline">Ver</span>
+                          <span className="text-xs font-bold text-indigo-600 group-hover:underline">Detalles</span>
                         </td>
                       </tr>
                     );
@@ -397,7 +398,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
               {teamStats.map((team) => (
                 <div
                   key={team.teamId}
-                  onClick={() => router.push(`/dashboard/equipos/${team.teamId}/analisis`)}
+                  onClick={() => setSelectedTeamDetail(team)}
                   className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer space-y-3"
                 >
                   <div className="flex items-center justify-between">
@@ -431,7 +432,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                   </div>
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
                     <span className="text-slate-500">Puntos: <strong className="text-slate-900">{team.points} pts</strong></span>
-                    <span className="font-bold text-indigo-600 hover:underline">Ver equipo →</span>
+                    <span className="font-bold text-indigo-600 hover:underline">Ver detalles →</span>
                   </div>
                 </div>
               ))}
@@ -549,6 +550,148 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
               <button
                 type="button"
                 onClick={() => setShowInjuriesModal(false)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Detalle Exhaustivo del Equipo ── */}
+      {selectedTeamDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh] overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+            {/* Header del Modal */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    {selectedTeamDetail.teamName}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {selectedTeamDetail.competitionName || "Competición oficial FFCV"}
+                    {selectedTeamDetail.groupName ? ` · ${selectedTeamDetail.groupName}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedTeamDetail(null)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+              {/* Posición y Puntos */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-100 text-center">
+                  <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider">
+                    Posición en Liga
+                  </span>
+                  <p className="text-2xl font-black text-indigo-950 mt-0.5">
+                    {selectedTeamDetail.currentPosition ? `${selectedTeamDetail.currentPosition}º` : "—"}
+                  </p>
+                  <p className="text-[10px] text-indigo-600 font-medium">
+                    {selectedTeamDetail.totalTeamsInGroup ? `de ${selectedTeamDetail.totalTeamsInGroup} equipos` : "Clasificación oficial"}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                    Puntos Conseguidos
+                  </span>
+                  <p className="text-2xl font-black text-slate-900 mt-0.5">
+                    {selectedTeamDetail.points} <span className="text-xs font-semibold text-slate-400">pts</span>
+                  </p>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    {typeof selectedTeamDetail.winRate === "number" ? selectedTeamDetail.winRate.toFixed(1) : "0"}% victorias
+                  </p>
+                </div>
+              </div>
+
+              {/* Estadísticas de Partidos */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  Balance de Competición
+                </span>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Jugados</span>
+                    <span className="text-sm font-black text-slate-900">{selectedTeamDetail.matchesPlayed}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-2xs">
+                    <span className="text-[10px] text-emerald-600 block font-semibold">Ganados</span>
+                    <span className="text-sm font-black text-emerald-700">{selectedTeamDetail.wins}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Empatados</span>
+                    <span className="text-sm font-black text-slate-700">{selectedTeamDetail.draws}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-rose-200 shadow-2xs">
+                    <span className="text-[10px] text-rose-600 block font-semibold">Perdidos</span>
+                    <span className="text-sm font-black text-rose-700">{selectedTeamDetail.losses}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Balance de Goles */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  Registro de Goles
+                </span>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-white p-2 rounded-lg border border-blue-200 shadow-2xs">
+                    <span className="text-[10px] text-blue-600 block font-semibold">Goles Favor</span>
+                    <span className="text-sm font-black text-blue-700">+{selectedTeamDetail.goalsFor}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-rose-200 shadow-2xs">
+                    <span className="text-[10px] text-rose-500 block font-semibold">Goles Contra</span>
+                    <span className="text-sm font-black text-rose-700">-{selectedTeamDetail.goalsAgainst}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Diferencia</span>
+                    <span className={`text-sm font-black ${selectedTeamDetail.goalDiff >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {selectedTeamDetail.goalDiff > 0 ? `+${selectedTeamDetail.goalDiff}` : selectedTeamDetail.goalDiff}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de Navegación Rápida */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/equipos/${selectedTeamDetail.teamId}/plantilla`)}
+                  className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Ver Plantilla</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/equipos/${selectedTeamDetail.teamId}/partidos`)}
+                  className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Ver Partidos y Actas</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedTeamDetail(null)}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Cerrar

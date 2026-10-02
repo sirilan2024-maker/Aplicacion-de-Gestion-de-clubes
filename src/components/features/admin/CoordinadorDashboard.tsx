@@ -43,6 +43,9 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
   const activeSeasonId = result.data?.seasonId;
   const selectedSeasonId = selectedSeason?.id;
 
+  const isFirstMountRef = React.useRef(true);
+  const prevSeasonIdRef = React.useRef(selectedSeason?.id);
+
   const refreshData = useCallback(
     async (overrideParams?: {
       seasonId?: string;
@@ -60,12 +63,13 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           date: overrideParams?.date ?? selectedDate,
           attendancePeriod: overrideParams?.attendancePeriod ?? attendancePeriod,
         });
-        setResult(fresh);
+        if (fresh && fresh.success) {
+          setResult(fresh);
+        } else if (fresh && !fresh.success) {
+          console.warn("[CoordinatorDashboard] refreshData warning:", fresh.error);
+        }
       } catch (err: any) {
-        setResult({
-          success: false,
-          error: err?.message || "Error al actualizar el panel de coordinación",
-        });
+        console.error("[CoordinatorDashboard] Error al actualizar:", err);
       } finally {
         setLoading(false);
       }
@@ -73,12 +77,25 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
     [selectedSeason?.id, selectedCategory, selectedTeamId, selectedDate, attendancePeriod]
   );
 
-  // Recarga al cambiar la temporada activa en el selector superior
+  // Recarga ÚNICAMENTE cuando el usuario cambia deliberadamente la temporada en el selector superior
   useEffect(() => {
-    if (selectedSeasonId && activeSeasonId && selectedSeasonId !== activeSeasonId) {
-      refreshData({ seasonId: selectedSeasonId });
+    // Si acaba de montar por primera vez con los datos del servidor, evitamos recarga redundante
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      if (selectedSeason?.id) {
+        prevSeasonIdRef.current = selectedSeason.id;
+      }
+      return;
     }
-  }, [selectedSeasonId, activeSeasonId, refreshData]);
+
+    // Solo si el usuario selecciona una temporada distinta tras la carga inicial
+    if (selectedSeason?.id && prevSeasonIdRef.current && selectedSeason.id !== prevSeasonIdRef.current) {
+      prevSeasonIdRef.current = selectedSeason.id;
+      refreshData({ seasonId: selectedSeason.id });
+    } else if (selectedSeason?.id && !prevSeasonIdRef.current) {
+      prevSeasonIdRef.current = selectedSeason.id;
+    }
+  }, [selectedSeason?.id]);
 
   // Recarga al cambiar de categoría o equipo
   const handleSelectCategory = (cat: FfcvCategory) => {

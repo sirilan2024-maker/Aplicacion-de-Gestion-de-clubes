@@ -93,7 +93,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
   ).length;
 
   return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm space-y-5 animate-in fade-in duration-300">
+    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm space-y-5">
       {/* ── Cabecera de Situación Deportiva ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">

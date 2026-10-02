@@ -353,6 +353,8 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
 
       ;(playersWithNotes || []).forEach((p: any) => {
         if (!p.injury_description || p.injury_description.trim().length === 0) return
+        const cleanDesc = p.injury_description.trim().toLowerCase()
+        if (['no', 'ninguna', 'nada', '-', 'bien', 'ninguno', '0', 'sin lesiones', 'no tiene'].includes(cleanDesc)) return
         if (activeInjuriesList.some(i => i.playerId === p.id)) return
 
         const tid = playerToTeamMap.get(p.id) || p.team_id
@@ -1330,24 +1332,37 @@ export async function getCoordinatorFullDashboardAction(params?: {
       };
     }).filter(c => c.teamsCount > 0);
 
-    // Lesiones activas reales extraídas de la tabla players
-    const activeInjuries = players
-      .filter(p => (p.lesiones && p.lesiones.trim().length > 0) || (p.medical_info && p.medical_info.trim().length > 0))
-      .map(p => {
-        const t = teamById.get(p.team_id);
-        return {
-          playerId: p.id,
-          playerName: `${p.first_name} ${p.last_name || ''}`.trim(),
-          teamId: p.team_id,
-          teamName: t?.name || 'Equipo',
-          teamCategory: t?.category || '',
-          injuryType: p.lesiones || p.medical_info || 'En recuperación médica',
-          severity: 'moderada' as const,
-          startDate: now.toISOString().split('T')[0],
-          estimatedReturnDate: '1-2 semanas',
-          observations: p.observaciones_medicas || null,
-        };
-      });
+    // 7. LESIONES ACTIVAS: Consultar estrictamente los registros médicos activos (player_injuries con status='activa' de la temporada activa)
+    const baseDashboard = await getCoordinatorDashboardAction(targetSeasonId);
+    const rawInjuriesList = (baseDashboard.data?.injuries?.activeInjuriesList || []) as any[];
+
+    const filteredInjuries = rawInjuriesList.filter((inj: any) => {
+      if (params?.teamId && params.teamId !== 'all') {
+        return inj.teamId === params.teamId;
+      }
+      if (params?.category && params.category !== 'todos') {
+        const t = teamById.get(inj.teamId);
+        const cat = (t?.category || inj.teamCategory || '').toLowerCase();
+        return cat.includes(params.category.toLowerCase());
+      }
+      return true;
+    });
+
+    const activeInjuries = filteredInjuries.map((inj: any) => {
+      const t = teamById.get(inj.teamId);
+      return {
+        playerId: inj.playerId,
+        playerName: inj.playerName,
+        teamId: inj.teamId,
+        teamName: inj.teamName || t?.name || 'Equipo',
+        teamCategory: t?.category || '',
+        injuryType: inj.injuryType || 'Lesión activa',
+        severity: (inj.severity || 'moderada').toLowerCase() as any,
+        startDate: inj.injuryDate || now.toISOString().split('T')[0],
+        estimatedReturnDate: inj.formattedRecoveryTime || 'En recuperación médica',
+        observations: inj.bodyRegion || null,
+      };
+    });
 
     // 8. SITUACIÓN DEPORTIVA REAL: Resultados disputados y goles reales
     const finishedMatches = matches.filter(m => m.estado === 'Finalizado' || (m.resultado_propio !== null && m.resultado_rival !== null));
@@ -1370,8 +1385,6 @@ export async function getCoordinatorFullDashboardAction(params?: {
     const totalPlayed = finishedMatches.length;
     const winRate = totalPlayed > 0 ? Math.round((wins / totalPlayed) * 100) : 0;
 
-    // Obtener datos deportivos base calculados (idénticos a Centro de Control de vista admin)
-    const baseDashboard = await getCoordinatorDashboardAction(targetSeasonId);
     let sportsData = baseDashboard.data?.sports || {
       totalPlayedMatches: totalPlayed,
       wins,
@@ -1559,8 +1572,8 @@ export async function getCoordinatorFullDashboardAction(params?: {
         },
         sports: sportsData,
         injuries: {
-          activeInjuriesCount: baseDashboard.data?.injuries?.activeInjuriesCount ?? activeInjuries.length,
-          activeInjuriesList: baseDashboard.data?.injuries?.activeInjuriesList ?? activeInjuries,
+          activeInjuriesCount: activeInjuries.length,
+          activeInjuriesList: filteredInjuries,
         },
         schedule: {
           selectedDate: selectedDateStr,

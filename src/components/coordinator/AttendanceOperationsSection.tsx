@@ -70,36 +70,23 @@ export function AttendanceOperationsSection({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
-      {/* Cabecera del Bloque - Clicable para abrir informe completo */}
+      {/* Cabecera del Bloque */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-        <div
-          onClick={(e) => {
-            e.preventDefault();
-            openPlayerReport(selectedTeamId || "all");
-          }}
-          className="flex items-center gap-3 cursor-pointer group select-none transition-opacity hover:opacity-95"
-          title="Haz clic para abrir el informe completo de asistencia por jugador"
-        >
-          <div className="w-9 h-9 rounded-xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center text-blue-600 transition-colors shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-2xs">
             <Users className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-extrabold text-slate-900 tracking-tight group-hover:text-blue-700 transition-colors">
-                Asistencia a Entrenamientos y Control Operativo
-              </h2>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-2xs">
-                <ClipboardList className="w-2.5 h-2.5" />
-                <span>Ver Informe por Jugador</span>
-              </span>
-            </div>
+            <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
+              Asistencia a Entrenamientos y Control Operativo
+            </h2>
             <p className="text-xs text-slate-500">
-              Seguimiento por equipos vs objetivo ({targetRate}%), faltas y parte médico · <span className="text-blue-600 font-bold group-hover:underline">Clic para ver informe detallado</span>
+              Seguimiento por equipos vs objetivo ({targetRate}%), faltas y parte médico
             </p>
           </div>
         </div>
 
-        {/* Botón de acceso directo e selector de período */}
+        {/* Botón de acceso directo Informe General y selector de período */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
@@ -111,7 +98,7 @@ export function AttendanceOperationsSection({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all active:scale-95 cursor-pointer"
           >
             <ClipboardList className="w-3.5 h-3.5" />
-            <span>Informe por Jugador</span>
+            <span>Informe General</span>
           </button>
 
           {onPeriodChange && (

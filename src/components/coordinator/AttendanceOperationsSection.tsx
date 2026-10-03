@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useMemo } from "react";
 import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX, ClipboardList } from "lucide-react";
 import { AttendanceCategoryStats, ActiveInjuryItem, TeamAttendanceSummary, PlayerAttendanceReportItem } from "@/types/coordinator";
@@ -71,7 +73,10 @@ export function AttendanceOperationsSection({
       {/* Cabecera del Bloque - Clicable para abrir informe completo */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div
-          onClick={() => openPlayerReport(selectedTeamId || "all")}
+          onClick={(e) => {
+            e.preventDefault();
+            openPlayerReport(selectedTeamId || "all");
+          }}
           className="flex items-center gap-3 cursor-pointer group select-none transition-opacity hover:opacity-95"
           title="Haz clic para abrir el informe completo de asistencia por jugador"
         >
@@ -97,7 +102,12 @@ export function AttendanceOperationsSection({
         {/* Botón de acceso directo e selector de período */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
-            onClick={() => openPlayerReport(selectedTeamId || "all")}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openPlayerReport(selectedTeamId || "all");
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all active:scale-95 cursor-pointer"
           >
             <ClipboardList className="w-3.5 h-3.5" />
@@ -201,7 +211,12 @@ export function AttendanceOperationsSection({
 
                         {/* Botón para abrir informe individual de este equipo */}
                         <button
-                          onClick={() => openPlayerReport(tm.teamId)}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openPlayerReport(tm.teamId);
+                          }}
                           className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer border border-blue-200 shadow-2xs"
                           title={`Ver informe completo de jugadores de ${tm.teamName}`}
                         >

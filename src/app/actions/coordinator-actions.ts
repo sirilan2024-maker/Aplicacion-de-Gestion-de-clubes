@@ -1308,6 +1308,8 @@ export async function getCoordinatorFullDashboardAction(params?: {
         };
       }).filter(mc => mc.yellowCards > 0 || mc.redCards > 0);
 
+      const teamMatchesForPlayer = matches.filter(m => m.equipo_id === player.team_id);
+
       const discRecord = calculatePlayerFfcvDiscipline({
         playerId: player.id,
         playerName: `${player.first_name} ${player.last_name || ''}`.trim(),
@@ -1317,6 +1319,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
         teamCategory: pTeam?.category || '',
         teamColor: pTeam?.color || null,
         matchCards,
+        teamMatches: teamMatchesForPlayer,
       });
 
       playerDisciplineList.push(discRecord);

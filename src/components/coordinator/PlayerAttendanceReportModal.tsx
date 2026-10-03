@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   X,
@@ -50,37 +51,53 @@ export function PlayerAttendanceReportModal({
   currentPeriod,
   onPeriodChange,
 }: PlayerAttendanceReportModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>(initialTeamId || "all");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "con_faltas" | "en_riesgo" | "cumple_objetivo">("todos");
-
-  const orderedTeams = useMemo(() => {
-    return CANONICAL_MODAL_ORDER.map((target) => {
-      const match = teams.find((t) => {
-        const n = t.name.trim().toLowerCase();
-        return n === target.key || n.startsWith(target.key);
-      });
-      return match ? { id: match.id, label: target.label } : null;
-    }).filter((t): t is { id: string; label: string } => t !== null);
-  }, [teams]);
   const [sortBy, setSortBy] = useState<"riesgo" | "faltas" | "asistencia_desc" | "nombre">("riesgo");
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
-  // Sincronizar filtro si cambia initialTeamId
-  React.useEffect(() => {
-    if (initialTeamId && initialTeamId !== "all") {
-      const hasPlayers = players.some((p) => p.teamId === initialTeamId);
-      setSelectedTeamFilter(hasPlayers ? initialTeamId : "all");
-    } else {
-      setSelectedTeamFilter("all");
-    }
-  }, [initialTeamId, players]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (!isOpen) return null;
+  // Sincronizar filtro cuando cambia initialTeamId o al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedTeamFilter(initialTeamId || "all");
+    }
+  }, [initialTeamId, isOpen]);
+
+  const orderedTeams = useMemo(() => {
+    const list: Array<{ id: string; label: string }> = [];
+    const usedIds = new Set<string>();
+
+    CANONICAL_MODAL_ORDER.forEach((target) => {
+      const match = (teams || []).find((t) => {
+        const n = (t?.name || "").trim().toLowerCase();
+        return n === target.key || n.startsWith(target.key);
+      });
+      if (match && !usedIds.has(match.id)) {
+        usedIds.add(match.id);
+        list.push({ id: match.id, label: target.label || match.name });
+      }
+    });
+
+    // Añadir cualquier equipo restante no contemplado en el orden canónico
+    (teams || []).forEach((t) => {
+      if (t?.id && !usedIds.has(t.id)) {
+        usedIds.add(t.id);
+        list.push({ id: t.id, label: t.name || "Equipo" });
+      }
+    });
+
+    return list;
+  }, [teams]);
 
   // Filtrado de jugadores
   const filteredPlayers = useMemo(() => {
-    return players.filter((p) => {
+    return (players || []).filter((p) => {
       // Filtro de equipo
       if (selectedTeamFilter !== "all" && p.teamId !== selectedTeamFilter) {
         return false;
@@ -89,22 +106,22 @@ export function PlayerAttendanceReportModal({
       // Filtro de búsqueda por texto
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        const matchesName = p.playerName.toLowerCase().includes(query);
-        const matchesDorsal = p.playerDorsal ? p.playerDorsal.toString() === query : false;
-        const matchesTeam = p.teamName.toLowerCase().includes(query);
+        const matchesName = (p.playerName || "").toLowerCase().includes(query);
+        const matchesDorsal = p.playerDorsal != null ? p.playerDorsal.toString() === query : false;
+        const matchesTeam = (p.teamName || "").toLowerCase().includes(query);
         if (!matchesName && !matchesDorsal && !matchesTeam) {
           return false;
         }
       }
 
       // Filtro de estado
-      if (statusFilter === "con_faltas" && p.absentCount <= 0) {
+      if (statusFilter === "con_faltas" && (p.absentCount || 0) <= 0) {
         return false;
       }
-      if (statusFilter === "en_riesgo" && p.attendanceRate >= 75 && p.absentCount <= 1) {
+      if (statusFilter === "en_riesgo" && (p.attendanceRate || 0) >= 75 && (p.absentCount || 0) <= 1) {
         return false;
       }
-      if (statusFilter === "cumple_objetivo" && p.attendanceRate < 85) {
+      if (statusFilter === "cumple_objetivo" && (p.attendanceRate || 0) < 85) {
         return false;
       }
 
@@ -116,16 +133,16 @@ export function PlayerAttendanceReportModal({
   const sortedPlayers = useMemo(() => {
     const list = [...filteredPlayers];
     if (sortBy === "riesgo") {
-      return list.sort((a, b) => a.attendanceRate - b.attendanceRate || b.absentCount - a.absentCount);
+      return list.sort((a, b) => (a.attendanceRate || 0) - (b.attendanceRate || 0) || (b.absentCount || 0) - (a.absentCount || 0));
     }
     if (sortBy === "faltas") {
-      return list.sort((a, b) => b.absentCount - a.absentCount || a.attendanceRate - b.attendanceRate);
+      return list.sort((a, b) => (b.absentCount || 0) - (a.absentCount || 0) || (a.attendanceRate || 0) - (b.attendanceRate || 0));
     }
     if (sortBy === "asistencia_desc") {
-      return list.sort((a, b) => b.attendanceRate - a.attendanceRate);
+      return list.sort((a, b) => (b.attendanceRate || 0) - (a.attendanceRate || 0));
     }
     if (sortBy === "nombre") {
-      return list.sort((a, b) => a.playerName.localeCompare(b.playerName));
+      return list.sort((a, b) => (a.playerName || "").localeCompare(b.playerName || ""));
     }
     return list;
   }, [filteredPlayers, sortBy]);
@@ -147,8 +164,10 @@ export function PlayerAttendanceReportModal({
     window.print();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 overflow-y-auto bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
         className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -545,6 +564,7 @@ export function PlayerAttendanceReportModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

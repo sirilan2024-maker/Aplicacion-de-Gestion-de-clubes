@@ -581,12 +581,20 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
       setEmailInput(member.email?.includes('/register/staff/') ? '' : (member.email || ''));
       setPromotionResult(null);
       
-      if (member.teams && member.teams.length > 0) {
-        setTeamIds(member.teams.map(t => t.id));
-      } else if (member.team_id) {
-        setTeamIds([member.team_id]);
+      if (member.type === 'player') {
+        if (member.teams && member.teams.length > 0) {
+          setTeamIds(member.teams.map(t => t.id));
+        } else {
+          setTeamIds([]);
+        }
       } else {
-        setTeamIds([]);
+        if (member.teams && member.teams.length > 0) {
+          setTeamIds(member.teams.map(t => t.id));
+        } else if (member.team_id) {
+          setTeamIds([member.team_id]);
+        } else {
+          setTeamIds([]);
+        }
       }
     }
   }, [member]);
@@ -611,6 +619,13 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
           const res = await promotePlayerToStaffAction(member.id, emailInput, activeRole, assignedRoles, teamIds);
           if (!res.success) throw new Error(res.error);
           
+          if ((res as any).alreadyRegistered || (!res.inviteToken && !res.tempPassword)) {
+            toast.success("Rol actualizado correctamente");
+            onSuccess();
+            onClose();
+            return;
+          }
+
           toast.success("Rol asignado correctamente");
           
           const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';

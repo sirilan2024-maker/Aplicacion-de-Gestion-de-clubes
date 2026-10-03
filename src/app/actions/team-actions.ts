@@ -21,8 +21,9 @@ export async function getAvailableCoachesAction(clubId: string) {
     return { success: false, error: "Error al cargar entrenadores" }
   }
 
-  // Filtrar en memoria por si el IN de supabase falla
-  const validRoles = ["entrenador", "coach", "coordinador", "staff"]
+  // Filtrar en memoria: solo técnicos de campo / banquillo (entrenador, coach, delegado)
+  // Un coordinador no es un entrenador de equipo
+  const validRoles = ["entrenador", "coach", "delegado", "segundo_entrenador"]
   const coaches = (data || []).filter(p => {
     const r1 = p.role?.toLowerCase() || ""
     const r2 = p.rol?.toLowerCase() || ""

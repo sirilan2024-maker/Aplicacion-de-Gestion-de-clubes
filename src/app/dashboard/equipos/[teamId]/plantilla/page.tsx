@@ -246,6 +246,8 @@ export default function PlantillaEquipoPage() {
     }
   };
 
+  const isReadOnly = ['jugador', 'familia', 'tutor', 'family'].includes(userRole?.toLowerCase() || '');
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="top-right" />
@@ -254,7 +256,7 @@ export default function PlantillaEquipoPage() {
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Plantilla Actual</h2>
         <div className="flex gap-3">
-          {(!userRole || !['entrenador', 'coach', 'coordinador'].includes(userRole.toLowerCase())) && (
+          {(!isReadOnly && ['admin', 'superadmin', 'coordinador'].includes(userRole?.toLowerCase() || '')) && (
             <>
               <button 
                 onClick={() => setIsExportPinsModalOpen(true)}
@@ -287,21 +289,21 @@ export default function PlantillaEquipoPage() {
                 <th className="px-6 py-2">Posición</th>
                 <th className="px-6 py-2">Rol</th>
                 <th className="px-6 py-2">Edad / Físico</th>
-                <th className="px-6 py-2">Contacto</th>
-                <th className="px-6 py-2 text-center">Acciones</th>
+                {!isReadOnly && <th className="px-6 py-2">Contacto</th>}
+                {!isReadOnly && <th className="px-6 py-2 text-center">Acciones</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={isReadOnly ? 5 : 7} className="px-6 py-16 text-center">
                     <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
                     <p className="text-slate-500 font-medium">Cargando plantilla...</p>
                   </td>
                 </tr>
               ) : players.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={isReadOnly ? 5 : 7} className="px-6 py-16 text-center">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4 border border-slate-100">
                       <Users className="w-8 h-8 text-slate-400" />
                     </div>
@@ -316,13 +318,14 @@ export default function PlantillaEquipoPage() {
                     <tr 
                       key={player.id} 
                       onClick={() => {
+                        if (isReadOnly) return;
                         if (esEntrenador) {
                           router.push(`/dashboard/club/miembros/staff/${player.id}`);
                         } else {
                           router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                         }
                       }}
-                      className="bg-white shadow-sm hover:shadow-md transition-all group cursor-pointer"
+                      className={`bg-white shadow-sm hover:shadow-md transition-all group ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
                     >
                       <td className="px-6 py-4 rounded-l-xl border-y border-l border-gray-200 group-hover:border-gray-300">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shadow-xs">
@@ -365,7 +368,7 @@ export default function PlantillaEquipoPage() {
                           {esEntrenador ? (player.posicion || 'Entrenador') : (player.posicion ? player.posicion : 'Jugador')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-900 border-y border-gray-200 group-hover:border-gray-300">
+                      <td className={`px-6 py-4 text-slate-900 border-y ${isReadOnly ? 'border-r rounded-r-xl' : ''} border-gray-200 group-hover:border-gray-300`}>
                         {player.birth_date ? (
                           <div className="flex flex-col">
                             <span className="font-bold">{calcularEdad(player.birth_date)}</span>
@@ -379,19 +382,23 @@ export default function PlantillaEquipoPage() {
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-slate-600 font-medium border-y border-gray-200 group-hover:border-gray-300">
-                        <div className="flex flex-col">
-                          <span className="font-bold">{getDisplayEmail(player)}</span>
-                          {player.phone && <span className="text-sm font-semibold text-slate-500">{player.phone}</span>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300">
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="p-2 text-slate-300 group-hover:text-blue-500 transition-colors bg-slate-50 rounded-full group-hover:bg-blue-50">
-                            <ChevronRight size={18} />
+                      {!isReadOnly && (
+                        <td className="px-6 py-4 text-slate-600 font-medium border-y border-gray-200 group-hover:border-gray-300">
+                          <div className="flex flex-col">
+                            <span className="font-bold">{getDisplayEmail(player)}</span>
+                            {player.phone && <span className="text-sm font-semibold text-slate-500">{player.phone}</span>}
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                      )}
+                      {!isReadOnly && (
+                        <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="p-2 text-slate-300 group-hover:text-blue-500 transition-colors bg-slate-50 rounded-full group-hover:bg-blue-50">
+                              <ChevronRight size={18} />
+                            </div>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -423,13 +430,14 @@ export default function PlantillaEquipoPage() {
               <div 
                 key={player.id}
                 onClick={() => {
+                  if (isReadOnly) return;
                   if (esEntrenador) {
                     router.push(`/dashboard/club/miembros/staff/${player.id}`);
                   } else {
                     router.push(`/dashboard/equipos/${teamId}/jugador/${player.id}`);
                   }
                 }}
-                className="bg-white rounded-2xl p-5 shadow-[0_8px_30px_rgba(37,99,235,0.22)] border border-blue-200/80 hover:shadow-[0_12px_35px_rgba(37,99,235,0.3)] relative overflow-hidden cursor-pointer transition-all active:scale-[0.99]"
+                className={`bg-white rounded-2xl p-5 shadow-[0_8px_30px_rgba(37,99,235,0.22)] border border-blue-200/80 hover:shadow-[0_12px_35px_rgba(37,99,235,0.3)] relative overflow-hidden transition-all ${isReadOnly ? 'cursor-default' : 'cursor-pointer active:scale-[0.99]'}`}
               >
                 <div className="absolute top-0 right-0 p-3 opacity-[0.03]">
                   <span className="text-7xl font-black text-slate-900 italic">
@@ -490,14 +498,19 @@ export default function PlantillaEquipoPage() {
                   <div className="text-slate-500">
                     <span className="block text-[10px] uppercase tracking-wider font-semibold opacity-70 mb-0.5">Físico</span>
                     <span className="text-slate-900 font-medium">
-                      {player.birth_date ? calcularEdad(player.birth_date) : '-'} años
+                      {player.birth_date ? calcularEdad(player.birth_date) : '-'}
                       {player.height && player.weight ? ` • ${player.height}m / ${player.weight}kg` : ''}
                     </span>
                   </div>
                   <div className="text-slate-500">
-                    <span className="block text-[10px] uppercase tracking-wider font-semibold opacity-70 mb-0.5">Contacto</span>
+                    <span className="block text-[10px] uppercase tracking-wider font-semibold opacity-70 mb-0.5">
+                      {isReadOnly ? 'Posición' : 'Contacto'}
+                    </span>
                     <span className="text-slate-900 font-medium truncate block">
-                      {getDisplayEmail(player) || '-'}
+                      {isReadOnly 
+                        ? (esEntrenador ? (player.posicion || 'Cuerpo Técnico') : (player.posicion_principal || 'Jugador'))
+                        : (getDisplayEmail(player) || '-')
+                      }
                     </span>
                   </div>
                 </div>

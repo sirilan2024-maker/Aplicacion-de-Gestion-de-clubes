@@ -93,6 +93,124 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
     (t) => t.competitionName === "Liga Brave" || t.teamCategory === "Liga Brave"
   ).length;
 
+  const renderTeamCard = (team: any) => {
+    return (
+      <div
+        key={team.teamId}
+        className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-300 shadow-2xs hover:shadow-xs transition-all space-y-3.5"
+      >
+        {/* Cabecera del Equipo */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-black text-slate-900 text-base">{team.teamName}</h4>
+            <p className="text-xs text-slate-500 font-medium">
+              {team.competitionName || "Competición oficial FFCV"}
+              {team.groupName ? ` · ${team.groupName}` : ""}
+            </p>
+          </div>
+          {team.currentPosition && (
+            <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-black text-xs border border-indigo-200">
+              {team.currentPosition}º
+            </span>
+          )}
+        </div>
+
+        {/* Posición en Liga y Puntos Conseguidos */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-100 text-center">
+            <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider block">
+              Posición en Liga
+            </span>
+            <p className="text-2xl font-black text-indigo-950 mt-0.5">
+              {team.currentPosition ? `${team.currentPosition}º` : "—"}
+            </p>
+            <p className="text-[10px] text-indigo-600 font-medium mt-0.5">
+              {team.totalTeamsInGroup ? `de ${team.totalTeamsInGroup} equipos` : "Clasificación oficial"}
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+            <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider block">
+              Puntos Conseguidos
+            </span>
+            <p className="text-2xl font-black text-slate-900 mt-0.5">
+              {team.points} <span className="text-xs font-semibold text-slate-400">pts</span>
+            </p>
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+              {typeof team.winRate === "number" ? team.winRate.toFixed(1) : "0.0"}% victorias
+            </p>
+          </div>
+        </div>
+
+        {/* Balance de Competición */}
+        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">
+            Balance de Competición
+          </span>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+              <span className="text-[10px] text-slate-400 block font-semibold">Jugados</span>
+              <span className="text-sm font-black text-slate-900">{team.matchesPlayed}</span>
+            </div>
+            <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-2xs">
+              <span className="text-[10px] text-emerald-600 block font-semibold">Ganados</span>
+              <span className="text-sm font-black text-emerald-700">{team.wins}</span>
+            </div>
+            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+              <span className="text-[10px] text-slate-500 block font-semibold">Empatados</span>
+              <span className="text-sm font-black text-slate-700">{team.draws}</span>
+            </div>
+            <div className="bg-white p-2 rounded-lg border border-rose-200 shadow-2xs">
+              <span className="text-[10px] text-rose-600 block font-semibold">Perdidos</span>
+              <span className="text-sm font-black text-rose-700">{team.losses}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Registro de Goles */}
+        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">
+            Registro de Goles
+          </span>
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="bg-white p-2 rounded-lg border border-blue-200 shadow-2xs">
+              <span className="text-[10px] text-blue-600 block font-semibold">Goles Favor</span>
+              <span className="text-sm font-black text-blue-700">+{team.goalsFor}</span>
+            </div>
+            <div className="bg-white p-2 rounded-lg border border-rose-200 shadow-2xs">
+              <span className="text-[10px] text-rose-500 block font-semibold">Goles Contra</span>
+              <span className="text-sm font-black text-rose-700">-{team.goalsAgainst}</span>
+            </div>
+            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+              <span className="text-[10px] text-slate-500 block font-semibold">Diferencia</span>
+              <span className={`text-sm font-black ${team.goalDiff >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Botones de Navegación Rápida */}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <Link
+            href={`/dashboard/equipos/${team.teamId}/plantilla`}
+            className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors text-center shadow-2xs active:scale-95"
+          >
+            <Users className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            <span>Ver Plantilla</span>
+          </Link>
+          <Link
+            href={`/dashboard/equipos/${team.teamId}/partidos`}
+            className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors text-center shadow-xs active:scale-95"
+          >
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span>Ver Partidos y Acta</span>
+          </Link>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm space-y-5">
       {/* ── Cabecera de Situación Deportiva ── */}
@@ -289,7 +407,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                 {teamStats.length} Equipos ({ffcvCount} FFCV · {braveCount} Liga Brave)
               </span>
 
-              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+              <div className="hidden sm:flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setTeamViewMode("table")}
@@ -299,7 +417,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                   title="Ver Cuadrante Global en Tabla"
                 >
                   <TableIcon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Tabla Global</span>
+                  <span>Tabla Global</span>
                 </button>
                 <button
                   type="button"
@@ -310,134 +428,100 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                   title="Ver Tarjetas de Equipos"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Tarjetas</span>
+                  <span>Tarjetas</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* 1. Vista Tabla */}
-          {teamViewMode === "table" ? (
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">
-                    <th className="py-3 px-3 text-left">Equipo</th>
-                    <th className="py-3 px-2 text-left">Competición / Grupo</th>
-                    <th className="py-3 px-1.5 text-center">Pos.</th>
-                    <th className="py-3 px-1.5 text-center">PJ</th>
-                    <th className="py-3 px-1.5 text-center text-emerald-800">V</th>
-                    <th className="py-3 px-1.5 text-center">E</th>
-                    <th className="py-3 px-1.5 text-center text-rose-800">D</th>
-                    <th className="py-3 px-1.5 text-center text-blue-800">GF</th>
-                    <th className="py-3 px-1.5 text-center text-rose-700">GC</th>
-                    <th className="py-3 px-1.5 text-center">Dif.</th>
-                    <th className="py-3 px-2 text-center text-indigo-900">Pts</th>
-                    <th className="py-3 px-2 text-center">% Vic.</th>
-                    <th className="py-3 px-3 text-right">Ver</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {teamStats.map((team) => {
-                    const isPositiveGD = team.goalDiff > 0;
-                    const isNeutralGD = team.goalDiff === 0;
+          {/* 1. Vista Móvil (tarjetas detalladas individuales para cada equipo) */}
+          <div className="block sm:hidden space-y-3.5">
+            {teamStats.map((team) => renderTeamCard(team))}
+          </div>
 
-                    return (
-                      <tr
-                        key={team.teamId}
-                        onClick={() => setSelectedTeamDetail(team)}
-                        className="hover:bg-indigo-50/50 transition-colors cursor-pointer group text-xs"
-                      >
-                        <td className="py-2.5 px-3 whitespace-nowrap">
-                          <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                            {team.teamName}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <div className="truncate max-w-[200px]">
-                            <span className="font-medium text-slate-700 block truncate">{team.competitionName}</span>
-                            {team.groupName && <span className="text-[10px] text-slate-400 block truncate">{team.groupName}</span>}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-1.5 text-center font-black">
-                          {team.currentPosition ? (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 text-[11px]">
-                              {team.currentPosition}º
+          {/* 2. Vista Desktop (Tabla Global o Tarjetas según selección) */}
+          <div className="hidden sm:block">
+            {teamViewMode === "table" ? (
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">
+                      <th className="py-3 px-3 text-left">Equipo</th>
+                      <th className="py-3 px-2 text-left">Competición / Grupo</th>
+                      <th className="py-3 px-1.5 text-center">Pos.</th>
+                      <th className="py-3 px-1.5 text-center">PJ</th>
+                      <th className="py-3 px-1.5 text-center text-emerald-800">V</th>
+                      <th className="py-3 px-1.5 text-center">E</th>
+                      <th className="py-3 px-1.5 text-center text-rose-800">D</th>
+                      <th className="py-3 px-1.5 text-center text-blue-800">GF</th>
+                      <th className="py-3 px-1.5 text-center text-rose-700">GC</th>
+                      <th className="py-3 px-1.5 text-center">Dif.</th>
+                      <th className="py-3 px-2 text-center text-indigo-900">Pts</th>
+                      <th className="py-3 px-2 text-center">% Vic.</th>
+                      <th className="py-3 px-3 text-right">Ver</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {teamStats.map((team) => {
+                      const isPositiveGD = team.goalDiff > 0;
+                      const isNeutralGD = team.goalDiff === 0;
+
+                      return (
+                        <tr
+                          key={team.teamId}
+                          onClick={() => setSelectedTeamDetail(team)}
+                          className="hover:bg-indigo-50/50 transition-colors cursor-pointer group text-xs"
+                        >
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                              {team.teamName}
                             </span>
-                          ) : (
-                            <span className="text-slate-400 font-normal">—</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-1.5 text-center font-bold text-slate-700">{team.matchesPlayed}</td>
-                        <td className="py-2.5 px-1.5 text-center font-bold text-emerald-600">{team.wins}</td>
-                        <td className="py-2.5 px-1.5 text-center font-bold text-slate-600">{team.draws}</td>
-                        <td className="py-2.5 px-1.5 text-center font-bold text-rose-600">{team.losses}</td>
-                        <td className="py-2.5 px-1.5 text-center font-bold text-blue-600">{team.goalsFor}</td>
-                        <td className="py-2.5 px-1.5 text-center font-bold text-rose-500">{team.goalsAgainst}</td>
-                        <td className="py-2.5 px-1.5 text-center font-black">
-                          <span className={isPositiveGD ? "text-emerald-600" : isNeutralGD ? "text-slate-500" : "text-rose-600"}>
-                            {isPositiveGD ? `+${team.goalDiff}` : team.goalDiff}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-2 text-center font-black text-slate-900 text-sm">{team.points}</td>
-                        <td className="py-2.5 px-2 text-center font-semibold text-slate-600">
-                          {typeof team.winRate === "number" ? team.winRate.toFixed(1) : "0.0"}%
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className="text-xs font-bold text-indigo-600 group-hover:underline">Detalles</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            /* 2. Vista Tarjetas */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {teamStats.map((team) => (
-                <div
-                  key={team.teamId}
-                  onClick={() => setSelectedTeamDetail(team)}
-                  className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{team.teamName}</h4>
-                      <p className="text-[11px] text-slate-400">{team.competitionName}</p>
-                    </div>
-                    {team.currentPosition && (
-                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-black text-xs">
-                        {team.currentPosition}º
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-4 gap-1 text-center py-2 bg-slate-50 rounded-xl text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">PJ</span>
-                      <span className="font-bold text-slate-800">{team.matchesPlayed}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-emerald-600 block">V</span>
-                      <span className="font-bold text-emerald-700">{team.wins}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block">E</span>
-                      <span className="font-bold text-slate-700">{team.draws}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-rose-600 block">D</span>
-                      <span className="font-bold text-rose-700">{team.losses}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                    <span className="text-slate-500">Puntos: <strong className="text-slate-900">{team.points} pts</strong></span>
-                    <span className="font-bold text-indigo-600 hover:underline">Ver detalles →</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <div className="truncate max-w-[200px]">
+                              <span className="font-medium text-slate-700 block truncate">{team.competitionName}</span>
+                              {team.groupName && <span className="text-[10px] text-slate-400 block truncate">{team.groupName}</span>}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-1.5 text-center font-black">
+                            {team.currentPosition ? (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 text-[11px]">
+                                {team.currentPosition}º
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-normal">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-1.5 text-center font-bold text-slate-700">{team.matchesPlayed}</td>
+                          <td className="py-2.5 px-1.5 text-center font-bold text-emerald-600">{team.wins}</td>
+                          <td className="py-2.5 px-1.5 text-center font-bold text-slate-600">{team.draws}</td>
+                          <td className="py-2.5 px-1.5 text-center font-bold text-rose-600">{team.losses}</td>
+                          <td className="py-2.5 px-1.5 text-center font-bold text-blue-600">{team.goalsFor}</td>
+                          <td className="py-2.5 px-1.5 text-center font-bold text-rose-500">{team.goalsAgainst}</td>
+                          <td className="py-2.5 px-1.5 text-center font-black">
+                            <span className={isPositiveGD ? "text-emerald-600" : isNeutralGD ? "text-slate-500" : "text-rose-600"}>
+                              {isPositiveGD ? `+${team.goalDiff}` : team.goalDiff}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-center font-black text-slate-900 text-sm">{team.points}</td>
+                          <td className="py-2.5 px-2 text-center font-semibold text-slate-600">
+                            {typeof team.winRate === "number" ? team.winRate.toFixed(1) : "0.0"}%
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <span className="text-xs font-bold text-indigo-600 group-hover:underline">Detalles</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {teamStats.map((team) => renderTeamCard(team))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

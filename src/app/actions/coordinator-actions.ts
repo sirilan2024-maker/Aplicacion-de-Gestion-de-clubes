@@ -1490,7 +1490,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
 
     const upcomingTrainings = (allTrainingsRaw || [])
       .filter((e: any) => e.date >= todayDate)
-      .slice(0, 20)
+      .slice(0, 60)
       .map((e: any) => {
         const t = e.teams as any;
         const rawCoach = t?.coach_id ? (allClubTeams.find(ct => ct.id === e.team_id) as any)?.coach : null;
@@ -1815,7 +1815,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .gte('fecha_hora', yesterday)
       .order('fecha_hora', { ascending: true })
-      .limit(10);
+      .limit(50);
 
     const agendaMatchesList: CoordinatorUpcomingMatch[] = (rawUpcomingMatches || []).map(m => {
       const tm = m.teams as any;

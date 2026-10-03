@@ -15,7 +15,7 @@ export function DisciplineSection({ records, recentCards = [], onPlayerClick }: 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | DisciplineStatus>("ALL");
   const [alertingId, setAlertingId] = useState<string | null>(null);
-  const [isReportOpen, setIsReportOpen] = useState(true);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const suspendedCount = useMemo(
     () => records.filter((r) => r.status === "Sancionado").length,

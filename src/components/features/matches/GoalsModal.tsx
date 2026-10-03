@@ -11,7 +11,7 @@ export function GoalsModal({ player, matchHistory, totalGoals, onClose }: GoalsM
   // Filter matches where the player scored goals
   const goalMatches = matchHistory
     .filter(m => (m.goles || 0) > 0)
-    .sort((a, b) => new Date((b.partidos as any)?.fecha_hora || 0).getTime() - new Date((a.partidos as any)?.fecha_hora || 0).getTime());
+    .sort((a, b) => new Date((a.partidos as any)?.fecha_hora || 0).getTime() - new Date((b.partidos as any)?.fecha_hora || 0).getTime());
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">

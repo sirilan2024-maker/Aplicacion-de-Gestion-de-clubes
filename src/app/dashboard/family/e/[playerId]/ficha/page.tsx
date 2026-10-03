@@ -284,7 +284,8 @@ export default function PlayerProfilePage() {
           processedMatches.add(m.id);
         }
       });
-      mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Orden del más cercano en fecha al más lejano
+      mHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // Entrenamientos y Asistencia
       const { data: attData } = await supabase
@@ -316,7 +317,8 @@ export default function PlayerProfilePage() {
           processedEvents.add(e.id);
         }
       });
-      tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Orden del más cercano en fecha al más lejano
+      tHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       setTrainingHistory(tHistory);
       setMatchHistory(mHistory);

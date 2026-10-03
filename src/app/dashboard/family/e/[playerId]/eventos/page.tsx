@@ -71,7 +71,7 @@ export default function FamilyEventsPage() {
         mergedEvents.sort((a, b) => {
           const timeA = new Date(`${a.date}T${a.start_time || '00:00'}:00`).getTime();
           const timeB = new Date(`${b.date}T${b.start_time || '00:00'}:00`).getTime();
-          return timeB - timeA; // Descending order as original
+          return timeA - timeB; // Orden del más cercano en fecha al más lejano
         });
 
         setEvents(mergedEvents);

@@ -385,7 +385,8 @@ export default function GlobalPlayerProfilePage() {
           }
         }
       });
-      mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Orden del más cercano en fecha al más lejano
+      mHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       // 3. Entrenamientos, Asistencia y ACWR
       const { data: attData } = await supabase
@@ -509,7 +510,8 @@ export default function GlobalPlayerProfilePage() {
         });
       }
       
-      allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Orden del más cercano en fecha al más lejano
+      allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setPlayerEvents(allEvents);
     } catch (err) {
       console.error(err);

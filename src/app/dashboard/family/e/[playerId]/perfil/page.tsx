@@ -143,7 +143,8 @@ export default function PlayerDashboardPage() {
         tarjetas_amarillas: h.yellow_cards ?? h.tarjetas_amarillas ?? 0,
         tarjetas_rojas: h.red_cards ?? h.tarjetas_rojas ?? 0
       }))
-      .sort((a, b) => new Date((b.partidos as any).fecha_hora).getTime() - new Date((a.partidos as any).fecha_hora).getTime())
+      // Orden del más cercano en fecha al más lejano
+      .sort((a, b) => new Date((a.partidos as any).fecha_hora).getTime() - new Date((b.partidos as any).fecha_hora).getTime())
       .slice(0, 10);
     setMatchHistory(finalizedHistory);
   }, [selectedTeamFilter, rawConvData, rawMatchEvents]);
@@ -402,7 +403,8 @@ export default function PlayerDashboardPage() {
                 tarjetas_amarillas: h.yellow_cards ?? h.tarjetas_amarillas ?? 0,
                 tarjetas_rojas: h.red_cards ?? h.tarjetas_rojas ?? 0
               }))
-              .sort((a, b) => new Date((b.partidos as any).fecha_hora).getTime() - new Date((a.partidos as any).fecha_hora).getTime())
+              // Orden del más cercano en fecha al más lejano
+              .sort((a, b) => new Date((a.partidos as any).fecha_hora).getTime() - new Date((b.partidos as any).fecha_hora).getTime())
               .slice(0, 10);
             setMatchHistory(finalizedHistory);
           }

@@ -56,7 +56,12 @@ export function PlayerPerformanceDrawer({
             .order('created_at', { ascending: false });
 
           if (officialConvs) {
-            setOfficialMatches(officialConvs);
+            const sortedConvs = [...officialConvs].sort((a, b) => {
+              const timeA = new Date(a.partidos?.fecha_hora || 0).getTime();
+              const timeB = new Date(b.partidos?.fecha_hora || 0).getTime();
+              return timeA - timeB;
+            });
+            setOfficialMatches(sortedConvs);
           }
 
           try {

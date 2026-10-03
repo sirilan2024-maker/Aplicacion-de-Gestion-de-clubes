@@ -67,7 +67,9 @@ export default function FamilyMatchesPage() {
 
         const { data: mData, error: mError } = await query;
         if (mError) throw mError;
-        setMatches(mData || []);
+        // Orden del más cercano en fecha al más lejano
+        const sorted = (mData || []).sort((a: any, b: any) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+        setMatches(sorted);
       }
 
     } catch (err: any) {

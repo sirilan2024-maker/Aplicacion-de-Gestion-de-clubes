@@ -68,15 +68,15 @@ export default function FamilyDisciplinePage() {
         }
       });
 
-      // Sort by match date descending
-      allCards.sort((a, b) => new Date(b.match?.fecha_hora || 0).getTime() - new Date(a.match?.fecha_hora || 0).getTime());
+      // Sort by match date (closest to furthest)
+      allCards.sort((a, b) => new Date(a.match?.fecha_hora || 0).getTime() - new Date(b.match?.fecha_hora || 0).getTime());
 
       // Format for DisciplineModal
       const formattedCardEvents = records.map(r => ({
         match: Array.isArray(r.partidos) ? r.partidos[0] : r.partidos,
         yellow: r.yellow_cards ?? r.tarjetas_amarillas ?? 0,
         red: r.red_cards ?? r.tarjetas_rojas ?? 0
-      })).sort((a, b) => new Date(b.match?.fecha_hora || 0).getTime() - new Date(a.match?.fecha_hora || 0).getTime());
+      })).sort((a, b) => new Date(a.match?.fecha_hora || 0).getTime() - new Date(b.match?.fecha_hora || 0).getTime());
 
       setStats({ yellow, red });
       setCards(allCards);

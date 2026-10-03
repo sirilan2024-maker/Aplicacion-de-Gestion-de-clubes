@@ -25,13 +25,13 @@ export function CriticalAlertsBanner({ alerts }: CriticalAlertsBannerProps) {
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-          <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-            Alertas Críticas y Operativas ({alerts.length})
+          <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+          <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+            REQUIERE ATENCIÓN ({alerts.length})
           </h2>
         </div>
-        <span className="text-[11px] font-semibold text-slate-400">
-          Supervisión en tiempo real
+        <span className="text-[10px] font-extrabold uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/80">
+          Acción requerida
         </span>
       </div>
 

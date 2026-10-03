@@ -139,6 +139,30 @@ export interface AbsentPlayerRecord {
   notes?: string;
 }
 
+export interface PlayerAttendanceRecordItem {
+  date: string;
+  status: 'presente' | 'ausente' | 'justificado' | 'otro';
+  rawStatus?: string;
+  notes?: string | null;
+}
+
+export interface PlayerAttendanceReportItem {
+  playerId: string;
+  playerName: string;
+  playerDorsal: number | null;
+  playerAvatar: string | null;
+  teamId: string;
+  teamName: string;
+  teamCategory: string;
+  totalSessions: number;
+  presentCount: number;
+  absentCount: number;
+  justifiedCount: number;
+  attendanceRate: number;
+  recentRecords: PlayerAttendanceRecordItem[];
+  statusBadge: 'excelente' | 'normal' | 'atencion' | 'critico';
+}
+
 export interface TeamAttendanceSummary {
   teamId: string;
   teamName: string;
@@ -150,6 +174,7 @@ export interface TeamAttendanceSummary {
   totalSessions: number;
   absentCount: number;
   absentPlayers: AbsentPlayerRecord[];
+  playerSummaries?: PlayerAttendanceReportItem[];
 }
 
 export interface TeamTodayTraining {
@@ -200,6 +225,7 @@ export interface CoordinatorDashboardFullData {
     categories: AttendanceCategoryStats[];
     activeInjuries: ActiveInjuryItem[];
     teamsAttendance?: TeamAttendanceSummary[];
+    playersAttendanceReport?: PlayerAttendanceReportItem[];
   };
   sports: {
     totalPlayedMatches: number;

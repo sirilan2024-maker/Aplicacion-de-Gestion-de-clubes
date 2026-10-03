@@ -1282,16 +1282,24 @@ export async function getCoordinatorFullDashboardAction(params?: {
 
     // 7. ASISTENCIA Y OPERACIONES REALES
     const now = new Date();
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    let startDate: Date;
+    if (params?.attendancePeriod === 'semana') {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (params?.attendancePeriod === 'temporada') {
+      startDate = new Date('2026-08-01T00:00:00.000Z');
+    } else {
+      // 'mes' por defecto
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
 
     const playerIds = players.map(p => p.id);
     let attList: any[] = [];
     if (playerIds.length > 0) {
       const { data: attendanceRaw } = await adminClient
         .from('attendance')
-        .select('session_id, player_id, status, created_at')
+        .select('id, session_id, player_id, status, created_at, date, notes')
         .in('player_id', playerIds)
-        .gte('created_at', oneMonthAgo.toISOString())
+        .gte('created_at', startDate.toISOString())
         .limit(5000);
       attList = attendanceRaw || [];
     }
@@ -1508,6 +1516,8 @@ export async function getCoordinatorFullDashboardAction(params?: {
     });
 
     // Asistencia detallada por equipo y desglose de faltas
+    const allPlayersAttendanceReport: any[] = [];
+
     const teamsAttendance = allClubTeams.map(t => {
       const rawCoach = Array.isArray(t.coach) ? t.coach[0] : t.coach;
       const coachName = rawCoach ? `${rawCoach.first_name || ''} ${rawCoach.last_name || ''}`.trim() : null;
@@ -1535,6 +1545,59 @@ export async function getCoordinatorFullDashboardAction(params?: {
         notes: val.notes,
       }));
 
+      const totalTeamSessions = Array.from(new Set(tAtt.map(a => a.date || (a.created_at ? a.created_at.split('T')[0] : '')))).filter(Boolean).length || Math.max(1, tPlayers.length > 0 ? 4 : 0);
+
+      // Desglose individual de cada jugador de la plantilla
+      const teamPlayerSummaries = tPlayers.map(p => {
+        const pAtt = tAtt.filter(a => a.player_id === p.id);
+        const pPresent = pAtt.filter(a => (a.status || '').toLowerCase().includes('present')).length;
+        const pAbsent = pAtt.filter(a => (a.status || '').toLowerCase().includes('ausent') || (a.status || '').toLowerCase().includes('absent')).length;
+        const pJustified = pAtt.filter(a => (a.status || '').toLowerCase().includes('justif') || (a.status || '').toLowerCase().includes('lesion') || (a.status || '').toLowerCase().includes('excus')).length;
+        const pTotal = pAtt.length;
+        const pRate = pTotal > 0 ? Math.round((pPresent / pTotal) * 100) : (pAbsent > 0 ? 0 : rate);
+
+        const recentRecords = pAtt.slice(-10).reverse().map(a => {
+          const s = (a.status || '').toLowerCase();
+          let normStatus: 'presente' | 'ausente' | 'justificado' | 'otro' = 'otro';
+          if (s.includes('present')) normStatus = 'presente';
+          else if (s.includes('ausent') || s.includes('absent')) normStatus = 'ausente';
+          else if (s.includes('justif') || s.includes('lesion') || s.includes('excus')) normStatus = 'justificado';
+
+          return {
+            date: a.date || (a.created_at ? a.created_at.split('T')[0] : ''),
+            status: normStatus,
+            rawStatus: a.status,
+            notes: a.notes || null,
+          };
+        });
+
+        let statusBadge: 'excelente' | 'normal' | 'atencion' | 'critico' = 'normal';
+        if (pRate >= 90) statusBadge = 'excelente';
+        else if (pRate >= 80) statusBadge = 'normal';
+        else if (pRate >= 70) statusBadge = 'atencion';
+        else statusBadge = 'critico';
+
+        const summaryItem = {
+          playerId: p.id,
+          playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador',
+          playerDorsal: p.dorsal ?? null,
+          playerAvatar: p.avatar_url ?? null,
+          teamId: t.id,
+          teamName: t.name,
+          teamCategory: t.category || '',
+          totalSessions: pTotal > 0 ? pTotal : totalTeamSessions,
+          presentCount: pTotal > 0 ? pPresent : (pAbsent === 0 ? totalTeamSessions : 0),
+          absentCount: pAbsent,
+          justifiedCount: pJustified,
+          attendanceRate: pRate,
+          recentRecords,
+          statusBadge,
+        };
+
+        allPlayersAttendanceReport.push(summaryItem);
+        return summaryItem;
+      });
+
       return {
         teamId: t.id,
         teamName: t.name,
@@ -1543,9 +1606,10 @@ export async function getCoordinatorFullDashboardAction(params?: {
         coachName,
         totalPlayers: tPlayers.length,
         attendanceRate: rate,
-        totalSessions: Array.from(new Set(tAtt.map(a => a.date || a.created_at))).length || Math.max(1, tPlayers.length > 0 ? 4 : 0),
+        totalSessions: totalTeamSessions,
         absentCount: absentPlayers.reduce((acc, p) => acc + p.absencesCount, 0),
         absentPlayers,
+        playerSummaries: teamPlayerSummaries,
       };
     });
 
@@ -1717,6 +1781,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
           categories: attendanceCategories,
           activeInjuries,
           teamsAttendance,
+          playersAttendanceReport: allPlayersAttendanceReport,
         },
         sports: sportsData,
         injuries: {

@@ -1,13 +1,17 @@
-import React, { useState } from "react";
-import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX } from "lucide-react";
-import { AttendanceCategoryStats, ActiveInjuryItem, TeamAttendanceSummary } from "@/types/coordinator";
+import React, { useState, useMemo } from "react";
+import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX, ClipboardList } from "lucide-react";
+import { AttendanceCategoryStats, ActiveInjuryItem, TeamAttendanceSummary, PlayerAttendanceReportItem } from "@/types/coordinator";
 import { InjuryDetailsModal } from "./InjuryDetailsModal";
+import { PlayerAttendanceReportModal } from "./PlayerAttendanceReportModal";
 
 interface AttendanceOperationsSectionProps {
   globalWeeklyRate: number;
   categories: AttendanceCategoryStats[];
   injuries: ActiveInjuryItem[];
   teamsAttendance?: TeamAttendanceSummary[];
+  playersAttendanceReport?: PlayerAttendanceReportItem[];
+  teams?: Array<{ id: string; name: string; category?: string }>;
+  selectedTeamId?: string;
   currentPeriod: "semana" | "mes" | "temporada";
   onPeriodChange?: (period: "semana" | "mes" | "temporada") => void;
 }
@@ -17,53 +21,107 @@ export function AttendanceOperationsSection({
   categories,
   injuries,
   teamsAttendance = [],
+  playersAttendanceReport = [],
+  teams = [],
+  selectedTeamId = "all",
   currentPeriod = "semana",
   onPeriodChange,
 }: AttendanceOperationsSectionProps) {
   const [selectedInjury, setSelectedInjury] = useState<ActiveInjuryItem | null>(null);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [showPlayerReportModal, setShowPlayerReportModal] = useState(false);
+  const [reportInitialTeamId, setReportInitialTeamId] = useState<string>("all");
   const targetRate = 85; // Objetivo de asistencia del club
 
   const toggleTeamAbsences = (teamId: string) => {
     setExpandedTeamId(expandedTeamId === teamId ? null : teamId);
   };
 
+  const openPlayerReport = (teamId: string = "all") => {
+    setReportInitialTeamId(teamId);
+    setShowPlayerReportModal(true);
+  };
+
+  // Preparar lista de jugadores combinada si no vino a nivel raíz
+  const effectivePlayersReport = useMemo(() => {
+    if (playersAttendanceReport && playersAttendanceReport.length > 0) {
+      return playersAttendanceReport;
+    }
+    const combined: PlayerAttendanceReportItem[] = [];
+    teamsAttendance.forEach((t) => {
+      if (t.playerSummaries) {
+        combined.push(...t.playerSummaries);
+      }
+    });
+    return combined;
+  }, [playersAttendanceReport, teamsAttendance]);
+
+  // Lista de equipos para el selector del modal
+  const effectiveTeams = useMemo(() => {
+    if (teams && teams.length > 0) return teams;
+    return teamsAttendance.map((t) => ({
+      id: t.teamId,
+      name: t.teamName,
+      category: t.teamCategory,
+    }));
+  }, [teams, teamsAttendance]);
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-5">
-      {/* Cabecera del Bloque */}
+      {/* Cabecera del Bloque - Clicable para abrir informe completo */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+        <div
+          onClick={() => openPlayerReport(selectedTeamId || "all")}
+          className="flex items-center gap-3 cursor-pointer group select-none transition-opacity hover:opacity-95"
+          title="Haz clic para abrir el informe completo de asistencia por jugador"
+        >
+          <div className="w-9 h-9 rounded-xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center text-blue-600 transition-colors shadow-2xs">
             <Users className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
-              Asistencia a Entrenamientos y Control Operativo
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-extrabold text-slate-900 tracking-tight group-hover:text-blue-700 transition-colors">
+                Asistencia a Entrenamientos y Control Operativo
+              </h2>
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-2xs">
+                <ClipboardList className="w-2.5 h-2.5" />
+                <span>Ver Informe por Jugador</span>
+              </span>
+            </div>
             <p className="text-xs text-slate-500">
-              Seguimiento por equipos vs objetivo del club ({targetRate}%), avisos de faltas y parte médico
+              Seguimiento por equipos vs objetivo ({targetRate}%), faltas y parte médico · <span className="text-blue-600 font-bold group-hover:underline">Clic para ver informe detallado</span>
             </p>
           </div>
         </div>
 
-        {/* Selector de Período */}
-        {onPeriodChange && (
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto">
-            {(["semana", "mes", "temporada"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => onPeriodChange(p)}
-                className={`px-3 py-1 rounded-md text-xs font-bold capitalize transition-all cursor-pointer ${
-                  currentPeriod === p
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Botón de acceso directo e selector de período */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => openPlayerReport(selectedTeamId || "all")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            <span>Informe por Jugador</span>
+          </button>
+
+          {onPeriodChange && (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+              {(["semana", "mes", "temporada"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => onPeriodChange(p)}
+                  className={`px-3 py-1 rounded-md text-xs font-bold capitalize transition-all cursor-pointer ${
+                    currentPeriod === p
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -129,7 +187,7 @@ export function AttendanceOperationsSection({
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         <div className="text-right">
                           <span
                             className={`text-sm font-black ${
@@ -140,6 +198,16 @@ export function AttendanceOperationsSection({
                           </span>
                           <p className="text-[9px] text-slate-400 font-medium">Asistencia</p>
                         </div>
+
+                        {/* Botón para abrir informe individual de este equipo */}
+                        <button
+                          onClick={() => openPlayerReport(tm.teamId)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer border border-blue-200 shadow-2xs"
+                          title={`Ver informe completo de jugadores de ${tm.teamName}`}
+                        >
+                          <ClipboardList className="w-3 h-3 text-blue-600" />
+                          <span>Informe</span>
+                        </button>
 
                         {tm.absentCount > 0 ? (
                           <button
@@ -264,6 +332,17 @@ export function AttendanceOperationsSection({
       <InjuryDetailsModal
         injury={selectedInjury}
         onClose={() => setSelectedInjury(null)}
+      />
+
+      {/* Modal de Informe Completo de Asistencia por Jugador */}
+      <PlayerAttendanceReportModal
+        isOpen={showPlayerReportModal}
+        onClose={() => setShowPlayerReportModal(false)}
+        players={effectivePlayersReport}
+        teams={effectiveTeams}
+        initialTeamId={reportInitialTeamId}
+        currentPeriod={currentPeriod}
+        onPeriodChange={onPeriodChange}
       />
     </div>
   );

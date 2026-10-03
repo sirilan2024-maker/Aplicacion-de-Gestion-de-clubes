@@ -225,10 +225,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           </div>
         )}
 
-        {/* 2. Banner de Alertas Inteligentes (disciplina, lesiones, absentismo >1 día/semana, horario, mensajes) */}
-        <CriticalAlertsBanner alerts={displayedAlerts} />
-
-        {/* 3. Métricas Rápidas de un Solo Vistazo (KPIs) */}
+        {/* 2. Métricas Rápidas de un Solo Vistazo (KPIs) - ENCIMA DE ALERTAS */}
         {isGlobalView ? (
           /* KPIs Globales (Todos los Equipos) */
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -365,24 +362,10 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           </div>
         )}
 
-        {/* 4. Bloque de Control Disciplinario y Tarjetas FFCV (con últimas tarjetas y desplegable para esconder informe) */}
-        <DisciplineSection
-          records={displayedDisciplineRecords}
-          recentCards={displayedRecentCards}
-          onPlayerClick={(playerId) => router.push(`/dashboard/matches?view=disciplina`)}
-        />
+        {/* 3. Banner de Alertas Inteligentes: REQUIERE ATENCIÓN (Acción requerida) */}
+        <CriticalAlertsBanner alerts={displayedAlerts} />
 
-        {/* 5. Bloque de Asistencia por Equipo y Parte Médico (lado a lado, con aviso y visor de ausentes) */}
-        <AttendanceOperationsSection
-          globalWeeklyRate={attendance.globalWeeklyRate}
-          categories={attendance.categories}
-          injuries={displayedInjuries}
-          teamsAttendance={displayedTeamsAttendance}
-          currentPeriod={attendancePeriod}
-          onPeriodChange={handleAttendancePeriodChange}
-        />
-
-        {/* 6. Situación Deportiva (con modal interactivo de detalles por equipo al pulsar) */}
+        {/* 4. Situación Deportiva (con modal interactivo de detalles por equipo al pulsar) */}
         <SituacionDeportivaSection
           sports={displayedSportsData as any}
           kpis={{
@@ -396,6 +379,26 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
               : (data.injuries?.activeInjuriesList || []).filter((i: any) => i.teamId === selectedTeamId)
             ) as any,
           }}
+        />
+
+        {/* 5. Asistencia a Entrenamientos y Control Operativo (Clicable para informe completo por jugador y parte médico) */}
+        <AttendanceOperationsSection
+          globalWeeklyRate={attendance.globalWeeklyRate}
+          categories={attendance.categories}
+          injuries={displayedInjuries}
+          teamsAttendance={displayedTeamsAttendance}
+          playersAttendanceReport={attendance.playersAttendanceReport}
+          teams={teamsList}
+          selectedTeamId={selectedTeamId}
+          currentPeriod={attendancePeriod}
+          onPeriodChange={handleAttendancePeriodChange}
+        />
+
+        {/* 6. Control Disciplinario y Tarjetas FFCV (con últimas tarjetas y desplegable para esconder informe) */}
+        <DisciplineSection
+          records={displayedDisciplineRecords}
+          recentCards={displayedRecentCards}
+          onPlayerClick={(playerId) => router.push(`/dashboard/matches?view=disciplina`)}
         />
 
         {/* 7. Agenda de Entrenamientos por Equipo (SOLO ENTRENAMIENTOS, NO INSTALACIONES) */}

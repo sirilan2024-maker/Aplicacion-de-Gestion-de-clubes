@@ -10,10 +10,10 @@ export async function getAvailableCoachesAction(clubId: string) {
   // Use service role to bypass RLS
   const supabase = await createAdminClient()
 
-  // Buscar perfiles con rol entrenador, coach o coordinador (revisando role y rol por si acaso)
+  // Buscar perfiles del club
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, role, rol, club_id")
+    .select("id, first_name, last_name, role, rol, roles, club_id")
     .eq("club_id", clubId)
 
   if (error) {
@@ -21,13 +21,14 @@ export async function getAvailableCoachesAction(clubId: string) {
     return { success: false, error: "Error al cargar entrenadores" }
   }
 
-  // Filtrar en memoria: solo técnicos de campo / banquillo (entrenador, coach, delegado)
-  // Un coordinador no es un entrenador de equipo
+  // Filtrar en memoria: cualquier miembro que tenga asignado un rol de banquillo/técnico
+  // (ya sea como rol principal o dentro de su lista de roles: entrenador, delegado, etc.)
   const validRoles = ["entrenador", "coach", "delegado", "segundo_entrenador"]
   const coaches = (data || []).filter(p => {
     const r1 = p.role?.toLowerCase() || ""
     const r2 = p.rol?.toLowerCase() || ""
-    return validRoles.includes(r1) || validRoles.includes(r2)
+    const allRoles = (p.roles || []).map((r: string) => r?.toLowerCase())
+    return validRoles.includes(r1) || validRoles.includes(r2) || allRoles.some((r: string) => validRoles.includes(r))
   })
 
   return { success: true, coaches }

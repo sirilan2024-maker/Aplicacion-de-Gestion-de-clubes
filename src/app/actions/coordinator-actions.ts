@@ -1190,7 +1190,28 @@ export async function getCoordinatorFullDashboardAction(params?: {
       .eq('season_id', targetSeasonId);
 
     const { data: rawTeams } = await teamsQuery;
-    const allClubTeams = rawTeams || [];
+    const CANONICAL_COORDINATOR_TEAMS = [
+      'senior',
+      'infantil a',
+      'infantil b',
+      'cadete a',
+      'cadete b',
+      'juvenil a',
+      'juvenil b'
+    ];
+
+    const allClubTeams = (rawTeams || [])
+      .filter(t => {
+        const norm = (t.name || '').trim().toLowerCase();
+        return CANONICAL_COORDINATOR_TEAMS.some(k => norm === k || norm.startsWith(k));
+      })
+      .sort((a, b) => {
+        const normA = (a.name || '').trim().toLowerCase();
+        const normB = (b.name || '').trim().toLowerCase();
+        const idxA = CANONICAL_COORDINATOR_TEAMS.findIndex(k => normA === k || normA.startsWith(k));
+        const idxB = CANONICAL_COORDINATOR_TEAMS.findIndex(k => normB === k || normB.startsWith(k));
+        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+      });
 
     // Filtrar según categoría o equipo si aplica
     let filteredTeams = allClubTeams;

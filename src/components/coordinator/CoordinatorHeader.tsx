@@ -18,6 +18,16 @@ interface CoordinatorHeaderProps {
   onShare: () => void;
 }
 
+const CANONICAL_DROPDOWN_ORDER = [
+  { key: "senior", label: "Senior" },
+  { key: "infantil a", label: "Infantil A" },
+  { key: "infantil b", label: "Infantil B" },
+  { key: "cadete a", label: "Cadete A" },
+  { key: "cadete b", label: "Cadete B" },
+  { key: "juvenil a", label: "Juvenil A" },
+  { key: "juvenil b", label: "Juvenil B" },
+];
+
 export function CoordinatorHeader({
   userFirstName,
   seasonName,
@@ -29,6 +39,15 @@ export function CoordinatorHeader({
   onRefresh,
   onShare,
 }: CoordinatorHeaderProps) {
+  const orderedTeams = React.useMemo(() => {
+    return CANONICAL_DROPDOWN_ORDER.map((target) => {
+      const match = teams.find((t) => {
+        const n = t.name.trim().toLowerCase();
+        return n === target.key || n.startsWith(target.key);
+      });
+      return match ? { id: match.id, label: target.label } : null;
+    }).filter((t): t is { id: string; label: string } => t !== null);
+  }, [teams]);
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -99,12 +118,10 @@ export function CoordinatorHeader({
                 onChange={(e) => onSelectTeamId(e.target.value)}
                 className="w-full appearance-none bg-slate-50 border border-slate-300 hover:border-indigo-400 text-slate-800 text-xs font-bold rounded-xl pl-3.5 pr-9 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer shadow-2xs transition-colors"
               >
-                <option value="all">
-                  🌐 Todos los equipos (Resumen General)
-                </option>
-                {teams.map((team) => (
+                <option value="all">Todos los equipos</option>
+                {orderedTeams.map((team) => (
                   <option key={team.id} value={team.id}>
-                    ⚽ {team.name} ({team.category})
+                    {team.label}
                   </option>
                 ))}
               </select>
@@ -126,8 +143,8 @@ export function CoordinatorHeader({
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
             <span>
               {selectedTeamId === "all"
-                ? `Supervisión activa de ${teams.length} equipos`
-                : `Subpanel específico: ${teams.find((t) => t.id === selectedTeamId)?.name || "Equipo"}`}
+                ? `Supervisión activa de ${orderedTeams.length} equipos`
+                : `Subpanel específico: ${orderedTeams.find((t) => t.id === selectedTeamId)?.label || "Equipo"}`}
             </span>
           </div>
         </div>

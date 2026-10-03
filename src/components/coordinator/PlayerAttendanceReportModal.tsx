@@ -31,6 +31,16 @@ interface PlayerAttendanceReportModalProps {
   onPeriodChange?: (period: "semana" | "mes" | "temporada") => void;
 }
 
+const CANONICAL_MODAL_ORDER = [
+  { key: "senior", label: "Senior" },
+  { key: "infantil a", label: "Infantil A" },
+  { key: "infantil b", label: "Infantil B" },
+  { key: "cadete a", label: "Cadete A" },
+  { key: "cadete b", label: "Cadete B" },
+  { key: "juvenil a", label: "Juvenil A" },
+  { key: "juvenil b", label: "Juvenil B" },
+];
+
 export function PlayerAttendanceReportModal({
   isOpen,
   onClose,
@@ -43,6 +53,16 @@ export function PlayerAttendanceReportModal({
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>(initialTeamId || "all");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "con_faltas" | "en_riesgo" | "cumple_objetivo">("todos");
+
+  const orderedTeams = useMemo(() => {
+    return CANONICAL_MODAL_ORDER.map((target) => {
+      const match = teams.find((t) => {
+        const n = t.name.trim().toLowerCase();
+        return n === target.key || n.startsWith(target.key);
+      });
+      return match ? { id: match.id, label: target.label } : null;
+    }).filter((t): t is { id: string; label: string } => t !== null);
+  }, [teams]);
   const [sortBy, setSortBy] = useState<"riesgo" | "faltas" | "asistencia_desc" | "nombre">("riesgo");
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
@@ -239,10 +259,10 @@ export function PlayerAttendanceReportModal({
               onChange={(e) => setSelectedTeamFilter(e.target.value)}
               className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
             >
-              <option value="all">Todos los Equipos</option>
-              {teams.map((t) => (
+              <option value="all">Todos los equipos</option>
+              {orderedTeams.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} {t.category ? `(${t.category})` : ""}
+                  {t.label}
                 </option>
               ))}
             </select>

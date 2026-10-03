@@ -82,21 +82,36 @@ export default function PlayerDashboardPage() {
     let matchesPlayed = 0;
 
     filteredConv.forEach((c: any) => {
+      // REGLA ESTRICTA: Solo contabilizar estadísticas deportivas de partidos Finalizados.
+      // Un partido Programado/futuro no ha comenzado y jamás debe sumar minutos, goles ni tarjetas.
+      if (!c.partidos || c.partidos.estado !== 'Finalizado') {
+        return;
+      }
+
       const mEvs = (rawMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
       const isLegitGoal = (e: any) => {
         const ev = (e.tipo_evento || '').toLowerCase();
         return ev.includes('gol') && !ev.includes('propia') && !ev.includes('pp');
       };
-      const g = (c.goals ?? c.goles) || mEvs.filter(isLegitGoal).length;
-      const y = (c.yellow_cards ?? c.tarjetas_amarillas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
-      const r = (c.red_cards ?? c.tarjetas_rojas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
-      const m = (c.minutes_played ?? c.minutos_jugados) || (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
+      const rawG = c.goals ?? c.goles;
+      const g = (rawG !== null && rawG !== undefined) ? Number(rawG) : mEvs.filter(isLegitGoal).length;
+
+      const rawY = c.yellow_cards ?? c.tarjetas_amarillas;
+      const y = (rawY !== null && rawY !== undefined) ? Number(rawY) : mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+
+      const rawR = c.red_cards ?? c.tarjetas_rojas;
+      const r = (rawR !== null && rawR !== undefined) ? Number(rawR) : mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
+
+      const rawM = c.minutes_played ?? c.minutos_jugados;
+      const m = (rawM !== null && rawM !== undefined)
+        ? Number(rawM)
+        : (c.titular ? 90 : 0);
 
       goals += g;
       yellowCards += y;
       redCards += r;
       minutes += m;
-      if (m > 0 || c.status === 'convocado' || mEvs.length > 0) {
+      if (m > 0 || c.titular) {
         matchesPlayed++;
       }
     });
@@ -259,16 +274,25 @@ export default function PlayerDashboardPage() {
         if (convData && convData.length > 0) {
           convData.forEach((c: any) => {
             const mEvs = (matchEventsData || []).filter((e: any) => e.partido_id === c.partido_id);
-            const g = (c.goals ?? c.goles) || mEvs.filter(isLegitGoal).length;
-            const y = (c.yellow_cards ?? c.tarjetas_amarillas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
-            const r = (c.red_cards ?? c.tarjetas_rojas) || mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
-            const m = (c.minutes_played ?? c.minutos_jugados) || (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
+            const rawG = c.goals ?? c.goles;
+            const g = (rawG !== null && rawG !== undefined) ? Number(rawG) : mEvs.filter(isLegitGoal).length;
+
+            const rawY = c.yellow_cards ?? c.tarjetas_amarillas;
+            const y = (rawY !== null && rawY !== undefined) ? Number(rawY) : mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+
+            const rawR = c.red_cards ?? c.tarjetas_rojas;
+            const r = (rawR !== null && rawR !== undefined) ? Number(rawR) : mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
+
+            const rawM = c.minutes_played ?? c.minutos_jugados;
+            const m = (rawM !== null && rawM !== undefined)
+              ? Number(rawM)
+              : (c.titular ? 90 : 0);
 
             goals += g;
             yellowCards += y;
             redCards += r;
             minutes += m;
-            if (m > 0 || c.status === 'convocado' || mEvs.length > 0) {
+            if (m > 0 || c.titular) {
               matchesPlayed++;
             }
           });
@@ -335,12 +359,13 @@ export default function PlayerDashboardPage() {
         }
 
         if (playerData.team_id) {
-          // Fetch Next Team Event (training, meeting, etc.)
+          // Fetch Next Team Event (training, meeting, etc., excluding matches which are already shown above)
           const todayStr = new Date().toISOString().split('T')[0]
           const { data: nextEvData } = await supabase
             .from("team_events")
             .select('id, title, date, start_time, event_type, location')
             .eq("team_id", playerData.team_id)
+            .neq("event_type", "Partido")
             .gte("date", todayStr)
             .order("date", { ascending: true })
             .limit(1)

@@ -98,6 +98,17 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     return hasConvocatoriaInTeam
   })
 
+// Mapeo seguro de equipos temporada 25/26 a 26/27 para evitar datos huérfanos
+const TEAM_25_TO_26_MAP: Record<string, string> = {
+  'ac851720-4531-4e41-97ba-f2290aea1be4': 'c29af0ae-55aa-4bd2-87f0-7697189d5293', // SENIOR
+  'b895fc97-c692-4189-a385-53bebd90d262': 'f74adef3-e72b-4800-bece-5303f07d7235', // JUVENIL A
+  '3b77f128-980e-4dff-9a47-1708fd029728': 'd3c2fb73-a24b-4b60-8fb9-52f13740a05a', // JUVENIL B
+  'e1be067f-2b93-4aac-969a-55c7c71badb9': '67083463-be90-4b8f-b6b2-54239af1c88b', // CADETE A
+  '6895bb7b-4c3f-4a78-a2fb-db94f4e5ce50': '5633f710-7707-40d7-b812-c51a44b90d9e', // CADETE B
+  '9fe1ca89-d32c-4098-8e18-60981708b57e': '7d07d46f-51e4-44f6-891c-b966a86b9cae', // INFANTIL A
+  'a0393d63-fa7b-40a7-97fc-60b61483babf': '7123c91a-69c1-4b94-9f85-0914dee8bbdc', // INFANTIL B
+};
+
   // Calcular totales por jugador
   const disciplineData = validPlayers.map(player => {
     const playerConvs = localConvocatorias.filter(c => c.player_id === player.id)
@@ -108,9 +119,15 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
 
     playerConvs.forEach(conv => {
       const match = matches.find(m => m.id === conv.partido_id)
+      if (!match) return
+      // REGLA DE ORO: Aislamiento permanente de temporadas. Excluir estrictamente 25/26
+      if (match.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return
+      if (match.season_id && match.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return
+      if (match.fecha_hora && new Date(match.fecha_hora) < new Date('2026-07-01')) return
+
       const yellowCount = conv.yellow_cards ?? conv.tarjetas_amarillas ?? 0
       const redCount = conv.red_cards ?? conv.tarjetas_rojas ?? 0
-      if (match && (yellowCount > 0 || redCount > 0)) {
+      if (yellowCount > 0 || redCount > 0) {
         totalYellow += yellowCount
         totalRed += redCount
         rawEvents.push({
@@ -122,9 +139,15 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     })
 
     // Partidos finalizados del equipo ordenados cronológicamente
-    const teamIdToFilter = player.team_id || teamId;
+    const rawTeamId = player.team_id || teamId;
+    const teamIdToFilter = TEAM_25_TO_26_MAP[rawTeamId] || rawTeamId;
     const finishedTeamMatches = matches
-      .filter(m => (teamIdToFilter === 'all' || m.equipo_id === teamIdToFilter) && (m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date()))
+      .filter(m => {
+        if (m.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+        if (m.season_id && m.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+        if (m.fecha_hora && new Date(m.fecha_hora) < new Date('2026-07-01')) return false;
+        return (teamIdToFilter === 'all' || m.equipo_id === teamIdToFilter) && (m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date());
+      })
       .sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
 
     const lastFinishedMatchId = finishedTeamMatches[finishedTeamMatches.length - 1]?.id;
@@ -209,11 +232,35 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     router.refresh()
   }
 
-  // Partidos recientes para el modo edición
-  const recentMatches = [...matches]
-    .filter(m => m.estado === 'Finalizado' || new Date(m.fecha_hora) < new Date())
-    .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
-    .slice(0, 15) // Últimos 15 partidos
+  // Partidos recientes específicos del jugador para el modo edición (estrictamente temporada 26/27 y equipo correspondiente)
+  const getPlayerRecentMatches = (player: any) => {
+    if (!player) return [];
+    const rawTeamId = player.team_id || teamId;
+    const effectiveTeamId = TEAM_25_TO_26_MAP[rawTeamId] || rawTeamId;
+
+    return [...matches]
+      .filter(m => {
+        // Regla 1: Exclusión absoluta de temporada pasada 25/26
+        if (m.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+        if (m.season_id && m.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+        if (m.fecha_hora && new Date(m.fecha_hora) < new Date('2026-07-01')) return false;
+
+        // Regla 2: El partido debe ser del equipo del jugador O el jugador debe estar convocado en ese partido
+        const belongsToTeam = effectiveTeamId && effectiveTeamId !== 'all' && m.equipo_id === effectiveTeamId;
+        const hasConvocatoria = localConvocatorias.some(c => c.partido_id === m.id && c.player_id === player.id);
+
+        if (!belongsToTeam && !hasConvocatoria) return false;
+
+        // Regla 3: Partidos disputados o programados en los próximos 7 días (para poder registrar tarjetas del partido de hoy o fin de semana)
+        const matchDate = new Date(m.fecha_hora);
+        const upcomingCutoff = new Date();
+        upcomingCutoff.setDate(upcomingCutoff.getDate() + 7);
+
+        return m.estado === 'Finalizado' || matchDate <= upcomingCutoff;
+      })
+      .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+      .slice(0, 15);
+  };
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -517,7 +564,7 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
         <DisciplineModal 
           player={selectedPlayer.player}
           cardEvents={selectedPlayer.cardEvents}
-          recentMatches={recentMatches}
+          recentMatches={getPlayerRecentMatches(selectedPlayer.player)}
           convocatorias={localConvocatorias}
           onClose={handleCloseModal}
           onCardsUpdated={(yellowDelta, redDelta, matchId, yellows, reds) => {

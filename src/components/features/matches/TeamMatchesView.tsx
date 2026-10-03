@@ -298,7 +298,7 @@ export function TeamMatchesView({
       ) : viewMode === 'disciplina' ? (
         <div className="pt-2">
           <TeamDisciplineView
-            matches={data.matches}
+            matches={(data.matches || []).filter(m => m.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' && (!m.season_id || m.season_id === '663ed6ef-1dab-4350-9489-ed50f9e9ac15'))}
             players={data.players}
             convocatorias={data.convocatorias}
             teamId={teamId}

@@ -54,7 +54,7 @@ export function ActaConciliationModal({ match, players, convocatorias, onClose, 
         assists: existingConv?.assists ?? 0,
         yellow_cards: existingConv?.yellow_cards ?? 0,
         red_cards: existingConv?.red_cards ?? 0,
-        minutes_played: existingConv?.minutes_played ?? (existingConv?.status === 'convocado' ? 90 : 0),
+        minutes_played: existingConv?.minutes_played ?? 0,
         estado_asistencia: existingConv?.estado_asistencia || (existingConv?.status === 'convocado' ? 'Presente' : 'Pendiente'),
         is_convocado: existingConv ? existingConv.status === 'convocado' : true
       }

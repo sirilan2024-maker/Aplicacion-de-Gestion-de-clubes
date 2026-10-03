@@ -106,7 +106,7 @@ export async function getClubFeesAction() {
   // Include players to get player_name, amount_paid_cents and fee_payments
   const { data, error } = await adminSupabase
     .from("fees")
-    .select("id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, receipt_path, players(first_name, last_name), fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
+    .select("id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, receipt_path, players(id, first_name, last_name, status), fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
     .eq("club_id", profile.club_id)
     .order("creado_en", { ascending: false });
 
@@ -115,7 +115,14 @@ export async function getClubFeesAction() {
     throw new Error(error.message);
   }
   
-  return data.map((f: any) => {
+  // Filtrar cuotas asociadas a jugadores inactivos o de prueba (manteniendo ingresos generales del club)
+  const activeFees = (data || []).filter((f: any) => {
+    if (!f.player_id) return true;
+    if (f.players?.status === 'inactive' || f.players?.status === 'inactivo') return false;
+    return true;
+  });
+
+  return activeFees.map((f: any) => {
     let paidCents = f.amount_paid_cents || 0;
     // Si la cuota figura como pagada pero amount_paid_cents es 0, asignarle el total de la cuota
     if (f.estado === 'pagado' && paidCents === 0) {
@@ -124,6 +131,7 @@ export async function getClubFeesAction() {
 
     return {
       id: f.id,
+      player_id: f.player_id,
       concept: f.concept,
       amount_cents: f.amount_cents,
       amount_paid_cents: paidCents,
@@ -131,7 +139,7 @@ export async function getClubFeesAction() {
       estado: f.estado || 'pendiente',
       fecha_pago: f.creado_en,
       tipo_cargo: f.tipo_cargo || 'one_time',
-      player_name: f.players ? `${f.players.first_name} ${f.players.last_name}` : "–",
+      player_name: f.players ? `${f.players.first_name} ${f.players.last_name}`.trim() : "–",
       payment_method: f.payment_method,
       receipt_path: f.receipt_path,
       payments: f.fee_payments || []
@@ -1513,10 +1521,14 @@ export async function getMemberBalancesAction() {
   // 2. Fetch active season players from player_season_history
   const { data: activePsh } = await adminSupabase
     .from('player_season_history')
-    .select('player_id')
+    .select('player_id, team_id')
     .eq('season_id', activeSeasonId);
 
   const activePlayerIds = (activePsh || []).map(p => p.player_id).filter(Boolean);
+  const pshTeamByPlayer = new Map<string, string>();
+  (activePsh || []).forEach(r => {
+    if (r.player_id && r.team_id) pshTeamByPlayer.set(r.player_id, r.team_id);
+  });
 
   if (activePlayerIds.length === 0) {
     return {
@@ -1526,10 +1538,20 @@ export async function getMemberBalancesAction() {
     };
   }
 
+  // Obtener equipos del club para resolver nombres de equipo de forma fiable
+  const { data: clubTeams } = await adminSupabase
+    .from('teams')
+    .select('id, name')
+    .eq('club_id', profile.club_id);
+  const teamNameById = new Map<string, string>();
+  (clubTeams || []).forEach(t => teamNameById.set(t.id, t.name));
+
   const { data: players, error: playersError } = await adminSupabase
     .from("players")
     .select("id, first_name, last_name, team_id, status, teams(id, name)")
     .in("id", activePlayerIds)
+    .neq("status", "inactive")
+    .neq("status", "inactivo")
     .order("first_name", { ascending: true });
 
   if (playersError) throw new Error(playersError.message);
@@ -1566,12 +1588,16 @@ export async function getMemberBalancesAction() {
     else if (balanceCents < 0) status = "saldo_favor";
 
     const teamObj = Array.isArray(p.teams) ? p.teams[0] : p.teams;
+    const effectiveTeamId = pshTeamByPlayer.get(p.id) || p.team_id || (teamObj as any)?.id;
+    const resolvedTeamName = (effectiveTeamId && teamNameById.get(effectiveTeamId))
+      || (teamObj as any)?.name
+      || "Sin equipo";
 
     return {
       player_id: p.id,
-      player_name: `${p.first_name} ${p.last_name}`,
-      team_id: (teamObj as any)?.id || "none",
-      team_name: (teamObj as any)?.name || "Sin equipo",
+      player_name: `${p.first_name} ${p.last_name}`.trim(),
+      team_id: effectiveTeamId || "none",
+      team_name: resolvedTeamName,
       total_charged_cents: totalChargedCents,
       total_paid_cents: totalPaidCents,
       balance_cents: balanceCents,

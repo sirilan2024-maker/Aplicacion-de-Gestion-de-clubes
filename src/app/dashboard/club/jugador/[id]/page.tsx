@@ -177,6 +177,13 @@ export default function GlobalPlayerProfilePage() {
     return isFormativeCategory(teamCategory, teamName, player?.birth_date);
   };
 
+  // Los jugadores Senior no pagan cuotas: se oculta toda la información financiera
+  const isSeniorPlayer = Boolean(
+    (player as any)?.is_senior ||
+    teamName.toUpperCase().includes('SENIOR') ||
+    teamCategory.toUpperCase().includes('SENIOR')
+  );
+
   const fetchPlayer = async () => {
     setLoading(true);
     const supabase = createClient();
@@ -291,11 +298,16 @@ export default function GlobalPlayerProfilePage() {
       if (convocatoriasData) {
         convocatoriasData.forEach(c => {
           if (c.partidos) {
+            const isPlayed = c.partidos.estado === 'Finalizado';
             const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
-            const gCount = c.goals || c.goles || mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
-            const yCount = c.yellow_cards || c.tarjetas_amarillas || mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
-            const rCount = c.red_cards || c.tarjetas_rojas || mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
-            const mins = c.minutes_played || c.minutos_jugados || (c.status === 'convocado' || mEvs.length > 0 ? 80 : 0);
+            const rawG = c.goals ?? c.goles;
+            const gCount = !isPlayed ? 0 : ((rawG !== null && rawG !== undefined) ? Number(rawG) : mEvs.filter((e: any) => e.tipo_evento === 'Gol').length);
+            const rawY = c.yellow_cards ?? c.tarjetas_amarillas;
+            const yCount = !isPlayed ? 0 : ((rawY !== null && rawY !== undefined) ? Number(rawY) : mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length);
+            const rawR = c.red_cards ?? c.tarjetas_rojas;
+            const rCount = !isPlayed ? 0 : ((rawR !== null && rawR !== undefined) ? Number(rawR) : mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length);
+            const rawM = c.minutes_played ?? c.minutos_jugados;
+            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 90 : 0);
 
             totalMatchMinutes += mins;
             totalGoalsCount += gCount;
@@ -330,7 +342,8 @@ export default function GlobalPlayerProfilePage() {
             const gCount = mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
             const yCount = mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
             const rCount = mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
-            const mins = 80;
+            // Sin convocatoria/acta no hay minutos oficiales: no se inventan
+            const mins = 0;
 
             totalMatchMinutes += mins;
             totalGoalsCount += gCount;
@@ -1210,12 +1223,13 @@ export default function GlobalPlayerProfilePage() {
                 <summary className="text-lg font-bold text-gray-900 border-b pb-2 flex items-center justify-between cursor-pointer list-none hover:text-blue-600 transition-colors">
                   <div className="flex items-center gap-2">
                     <FileText size={18} className="text-blue-500" />
-                    Facturación y Datos Bancarios SEPA
+                    {isSeniorPlayer ? 'Inscripción y Documentación' : 'Facturación y Datos Bancarios SEPA'}
                   </div>
                   <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                 </summary>
 
-                {/* Sub-bloque SEPA */}
+                {/* Sub-bloque SEPA (no aplica a Senior: no pagan cuotas) */}
+                {!isSeniorPlayer && (
                 <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -1278,8 +1292,11 @@ export default function GlobalPlayerProfilePage() {
                     </div>
                   </div>
                 </div>
+                )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+              <div className={`grid grid-cols-1 ${isSeniorPlayer ? '' : 'sm:grid-cols-3'} gap-4 mt-4`}>
+                {!isSeniorPlayer && (
+                <>
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                   <span className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Método de Pago</span>
                   <span className="text-lg font-bold text-blue-900">{(player as any).payment_method || '—'}</span>
@@ -1290,6 +1307,8 @@ export default function GlobalPlayerProfilePage() {
                     {(player as any).payment_plan === 'Fraccionado' ? '2 cuotas de 125€' : (player as any).payment_plan === 'Total' ? 'Pago total de 250€' : (player as any).payment_plan || '—'}
                   </span>
                 </div>
+                </>
+                )}
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                   <span className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estado Inscripción</span>
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-bold ${
@@ -2097,24 +2116,48 @@ function DisciplineTab({ playerId }: { playerId: string }) {
     const fetchDiscipline = async () => {
       const supabase = createClient()
       
-      const { data, error } = await supabase
-        .from('discipline_cards')
+      const { data: convs, error } = await supabase
+        .from('convocatorias')
         .select(`
-          id, card_type, reason, created_at,
-          partidos:match_id (
-            id, date, opponent
+          yellow_cards, red_cards, tarjetas_amarillas, tarjetas_rojas,
+          partidos:partido_id (
+            id, fecha_hora, rival_nombre, lugar, season_id
           )
         `)
         .eq('player_id', playerId)
-        .order('created_at', { ascending: false })
 
-      if (!error && data) {
-        setData(data)
+      if (!error && convs) {
+        const filtered = convs
+          .filter((c: any) => {
+            const p = Array.isArray(c.partidos) ? c.partidos[0] : c.partidos;
+            if (!p) return false;
+            if (p.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+            if (p.season_id && p.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+            if (p.fecha_hora && new Date(p.fecha_hora) < new Date('2026-07-01')) return false;
+            const y = c.yellow_cards ?? c.tarjetas_amarillas ?? 0;
+            const r = c.red_cards ?? c.tarjetas_rojas ?? 0;
+            return y > 0 || r > 0;
+          })
+          .map((c: any) => {
+            const p = Array.isArray(c.partidos) ? c.partidos[0] : c.partidos;
+            const y = c.yellow_cards ?? c.tarjetas_amarillas ?? 0;
+            const r = c.red_cards ?? c.tarjetas_rojas ?? 0;
+            return {
+              title: `vs ${p.rival_nombre}`,
+              type: p.lugar || 'Partido Oficial',
+              date: p.fecha_hora,
+              yellows: y,
+              reds: r
+            };
+          })
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setData(filtered)
         
         let y = 0, r = 0
-        data.forEach(c => {
-          if (c.card_type === 'Amarilla') y++
-          if (c.card_type === 'Roja') r++
+        filtered.forEach(c => {
+          y += c.yellows
+          r += c.reds
         })
         
         const cyclesComp = Math.floor(y / 5)

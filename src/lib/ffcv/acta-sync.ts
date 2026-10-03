@@ -6,17 +6,70 @@ const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
 const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
 
 /**
- * Normalizes words from a person's name for robust matching
+ * Normalizes words from a person's name for robust matching.
+ * - Joins particles to the next word ("EL ORF" -> "elorf") so it matches "ELORF"
+ * - Collapses repeated letters ("YOUSSEF" -> "yousef")
  */
+const NAME_PARTICLES = new Set(['el', 'al', 'de', 'la', 'del', 'ben', 'ait', 'van', 'da', 'do']);
 function normalizeNameWords(str: string): string[] {
-  return (str || '')
+  const raw = (str || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/g, ' ')
     .trim()
     .split(/\s+/)
+    .filter(Boolean);
+
+  const joined: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (NAME_PARTICLES.has(raw[i]) && i + 1 < raw.length) {
+      joined.push(raw[i] + raw[i + 1]);
+      i++;
+    } else {
+      joined.push(raw[i]);
+    }
+  }
+
+  return joined
+    .map(w => w.replace(/(.)\1+/g, '$1'))
     .filter(w => w.length > 2);
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+
+/** Two name words are equivalent if identical, or (len>=5) 1 edit apart / one contains the other */
+function wordsEquivalent(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 5 || b.length < 5) return false;
+  if (a.includes(b) || b.includes(a)) return true;
+  return levenshtein(a, b) <= 1;
+}
+
+function countCommonWords(a: string[], b: string[]): number {
+  const used = new Set<number>();
+  let common = 0;
+  for (const w of a) {
+    const idx = b.findIndex((x, i) => !used.has(i) && wordsEquivalent(w, x));
+    if (idx >= 0) {
+      used.add(idx);
+      common++;
+    }
+  }
+  return common;
 }
 
 /**
@@ -26,10 +79,18 @@ function matchPlayer(
   ffcvName: string,
   dorsal: string | number | undefined,
   allPlayers: any[],
-  teamPlayers: any[]
+  teamPlayers: any[],
+  isSeniorMatch: boolean = false
 ): any {
   const ffcvWords = normalizeNameWords(ffcvName);
   if (ffcvWords.length === 0) return null;
+
+  // Extract first name and surnames from FFCV format: "APELLIDOS, NOMBRE"
+  let ffcvFirstName = '';
+  if (ffcvName.includes(',')) {
+    const parts = ffcvName.split(',');
+    ffcvFirstName = normalizeNameWords(parts[1] || '')[0] || '';
+  }
 
   let bestPlayer = null;
   let bestScore = 0;
@@ -37,29 +98,56 @@ function matchPlayer(
   // 1. Try matching against team players first (ACTIVE SEASON ONLY)
   for (const p of teamPlayers) {
     const dbWords = normalizeNameWords(`${p.first_name} ${p.last_name}`);
-    const common = ffcvWords.filter(w => dbWords.includes(w)).length;
+    const common = countCommonWords(ffcvWords, dbWords);
     let score = common * 3;
     if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 3;
-    if (score > bestScore && common >= 1) {
-      bestScore = score;
-      bestPlayer = p;
+
+    // Check first name compatibility if available
+    const dbFirstName = normalizeNameWords(p.first_name || '')[0] || '';
+    const firstNameMatches = ffcvFirstName && dbFirstName ? wordsEquivalent(ffcvFirstName, dbFirstName) : false;
+
+    if (common >= 2 || (common >= 1 && (firstNameMatches || (dorsal && p.dorsal && String(p.dorsal) === String(dorsal))))) {
+      if (score > bestScore) {
+        bestScore = score;
+        bestPlayer = p;
+      }
     }
   }
 
-  if (bestPlayer && bestScore >= 4) return bestPlayer;
+  if (bestPlayer && bestScore >= 5) return bestPlayer;
 
   // 2. Try matching against all club players strictly in the active season (for lower/upper team call-ups)
-  // Require at least 2 common words or 1 common word + matching dorsal to prevent false positives
+  // STRICT RULES FOR CROSS-TEAM MATCHING:
+  // - Require AT LEAST 2 common words (both first name and surname, or two surnames)
+  // - NEVER match on dorsal alone or dorsal + 1 surname across different teams
+  // - First name MUST NOT conflict
+  // - An adult Senior player can NEVER be called down to a youth team (Juvenil, Cadete, etc.)
   let bestClubPlayer = null;
   let bestClubScore = 0;
+
   for (const p of allPlayers) {
+    // If this is a youth match, an adult/senior player cannot be called up down
+    if (!isSeniorMatch && (p.is_senior || p.teams?.name?.toUpperCase().includes('SENIOR') || p.teams?.category?.toUpperCase().includes('SENIOR'))) {
+      continue;
+    }
+
     const dbWords = normalizeNameWords(`${p.first_name} ${p.last_name}`);
-    const common = ffcvWords.filter(w => dbWords.includes(w)).length;
-    let score = common * 3;
-    if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 3;
-    if (score > bestClubScore && (common >= 2 || (common >= 1 && dorsal && String(p.dorsal) === String(dorsal)))) {
-      bestClubScore = score;
-      bestClubPlayer = p;
+    const common = countCommonWords(ffcvWords, dbWords);
+
+    // Check first name compatibility
+    const dbFirstName = normalizeNameWords(p.first_name || '')[0] || '';
+    if (ffcvFirstName && dbFirstName && !wordsEquivalent(ffcvFirstName, dbFirstName)) {
+      // First names conflict (e.g. Yerai vs Cristian) -> NEVER match
+      continue;
+    }
+
+    if (common >= 2) {
+      let score = common * 3;
+      if (dorsal && p.dorsal && String(p.dorsal) === String(dorsal)) score += 2;
+      if (score > bestClubScore) {
+        bestClubScore = score;
+        bestClubPlayer = p;
+      }
     }
   }
 
@@ -173,17 +261,19 @@ export async function syncFFCVActaToConvocatorias(
     // 2. Load club players for matching (ACTIVE SEASON ONLY, NEVER 25/26, NEVER INACTIVE)
     const { data: activeTeams } = await supabase
       .from('teams')
-      .select('id')
+      .select('id, name')
       .neq('season_id', CLOSED_SEASON_ID)
       .eq('season_id', ACTIVE_SEASON_ID);
     const activeTeamIds = (activeTeams || []).map((t: any) => t.id);
 
     const { data: allPlayers } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, team_id, status')
+      .select('id, first_name, last_name, dorsal, team_id, status, is_senior, teams:teams(id, name, category)')
       .in('team_id', activeTeamIds)
       .neq('status', 'inactive');
 
+    const matchTeam = (activeTeams || []).find((t: any) => t.id === partido.equipo_id);
+    const isSeniorMatch = Boolean((matchTeam?.name || '').toUpperCase().includes('SENIOR'));
     const teamPlayers = (allPlayers || []).filter((p: any) => p.team_id === partido.equipo_id);
 
     // 3. Build convocatorias payload
@@ -191,7 +281,7 @@ export async function syncFFCVActaToConvocatorias(
     const matchedCardIndices = new Set<number>();
 
     for (const fp of ourPlayers) {
-      const matched = matchPlayer(fp.nombre_jugador, fp.dorsal, allPlayers || [], teamPlayers);
+      const matched = matchPlayer(fp.nombre_jugador, fp.dorsal, allPlayers || [], teamPlayers, isSeniorMatch);
       if (!matched) {
         continue;
       }

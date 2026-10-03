@@ -61,8 +61,24 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
     setTimeout(() => setSavingCards(null), 500)
   }
 
+  // Regla de Oro: Filtrar estrictamente datos de la temporada activa 26/27 y excluir la 25/26
+  const validCardEvents = cardEvents.filter(ev => {
+    if (!ev.match) return false;
+    if (ev.match.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+    if (ev.match.season_id && ev.match.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+    if (ev.match.fecha_hora && new Date(ev.match.fecha_hora) < new Date('2026-07-01')) return false;
+    return true;
+  });
+
+  const validSeasonMatches = recentMatches.filter(m => {
+    if (m.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+    if (m.season_id && m.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+    if (m.fecha_hora && new Date(m.fecha_hora) < new Date('2026-07-01')) return false;
+    return true;
+  });
+
   // Calculate cycle status and sanctions based on chronological events
-  const chronologicalEvents = [...cardEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
+  const chronologicalEvents = [...validCardEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
   let cycleCards = 0;
   let cyclesCompleted = 0;
   let redSanctions = 0;
@@ -132,7 +148,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
 
           {!isEditing ? (
             // MODO VISTA
-            cardEvents.length === 0 ? (
+            validCardEvents.length === 0 ? (
               <div className="p-12 text-center">
                 <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <AlertCircle className="text-emerald-500" size={32} />
@@ -150,7 +166,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {cardEvents.map((ev: any, idx: number) => (
+                  {validCardEvents.map((ev: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="px-6 py-4 font-medium text-slate-900 whitespace-nowrap">
                         {new Date(ev.match.fecha_hora).toLocaleDateString('es-ES')}
@@ -202,7 +218,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {recentMatches.map(m => {
+                {validSeasonMatches.map(m => {
                   const conv = localConvs.find(c => c.partido_id === m.id && c.player_id === player.id)
                   const currentYellow = conv?.yellow_cards || 0
                   const currentRed = conv?.red_cards || 0
@@ -261,7 +277,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                     </tr>
                   )
                 })}
-                {recentMatches.length === 0 && (
+                {validSeasonMatches.length === 0 && (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-slate-500">
                       No hay partidos registrados para este equipo.

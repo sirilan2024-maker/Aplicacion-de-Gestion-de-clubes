@@ -35,15 +35,22 @@ export default function FamilyDisciplinePage() {
       if (pError) throw pError;
       setPlayerInfo(pData);
 
-      // Fetch cards from convocatorias
+      // Fetch cards from convocatorias (estrictamente temporada activa 26/27)
       const { data: convData, error: convError } = await supabase
         .from('convocatorias')
-        .select('yellow_cards, red_cards, tarjetas_amarillas, tarjetas_rojas, partidos(fecha_hora, rival_nombre, lugar)')
+        .select('yellow_cards, red_cards, tarjetas_amarillas, tarjetas_rojas, partidos(fecha_hora, rival_nombre, lugar, season_id)')
         .eq('player_id', playerId);
 
       if (convError) throw convError;
 
-      const records = (convData || []).filter(r => (r.yellow_cards || r.tarjetas_amarillas || 0) > 0 || (r.red_cards || r.tarjetas_rojas || 0) > 0);
+      const records = (convData || []).filter(r => {
+        const match = Array.isArray(r.partidos) ? r.partidos[0] : r.partidos;
+        if (!match) return false;
+        if (match.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+        if (match.season_id && match.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+        if (match.fecha_hora && new Date(match.fecha_hora) < new Date('2026-07-01')) return false;
+        return (r.yellow_cards || r.tarjetas_amarillas || 0) > 0 || (r.red_cards || r.tarjetas_rojas || 0) > 0;
+      });
       let yellow = 0, red = 0;
       const allCards: any[] = [];
 

@@ -176,7 +176,13 @@ export default function PlayerProfilePage() {
         .single();
         
       if (error) throw error;
-      setPlayer(data);
+      let teamInfo: { name?: string; category?: string } | null = null;
+      if (data?.team_id) {
+        const { data: tData } = await supabase.from('teams').select('name, category').eq('id', data.team_id).maybeSingle();
+        teamInfo = tData || null;
+      }
+      // `teams` solo se adjunta a `player` (para detectar Senior y ocultar cuotas), no a editData
+      setPlayer({ ...data, teams: teamInfo } as any);
       setEditData(data);
 
       const { data: docs } = await supabase
@@ -231,11 +237,13 @@ export default function PlayerProfilePage() {
 
         convocatoriasData.forEach(c => {
           if (c.partidos) {
+            const isPlayed = c.partidos.estado === 'Finalizado';
             const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
-            const gCount = c.goals ?? c.goles ?? mEvs.filter(isLegitGoal).length;
-            const yCount = c.yellow_cards ?? c.tarjetas_amarillas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
-            const rCount = c.red_cards ?? c.tarjetas_rojas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
-            const mins = c.minutes_played ?? c.minutos_jugados ?? (c.status === 'convocado' || mEvs.length > 0 ? 90 : 0);
+            const gCount = !isPlayed ? 0 : Number(c.goals ?? c.goles ?? mEvs.filter(isLegitGoal).length);
+            const yCount = !isPlayed ? 0 : Number(c.yellow_cards ?? c.tarjetas_amarillas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length);
+            const rCount = !isPlayed ? 0 : Number(c.red_cards ?? c.tarjetas_rojas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length);
+            const rawM = c.minutes_played ?? c.minutos_jugados;
+            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 90 : 0);
 
             mHistory.push({
               id: c.partido_id,
@@ -1675,24 +1683,48 @@ function DisciplineTab({ playerId }: { playerId: string }) {
     const fetchDiscipline = async () => {
       const supabase = createClient()
       
-      const { data, error } = await supabase
-        .from('discipline_cards')
+      const { data: convs, error } = await supabase
+        .from('convocatorias')
         .select(`
-          id, card_type, reason, created_at,
-          partidos:match_id (
-            id, date, opponent
+          yellow_cards, red_cards, tarjetas_amarillas, tarjetas_rojas,
+          partidos:partido_id (
+            id, fecha_hora, rival_nombre, lugar, season_id
           )
         `)
         .eq('player_id', playerId)
-        .order('created_at', { ascending: false })
 
-      if (!error && data) {
-        setData(data)
+      if (!error && convs) {
+        const filtered = convs
+          .filter((c: any) => {
+            const p = Array.isArray(c.partidos) ? c.partidos[0] : c.partidos;
+            if (!p) return false;
+            if (p.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+            if (p.season_id && p.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+            if (p.fecha_hora && new Date(p.fecha_hora) < new Date('2026-07-01')) return false;
+            const y = c.yellow_cards ?? c.tarjetas_amarillas ?? 0;
+            const r = c.red_cards ?? c.tarjetas_rojas ?? 0;
+            return y > 0 || r > 0;
+          })
+          .map((c: any) => {
+            const p = Array.isArray(c.partidos) ? c.partidos[0] : c.partidos;
+            const y = c.yellow_cards ?? c.tarjetas_amarillas ?? 0;
+            const r = c.red_cards ?? c.tarjetas_rojas ?? 0;
+            return {
+              title: `vs ${p.rival_nombre}`,
+              type: p.lugar || 'Partido Oficial',
+              date: p.fecha_hora,
+              yellows: y,
+              reds: r
+            };
+          })
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setData(filtered)
         
         let y = 0, r = 0
-        data.forEach(c => {
-          if (c.card_type === 'Amarilla') y++
-          if (c.card_type === 'Roja') r++
+        filtered.forEach(c => {
+          y += c.yellows
+          r += c.reds
         })
         
         const cyclesComp = Math.floor(y / 5)

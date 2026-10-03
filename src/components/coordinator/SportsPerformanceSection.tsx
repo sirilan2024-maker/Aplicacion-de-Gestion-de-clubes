@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Trophy, ArrowRight, Shield, Activity, Target } from "lucide-react";
+import { Trophy, ArrowRight, Shield, Activity, Target, BarChart3 } from "lucide-react";
 import { SportsWeekendSummary } from "@/types/coordinator";
 
 interface SportsPerformanceSectionProps {
@@ -138,11 +138,19 @@ export function SportsPerformanceSection({ weekend, teamStandings }: SportsPerfo
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-right shrink-0">
+                  <div className="flex items-center gap-2 text-right shrink-0">
                     <div>
                       <p className="text-xs font-black text-slate-900">{st.points} pts</p>
                       <p className="text-[10px] text-slate-400">{st.played} PJ</p>
                     </div>
+                    <Link
+                      href={`/dashboard/equipos/${st.teamId}/analisis`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"
+                      title="Ver análisis de rendimiento"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                    </Link>
                     <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600 transition-colors" />
                   </div>
                 </Link>

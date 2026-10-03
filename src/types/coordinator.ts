@@ -100,12 +100,15 @@ export interface UpcomingTrainingItem {
 
 export interface CoordinatorBannerAlert {
   id: string;
-  type: 'sancion' | 'apercibido' | 'lesion' | 'falta_asistencia' | 'cambio_horario' | 'mensaje_interno' | 'horario_solapado';
+  type: 'sancion' | 'apercibido' | 'lesion' | 'falta_asistencia' | 'cambio_horario' | 'mensaje_interno' | 'horario_solapado' | 'sin_entrenador';
   severity: 'error' | 'warning' | 'info';
   title: string;
   message: string;
   teamId?: string;
   playerId?: string;
+  actionType?: 'cartelera' | 'chat' | 'link';
+  actionText?: string;
+  actionUrl?: string;
 }
 
 export interface CoordinatorTeamItem {

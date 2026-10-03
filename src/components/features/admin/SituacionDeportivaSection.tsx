@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Trophy, ChevronRight, Users, ArrowRight, Shield, TrendingUp,
   ClipboardCheck, Clock, Activity, Table as TableIcon, LayoutGrid,
-  ExternalLink, Calendar, HeartPulse, CheckCircle2, X
+  ExternalLink, Calendar, HeartPulse, CheckCircle2, X, BarChart3
 } from "lucide-react";
 
 export interface SituacionDeportivaProps {
@@ -194,17 +194,33 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
         <div className="grid grid-cols-2 gap-2 pt-1">
           <Link
             href={`/dashboard/equipos/${team.teamId}/plantilla`}
-            className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors text-center shadow-2xs active:scale-95"
+            className="py-2.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] sm:text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors text-center shadow-2xs active:scale-95"
           >
             <Users className="w-3.5 h-3.5 text-slate-600 shrink-0" />
             <span>Ver Plantilla</span>
           </Link>
           <Link
             href={`/dashboard/equipos/${team.teamId}/partidos`}
-            className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors text-center shadow-xs active:scale-95"
+            className="py-2.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] sm:text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors text-center shadow-2xs active:scale-95"
           >
-            <Calendar className="w-3.5 h-3.5 shrink-0" />
-            <span>Ver Partidos y Acta</span>
+            <Calendar className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            <span>Partidos y Actas</span>
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            href={`/dashboard/equipos/${team.teamId}/analisis`}
+            className="py-2.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] sm:text-xs font-extrabold rounded-xl flex items-center justify-center gap-1 transition-colors text-center shadow-2xs active:scale-95 cursor-pointer"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Análisis</span>
+          </Link>
+          <Link
+            href={`/dashboard/equipos/${team.teamId}/partidos?view=clasificacion`}
+            className="py-2.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs font-extrabold rounded-xl flex items-center justify-center gap-1 transition-colors text-center shadow-xs active:scale-95 cursor-pointer"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <span>Clasificación</span>
           </Link>
         </div>
       </div>
@@ -508,7 +524,29 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                             {typeof team.winRate === "number" ? team.winRate.toFixed(1) : "0.0"}%
                           </td>
                           <td className="py-2.5 px-3 text-right">
-                            <span className="text-xs font-bold text-indigo-600 group-hover:underline">Detalles</span>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Link
+                                href={`/dashboard/equipos/${team.teamId}/analisis`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
+                                title="Ver análisis de rendimiento del equipo"
+                              >
+                                <BarChart3 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                <span>Análisis</span>
+                              </Link>
+                              <Link
+                                href={`/dashboard/equipos/${team.teamId}/partidos?view=clasificacion`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
+                                title="Ver clasificación general de su grupo en la FFCV"
+                              >
+                                <Trophy className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>Clasificación FFCV</span>
+                              </Link>
+                              <span className="text-xs font-bold text-slate-400 group-hover:text-indigo-600 transition-colors">
+                                Ver
+                              </span>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -763,10 +801,26 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                 <button
                   type="button"
                   onClick={() => router.push(`/dashboard/equipos/${selectedTeamDetail.teamId}/partidos`)}
-                  className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Calendar className="w-3.5 h-3.5" />
+                  <Calendar className="w-3.5 h-3.5 text-slate-600" />
                   <span>Ver Partidos y Actas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/equipos/${selectedTeamDetail.teamId}/analisis`)}
+                  className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Análisis del Equipo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/equipos/${selectedTeamDetail.teamId}/partidos?view=clasificacion`)}
+                  className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Trophy className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Clasificación FFCV</span>
                 </button>
               </div>
             </div>

@@ -12,13 +12,17 @@ export interface CoordinatorBannerAlert {
   message: string;
   teamId?: string;
   playerId?: string;
+  actionType?: "cartelera" | "chat" | "link";
+  actionText?: string;
+  actionUrl?: string;
 }
 
 interface CriticalAlertsBannerProps {
   alerts: CoordinatorBannerAlert[];
+  onOpenCartelera?: () => void;
 }
 
-export function CriticalAlertsBanner({ alerts }: CriticalAlertsBannerProps) {
+export function CriticalAlertsBanner({ alerts, onOpenCartelera }: CriticalAlertsBannerProps) {
   if (!alerts || alerts.length === 0) return null;
 
   return (
@@ -77,16 +81,33 @@ export function CriticalAlertsBanner({ alerts }: CriticalAlertsBannerProps) {
               <IconComponent className="w-4 h-4 mt-0.5 shrink-0" />
               <div className="min-w-0 flex-1 break-words">
                 <p className="text-xs font-bold leading-tight">{alert.title}</p>
-                <p className="text-[11px] leading-snug mt-0.5 opacity-90">{alert.message}</p>
+                <p className="text-[11px] leading-snug mt-0.5 opacity-90 whitespace-pre-line">{alert.message}</p>
               </div>
-              {alert.teamId && (
+              {alert.type === "cambio_horario" ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenCartelera?.()}
+                  className="shrink-0 text-[10px] font-black underline ml-1 self-center hover:opacity-100 cursor-pointer text-indigo-700 bg-white/70 hover:bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200 shadow-2xs transition-all active:scale-95"
+                  title="Abrir Cartelera de la Jornada"
+                >
+                  {alert.actionText || "Cartelera Jornada"}
+                </button>
+              ) : alert.type === "mensaje_interno" ? (
+                <Link
+                  href={alert.actionUrl || "/dashboard/mensajes"}
+                  className="shrink-0 text-[10px] font-black underline ml-1 self-center hover:opacity-100 text-sky-700 bg-white/70 hover:bg-white px-2.5 py-1.5 rounded-lg border border-sky-200 shadow-2xs transition-all active:scale-95"
+                  title="Abrir Mensajería"
+                >
+                  {alert.actionText || "Ver Chat"}
+                </Link>
+              ) : alert.teamId ? (
                 <Link
                   href={`/dashboard/equipos/${alert.teamId}/plantilla`}
                   className="shrink-0 text-[10px] font-bold underline ml-1 self-center hover:opacity-100"
                 >
                   Ver
                 </Link>
-              )}
+              ) : null}
             </div>
           );
         })}

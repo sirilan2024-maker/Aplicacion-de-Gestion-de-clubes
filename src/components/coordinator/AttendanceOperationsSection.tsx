@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX, ClipboardList } from "lucide-react";
+import Link from "next/link";
+import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX, ClipboardList, CalendarCheck } from "lucide-react";
 import { AttendanceCategoryStats, ActiveInjuryItem, TeamAttendanceSummary, PlayerAttendanceReportItem } from "@/types/coordinator";
 import { formatDateDMY } from "@/lib/utils";
 import { InjuryDetailsModal } from "./InjuryDetailsModal";
@@ -87,8 +88,17 @@ export function AttendanceOperationsSection({
           </div>
         </div>
 
-        {/* Botón de acceso directo Informe General y selector de período */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Botón de acceso directo Informe General, Control Asistencia y selector de período */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <Link
+            href="/admin/asistencia"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            title="Ir a Control de Asistencia"
+          >
+            <CalendarCheck className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Control asistencia</span>
+          </Link>
+
           <button
             type="button"
             onClick={(e) => {

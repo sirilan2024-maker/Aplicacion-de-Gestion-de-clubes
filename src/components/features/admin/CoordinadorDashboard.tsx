@@ -359,7 +359,10 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
         )}
 
         {/* 3. Banner de Alertas Inteligentes: REQUIERE ATENCIÓN (Acción requerida) */}
-        <CriticalAlertsBanner alerts={displayedAlerts} />
+        <CriticalAlertsBanner
+          alerts={displayedAlerts}
+          onOpenCartelera={() => setShowMatchdayModal(true)}
+        />
 
         {/* 4. Situación Deportiva (con modal interactivo de detalles por equipo al pulsar) */}
         <SituacionDeportivaSection

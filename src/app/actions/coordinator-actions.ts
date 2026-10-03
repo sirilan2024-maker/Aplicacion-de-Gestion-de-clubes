@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthenticatedContext, ADMIN_ROLES, getEffectiveSelectedSeasonId, canUserAccessModule } from '@/lib/auth-helpers'
 import { NotificationService } from '@/lib/notifications/notification-service'
 import { findRivalShield } from '@/lib/ffcv/rival-shields'
+import { formatDateDMY } from '@/lib/utils'
 
 export interface CoordinatorTeamSummary {
   teamId: string
@@ -1172,6 +1173,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
 
     const adminClient = createAdminClient();
     const clubId = context.profile.club_id;
+    const currentUserId = context.user.id;
     if (!clubId) {
       return { success: false, error: 'Perfil sin club asignado' };
     }
@@ -1763,44 +1765,83 @@ export async function getCoordinatorFullDashboardAction(params?: {
       }
     });
 
-    // Alertas de cambios de hora de partido y próximos horarios oficiales
+    // Alertas de cambios de hora de partido y próximos horarios oficiales (agrupados juntos)
     const upcomingMatches = matches.filter(m => m.fecha_hora && new Date(m.fecha_hora) >= now);
-    upcomingMatches.slice(0, 3).forEach(m => {
-      const tm = teamById.get(m.equipo_id);
-      const mDate = new Date(m.fecha_hora);
-      const dateFormatted = mDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
-      const timeFormatted = mDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const nextMatches = upcomingMatches.slice(0, 3);
+    if (nextMatches.length > 0) {
+      const matchLines = nextMatches.map(m => {
+        const tm = teamById.get(m.equipo_id);
+        const mDate = new Date(m.fecha_hora);
+        const dateFormatted = formatDateDMY(m.fecha_hora);
+        const timeFormatted = mDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const lugarStr = m.lugar ? ` (${m.lugar})` : '';
+        return `• ${tm?.name || 'Equipo'} vs ${m.rival_nombre}: ${dateFormatted} a las ${timeFormatted}${lugarStr}`;
+      });
+
       alerts.push({
-        id: `horario-${m.id}`,
+        id: 'horarios-oficiales-proximos',
         type: 'cambio_horario',
         severity: 'info',
-        title: `Horario Oficial: ${tm?.name || 'Equipo'} vs ${m.rival_nombre}`,
-        message: `Partido programado para el ${dateFormatted} a las ${timeFormatted} en ${m.lugar || 'campo oficial'}.`,
-        teamId: m.equipo_id,
+        title: `Horarios Oficiales Confirmados (${nextMatches.length} partidos)`,
+        message: matchLines.join('\n'),
+        actionType: 'cartelera',
+        actionText: 'Cartelera Jornada',
       });
-    });
+    }
 
-    // Avisos de mensajes internos de entrenadores o jugadores
+    // Avisos de mensajes internos recibidos de entrenadores, familias o jugadores (EXCLUYENDO los enviados por el propio coordinador)
     try {
-      const { data: recentNotifs } = await adminClient
-        .from('notifications')
-        .select('id, title, content, created_at')
-        .eq('club_id', clubId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      if (recentNotifs && recentNotifs.length > 0) {
-        recentNotifs.forEach(n => {
-          alerts.push({
-            id: `msg-${n.id}`,
-            type: 'mensaje_interno',
-            severity: 'info',
-            title: n.title || 'Aviso Interno',
-            message: (n.content || '').substring(0, 140),
+      const { data: clubChannels } = await adminClient
+        .from('chat_channels')
+        .select('id, name, type, team_id')
+        .eq('club_id', clubId);
+
+      const channelIds = (clubChannels || []).map(c => c.id);
+      const channelById = new Map((clubChannels || []).map(c => [c.id, c]));
+
+      if (channelIds.length > 0) {
+        const { data: incomingMsgs } = await adminClient
+          .from('chat_messages')
+          .select('id, content, created_at, sender_id, channel_id')
+          .in('channel_id', channelIds)
+          .neq('sender_id', currentUserId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (incomingMsgs && incomingMsgs.length > 0) {
+          const senderIds = Array.from(new Set(incomingMsgs.map(m => m.sender_id).filter(Boolean)));
+          let senderMap = new Map<string, any>();
+          if (senderIds.length > 0) {
+            const { data: senderProfiles } = await adminClient
+              .from('profiles')
+              .select('id, first_name, last_name, role')
+              .in('id', senderIds);
+            (senderProfiles || []).forEach(p => senderMap.set(p.id, p));
+          }
+
+          incomingMsgs.forEach(m => {
+            const sender = senderMap.get(m.sender_id);
+            const ch = channelById.get(m.channel_id);
+            const senderName = sender ? `${sender.first_name || ''} ${sender.last_name || ''}`.trim() : 'Usuario';
+            const roleStr = sender?.role ? ` (${sender.role})` : '';
+            const channelStr = ch?.name ? ` en ${ch.name}` : '';
+
+            alerts.push({
+              id: `msg-${m.id}`,
+              type: 'mensaje_interno',
+              severity: 'info',
+              title: `Mensaje de ${senderName}${roleStr}`,
+              message: `Recibido${channelStr}: "${(m.content || '').substring(0, 110)}"`,
+              teamId: ch?.team_id || undefined,
+              actionType: 'chat',
+              actionText: 'Ver Chat',
+              actionUrl: '/dashboard/mensajes',
+            });
           });
-        });
+        }
       }
     } catch (e) {
-      // Ignorar si notifications no tiene datos
+      console.error('[coordinator] Error fetching incoming messages:', e);
     }
 
     // 11. Agenda del Club (Partidos Oficiales) y Comunicaciones (Canales y Tablón de Anuncios)

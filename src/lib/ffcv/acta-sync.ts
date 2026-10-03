@@ -331,7 +331,7 @@ export async function syncFFCVActaToConvocatorias(
           if (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) {
             yellows += 1;
             reds += 1;
-          } else if (c.codigo_tipo_amonestacion === '101' || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2') {
+          } else if (c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja' || (c.tarjeta || '').toLowerCase() === 'roja') {
             reds += 1;
           } else {
             yellows += 1;
@@ -359,7 +359,7 @@ export async function syncFFCVActaToConvocatorias(
         const matchByName = !c.codjugador && countCommonWords(normalizeNameWords(c.nombre_jugador), normalizeNameWords(fp.nombre_jugador)) >= 2;
         if (matchByCode || matchByName) {
           const isRed = (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) ||
-                        (c.codigo_tipo_amonestacion === '101' || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2');
+                        (c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja' || (c.tarjeta || '').toLowerCase() === 'roja');
           if (isRed && c.minuto) {
             sendOffMinute = Number(c.minuto);
           }
@@ -424,7 +424,7 @@ export async function syncFFCVActaToConvocatorias(
             if (sc.segunda_amarilla === '1' || sc.segunda_amarilla === 1) {
               staffYellows += 1;
               staffReds += 1;
-            } else if (sc.codigo_tipo_amonestacion === '101' || sc.codigo_tipo_amonestacion === '200' || sc.codigo_tipo_amonestacion === '2') {
+            } else if (sc.codigo_tipo_amonestacion === '200' || sc.codigo_tipo_amonestacion === '2' || (sc.tipo_tarjeta || '').toLowerCase() === 'roja' || (sc.tarjeta || '').toLowerCase() === 'roja') {
               staffReds += 1;
             } else {
               staffYellows += 1;

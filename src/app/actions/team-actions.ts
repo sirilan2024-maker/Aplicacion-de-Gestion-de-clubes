@@ -50,6 +50,7 @@ export async function getTeamCoachesProfilesAction(teamId: string) {
     .from("team_coaches")
     .select(`
       profile_id,
+      role,
       profiles:profile_id (
         id, first_name, last_name, email, rol, role, avatar_url
       )

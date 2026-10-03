@@ -100,12 +100,13 @@ export default function PlantillaEquipoPage() {
       const validCoaches = (coachesData || []).filter((tc: any) => tc && tc.profiles);
       const mappedCoaches: Player[] = validCoaches.map((tc: any) => {
         const p = tc.profiles;
+        const staffRole = tc.role || p.role || p.rol || "Entrenador";
         return {
           id: p.id,
-          first_name: p.first_name || "Entrenador",
+          first_name: p.first_name || staffRole,
           last_name: p.last_name || "",
-          posicion: tc.role || "Entrenador",
-          posicion_principal: "Entrenador",
+          posicion: staffRole,
+          posicion_principal: staffRole,
           status: "active",
           birth_date: p.birth_date || "",
           email: p.email,

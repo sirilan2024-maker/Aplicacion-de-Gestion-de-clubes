@@ -51,12 +51,44 @@ function levenshtein(a: string, b: string): number {
   return dp[b.length];
 }
 
-/** Two name words are equivalent if identical, or (len>=5) 1 edit apart / one contains the other */
+const NICKNAMES_MAP: Record<string, string[]> = {
+  francisco: ['fran', 'paco', 'curro'],
+  fran: ['francisco', 'paco'],
+  paco: ['francisco'],
+  jose: ['pepe', 'pep'],
+  pepe: ['jose'],
+  antonio: ['toni', 'tono'],
+  toni: ['antonio'],
+  manuel: ['manu', 'manolo'],
+  manu: ['manuel'],
+  alejandro: ['alex', 'ale'],
+  alex: ['alejandro'],
+  javier: ['javi'],
+  javi: ['javier'],
+  ignacio: ['nacho'],
+  nacho: ['ignacio'],
+  roberto: ['rober'],
+  rober: ['roberto'],
+  mohamed: ['mohammed', 'mohamd', 'moha', 'med'],
+  mohammed: ['mohamed', 'mohamd', 'moha', 'med'],
+  mohamd: ['mohamed', 'mohammed', 'moha', 'med'],
+  atouzani: ['touzani'],
+  touzani: ['atouzani'],
+  khayefallah: ['khaef', 'allah', 'daghmani', 'khaefallah'],
+  khaefallah: ['khayefallah', 'khaef', 'allah', 'daghmani'],
+  daghmani: ['khayefallah', 'khaefallah'],
+  serna: ['ballesta']
+};
+
+/** Two name words are equivalent if identical, aliases/nicknames, or (len>=4) 1 edit apart / substring */
 function wordsEquivalent(a: string, b: string): boolean {
   if (a === b) return true;
-  if (a.length < 5 || b.length < 5) return false;
-  if (a.includes(b) || b.includes(a)) return true;
-  return levenshtein(a, b) <= 1;
+  if (NICKNAMES_MAP[a]?.includes(b) || NICKNAMES_MAP[b]?.includes(a)) return true;
+  if (a.length >= 4 && b.length >= 4) {
+    if (a.includes(b) || b.includes(a)) return true;
+    if (levenshtein(a, b) <= 1) return true;
+  }
+  return false;
 }
 
 function countCommonWords(a: string[], b: string[]): number {
@@ -299,7 +331,7 @@ export async function syncFFCVActaToConvocatorias(
           if (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) {
             yellows += 1;
             reds += 1;
-          } else if (c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2') {
+          } else if (c.codigo_tipo_amonestacion === '101' || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2') {
             reds += 1;
           } else {
             yellows += 1;
@@ -307,13 +339,30 @@ export async function syncFFCVActaToConvocatorias(
         }
       });
 
-      // Goals parsing
+      // Goals parsing (EXCLUYENDO autogoles en propia puerta: tipo_gol 102 en FFCV / RFEF)
       let goals = 0;
       ourGoals.forEach((g: any) => {
+        if (String(g.tipo_gol) === '102' || g.tipo_gol === 102) {
+          return;
+        }
         const matchByCode = g.codjugador && String(g.codjugador) === String(fp.codjugador);
-        const matchByName = !g.codjugador && normalizeNameWords(g.nombre_jugador).filter(w => normalizeNameWords(fp.nombre_jugador).includes(w)).length >= 2;
+        const matchByName = !g.codjugador && countCommonWords(normalizeNameWords(g.nombre_jugador), normalizeNameWords(fp.nombre_jugador)) >= 2;
         if (matchByCode || matchByName) {
           goals += 1;
+        }
+      });
+
+      // Red card minute if sent off (para detener el cómputo de minutos jugados)
+      let sendOffMinute: number | null = null;
+      ourCards.forEach((c: any) => {
+        const matchByCode = c.codjugador && String(c.codjugador) === String(fp.codjugador);
+        const matchByName = !c.codjugador && countCommonWords(normalizeNameWords(c.nombre_jugador), normalizeNameWords(fp.nombre_jugador)) >= 2;
+        if (matchByCode || matchByName) {
+          const isRed = (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) ||
+                        (c.codigo_tipo_amonestacion === '101' || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2');
+          if (isRed && c.minuto) {
+            sendOffMinute = Number(c.minuto);
+          }
         }
       });
 
@@ -321,20 +370,16 @@ export async function syncFFCVActaToConvocatorias(
       let minutes = 0;
       if (isTitular) {
         const subOut = ourSubs.find((s: any) => String(s.codjugador_sale) === String(fp.codjugador));
-        if (subOut && subOut.minuto) {
-          minutes = Number(subOut.minuto);
-        } else {
-          minutes = 90;
-        }
+        const outMin = subOut && subOut.minuto ? Number(subOut.minuto) : 90;
+        minutes = sendOffMinute !== null ? Math.min(outMin, sendOffMinute) : outMin;
       } else {
         const subIn = ourSubs.find((s: any) => String(s.codjugador_entra) === String(fp.codjugador));
         if (subIn && subIn.minuto) {
+          const inMin = Number(subIn.minuto);
           const subOut = ourSubs.find((s: any) => String(s.codjugador_sale) === String(fp.codjugador));
-          if (subOut && subOut.minuto) {
-            minutes = Math.max(0, Number(subOut.minuto) - Number(subIn.minuto));
-          } else {
-            minutes = Math.max(0, 90 - Number(subIn.minuto));
-          }
+          const outMin = subOut && subOut.minuto ? Number(subOut.minuto) : 90;
+          const endMin = sendOffMinute !== null ? Math.min(outMin, sendOffMinute) : outMin;
+          minutes = Math.max(0, endMin - inMin);
         } else {
           minutes = 0;
         }
@@ -379,7 +424,7 @@ export async function syncFFCVActaToConvocatorias(
             if (sc.segunda_amarilla === '1' || sc.segunda_amarilla === 1) {
               staffYellows += 1;
               staffReds += 1;
-            } else if (sc.codigo_tipo_amonestacion === '200' || sc.codigo_tipo_amonestacion === '2') {
+            } else if (sc.codigo_tipo_amonestacion === '101' || sc.codigo_tipo_amonestacion === '200' || sc.codigo_tipo_amonestacion === '2') {
               staffReds += 1;
             } else {
               staffYellows += 1;
@@ -434,6 +479,33 @@ export async function syncFFCVActaToConvocatorias(
     if (upsertErr) {
       console.error('[syncFFCVActaToConvocatorias] Error upserting convocatorias:', upsertErr);
       return { success: false, syncedCount: 0, error: upsertErr.message };
+    }
+
+    // Limpiar / resetear jugadores de borradores locales que no estuvieron en el acta oficial
+    const syncedPlayerIds = new Set(payload.map(p => p.player_id));
+    const { data: existingConvs } = await supabase
+      .from('convocatorias')
+      .select('id, player_id')
+      .eq('partido_id', partido.id);
+
+    const nonActaConvs = (existingConvs || []).filter((c: any) => !syncedPlayerIds.has(c.player_id));
+    if (nonActaConvs.length > 0) {
+      const nonActaIds = nonActaConvs.map((c: any) => c.id);
+      await supabase
+        .from('convocatorias')
+        .update({
+          status: 'no_convocado',
+          titular: false,
+          minutes_played: 0,
+          minutos_jugados: 0,
+          goals: 0,
+          goles: 0,
+          yellow_cards: 0,
+          tarjetas_amarillas: 0,
+          red_cards: 0,
+          tarjetas_rojas: 0
+        })
+        .in('id', nonActaIds);
     }
 
     // Also ensure partido status and score are up to date

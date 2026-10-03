@@ -316,6 +316,7 @@ function normalizeTeamMatchName(str: string): string {
       .select('id, equipo_id')
       .eq('club_id', clubId)
       .in('equipo_id', teamIds)
+      .eq('estado', 'Finalizado')
 
     if (seasonFilterId && seasonFilterId !== 'todas') {
       matchQuery = matchQuery.eq('season_id', seasonFilterId)
@@ -333,7 +334,7 @@ function normalizeTeamMatchName(str: string): string {
       while (true) {
         const { data: pageData, error } = await supabase
           .from('convocatorias')
-          .select('player_id, partido_id, goals, yellow_cards, red_cards, minutes_played')
+          .select('player_id, partido_id, goals, yellow_cards, red_cards, minutes_played, titular')
           .in('partido_id', clubMatchIds)
           .range(page * pageSize, (page + 1) * pageSize - 1)
         if (error || !pageData || pageData.length === 0) break
@@ -367,11 +368,13 @@ function normalizeTeamMatchName(str: string): string {
     convocatorias.forEach(c => {
       const pStat = playerAggMap.get(c.player_id)
       if (pStat) {
-        pStat.matchesPlayed++
+        const min = c.minutes_played || 0
+        if (min > 0 || c.titular) {
+          pStat.matchesPlayed++
+        }
         const g = c.goals || 0
         const y = c.yellow_cards || 0
         const r = c.red_cards || 0
-        const min = c.minutes_played || 0
 
         pStat.goals += g
         pStat.yellowCards += y

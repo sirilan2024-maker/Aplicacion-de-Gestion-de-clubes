@@ -1655,7 +1655,7 @@ export default function PlayerProfilePage() {
           <FamilyDocumentUploader 
             playerId={player.id} 
             playerName={`${player.first_name} ${player.last_name}`} 
-            isSenior={player.is_senior} 
+            isSenior={Boolean(player.is_senior)} 
           />
         )}
 

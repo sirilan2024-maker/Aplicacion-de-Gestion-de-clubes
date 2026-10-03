@@ -141,7 +141,7 @@ export interface AbsentPlayerRecord {
 
 export interface PlayerAttendanceRecordItem {
   date: string;
-  status: 'presente' | 'ausente' | 'justificado' | 'otro';
+  status: 'presente' | 'ausente' | 'justificado' | 'retraso' | 'otro';
   rawStatus?: string;
   notes?: string | null;
 }
@@ -158,6 +158,7 @@ export interface PlayerAttendanceReportItem {
   presentCount: number;
   absentCount: number;
   justifiedCount: number;
+  lateCount?: number;
   attendanceRate: number;
   recentRecords: PlayerAttendanceRecordItem[];
   statusBadge: 'excelente' | 'normal' | 'atencion' | 'critico';

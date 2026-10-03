@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Users, HeartPulse, CheckCircle2, AlertCircle, ArrowUpRight, Target, ChevronDown, ChevronUp, UserX, ClipboardList } from "lucide-react";
 import { AttendanceCategoryStats, ActiveInjuryItem, TeamAttendanceSummary, PlayerAttendanceReportItem } from "@/types/coordinator";
+import { formatDateDMY } from "@/lib/utils";
 import { InjuryDetailsModal } from "./InjuryDetailsModal";
 import { PlayerAttendanceReportModal } from "./PlayerAttendanceReportModal";
 
@@ -255,7 +256,7 @@ export function AttendanceOperationsSection({
                                 <span className="font-bold text-slate-800 block truncate">{p.playerName}</span>
                                 {p.date && (
                                   <span className="text-[10px] text-slate-400 block truncate">
-                                    Fecha: {p.date}
+                                    Fecha: {formatDateDMY(p.date)}
                                   </span>
                                 )}
                               </div>
@@ -319,7 +320,7 @@ export function AttendanceOperationsSection({
                     </span>
                     {inj.estimatedReturnDate && (
                       <span className="text-[10px] text-slate-400 mt-1">
-                        Est: {inj.estimatedReturnDate}
+                        Est: {formatDateDMY(inj.estimatedReturnDate)}
                       </span>
                     )}
                   </div>

@@ -1603,15 +1603,17 @@ export async function getCoordinatorFullDashboardAction(params?: {
       const teamPlayerSummaries = tPlayers.map(p => {
         const pAtt = tAtt.filter(a => a.player_id === p.id);
         const pPresent = pAtt.filter(a => (a.status || '').toLowerCase().includes('present')).length;
+        const pLate = pAtt.filter(a => (a.status || '').toLowerCase().includes('retras') || (a.status || '').toLowerCase().includes('late')).length;
         const pAbsent = pAtt.filter(a => (a.status || '').toLowerCase().includes('ausent') || (a.status || '').toLowerCase().includes('absent')).length;
         const pJustified = pAtt.filter(a => (a.status || '').toLowerCase().includes('justif') || (a.status || '').toLowerCase().includes('lesion') || (a.status || '').toLowerCase().includes('excus')).length;
         const pTotal = pAtt.length;
-        const pRate = pTotal > 0 ? Math.round((pPresent / pTotal) * 100) : (pAbsent > 0 ? 0 : rate);
+        const pRate = pTotal > 0 ? Math.round(((pPresent + pLate) / pTotal) * 100) : (pAbsent > 0 ? 0 : rate);
 
         const recentRecords = pAtt.slice(-10).reverse().map(a => {
           const s = (a.status || '').toLowerCase();
-          let normStatus: 'presente' | 'ausente' | 'justificado' | 'otro' = 'otro';
-          if (s.includes('present')) normStatus = 'presente';
+          let normStatus: 'presente' | 'ausente' | 'justificado' | 'retraso' | 'otro' = 'otro';
+          if (s.includes('retras') || s.includes('late')) normStatus = 'retraso';
+          else if (s.includes('present')) normStatus = 'presente';
           else if (s.includes('ausent') || s.includes('absent')) normStatus = 'ausente';
           else if (s.includes('justif') || s.includes('lesion') || s.includes('excus')) normStatus = 'justificado';
 
@@ -1641,6 +1643,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
           presentCount: pTotal > 0 ? pPresent : (pAbsent === 0 ? totalTeamSessions : 0),
           absentCount: pAbsent,
           justifiedCount: pJustified,
+          lateCount: pLate,
           attendanceRate: pRate,
           recentRecords,
           statusBadge,

@@ -3,6 +3,7 @@
 import React from "react";
 import { X, HeartPulse, Calendar, AlertCircle, FileText } from "lucide-react";
 import { ActiveInjuryItem } from "@/types/coordinator";
+import { formatDateDMY } from "@/lib/utils";
 
 interface InjuryDetailsModalProps {
   injury: ActiveInjuryItem | null;
@@ -68,7 +69,7 @@ export function InjuryDetailsModal({ injury, onClose }: InjuryDetailsModalProps)
               <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
               <div>
                 <p className="text-[10px] text-slate-400 font-bold">Fecha de Baja</p>
-                <p className="font-semibold text-slate-700">{injury.startDate || 'No indicada'}</p>
+                <p className="font-semibold text-slate-700">{injury.startDate ? formatDateDMY(injury.startDate) : 'No indicada'}</p>
               </div>
             </div>
 
@@ -76,7 +77,7 @@ export function InjuryDetailsModal({ injury, onClose }: InjuryDetailsModalProps)
               <Calendar className="w-4 h-4 text-emerald-500 shrink-0" />
               <div>
                 <p className="text-[10px] text-slate-400 font-bold">Retorno Estimado</p>
-                <p className="font-semibold text-slate-700">{injury.estimatedReturnDate || 'Pendiente de evolución'}</p>
+                <p className="font-semibold text-slate-700">{injury.estimatedReturnDate ? formatDateDMY(injury.estimatedReturnDate) : 'Pendiente de evolución'}</p>
               </div>
             </div>
           </div>

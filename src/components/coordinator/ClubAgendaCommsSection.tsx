@@ -18,6 +18,7 @@ import {
   UpcomingTrainingItem,
   CoordinatorCommunications,
 } from "@/types/coordinator";
+import { formatDateDMY } from "@/lib/utils";
 
 interface ClubAgendaCommsSectionProps {
   upcomingMatches: CoordinatorUpcomingMatch[];
@@ -308,11 +309,7 @@ export function ClubAgendaCommsSection({
               <div className="divide-y divide-slate-100">
                 {displayedMatches.map((m) => {
                   const matchDate = new Date(m.fechaHora);
-                  const dateStr = matchDate.toLocaleDateString("es-ES", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                  });
+                  const dateStr = formatDateDMY(m.fechaHora);
                   const timeStr = matchDate.toLocaleTimeString("es-ES", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -327,8 +324,8 @@ export function ClubAgendaCommsSection({
                       className="py-3 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/70 rounded-xl px-2 -mx-2 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-14 text-center shrink-0">
-                          <div className="text-[11px] font-bold text-slate-500 uppercase">{dateStr}</div>
+                        <div className="w-16 text-center shrink-0">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase">{dateStr}</div>
                           <div className="text-xs font-black text-slate-800 flex items-center justify-center gap-0.5">
                             <Clock className="w-3 h-3 text-slate-400" />
                             {timeStr}
@@ -427,8 +424,8 @@ export function ClubAgendaCommsSection({
                     className="py-3 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/70 rounded-xl px-2 -mx-2 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-14 text-center shrink-0">
-                        <div className="text-[11px] font-bold text-indigo-600 uppercase">{t.date}</div>
+                      <div className="w-16 text-center shrink-0">
+                        <div className="text-[10px] font-bold text-indigo-600 uppercase">{formatDateDMY(t.date)}</div>
                         <div className="text-xs font-black text-slate-800">{t.startTime || "18:00"}</div>
                       </div>
                       <div className="space-y-0.5 min-w-0">
@@ -550,9 +547,8 @@ export function ClubAgendaCommsSection({
                   &ldquo;{communications.latestAnnouncement.content}&rdquo;
                 </p>
                 <p className="text-[10px] text-slate-400">
-                  {new Date(communications.latestAnnouncement.createdAt).toLocaleDateString("es-ES", {
-                    day: "numeric",
-                    month: "short",
+                  {formatDateDMY(communications.latestAnnouncement.createdAt)}{" "}
+                  {new Date(communications.latestAnnouncement.createdAt).toLocaleTimeString("es-ES", {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}

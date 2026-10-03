@@ -19,8 +19,10 @@ import {
   ArrowUpDown,
   ShieldAlert,
   ClipboardList,
+  Clock,
 } from "lucide-react";
 import { PlayerAttendanceReportItem } from "@/types/coordinator";
+import { formatDateDMY } from "@/lib/utils";
 
 interface PlayerAttendanceReportModalProps {
   isOpen: boolean;
@@ -54,8 +56,8 @@ export function PlayerAttendanceReportModal({
   const [mounted, setMounted] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>(initialTeamId || "all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "con_faltas" | "en_riesgo" | "cumple_objetivo">("todos");
-  const [sortBy, setSortBy] = useState<"riesgo" | "faltas" | "asistencia_desc" | "nombre">("riesgo");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "con_faltas" | "en_riesgo" | "cumple_objetivo" | "con_retrasos">("todos");
+  const [sortBy, setSortBy] = useState<"riesgo" | "faltas" | "retrasos" | "asistencia_desc" | "nombre">("riesgo");
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +120,9 @@ export function PlayerAttendanceReportModal({
       if (statusFilter === "con_faltas" && (p.absentCount || 0) <= 0) {
         return false;
       }
+      if (statusFilter === "con_retrasos" && (p.lateCount || 0) <= 0) {
+        return false;
+      }
       if (statusFilter === "en_riesgo" && (p.attendanceRate || 0) >= 75 && (p.absentCount || 0) <= 1) {
         return false;
       }
@@ -138,6 +143,9 @@ export function PlayerAttendanceReportModal({
     if (sortBy === "faltas") {
       return list.sort((a, b) => (b.absentCount || 0) - (a.absentCount || 0) || (a.attendanceRate || 0) - (b.attendanceRate || 0));
     }
+    if (sortBy === "retrasos") {
+      return list.sort((a, b) => (b.lateCount || 0) - (a.lateCount || 0) || (a.attendanceRate || 0) - (b.attendanceRate || 0));
+    }
     if (sortBy === "asistencia_desc") {
       return list.sort((a, b) => (b.attendanceRate || 0) - (a.attendanceRate || 0));
     }
@@ -154,6 +162,7 @@ export function PlayerAttendanceReportModal({
     : 0;
   const compliantCount = sortedPlayers.filter((p) => p.attendanceRate >= 85).length;
   const atRiskCount = sortedPlayers.filter((p) => p.attendanceRate < 75 || p.absentCount > 1).length;
+  const totalLates = sortedPlayers.reduce((acc, p) => acc + (p.lateCount || 0), 0);
   const totalAbsences = sortedPlayers.reduce((acc, p) => acc + p.absentCount, 0);
 
   const toggleExpand = (playerId: string) => {
@@ -212,7 +221,7 @@ export function PlayerAttendanceReportModal({
 
         {/* Resumen KPIs del informe (en móvil: tira horizontal scrolleable compacta) */}
         <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 sm:px-6 sm:py-3.5 shrink-0 overflow-x-auto no-scrollbar">
-          <div className="flex sm:grid sm:grid-cols-5 gap-2 sm:gap-3 min-w-max sm:min-w-0">
+          <div className="flex sm:grid sm:grid-cols-6 gap-2 sm:gap-3 min-w-max sm:min-w-0">
             <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[95px] sm:min-w-0">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-slate-400 uppercase">Evaluados</p>
               <p className="text-base sm:text-xl font-black text-slate-900 mt-0.5">{totalEvaluated}</p>
@@ -244,6 +253,12 @@ export function PlayerAttendanceReportModal({
             <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[105px] sm:min-w-0">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-amber-600 uppercase">Total Faltas</p>
               <p className="text-base sm:text-xl font-black text-amber-700 mt-0.5">{totalAbsences}</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-500">{currentPeriod}</p>
+            </div>
+
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[100px] sm:min-w-0">
+              <p className="text-[9px] sm:text-[10px] font-extrabold text-orange-600 uppercase">Retrasos</p>
+              <p className="text-base sm:text-xl font-black text-orange-700 mt-0.5">{totalLates}</p>
               <p className="text-[9px] sm:text-[10px] text-slate-500">{currentPeriod}</p>
             </div>
           </div>
@@ -296,6 +311,7 @@ export function PlayerAttendanceReportModal({
               >
                 <option value="todos">Todos Estados</option>
                 <option value="con_faltas">⚠️ Con Faltas</option>
+                <option value="con_retrasos">⏰ Con Retrasos</option>
                 <option value="en_riesgo">🚨 En Riesgo (&lt;75%)</option>
                 <option value="cumple_objetivo">✅ Objetivo (≥85%)</option>
               </select>
@@ -313,6 +329,7 @@ export function PlayerAttendanceReportModal({
               >
                 <option value="riesgo">Menor % (Riesgo)</option>
                 <option value="faltas">Más Faltas</option>
+                <option value="retrasos">Más Retrasos</option>
                 <option value="asistencia_desc">Mayor %</option>
                 <option value="nombre">Nombre A-Z</option>
               </select>
@@ -423,6 +440,12 @@ export function PlayerAttendanceReportModal({
                             {player.absentCount}
                           </span>
                         </div>
+                        {(player.lateCount ?? 0) > 0 && (
+                          <div className="text-center px-2 py-1 bg-orange-50 rounded-lg border border-orange-100">
+                            <span className="block text-[10px] font-bold text-orange-600 uppercase">Retrasos</span>
+                            <span className="font-black text-orange-800">{player.lateCount}</span>
+                          </div>
+                        )}
                         {player.justifiedCount > 0 && (
                           <div className="text-center px-2 py-1 bg-blue-50 rounded-lg border border-blue-100">
                             <span className="block text-[10px] font-bold text-blue-600 uppercase">Justif.</span>
@@ -519,6 +542,10 @@ export function PlayerAttendanceReportModal({
                               badgeBg = "bg-amber-50 text-amber-700 border-amber-200";
                               icon = <AlertTriangle className="w-3 h-3 text-amber-600" />;
                               label = "Justificado / Lesión";
+                            } else if (rec.status === "retraso") {
+                              badgeBg = "bg-orange-50 text-orange-700 border-orange-200";
+                              icon = <Clock className="w-3 h-3 text-orange-600" />;
+                              label = "Retraso";
                             }
 
                             return (
@@ -532,7 +559,7 @@ export function PlayerAttendanceReportModal({
                                     <span className="truncate">{label}</span>
                                   </div>
                                   <span className="text-[10px] opacity-80 block mt-0.5">
-                                    {rec.date ? `Fecha: ${rec.date}` : "Sesión ordinaria"}
+                                    {rec.date ? `Fecha: ${formatDateDMY(rec.date)}` : "Sesión ordinaria"}
                                   </span>
                                   {rec.notes && (
                                     <span className="text-[10px] italic block truncate text-slate-600" title={rec.notes}>

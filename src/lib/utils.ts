@@ -19,6 +19,26 @@ export function formatDate(date: Date | string | number) {
 }
 
 /**
+ * Formatea una fecha estrictamente en formato día/mes/año (DD/MM/AAAA).
+ * @example "18/10/2026"
+ */
+export function formatDateDMY(dateInput?: Date | string | number | null): string {
+  if (!dateInput) return "";
+  if (typeof dateInput === "string") {
+    const match = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+  }
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Retorna el tiempo transcurrido desde una fecha (hace X minutos, etc).
  */
 export function formatRelativeTime(date: Date | string | number) {

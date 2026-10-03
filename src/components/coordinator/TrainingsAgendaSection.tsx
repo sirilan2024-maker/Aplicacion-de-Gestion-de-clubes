@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Clock, Calendar, MapPin, User, ChevronRight, X, Shield, CalendarDays, CheckCircle2 } from "lucide-react";
 import { TeamTrainingCard, UpcomingTrainingItem } from "@/types/coordinator";
+import { formatDateDMY } from "@/lib/utils";
 
 interface TrainingsAgendaSectionProps {
   teamsTrainings: TeamTrainingCard[];
@@ -222,11 +223,7 @@ export function TrainingsAgendaSection({
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">
-                          {new Date(session.date + "T12:00:00").toLocaleDateString("es-ES", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                          })}
+                          {formatDateDMY(session.date)}
                         </span>
                         <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
                           {session.startTime} {session.endTime ? `- ${session.endTime}` : ""}

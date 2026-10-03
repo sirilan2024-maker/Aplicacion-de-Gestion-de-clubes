@@ -115,26 +115,42 @@ export async function assignStaffToTeamAction(staffId: string, teamIds: string[]
   await adminClient.from('team_coaches').delete().eq('profile_id', staffId).eq('club_id', context.profile.club_id)
 
   if (teamIds && teamIds.length > 0) {
-    // Validar que todos los equipos pertenezcan al club del administrador
-    const { data: validTeams } = await adminClient
-      .from('teams')
-      .select('id')
-      .in('id', teamIds)
-      .eq('club_id', context.profile.club_id)
+    // Validar el rol del miembro: SOLO roles de cuerpo técnico de campo/banquillo van a team_coaches
+    const { data: staffProfile } = await adminClient
+      .from('profiles')
+      .select('role, roles')
+      .eq('id', staffId)
+      .maybeSingle()
 
-    const validTeamIds = (validTeams || []).map(t => t.id)
-    if (validTeamIds.length !== teamIds.length) {
-      return { success: false, error: 'Uno o más equipos seleccionados no pertenecen a tu club' }
+    const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador']
+    const userRoles = [staffProfile?.role, ...(staffProfile?.roles || [])].filter(Boolean).map((r: string) => r.toLowerCase())
+    const isBenchStaff = userRoles.some((r: string) => benchRoles.includes(r))
+
+    if (isBenchStaff) {
+      // Validar que todos los equipos pertenezcan al club del administrador
+      const { data: validTeams } = await adminClient
+        .from('teams')
+        .select('id')
+        .in('id', teamIds)
+        .eq('club_id', context.profile.club_id)
+
+      const validTeamIds = (validTeams || []).map(t => t.id)
+      if (validTeamIds.length !== teamIds.length) {
+        return { success: false, error: 'Uno o más equipos seleccionados no pertenecen a tu club' }
+      }
+
+      const rawRole = staffProfile?.role || 'Entrenador'
+      const roleCapitalized = rawRole.charAt(0).toUpperCase() + rawRole.slice(1)
+      const inserts = validTeamIds.map(id => ({
+        profile_id: staffId, 
+        team_id: id, 
+        role: roleCapitalized,
+        club_id: context.profile.club_id 
+      }))
+
+      const { error } = await adminClient.from('team_coaches').insert(inserts)
+      if (error) return { success: false, error: error.message }
     }
-
-    const inserts = validTeamIds.map(id => ({
-      profile_id: staffId, 
-      team_id: id, 
-      club_id: context.profile.club_id 
-    }))
-
-    const { error } = await adminClient.from('team_coaches').insert(inserts)
-    if (error) return { success: false, error: error.message }
   }
   
   revalidatePath("/dashboard/club/miembros")
@@ -1505,77 +1521,118 @@ export async function promotePlayerToStaffAction(
     let generatedToken: string | null = null;
     let isAlreadyRegistered = false;
 
-    if (hasValidEmail) {
-      // Buscar si ya existe un perfil con ese email
-      const { data: existingProfile } = await adminClient
+    // 1. Buscar si ya existe un perfil vinculado a este jugador o con este email
+    let existingProfile: any = null;
+    if (player.user_auth_id) {
+      const { data: p } = await adminClient
         .from('profiles')
-        .select('id, email, club_id, roles')
+        .select('id, email, club_id, roles, role, first_name, last_name')
+        .eq('id', player.user_auth_id)
+        .maybeSingle();
+      if (p) existingProfile = p;
+    }
+    if (!existingProfile) {
+      const { data: p } = await adminClient
+        .from('profiles')
+        .select('id, email, club_id, roles, role, first_name, last_name')
+        .eq('linked_player_id', playerId)
+        .maybeSingle();
+      if (p) existingProfile = p;
+    }
+    if (!existingProfile && hasValidEmail) {
+      const { data: p } = await adminClient
+        .from('profiles')
+        .select('id, email, club_id, roles, role, first_name, last_name')
         .eq('email', targetEmail)
         .maybeSingle();
+      if (p) existingProfile = p;
+    }
 
-      if (existingProfile) {
-        staffProfileId = existingProfile.id;
-        isAlreadyRegistered = true;
-        const mergedRoles = Array.from(new Set([...(existingProfile.roles || []), ...rolesList, role]));
+    if (existingProfile) {
+      staffProfileId = existingProfile.id;
+      isAlreadyRegistered = true;
+      const mergedRoles = Array.from(new Set([...(existingProfile.roles || []), ...rolesList, role]));
+      await adminClient
+        .from('profiles')
+        .update({
+          role: role,
+          roles: mergedRoles,
+          club_id: context.profile.club_id,
+          first_name: player.first_name || existingProfile.first_name,
+          last_name: player.last_name || existingProfile.last_name,
+          linked_player_id: playerId,
+          is_active: true
+        })
+        .eq('id', existingProfile.id);
+
+      const resolvedEmail = existingProfile.email || targetEmail || null;
+      if (resolvedEmail && (!player.email || player.email !== resolvedEmail)) {
+        await adminClient
+          .from('players')
+          .update({ email: resolvedEmail })
+          .eq('id', playerId);
+      }
+
+      // Eliminar invitaciones previas de staff pendientes para este usuario
+      if (resolvedEmail) {
+        await adminClient
+          .from('staff_invitations')
+          .delete()
+          .eq('club_id', context.profile.club_id)
+          .eq('email', resolvedEmail);
+      }
+      await adminClient
+        .from('staff_invitations')
+        .delete()
+        .eq('club_id', context.profile.club_id)
+        .eq('name', `${player.first_name} ${player.last_name}`.trim());
+    } else if (hasValidEmail) {
+      // Crear usuario auth con contraseña temporal
+      generatedPassword = 'Club' + Math.random().toString(36).substring(2, 8) + '!';
+      const { data: newAuth, error: createAuthErr } = await adminClient.auth.admin.createUser({
+        email: targetEmail,
+        password: generatedPassword,
+        email_confirm: true,
+        user_metadata: {
+          first_name: player.first_name,
+          last_name: player.last_name,
+          role: role
+        }
+      });
+
+      if (newAuth?.user) {
+        staffProfileId = newAuth.user.id;
         await adminClient
           .from('profiles')
-          .update({
-            role: role,
-            roles: mergedRoles,
+          .upsert({
+            id: staffProfileId,
             club_id: context.profile.club_id,
-            first_name: player.first_name,
-            last_name: player.last_name,
-            linked_player_id: playerId
-          })
-          .eq('id', existingProfile.id);
-      } else {
-        // Crear usuario auth con contraseña temporal
-        generatedPassword = 'Club' + Math.random().toString(36).substring(2, 8) + '!';
-        const { data: newAuth, error: createAuthErr } = await adminClient.auth.admin.createUser({
-          email: targetEmail,
-          password: generatedPassword,
-          email_confirm: true,
-          user_metadata: {
-            first_name: player.first_name,
-            last_name: player.last_name,
-            role: role
-          }
-        });
-
-        if (newAuth?.user) {
-          staffProfileId = newAuth.user.id;
-          await adminClient
-            .from('profiles')
-            .upsert({
-              id: staffProfileId,
-              club_id: context.profile.club_id,
-              email: targetEmail,
-              first_name: player.first_name,
-              last_name: player.last_name,
-              role: role,
-              roles: rolesList.length > 0 ? rolesList : [role],
-              linked_player_id: playerId,
-              is_active: true
-            });
-        }
-
-        // Generar token de invitación solo si NO existía la cuenta previamente
-        const { data: inviteRec } = await adminClient
-          .from('staff_invitations')
-          .insert({
-            club_id: context.profile.club_id,
-            role: role,
-            name: `${player.first_name} ${player.last_name}`.trim(),
             email: targetEmail,
-            team_id: teamIds[0] || null,
-            created_by: context.user.id
-          })
-          .select('token')
-          .maybeSingle();
+            first_name: player.first_name,
+            last_name: player.last_name,
+            role: role,
+            roles: rolesList.length > 0 ? rolesList : [role],
+            linked_player_id: playerId,
+            is_active: true
+          });
+      }
 
-        if (inviteRec?.token) {
-          generatedToken = inviteRec.token;
-        }
+      // Generar token de invitación solo si NO existía la cuenta previamente
+      const { data: inviteRec } = await adminClient
+        .from('staff_invitations')
+        .insert({
+          club_id: context.profile.club_id,
+          role: role,
+          name: `${player.first_name} ${player.last_name}`.trim(),
+          email: targetEmail,
+          team_id: teamIds[0] || null,
+          created_by: context.user.id
+        })
+        .select('token')
+        .maybeSingle();
+
+      if (inviteRec?.token) {
+        generatedToken = inviteRec.token;
       }
     } else {
       // No se proporcionó email: Generar enlace de invitación de staff para que el propio miembro configure su cuenta
@@ -1634,7 +1691,7 @@ export async function promotePlayerToStaffAction(
       tempPassword: generatedPassword, 
       inviteToken: generatedToken,
       alreadyRegistered: isAlreadyRegistered,
-      email: targetEmail 
+      email: isAlreadyRegistered ? (existingProfile?.email || targetEmail) : (hasValidEmail ? targetEmail : null)
     };
   } catch (err: any) {
     console.error('Error promoting player to staff:', err);

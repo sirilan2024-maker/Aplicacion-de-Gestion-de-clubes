@@ -639,12 +639,17 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
           onSuccess();
           return;
         } else {
-          // Si sigue siendo solo jugador
+          // Si se retiran roles de staff y queda solo como jugador:
+          // Actualizar el perfil en la base de datos si ya tenía cuenta
+          const linkedProfileId = member.staff_id || (member as any).user_auth_id;
+          if (linkedProfileId) {
+            await updateUserRolesAction(linkedProfileId, 'jugador', ['jugador']);
+          }
           if (teamIds.length > 0) {
             const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
             await assignPlayerToTeamAction(member.id, teamIds[0]);
           }
-          toast.success("Datos del jugador actualizados correctamente");
+          toast.success("Rol actualizado correctamente");
         }
       } else {
         const resRole = await updateUserRolesAction(member.id, activeRole, assignedRoles);
@@ -1175,6 +1180,7 @@ function GlobalMembersContent() {
 
             allMembers.push({
               id: p.id,
+              staff_id: p.user_auth_id || null,
               player_id: p.id,
               first_name: p.first_name || '',
               last_name: p.last_name || '',

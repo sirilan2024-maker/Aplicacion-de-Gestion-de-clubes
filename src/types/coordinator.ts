@@ -281,4 +281,34 @@ export interface CoordinatorDashboardFullData {
     upcomingTrainings: UpcomingTrainingItem[];
     teamsTrainings?: TeamTrainingCard[];
   };
+  agendaClub?: {
+    upcomingMatches: CoordinatorUpcomingMatch[];
+    upcomingTrainings: UpcomingTrainingItem[];
+  };
+  communications?: CoordinatorCommunications;
+}
+
+export interface CoordinatorUpcomingMatch {
+  id: string;
+  fechaHora: string;
+  rivalNombre: string;
+  lugar: string;
+  jornada?: number;
+  esLocal: boolean;
+  estado: string;
+  resultadoPropio?: number | null;
+  resultadoRival?: number | null;
+  teamId?: string;
+  teamName: string;
+  teamCategory: string;
+  teamColor: string;
+}
+
+export interface CoordinatorCommunications {
+  activeChannelsCount: number;
+  latestAnnouncement: {
+    id: string;
+    content: string;
+    createdAt: string;
+  } | null;
 }

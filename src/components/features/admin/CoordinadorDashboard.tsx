@@ -16,7 +16,7 @@ import { CriticalAlertsBanner } from "@/components/coordinator/CriticalAlertsBan
 import { DisciplineSection } from "@/components/coordinator/DisciplineSection";
 import { AttendanceOperationsSection } from "@/components/coordinator/AttendanceOperationsSection";
 import { SituacionDeportivaSection } from "@/components/features/admin/SituacionDeportivaSection";
-import { TrainingsAgendaSection } from "@/components/coordinator/TrainingsAgendaSection";
+import { ClubAgendaCommsSection } from "@/components/coordinator/ClubAgendaCommsSection";
 import { CoordinatorDashboardFullData, CoordinatorTeamItem } from "@/types/coordinator";
 
 type Props = {
@@ -168,10 +168,6 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
     };
   }, [sports, isGlobalView, selectedTeamId]);
 
-  // Entrenamientos
-  const displayedTeamsTrainings = isGlobalView
-    ? schedule.teamsTrainings || []
-    : (schedule.teamsTrainings || []).filter((t) => t.teamId === selectedTeamId);
 
   // KPIs del equipo específico
   const currentTeamAttSummary = (attendance.teamsAttendance || []).find((t) => t.teamId === selectedTeamId);
@@ -401,11 +397,12 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           onPlayerClick={(playerId) => router.push(`/dashboard/matches?view=disciplina`)}
         />
 
-        {/* 7. Agenda de Entrenamientos por Equipo (SOLO ENTRENAMIENTOS, NO INSTALACIONES) */}
-        <TrainingsAgendaSection
-          teamsTrainings={displayedTeamsTrainings}
+        {/* 7. Agenda del Club y Comunicaciones (Partidos, Entrenamientos y Canales Oficiales) */}
+        <ClubAgendaCommsSection
+          upcomingMatches={data.agendaClub?.upcomingMatches || []}
+          upcomingTrainings={schedule.upcomingTrainings || []}
+          communications={data.communications}
           selectedTeamId={selectedTeamId}
-          onSelectTeam={handleSelectTeamId}
         />
       </div>
 

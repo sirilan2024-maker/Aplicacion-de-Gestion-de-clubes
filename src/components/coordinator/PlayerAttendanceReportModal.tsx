@@ -48,10 +48,13 @@ export function PlayerAttendanceReportModal({
 
   // Sincronizar filtro si cambia initialTeamId
   React.useEffect(() => {
-    if (initialTeamId) {
-      setSelectedTeamFilter(initialTeamId);
+    if (initialTeamId && initialTeamId !== "all") {
+      const hasPlayers = players.some((p) => p.teamId === initialTeamId);
+      setSelectedTeamFilter(hasPlayers ? initialTeamId : "all");
+    } else {
+      setSelectedTeamFilter("all");
     }
-  }, [initialTeamId]);
+  }, [initialTeamId, players]);
 
   if (!isOpen) return null;
 
@@ -125,7 +128,7 @@ export function PlayerAttendanceReportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
         className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}

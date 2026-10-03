@@ -30,7 +30,10 @@ export interface CoordinatorUpcomingMatch {
   teamName: string
   teamCategory: string
   teamColor: string | null
-  convocadosCount: number
+  convocadosCount?: number
+  resultadoPropio?: number | null
+  resultadoRival?: number | null
+  jornada?: number
 }
 
 export interface CoordinatorAlert {
@@ -1200,16 +1203,41 @@ export async function getCoordinatorFullDashboardAction(params?: {
 
     const teamIds = filteredTeams.map(t => t.id);
 
-    // 3. Obtener jugadores de los equipos filtrados (usando columnas reales de players)
+    // 3. Obtener jugadores de los equipos filtrados (usando columnas reales de players y player_season_history)
     let players: any[] = [];
     if (teamIds.length > 0) {
+      const { data: pshRows } = await adminClient
+        .from('player_season_history')
+        .select('player_id, team_id')
+        .eq('season_id', targetSeasonId)
+        .in('team_id', teamIds);
+
+      const pshTeamByPlayer = new Map<string, string>();
+      (pshRows || []).forEach(r => {
+        if (r.player_id && r.team_id) pshTeamByPlayer.set(r.player_id, r.team_id);
+      });
+
+      const pshPlayerIds = Array.from(pshTeamByPlayer.keys());
+
       const { data: playersData, error: plErr } = await adminClient
         .from('players')
-        .select('id, team_id, first_name, last_name, dorsal, status, lesiones, observaciones_medicas, medical_info')
-        .in('team_id', teamIds)
+        .select('id, team_id, first_name, last_name, dorsal, avatar_url, status, lesiones, observaciones_medicas, medical_info')
+        .or(`team_id.in.(${teamIds.join(',')})${pshPlayerIds.length > 0 ? `,id.in.(${pshPlayerIds.join(',')})` : ''}`)
         .neq('status', 'inactive');
+
       if (plErr) console.error('[coordinator] Error fetching players:', plErr);
-      players = playersData || [];
+
+      const rawPlayers = playersData || [];
+      const seen = new Set<string>();
+      players = rawPlayers.map(p => ({
+        ...p,
+        team_id: pshTeamByPlayer.get(p.id) || p.team_id
+      })).filter(p => {
+        if (!teamIds.includes(p.team_id)) return false;
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
     }
 
     // 4. Obtener partidos de los equipos filtrados en la temporada activa (sin pedir jornada inexistente)
@@ -1748,6 +1776,73 @@ export async function getCoordinatorFullDashboardAction(params?: {
       // Ignorar si notifications no tiene datos
     }
 
+    // 11. Agenda del Club (Partidos Oficiales) y Comunicaciones (Canales y Tablón de Anuncios)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const allClubTeamIds = allClubTeams.map(t => t.id);
+    const { data: rawUpcomingMatches } = await adminClient
+      .from('partidos')
+      .select(`
+        id, equipo_id, fecha_hora, rival_nombre, lugar, estado,
+        resultado_propio, resultado_rival,
+        teams:equipo_id (name, category, color)
+      `)
+      .eq('club_id', clubId)
+      .in('equipo_id', allClubTeamIds.length > 0 ? allClubTeamIds : ['00000000-0000-0000-0000-000000000000'])
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .gte('fecha_hora', yesterday)
+      .order('fecha_hora', { ascending: true })
+      .limit(10);
+
+    const agendaMatchesList: CoordinatorUpcomingMatch[] = (rawUpcomingMatches || []).map(m => {
+      const tm = m.teams as any;
+      const isLocal = m.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(m.lugar || '');
+      return {
+        id: m.id,
+        teamId: m.equipo_id,
+        fechaHora: m.fecha_hora,
+        rivalNombre: m.rival_nombre || 'Rival por definir',
+        lugar: m.lugar || 'Por determinar',
+        jornada: undefined,
+        esLocal: isLocal,
+        estado: m.estado || 'Programado',
+        resultadoPropio: m.resultado_propio,
+        resultadoRival: m.resultado_rival,
+        teamName: tm?.name || 'Equipo del Club',
+        teamCategory: tm?.category || '',
+        teamColor: tm?.color || '#4F46E5',
+      };
+    });
+
+    // Comunicaciones
+    const { data: channels, count: activeChannelsCount } = await adminClient
+      .from('chat_channels')
+      .select('id, type, name', { count: 'exact' })
+      .eq('club_id', clubId);
+
+    const globalChannel = (channels || []).find((c: { type: string }) => c.type === 'global');
+    let latestAnnouncement: { id: string; content: string; createdAt: string } | null = null;
+    if (globalChannel) {
+      const { data: msgs } = await adminClient
+        .from('chat_messages')
+        .select('id, content, created_at')
+        .eq('channel_id', globalChannel.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (msgs && msgs.length > 0) {
+        latestAnnouncement = {
+          id: msgs[0].id,
+          content: msgs[0].content,
+          createdAt: msgs[0].created_at,
+        };
+      }
+    }
+
+    const commsData = {
+      activeChannelsCount: activeChannelsCount || (channels?.length || 16),
+      latestAnnouncement,
+    };
+
     const selectedDateStr = params?.date || todayDate;
 
     return {
@@ -1795,6 +1890,11 @@ export async function getCoordinatorFullDashboardAction(params?: {
           upcomingTrainings,
           teamsTrainings,
         },
+        agendaClub: {
+          upcomingMatches: agendaMatchesList,
+          upcomingTrainings: upcomingTrainings.slice(0, 10),
+        },
+        communications: commsData,
       },
     };
   } catch (err: any) {

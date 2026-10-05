@@ -1853,11 +1853,38 @@ export async function updateMemberRolesAndTeamsAction(params: {
             }, { onConflict: 'player_id,season_id' });
         }
       }
+    } else {
+      // SI SE RETIRÓ EL ROL DE JUGADOR: Desvincular equipo, marcar inactivo y limpiar de player_season_history
+      if (targetPlayerId) {
+        await adminClient
+          .from('players')
+          .update({
+            team_id: null,
+            status: 'inactive'
+          })
+          .eq('id', targetPlayerId)
+          .eq('club_id', clubId);
+
+        if (activeSeason?.id) {
+          await adminClient
+            .from('player_season_history')
+            .delete()
+            .eq('player_id', targetPlayerId)
+            .eq('season_id', activeSeason.id);
+        }
+      }
+
+      if (targetProfileId) {
+        await adminClient
+          .from('profiles')
+          .update({ linked_player_id: null })
+          .eq('id', targetProfileId);
+      }
     }
 
     // 2. GESTIÓN DE ROLES Y EQUIPOS DE STAFF / CUERPO TÉCNICO
-    const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'];
-    const staffRoles = ['admin', 'coordinador', 'secretario', 'tesorero', 'directivo', ...benchRoles];
+    const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador', 'metodologo'];
+    const staffRoles = ['admin', 'administrador', 'directivo', 'coordinador', 'metodologo', 'secretario', 'tesorero', 'socio', ...benchRoles];
     const hasStaffRole = assignedRoles.some(r => staffRoles.includes(r.toLowerCase())) || staffRoles.includes(activeRole.toLowerCase());
 
     let promotionResult = null;
@@ -1902,7 +1929,10 @@ export async function updateMemberRolesAndTeamsAction(params: {
         const hasBenchRole = assignedRoles.some(r => benchRoles.includes(r.toLowerCase())) || benchRoles.includes(activeRole.toLowerCase());
         if (hasBenchRole && staffTeamIds.length > 0) {
           const benchRoleFound = benchRoles.find(r => assignedRoles.map(x => x.toLowerCase()).includes(r)) || 'entrenador';
-          const roleCapitalized = benchRoleFound.charAt(0).toUpperCase() + benchRoleFound.slice(1);
+          let roleCapitalized = benchRoleFound.charAt(0).toUpperCase() + benchRoleFound.slice(1);
+          if (benchRoleFound === 'preparador_fisico') roleCapitalized = 'Preparador Físico';
+          if (benchRoleFound === 'metodologo') roleCapitalized = 'Metodólogo';
+          if (benchRoleFound === 'segundo_entrenador') roleCapitalized = 'Segundo Entrenador';
 
           const inserts = staffTeamIds.map(tId => ({
             profile_id: targetProfileId,

@@ -487,7 +487,7 @@ export async function getClubStaffAction(clubId: string) {
         team_coaches(role, teams(id, name, color))
       `)
       .eq('club_id', clubId)
-      .or('role.in.(admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado),roles.ov.{admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado}');
+      .or('role.in.(admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado,preparador_fisico,metodologo,socio),roles.ov.{admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado,preparador_fisico,metodologo,socio}');
     
     if (error) throw error;
 

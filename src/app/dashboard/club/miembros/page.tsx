@@ -616,7 +616,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         throw new Error("El rol activo debe estar entre los roles asignados.");
       }
 
-      const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'];
+      const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador', 'metodologo'];
       const hasBenchRole = assignedRoles.some(r => benchRoles.includes(r.toLowerCase())) || benchRoles.includes(activeRole.toLowerCase());
       const hasPlayerRole = assignedRoles.includes('jugador');
 
@@ -799,16 +799,19 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                 <label className="block text-sm font-medium text-gray-700 mb-2">Roles Asignados</label>
                 <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   {[
-                    { val: 'admin', label: 'Admin' },
+                    { val: 'admin', label: 'Administrador' },
+                    { val: 'directivo', label: 'Directivo' },
                     { val: 'coordinador', label: 'Coordinador' },
+                    { val: 'metodologo', label: 'Metodólogo' },
                     { val: 'entrenador', label: 'Entrenador' },
-                    { val: 'jugador', label: 'Jugador' },
-                    { val: 'tutor', label: 'Padre/Madre/Tutor' },
+                    { val: 'preparador_fisico', label: 'Preparador Físico' },
+                    { val: 'delegado', label: 'Delegado' },
                     { val: 'secretario', label: 'Secretario' },
                     { val: 'tesorero', label: 'Tesorero' },
-                    { val: 'delegado', label: 'Delegado' },
                     { val: 'utillero', label: 'Utillero' },
-                    { val: 'directivo', label: 'Miembro Directivo' }
+                    { val: 'socio', label: 'Socio' },
+                    { val: 'jugador', label: 'Jugador' },
+                    { val: 'tutor', label: 'Padre/Madre/Tutor' }
                   ].map(r => {
                     const checked = assignedRoles.includes(r.val);
                     return (
@@ -851,11 +854,33 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                     onChange={e => setActiveRole(e.target.value)} 
                     className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 capitalize"
                   >
-                    {assignedRoles.map(r => (
-                      <option key={r} value={r}>
-                        {r === 'admin' ? 'Admin' : r === 'coach' || r === 'entrenador' ? 'Entrenador' : r === 'coordinador' ? 'Coordinador' : r === 'jugador' ? 'Jugador' : r === 'tutor' ? 'Padre/Madre/Tutor' : r === 'directivo' ? 'Miembro Directivo' : r.charAt(0).toUpperCase() + r.slice(1)}
-                      </option>
-                    ))}
+                    {assignedRoles.map(r => {
+                      const getRoleLabel = (roleVal: string) => {
+                        switch (roleVal.toLowerCase()) {
+                          case 'admin':
+                          case 'administrador': return 'Administrador';
+                          case 'directivo': return 'Directivo';
+                          case 'coordinador': return 'Coordinador';
+                          case 'metodologo': return 'Metodólogo';
+                          case 'entrenador':
+                          case 'coach': return 'Entrenador';
+                          case 'preparador_fisico': return 'Preparador Físico';
+                          case 'delegado': return 'Delegado';
+                          case 'secretario': return 'Secretario';
+                          case 'tesorero': return 'Tesorero';
+                          case 'utillero': return 'Utillero';
+                          case 'socio': return 'Socio';
+                          case 'jugador': return 'Jugador';
+                          case 'tutor': return 'Padre/Madre/Tutor';
+                          default: return roleVal.charAt(0).toUpperCase() + roleVal.slice(1);
+                        }
+                      };
+                      return (
+                        <option key={r} value={r}>
+                          {getRoleLabel(r)}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}
@@ -883,7 +908,7 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
               )}
 
               {/* SELECCIÓN CONTEXTUAL: ¿De qué equipo(s) es Entrenador / Cuerpo Técnico? */}
-              {assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'].includes(r.toLowerCase())) && (
+              {assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador', 'metodologo'].includes(r.toLowerCase())) && (
                 <div className="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2">
                   <label className="block text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
                     <span>📋</span> ¿De qué equipo(s) es Entrenador / Cuerpo Técnico?
@@ -914,10 +939,10 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                 </div>
               )}
 
-              {/* Mensaje informativo para Roles Directivos / Coordinación */}
-              {assignedRoles.some(r => ['admin', 'coordinador', 'secretario', 'tesorero', 'directivo'].includes(r.toLowerCase())) && !assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'].includes(r.toLowerCase())) && !assignedRoles.includes('jugador') && (
+              {/* Mensaje informativo para Roles Directivos / Coordinación / Socios */}
+              {assignedRoles.some(r => ['admin', 'coordinador', 'secretario', 'tesorero', 'directivo', 'socio'].includes(r.toLowerCase())) && !assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador', 'metodologo'].includes(r.toLowerCase())) && !assignedRoles.includes('jugador') && (
                 <p className="text-xs text-purple-700 bg-purple-50 p-2.5 rounded-lg border border-purple-200">
-                  🏛️ <strong>Funciones de Club / Coordinación:</strong> Tienen alcance transversal a toda la estructura del club sin limitación de equipo.
+                  🏛️ <strong>Funciones Institucionales / Directivas / Socios:</strong> Tienen alcance transversal a toda la estructura del club sin limitación de equipo.
                 </p>
               )}
               
@@ -1175,12 +1200,6 @@ function GlobalMembersContent() {
           playersData.forEach(p => {
             const isCoach = p.posicion?.toLowerCase().includes('entrenador') || p.posicion?.toLowerCase().includes('delegado') || p.posicion?.toLowerCase().includes('técnico');
             const determinedRole = isCoach ? 'entrenador' : 'jugador';
-            
-            if (isCoach) {
-              staffCount++;
-            } else {
-              playersCount++;
-            }
 
             const playerEmail = (p.email || '').toLowerCase().trim();
             const matchingStaff = 
@@ -1189,33 +1208,35 @@ function GlobalMembersContent() {
               (playerEmail && staffByEmail.get(playerEmail));
 
             if (matchingStaff) {
-              matchingStaff.player_id = p.id;
-              if (matchingStaff.roles && !matchingStaff.roles.includes('jugador')) {
-                matchingStaff.roles.push('jugador');
-              }
-              if (p.team_id && p.equipos?.name) {
-                if (!matchingStaff.teams) matchingStaff.teams = [];
-                const alreadyHasPlayerTeam = matchingStaff.teams.some(
-                  (t: any) => t.id === p.team_id && t.role?.toLowerCase() === 'jugador'
-                );
-                if (!alreadyHasPlayerTeam) {
-                  matchingStaff.teams.push({
-                    id: p.team_id,
-                    name: p.equipos.name,
-                    color: p.equipos.color,
-                    role: 'Jugador'
-                  });
+              const isActuallyPlayer = matchingStaff.roles?.includes('jugador') || matchingStaff.role === 'jugador';
+              if (isActuallyPlayer) {
+                playersCount++;
+                matchingStaff.player_id = p.id;
+                if (p.team_id && p.equipos?.name) {
+                  if (!matchingStaff.teams) matchingStaff.teams = [];
+                  const alreadyHasPlayerTeam = matchingStaff.teams.some(
+                    (t: any) => t.id === p.team_id && t.role?.toLowerCase() === 'jugador'
+                  );
+                  if (!alreadyHasPlayerTeam) {
+                    matchingStaff.teams.push({
+                      id: p.team_id,
+                      name: p.equipos.name,
+                      color: p.equipos.color,
+                      role: 'Jugador'
+                    });
+                  }
                 }
-              }
-              if (!matchingStaff.team_name && p.equipos?.name) {
-                matchingStaff.team_id = p.team_id;
-                matchingStaff.team_name = p.equipos?.name;
-                matchingStaff.team_color = p.equipos?.color;
               }
               if (!matchingStaff.avatar_url && p.avatar_url) {
                 matchingStaff.avatar_url = p.avatar_url;
               }
               return;
+            }
+
+            if (isCoach) {
+              staffCount++;
+            } else {
+              playersCount++;
             }
 
             const playerTeams = (p.team_id && p.equipos?.name) ? [{
@@ -1248,11 +1269,13 @@ function GlobalMembersContent() {
         const getMemberPriority = (m: Member): number => {
           const allRoles = [(m.role || ''), ...(m.roles || [])].map(r => r.toLowerCase().trim())
           if (allRoles.some(r => r === 'admin' || r === 'administrador')) return 1
-          if (allRoles.some(r => r === 'coach' || r === 'entrenador')) return 2
-          if (allRoles.some(r => r === 'coordinador' || r === 'coordinador_general')) return 3
-          if (allRoles.some(r => r === 'secretario' || r === 'secretaria' || r === 'tesorero' || r === 'tesoreria' || r === 'directivo')) return 4
-          if (allRoles.some(r => r === 'delegado' || r === 'utillero' || r === 'staff')) return 5
-          if (m.type === 'staff') return 6
+          if (allRoles.some(r => r === 'directivo' || r === 'director')) return 2
+          if (allRoles.some(r => r === 'coordinador' || r === 'coordinador_general' || r === 'metodologo')) return 3
+          if (allRoles.some(r => r === 'coach' || r === 'entrenador' || r === 'preparador_fisico')) return 4
+          if (allRoles.some(r => r === 'secretario' || r === 'secretaria' || r === 'tesorero' || r === 'tesoreria')) return 5
+          if (allRoles.some(r => r === 'delegado' || r === 'utillero' || r === 'staff')) return 6
+          if (allRoles.some(r => r === 'socio')) return 7
+          if (m.type === 'staff') return 8
           return 10 // Jugadores y otros miembros
         }
 
@@ -1369,11 +1392,13 @@ function GlobalMembersContent() {
   const getMemberPriority = (m: Member): number => {
     const allRoles = [(m.role || ''), ...(m.roles || [])].map(r => r.toLowerCase().trim())
     if (allRoles.some(r => r === 'admin' || r === 'administrador')) return 1
-    if (allRoles.some(r => r === 'coach' || r === 'entrenador')) return 2
-    if (allRoles.some(r => r === 'coordinador' || r === 'coordinador_general')) return 3
-    if (allRoles.some(r => r === 'secretario' || r === 'secretaria' || r === 'tesorero' || r === 'tesoreria' || r === 'directivo')) return 4
-    if (allRoles.some(r => r === 'delegado' || r === 'utillero' || r === 'staff')) return 5
-    if (m.type === 'staff') return 6
+    if (allRoles.some(r => r === 'directivo' || r === 'director')) return 2
+    if (allRoles.some(r => r === 'coordinador' || r === 'coordinador_general' || r === 'metodologo')) return 3
+    if (allRoles.some(r => r === 'coach' || r === 'entrenador' || r === 'preparador_fisico')) return 4
+    if (allRoles.some(r => r === 'secretario' || r === 'secretaria' || r === 'tesorero' || r === 'tesoreria')) return 5
+    if (allRoles.some(r => r === 'delegado' || r === 'utillero' || r === 'staff')) return 6
+    if (allRoles.some(r => r === 'socio')) return 7
+    if (m.type === 'staff') return 8
     return 10 // Jugadores y resto de miembros
   }
 
@@ -1409,29 +1434,40 @@ function GlobalMembersContent() {
       case 'admin':
       case 'administrador':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">Administrador</span>
+      case 'directivo':
+      case 'director':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300">Directivo</span>
       case 'coordinador':
       case 'coordinador_general':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">Coordinador</span>
+      case 'metodologo':
+      case 'metodología':
+      case 'metodologia':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 border border-violet-200">Metodólogo</span>
       case 'coach':
       case 'entrenador':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">Entrenador</span>
-      case 'jugador':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Jugador</span>
+      case 'preparador_fisico':
+      case 'preparador físico':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Prep. Físico</span>
+      case 'delegado':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">Delegado</span>
       case 'secretario':
       case 'secretaria':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 border border-teal-200">Secretario</span>
       case 'tesorero':
       case 'tesoreria':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">Tesorero</span>
-      case 'directivo':
-      case 'director':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300">Directivo</span>
-      case 'delegado':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 border border-cyan-200">Delegado</span>
+      case 'utillero':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-200">Utillero</span>
+      case 'socio':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-lime-100 text-lime-800 border border-lime-200">Socio</span>
+      case 'jugador':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Jugador</span>
       case 'tutor':
       case 'familiar':
       case 'familia':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Familiar</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">Familiar</span>
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200 capitalize">{role}</span>
     }
@@ -1606,10 +1642,19 @@ function GlobalMembersContent() {
             className="border border-gray-300 rounded-lg px-4 py-2.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none w-full sm:w-48"
           >
             <option value="all">Todos los roles</option>
-            <option value="staff">Solo Staff</option>
+            <option value="staff">Solo Staff / Cuerpo Técnico</option>
             <option value="jugador">Solo Jugadores</option>
             <option value="admin">Administradores</option>
+            <option value="directivo">Directiva</option>
+            <option value="coordinador">Coordinadores</option>
+            <option value="metodologo">Metodólogos</option>
             <option value="entrenador">Entrenadores</option>
+            <option value="preparador_fisico">Prep. Físicos</option>
+            <option value="delegado">Delegados</option>
+            <option value="secretario">Secretarios</option>
+            <option value="tesorero">Tesoreros</option>
+            <option value="utillero">Utilleros</option>
+            <option value="socio">Socios</option>
           </select>
 
           <select 

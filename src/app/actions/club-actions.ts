@@ -1706,3 +1706,241 @@ export async function promotePlayerToStaffAction(
     return { success: false, error: err.message };
   }
 }
+
+export async function updateMemberRolesAndTeamsAction(params: {
+  memberId: string;
+  memberType: 'staff' | 'player';
+  staffProfileId?: string | null;
+  playerId?: string | null;
+  activeRole: string;
+  assignedRoles: string[];
+  playerTeamId?: string | null;
+  staffTeamIds?: string[];
+  emailInput?: string;
+}): Promise<{ success: boolean; error?: string; promotionResult?: any }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || 'No autenticado' };
+    }
+
+    if (!ADMIN_ROLES.includes(context.profile.role)) {
+      return { success: false, error: 'No tienes permisos para modificar roles y equipos de miembros' };
+    }
+
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminClient = createAdminClient();
+    const clubId = context.profile.club_id;
+
+    const {
+      memberId,
+      memberType,
+      activeRole,
+      assignedRoles,
+      playerTeamId,
+      staffTeamIds = [],
+      emailInput
+    } = params;
+
+    let targetPlayerId: string | null = params.playerId || (memberType === 'player' ? memberId : null);
+    let targetProfileId: string | null = params.staffProfileId || (memberType === 'staff' ? memberId : null);
+
+    // Si no tenemos targetProfileId pero sí targetPlayerId, buscar si el jugador tiene user_auth_id
+    if (!targetProfileId && targetPlayerId) {
+      const { data: p } = await adminClient
+        .from('players')
+        .select('user_auth_id, email, club_id')
+        .eq('id', targetPlayerId)
+        .eq('club_id', clubId)
+        .maybeSingle();
+
+      if (p?.user_auth_id) {
+        targetProfileId = p.user_auth_id;
+      }
+    }
+
+    // Si no tenemos targetPlayerId pero sí targetProfileId, buscar si el perfil tiene linked_player_id
+    if (!targetPlayerId && targetProfileId) {
+      const { data: prof } = await adminClient
+        .from('profiles')
+        .select('linked_player_id, first_name, last_name, email, phone, dni')
+        .eq('id', targetProfileId)
+        .eq('club_id', clubId)
+        .maybeSingle();
+
+      if (prof?.linked_player_id) {
+        targetPlayerId = prof.linked_player_id;
+      } else if (assignedRoles.includes('jugador')) {
+        const { data: existingPlayer } = await adminClient
+          .from('players')
+          .select('id')
+          .eq('club_id', clubId)
+          .or(`user_auth_id.eq.${targetProfileId}${prof?.email ? `,email.eq.${prof.email}` : ''}`)
+          .maybeSingle();
+
+        if (existingPlayer) {
+          targetPlayerId = existingPlayer.id;
+        } else if (playerTeamId) {
+          const { data: newPlayer, error: npErr } = await adminClient
+            .from('players')
+            .insert({
+              club_id: clubId,
+              user_auth_id: targetProfileId,
+              first_name: prof?.first_name || '',
+              last_name: prof?.last_name || '',
+              email: prof?.email || null,
+              phone: prof?.phone || null,
+              dni: prof?.dni || null,
+              team_id: playerTeamId,
+              posicion_principal: 'Jugador',
+              posicion: 'jugador',
+              status: 'active'
+            })
+            .select('id')
+            .single();
+
+          if (!npErr && newPlayer) {
+            targetPlayerId = newPlayer.id;
+          }
+        }
+      }
+    }
+
+    if (targetProfileId && targetPlayerId) {
+      await adminClient
+        .from('profiles')
+        .update({ linked_player_id: targetPlayerId })
+        .eq('id', targetProfileId);
+
+      await adminClient
+        .from('players')
+        .update({ user_auth_id: targetProfileId })
+        .eq('id', targetPlayerId);
+    }
+
+    // Obtener temporada activa vigente
+    const { data: activeSeason } = await adminClient
+      .from('seasons')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // 1. GESTIÓN DEL ROL Y EQUIPO DE JUGADOR
+    if (assignedRoles.includes('jugador')) {
+      if (targetPlayerId) {
+        const { error: plErr } = await adminClient
+          .from('players')
+          .update({
+            team_id: playerTeamId || null,
+            posicion: 'jugador',
+            status: 'active'
+          })
+          .eq('id', targetPlayerId)
+          .eq('club_id', clubId);
+
+        if (plErr) console.error('[updateMemberRolesAndTeamsAction] Error updating player team:', plErr.message);
+
+        if (playerTeamId && activeSeason?.id) {
+          await adminClient
+            .from('player_season_history')
+            .upsert({
+              player_id: targetPlayerId,
+              season_id: activeSeason.id,
+              team_id: playerTeamId,
+              club_id: clubId,
+              status: 'active'
+            }, { onConflict: 'player_id,season_id' });
+        }
+      }
+    }
+
+    // 2. GESTIÓN DE ROLES Y EQUIPOS DE STAFF / CUERPO TÉCNICO
+    const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'];
+    const staffRoles = ['admin', 'coordinador', 'secretario', 'tesorero', 'directivo', ...benchRoles];
+    const hasStaffRole = assignedRoles.some(r => staffRoles.includes(r.toLowerCase())) || staffRoles.includes(activeRole.toLowerCase());
+
+    let promotionResult = null;
+
+    if (hasStaffRole) {
+      if (!targetProfileId && targetPlayerId) {
+        // Necesita ser promovido a staff
+        const promRes = await promotePlayerToStaffAction(
+          targetPlayerId,
+          emailInput || '',
+          activeRole,
+          assignedRoles,
+          staffTeamIds
+        );
+        if (!promRes.success) {
+          return { success: false, error: promRes.error };
+        }
+        promotionResult = promRes;
+      } else if (targetProfileId) {
+        // Actualizar roles en el perfil existente
+        const { error: profErr } = await adminClient
+          .from('profiles')
+          .update({
+            role: activeRole,
+            roles: assignedRoles,
+            is_active: true
+          })
+          .eq('id', targetProfileId)
+          .eq('club_id', clubId);
+
+        if (profErr) {
+          return { success: false, error: profErr.message };
+        }
+
+        // Actualizar team_coaches
+        await adminClient
+          .from('team_coaches')
+          .delete()
+          .eq('profile_id', targetProfileId)
+          .eq('club_id', clubId);
+
+        const hasBenchRole = assignedRoles.some(r => benchRoles.includes(r.toLowerCase())) || benchRoles.includes(activeRole.toLowerCase());
+        if (hasBenchRole && staffTeamIds.length > 0) {
+          const benchRoleFound = benchRoles.find(r => assignedRoles.map(x => x.toLowerCase()).includes(r)) || 'entrenador';
+          const roleCapitalized = benchRoleFound.charAt(0).toUpperCase() + benchRoleFound.slice(1);
+
+          const inserts = staffTeamIds.map(tId => ({
+            profile_id: targetProfileId,
+            team_id: tId,
+            role: roleCapitalized,
+            club_id: clubId
+          }));
+
+          const { error: tcErr } = await adminClient.from('team_coaches').insert(inserts);
+          if (tcErr) console.error('[updateMemberRolesAndTeamsAction] Error inserting team_coaches:', tcErr.message);
+        }
+      }
+    } else {
+      // No tiene rol de staff, limpiar team_coaches si existía perfil
+      if (targetProfileId) {
+        await adminClient
+          .from('team_coaches')
+          .delete()
+          .eq('profile_id', targetProfileId)
+          .eq('club_id', clubId);
+
+        await adminClient
+          .from('profiles')
+          .update({
+            role: 'jugador',
+            roles: ['jugador']
+          })
+          .eq('id', targetProfileId)
+          .eq('club_id', clubId);
+      }
+    }
+
+    revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page');
+
+    return { success: true, promotionResult };
+  } catch (err: any) {
+    console.error('[updateMemberRolesAndTeamsAction] Unexpected error:', err);
+    return { success: false, error: err.message || 'Error inesperado al guardar roles' };
+  }
+}

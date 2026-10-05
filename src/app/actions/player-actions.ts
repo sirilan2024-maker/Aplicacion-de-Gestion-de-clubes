@@ -484,7 +484,7 @@ export async function getClubStaffAction(clubId: string) {
         license_number,
         avatar_url,
         linked_player_id,
-        team_coaches(teams(id, name, color))
+        team_coaches(role, teams(id, name, color))
       `)
       .eq('club_id', clubId)
       .or('role.in.(admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado),roles.ov.{admin,coordinador,entrenador,coach,utillero,directivo,secretario,tesorero,delegado}');
@@ -493,7 +493,12 @@ export async function getClubStaffAction(clubId: string) {
 
     const mappedData = data.map(profile => {
       const tcArray = profile.team_coaches || [];
-      const teamsArray = tcArray.map((tc: any) => tc.teams).filter(Boolean);
+      const teamsArray = tcArray.map((tc: any) => ({
+        id: tc.teams?.id,
+        name: tc.teams?.name,
+        color: tc.teams?.color,
+        role: tc.role || 'Entrenador'
+      })).filter((t: any) => Boolean(t.id));
       return {
         ...profile,
         teams: teamsArray,

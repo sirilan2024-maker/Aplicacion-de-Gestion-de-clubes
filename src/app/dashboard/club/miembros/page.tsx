@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Users, Search, Loader2, Mail, Shield, User as UserIcon, Archive } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
 import { archivePlayerAction, updatePlayerPositionAction, exportRgpdAction, createFamilyAndPlayerAction, getClubStaffAction } from "@/app/actions/player-actions"
-import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction, promotePlayerToStaffAction } from "@/app/actions/club-actions"
+import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction, promotePlayerToStaffAction, updateMemberRolesAndTeamsAction } from "@/app/actions/club-actions"
 import Link from "next/link"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
@@ -559,7 +559,8 @@ function AddPlayerModal({ open, onClose, onSuccess, clubId, teams }: { open: boo
 function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: boolean; onClose: () => void; member: Member | null; teams: {id: string, name: string}[]; onSuccess: () => void }) {
   const [activeRole, setActiveRole] = useState("");
   const [assignedRoles, setAssignedRoles] = useState<string[]>([]);
-  const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [playerTeamId, setPlayerTeamId] = useState<string>("");
+  const [staffTeamIds, setStaffTeamIds] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -581,20 +582,24 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
       setEmailInput(member.email?.includes('/register/staff/') ? '' : (member.email || ''));
       setPromotionResult(null);
       
-      if (member.type === 'player') {
-        if (member.teams && member.teams.length > 0) {
-          setTeamIds(member.teams.map(t => t.id));
-        } else {
-          setTeamIds([]);
-        }
+      // 1. Identificar equipo federado como Jugador
+      const playerTeam = member.teams?.find(t => t.role?.toLowerCase() === 'jugador');
+      if (playerTeam) {
+        setPlayerTeamId(playerTeam.id);
+      } else if (member.type === 'player' && member.team_id) {
+        setPlayerTeamId(member.team_id);
       } else {
-        if (member.teams && member.teams.length > 0) {
-          setTeamIds(member.teams.map(t => t.id));
-        } else if (member.team_id) {
-          setTeamIds([member.team_id]);
-        } else {
-          setTeamIds([]);
-        }
+        setPlayerTeamId("");
+      }
+
+      // 2. Identificar equipos como Entrenador / Cuerpo Técnico
+      const staffTeams = (member.teams || []).filter(t => t.role?.toLowerCase() !== 'jugador');
+      if (staffTeams.length > 0) {
+        setStaffTeamIds(staffTeams.map(t => t.id));
+      } else if (member.type === 'staff' && member.team_id) {
+        setStaffTeamIds([member.team_id]);
+      } else {
+        setStaffTeamIds([]);
       }
     }
   }, [member]);
@@ -611,56 +616,41 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
         throw new Error("El rol activo debe estar entre los roles asignados.");
       }
 
-      if (member.type === 'player') {
-        const staffRoles = ['entrenador', 'coach', 'coordinador', 'admin', 'delegado', 'secretario', 'tesorero', 'utillero', 'directivo'];
-        const hasStaffRole = assignedRoles.some(r => staffRoles.includes(r.toLowerCase())) || staffRoles.includes(activeRole.toLowerCase());
+      const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'];
+      const hasBenchRole = assignedRoles.some(r => benchRoles.includes(r.toLowerCase())) || benchRoles.includes(activeRole.toLowerCase());
+      const hasPlayerRole = assignedRoles.includes('jugador');
 
-        if (hasStaffRole) {
-          const res = await promotePlayerToStaffAction(member.id, emailInput, activeRole, assignedRoles, teamIds);
-          if (!res.success) throw new Error(res.error);
-          
-          if ((res as any).alreadyRegistered || (!res.inviteToken && !res.tempPassword)) {
-            toast.success("Rol actualizado correctamente");
-            onSuccess();
-            onClose();
-            return;
-          }
+      const res = await updateMemberRolesAndTeamsAction({
+        memberId: member.id,
+        memberType: member.type,
+        staffProfileId: member.staff_id || (member.type === 'staff' ? member.id : null),
+        playerId: member.player_id || (member.type === 'player' ? member.id : null),
+        activeRole,
+        assignedRoles,
+        playerTeamId: hasPlayerRole ? (playerTeamId || null) : null,
+        staffTeamIds: hasBenchRole ? staffTeamIds : [],
+        emailInput: emailInput.trim() || undefined
+      });
 
-          toast.success("Rol asignado correctamente");
-          
-          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-          const fullInviteLink = res.inviteToken ? `${baseUrl}/register/staff/${res.inviteToken}` : null;
-          
-          setPromotionResult({
-            email: res.email || emailInput || "Lo indicará el propio miembro al registrarse",
-            tempPassword: res.tempPassword,
-            inviteLink: fullInviteLink
-          });
-          onSuccess();
-          return;
-        } else {
-          // Si se retiran roles de staff y queda solo como jugador:
-          // Actualizar el perfil en la base de datos si ya tenía cuenta
-          const linkedProfileId = member.staff_id || (member as any).user_auth_id;
-          if (linkedProfileId) {
-            await updateUserRolesAction(linkedProfileId, 'jugador', ['jugador']);
-          }
-          if (teamIds.length > 0) {
-            const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
-            await assignPlayerToTeamAction(member.id, teamIds[0]);
-          }
-          toast.success("Rol actualizado correctamente");
-        }
-      } else {
-        const resRole = await updateUserRolesAction(member.id, activeRole, assignedRoles);
-        if (!resRole.success) throw new Error(resRole.error);
-        
-        const resTeam = await assignStaffToTeamAction(member.id, teamIds);
-        if (!resTeam.success) throw new Error(resTeam.error);
-        
-        toast.success("Staff actualizado correctamente");
+      if (!res.success) {
+        throw new Error(res.error || "Error al actualizar roles");
       }
 
+      if (res.promotionResult && (res.promotionResult.inviteToken || res.promotionResult.tempPassword)) {
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const fullInviteLink = res.promotionResult.inviteToken ? `${baseUrl}/register/staff/${res.promotionResult.inviteToken}` : null;
+        
+        setPromotionResult({
+          email: res.promotionResult.email || emailInput || "Lo indicará el propio miembro al registrarse",
+          tempPassword: res.promotionResult.tempPassword,
+          inviteLink: fullInviteLink
+        });
+        toast.success("Rol asignado correctamente");
+        onSuccess();
+        return;
+      }
+
+      toast.success("Roles y equipos actualizados correctamente");
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -870,41 +860,66 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                 </div>
               )}
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'].includes(r.toLowerCase()))
-                    ? "Equipos asignados como Cuerpo Técnico (Entrenador / Staff)"
-                    : "Asignar a Equipo(s)"}
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Selecciona los equipos donde este miembro ejercerá funciones técnicas en el banquillo.
-                </p>
-                <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto p-2 bg-white">
-                  {teams.length === 0 && <p className="text-sm text-gray-500 p-2">No hay equipos disponibles</p>}
-                  {teams.map(t => (
-                    <label key={t.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={teamIds.includes(t.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setTeamIds([...teamIds, t.id]);
-                          } else {
-                            setTeamIds(teamIds.filter(id => id !== t.id));
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="ml-3 text-sm text-gray-700">{t.name}</span>
-                    </label>
-                  ))}
-                </div>
-                {(assignedRoles.includes('jugador') || member.player_id) && (
-                  <p className="text-xs text-blue-700 bg-blue-50 p-2 rounded-lg mt-2 border border-blue-100">
-                    ℹ️ <strong>Rol de Jugador activo:</strong> Su equipo como jugador federado se mantiene en su ficha deportiva independiente.
+              {/* SELECCIÓN CONTEXTUAL: ¿De qué equipo es Jugador? */}
+              {assignedRoles.includes('jugador') && (
+                <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 space-y-2">
+                  <label className="block text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>⚽</span> ¿De qué equipo es Jugador?
+                  </label>
+                  <p className="text-xs text-blue-700">
+                    Selecciona el equipo federado oficial donde compite como jugador de la plantilla.
                   </p>
-                )}
-              </div>
+                  <select
+                    value={playerTeamId}
+                    onChange={e => setPlayerTeamId(e.target.value)}
+                    className="w-full border border-blue-300 rounded-lg p-2.5 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-800"
+                  >
+                    <option value="">-- Sin equipo de jugador asignado --</option>
+                    {teams.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* SELECCIÓN CONTEXTUAL: ¿De qué equipo(s) es Entrenador / Cuerpo Técnico? */}
+              {assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'].includes(r.toLowerCase())) && (
+                <div className="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2">
+                  <label className="block text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📋</span> ¿De qué equipo(s) es Entrenador / Cuerpo Técnico?
+                  </label>
+                  <p className="text-xs text-emerald-700">
+                    Marca los equipos donde este miembro ejercerá funciones técnicas en el banquillo.
+                  </p>
+                  <div className="border border-emerald-200 rounded-lg max-h-44 overflow-y-auto p-2 bg-white divide-y divide-gray-100">
+                    {teams.length === 0 && <p className="text-xs text-gray-500 p-2">No hay equipos disponibles</p>}
+                    {teams.map(t => (
+                      <label key={t.id} className="flex items-center p-2 hover:bg-emerald-50/50 rounded cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={staffTeamIds.includes(t.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setStaffTeamIds([...staffTeamIds, t.id]);
+                            } else {
+                              setStaffTeamIds(staffTeamIds.filter(id => id !== t.id));
+                            }
+                          }}
+                          className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                        />
+                        <span className="ml-3 text-sm font-medium text-gray-800">{t.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Mensaje informativo para Roles Directivos / Coordinación */}
+              {assignedRoles.some(r => ['admin', 'coordinador', 'secretario', 'tesorero', 'directivo'].includes(r.toLowerCase())) && !assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'].includes(r.toLowerCase())) && !assignedRoles.includes('jugador') && (
+                <p className="text-xs text-purple-700 bg-purple-50 p-2.5 rounded-lg border border-purple-200">
+                  🏛️ <strong>Funciones de Club / Coordinación:</strong> Tienen alcance transversal a toda la estructura del club sin limitación de equipo.
+                </p>
+              )}
               
               <div className="pt-2 flex gap-3">
                 <button 
@@ -942,7 +957,7 @@ interface Member {
   team_name?: string | null
   team_color?: string | null
   team_id?: string | null
-  teams?: {id: string, name: string, color?: string}[]
+  teams?: {id: string, name: string, color?: string, role?: string}[]
   type: 'staff' | 'player'
   avatar_url?: string | null
 }
@@ -1178,6 +1193,20 @@ function GlobalMembersContent() {
               if (matchingStaff.roles && !matchingStaff.roles.includes('jugador')) {
                 matchingStaff.roles.push('jugador');
               }
+              if (p.team_id && p.equipos?.name) {
+                if (!matchingStaff.teams) matchingStaff.teams = [];
+                const alreadyHasPlayerTeam = matchingStaff.teams.some(
+                  (t: any) => t.id === p.team_id && t.role?.toLowerCase() === 'jugador'
+                );
+                if (!alreadyHasPlayerTeam) {
+                  matchingStaff.teams.push({
+                    id: p.team_id,
+                    name: p.equipos.name,
+                    color: p.equipos.color,
+                    role: 'Jugador'
+                  });
+                }
+              }
               if (!matchingStaff.team_name && p.equipos?.name) {
                 matchingStaff.team_id = p.team_id;
                 matchingStaff.team_name = p.equipos?.name;
@@ -1188,6 +1217,13 @@ function GlobalMembersContent() {
               }
               return;
             }
+
+            const playerTeams = (p.team_id && p.equipos?.name) ? [{
+              id: p.team_id,
+              name: p.equipos.name,
+              color: p.equipos.color,
+              role: 'Jugador'
+            }] : [];
 
             allMembers.push({
               id: p.id,
@@ -1201,6 +1237,7 @@ function GlobalMembersContent() {
               team_id: p.team_id,
               team_name: p.equipos?.name,
               team_color: p.equipos?.color,
+              teams: playerTeams,
               avatar_url: p.avatar_url,
               type: 'player'
             })
@@ -1322,8 +1359,8 @@ function GlobalMembersContent() {
 
     let teamMatch = false;
     if (teamFilter === 'all') teamMatch = true;
-    else if (teamFilter === 'unassigned') teamMatch = !m.team_name;
-    else teamMatch = m.team_name === teamFilter;
+    else if (teamFilter === 'unassigned') teamMatch = !m.team_name && (!m.teams || m.teams.length === 0);
+    else teamMatch = m.team_name === teamFilter || Boolean(m.teams && m.teams.some(t => t.name === teamFilter));
 
     return searchMatch && roleMatch && teamMatch;
   })
@@ -1347,8 +1384,8 @@ function GlobalMembersContent() {
     if (prioA !== prioB) return prioA - prioB
     
     if (a.type === 'player' && b.type === 'player') {
-      const aSinEquipo = !a.team_name
-      const bSinEquipo = !b.team_name
+      const aSinEquipo = !a.team_name && (!a.teams || a.teams.length === 0)
+      const bSinEquipo = !b.team_name && (!b.teams || b.teams.length === 0)
       if (aSinEquipo && !bSinEquipo) return -1
       if (!aSinEquipo && bSinEquipo) return 1
     }
@@ -1359,7 +1396,12 @@ function GlobalMembersContent() {
   })
 
   // Extract unique teams for the dropdown
-  const uniqueTeams = Array.from(new Set(members.map(m => m.team_name).filter(Boolean))) as string[];
+  const uniqueTeams = Array.from(new Set(
+    members.flatMap(m => [
+      m.team_name,
+      ...(m.teams ? m.teams.map(t => t.name) : [])
+    ]).filter(Boolean)
+  )) as string[];
   uniqueTeams.sort((a, b) => a.localeCompare(b));
 
   const getRoleBadge = (role: string) => {
@@ -1405,6 +1447,57 @@ function GlobalMembersContent() {
       </div>
     );
   }
+
+  const renderMemberTeams = (member: Member) => {
+    if (member.teams && member.teams.length > 0) {
+      return (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {member.teams.map((t, idx) => {
+            const isPlayer = t.role?.toLowerCase() === 'jugador';
+            return (
+              <span
+                key={idx}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  isPlayer
+                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                }`}
+              >
+                {t.color && (
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: t.color }}></span>
+                )}
+                <span>{t.name}</span>
+                <span className="text-[10px] font-medium opacity-75">
+                  ({t.role || (isPlayer ? 'Jugador' : 'Staff')})
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (member.team_name) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+          {member.team_color && (
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: member.team_color }}></span>
+          )}
+          <span>{member.team_name}</span>
+        </span>
+      );
+    }
+
+    if (member.type === 'player') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase tracking-wider shadow-sm">
+          Sin Equipo
+        </span>
+      );
+    }
+
+    return <span className="text-gray-400 text-xs italic">Global / Sin asignar</span>;
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -1580,18 +1673,7 @@ function GlobalMembersContent() {
                 </div>
                 <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-50">
                   <div className="text-sm">
-                    {member.team_name ? (
-                      <div className="flex items-center gap-2">
-                        {member.team_color && (
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: member.team_color }}></div>
-                        )}
-                        <span className="font-medium text-gray-700">{member.team_name}</span>
-                      </div>
-                    ) : member.type === 'player' ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase tracking-wider shadow-sm">Sin Equipo</span>
-                    ) : (
-                      <span className="text-gray-400 text-xs italic">Global / Sin asignar</span>
-                    )}
+                    {renderMemberTeams(member)}
                   </div>
                   <div className="flex gap-2 items-center">
                       {member.email?.includes('/register/staff/') ? (
@@ -1718,46 +1800,34 @@ function GlobalMembersContent() {
                       {renderRoleBadges(member)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap border-y border-gray-200 group-hover:border-gray-300">
-                      {member.teams && member.teams.length > 1 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {member.teams.map((t, idx) => (
-                            <span key={idx} className="px-2.5 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                              {t.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : member.team_name ? (
-                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                          {member.team_name}
-                        </span>
-                      ) : member.type === 'player' ? (
+                      {member.type === 'player' && (!member.teams || member.teams.length === 0) && !member.team_name ? (
                         <div className="flex flex-col gap-1.5 items-start">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700 border border-red-200 uppercase tracking-wider shadow-sm">Sin Equipo</span>
                           <select 
                             onClick={(e) => e.stopPropagation()}
-                          onChange={async (e) => {
-                            e.stopPropagation();
-                            if (e.target.value) {
-                              const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
-                              const res = await assignPlayerToTeamAction(member.id, e.target.value);
-                              if (res.success) {
-                                toast.success("Equipo asignado");
-                                fetchMembers();
-                              } else {
-                                toast.error("Error al asignar");
+                            onChange={async (e) => {
+                              e.stopPropagation();
+                              if (e.target.value) {
+                                const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions");
+                                const res = await assignPlayerToTeamAction(member.id, e.target.value);
+                                if (res.success) {
+                                  toast.success("Equipo asignado");
+                                  fetchMembers();
+                                } else {
+                                  toast.error("Error al asignar");
+                                }
                               }
-                            }
-                          }}
-                          className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-700"
-                        >
-                          <option value="">Asignar equipo...</option>
-                          {allTeams.map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
+                            }}
+                            className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-700"
+                          >
+                            <option value="">Asignar equipo...</option>
+                            {allTeams.map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-500 italic">Sin equipo</span>
+                        renderMemberTeams(member)
                       )}
                     </td>
                     <td className="px-6 py-4 text-right rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300">

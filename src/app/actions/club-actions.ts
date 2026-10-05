@@ -139,8 +139,11 @@ export async function assignStaffToTeamAction(staffId: string, teamIds: string[]
         return { success: false, error: 'Uno o más equipos seleccionados no pertenecen a tu club' }
       }
 
-      const rawRole = staffProfile?.role || 'Entrenador'
-      const roleCapitalized = rawRole.charAt(0).toUpperCase() + rawRole.slice(1)
+      const benchRoleFound = benchRoles.find(r => userRoles.includes(r)) || 'entrenador'
+      const roleToUse = benchRoles.includes((staffProfile?.role || '').toLowerCase()) 
+        ? (staffProfile?.role || 'Entrenador')
+        : benchRoleFound
+      const roleCapitalized = roleToUse.charAt(0).toUpperCase() + roleToUse.slice(1)
       const inserts = validTeamIds.map(id => ({
         profile_id: staffId, 
         team_id: id, 
@@ -1669,11 +1672,16 @@ export async function promotePlayerToStaffAction(
         .eq('profile_id', staffProfileId)
         .eq('club_id', context.profile.club_id);
 
-      // SOLO asignar en team_coaches si el rol es de cuerpo técnico de campo/banquillo
+      // SOLO asignar en team_coaches si alguno de los roles es de cuerpo técnico de campo/banquillo
       // Roles de gestión de club como "coordinador", "admin", "directivo", etc. NO van a team_coaches
       const benchRoles = ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'];
-      const roleCapitalized = role.charAt(0).toUpperCase() + role.slice(1);
-      if (benchRoles.includes(role.toLowerCase()) && teamIds && teamIds.length > 0) {
+      const allRoles = Array.from(new Set([role, ...(rolesList || [])])).filter(Boolean).map(r => r.toLowerCase());
+      const hasBenchRole = allRoles.some(r => benchRoles.includes(r));
+
+      if (hasBenchRole && teamIds && teamIds.length > 0) {
+        const benchRoleFound = benchRoles.find(r => allRoles.includes(r)) || 'entrenador';
+        const roleToUse = benchRoles.includes(role.toLowerCase()) ? role : benchRoleFound;
+        const roleCapitalized = roleToUse.charAt(0).toUpperCase() + roleToUse.slice(1);
         const inserts = teamIds.map(tId => ({
           profile_id: staffProfileId,
           team_id: tId,

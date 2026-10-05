@@ -100,7 +100,10 @@ export default function PlantillaEquipoPage() {
       const validCoaches = (coachesData || []).filter((tc: any) => tc && tc.profiles);
       const mappedCoaches: Player[] = validCoaches.map((tc: any) => {
         const p = tc.profiles;
-        const staffRole = tc.role || p.role || p.rol || "Entrenador";
+        let staffRole = tc.role || p.role || p.rol || "Entrenador";
+        if (staffRole.toLowerCase() === 'jugador') {
+          staffRole = "Entrenador";
+        }
         return {
           id: p.id,
           first_name: p.first_name || staffRole,
@@ -119,13 +122,17 @@ export default function PlantillaEquipoPage() {
         };
       });
 
-      // Deduplicate: remove any player record that matches coach email or full name
+      // Deduplicate: solo remover registros de la tabla 'players' si ese registro estaba duplicado como cuerpo técnico
+      // Un jugador real de la plantilla nunca debe ser eliminado si además entrena a otro equipo o tiene cuenta de staff
       const coachEmails = new Set(mappedCoaches.map(c => c.email?.toLowerCase()).filter(Boolean));
       const coachNames = new Set(mappedCoaches.map(c => `${c.first_name?.trim()} ${c.last_name?.trim()}`.toLowerCase()));
       const filteredPlayersData = playersData.filter((p: any) => {
-        const fullName = `${p.first_name?.trim()} ${p.last_name?.trim()}`.toLowerCase();
-        if (p.email && coachEmails.has(p.email.toLowerCase())) return false;
-        if (coachNames.has(fullName)) return false;
+        const isDuplicateStaffRecord = ['entrenador', 'delegado', 'técnico', 'cuerpo técnico'].includes((p.posicion || p.posicion_principal || '').toLowerCase());
+        if (isDuplicateStaffRecord) {
+          const fullName = `${p.first_name?.trim()} ${p.last_name?.trim()}`.toLowerCase();
+          if (p.email && coachEmails.has(p.email.toLowerCase())) return false;
+          if (coachNames.has(fullName)) return false;
+        }
         return true;
       });
 
@@ -220,23 +227,32 @@ export default function PlantillaEquipoPage() {
     const supabase = createClient();
 
     try {
-      const { error } = await supabase
-        .from("players")
-        .update({
-          first_name: editingPlayer.first_name,
-          last_name: editingPlayer.last_name,
-          posicion: editingPlayer.posicion,
-          posicion_principal: editingPlayer.posicion_principal,
-          status: editingPlayer.status,
-          dorsal: editingPlayer.dorsal,
-          height: editingPlayer.height,
-          weight: editingPlayer.weight,
-          phone: editingPlayer.phone,
-        })
-        .eq("id", editingPlayer.id);
+      if (isCoachMember(editingPlayer)) {
+        await supabase
+          .from("team_coaches")
+          .update({ role: editingPlayer.posicion })
+          .eq("team_id", teamId)
+          .eq("profile_id", editingPlayer.id);
+        toast.success("Cuerpo técnico actualizado");
+      } else {
+        const { error } = await supabase
+          .from("players")
+          .update({
+            first_name: editingPlayer.first_name,
+            last_name: editingPlayer.last_name,
+            posicion: editingPlayer.posicion,
+            posicion_principal: editingPlayer.posicion_principal,
+            status: editingPlayer.status,
+            dorsal: editingPlayer.dorsal,
+            height: editingPlayer.height,
+            weight: editingPlayer.weight,
+            phone: editingPlayer.phone,
+          })
+          .eq("id", editingPlayer.id);
 
-      if (error) throw error;
-      toast.success("Jugador actualizado");
+        if (error) throw error;
+        toast.success("Jugador actualizado");
+      }
       setEditingPlayer(null);
       fetchData(); // refresh data
     } catch (err: any) {
@@ -557,26 +573,55 @@ export default function PlantillaEquipoPage() {
                     className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Rol en el equipo</label>
-                  <input 
-                    type="text" 
-                    value={editingPlayer.posicion || ''}
-                    onChange={(e) => setEditingPlayer({...editingPlayer, posicion: e.target.value})}
-                    placeholder="Ej. Jugador, Entrenador..."
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Posición en el campo</label>
-                  <input 
-                    type="text" 
-                    value={editingPlayer.posicion_principal || ''}
-                    onChange={(e) => setEditingPlayer({...editingPlayer, posicion_principal: e.target.value})}
-                    placeholder="Ej. Delantero, Defensa..."
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
-                  />
-                </div>
+                {isCoachMember(editingPlayer) ? (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">Cargo Técnico</label>
+                    <select
+                      value={editingPlayer.posicion || 'Entrenador'}
+                      onChange={(e) => setEditingPlayer({...editingPlayer, posicion: e.target.value, posicion_principal: e.target.value})}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900"
+                    >
+                      <option value="Entrenador">Entrenador</option>
+                      <option value="Segundo Entrenador">Segundo Entrenador</option>
+                      <option value="Delegado">Delegado</option>
+                      <option value="Preparador Físico">Preparador Físico</option>
+                      <option value="Utillero">Utillero</option>
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">Rol en el equipo</label>
+                      <select 
+                        value={['capitán', 'segundo capitán', 'tercer capitán'].includes((editingPlayer.posicion || '').toLowerCase()) ? editingPlayer.posicion! : 'Jugador'}
+                        onChange={(e) => setEditingPlayer({...editingPlayer, posicion: e.target.value})}
+                        className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
+                      >
+                        <option value="Jugador">Jugador</option>
+                        <option value="Capitán">Capitán</option>
+                        <option value="Segundo Capitán">Segundo Capitán</option>
+                        <option value="Tercer Capitán">Tercer Capitán</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">Posición en el campo</label>
+                      <select 
+                        value={editingPlayer.posicion_principal || ''}
+                        onChange={(e) => setEditingPlayer({...editingPlayer, posicion_principal: e.target.value})}
+                        className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900" 
+                      >
+                        <option value="">Sin especificar</option>
+                        <option value="Portero">Portero</option>
+                        <option value="Defensa">Defensa</option>
+                        <option value="Lateral">Lateral</option>
+                        <option value="Central">Central</option>
+                        <option value="Mediocentro">Mediocentro</option>
+                        <option value="Extremo">Extremo</option>
+                        <option value="Delantero">Delantero</option>
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Estado del jugador</label>
                   <select 

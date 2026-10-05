@@ -871,7 +871,14 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
               )}
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Asignar a Equipo(s)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {assignedRoles.some(r => ['entrenador', 'coach', 'delegado', 'utillero', 'preparador_fisico', 'segundo_entrenador'].includes(r.toLowerCase()))
+                    ? "Equipos asignados como Cuerpo Técnico (Entrenador / Staff)"
+                    : "Asignar a Equipo(s)"}
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Selecciona los equipos donde este miembro ejercerá funciones técnicas en el banquillo.
+                </p>
                 <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto p-2 bg-white">
                   {teams.length === 0 && <p className="text-sm text-gray-500 p-2">No hay equipos disponibles</p>}
                   {teams.map(t => (
@@ -892,7 +899,11 @@ function ManageStaffModal({ open, onClose, member, teams, onSuccess }: { open: b
                     </label>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Al asignar un equipo, este miembro será el responsable principal de dicho equipo.</p>
+                {(assignedRoles.includes('jugador') || member.player_id) && (
+                  <p className="text-xs text-blue-700 bg-blue-50 p-2 rounded-lg mt-2 border border-blue-100">
+                    ℹ️ <strong>Rol de Jugador activo:</strong> Su equipo como jugador federado se mantiene en su ficha deportiva independiente.
+                  </p>
+                )}
               </div>
               
               <div className="pt-2 flex gap-3">

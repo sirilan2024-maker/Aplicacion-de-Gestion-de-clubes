@@ -334,8 +334,21 @@ export function AttendancePlayerDrawer({ playerId, seasonId, onClose, records }:
                     </div>
 
                     {r.notes && (
-                      <div className="text-[11px] text-slate-600 bg-amber-50/70 border border-amber-200/50 p-2 rounded-lg italic">
-                        Nota: {r.notes}
+                      <div className="text-[11px] bg-amber-50/80 border border-amber-200/70 p-2 rounded-lg space-y-1">
+                        {(() => {
+                          const match = r.notes.match(/^\[(.*?)\]\s*(.*)$/);
+                          if (match) {
+                            return (
+                              <div className="space-y-0.5">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-200/80 text-amber-900 border border-amber-300">
+                                  {match[1]}
+                                </span>
+                                {match[2] && <p className="text-slate-700 italic">{match[2]}</p>}
+                              </div>
+                            );
+                          }
+                          return <p className="text-slate-700 italic">Nota: {r.notes}</p>;
+                        })()}
                       </div>
                     )}
                   </div>

@@ -20,10 +20,10 @@ interface AttendanceKPIsHeaderProps {
 export function AttendanceKPIsHeader({ kpis }: AttendanceKPIsHeaderProps) {
   return (
     <div className="w-full">
-      {/* Móvil: Carrusel horizontal táctil snap (máximo 2 tarjetas visibles simultáneamente) */}
-      <div className="flex sm:hidden overflow-x-auto gap-2.5 pb-2 snap-x snap-mandatory scrollbar-none -mx-1 px-1">
+      {/* Móvil: Grid de tarjetas que envuelven verticalmente sin scroll lateral */}
+      <div className="grid sm:hidden grid-cols-2 gap-2.5 pb-2 -mx-1 px-1">
         {/* Ratio Asistencia */}
-        <div className="min-w-[155px] max-w-[190px] flex-1 snap-start bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-3.5 text-white shadow-xs flex flex-col justify-between">
+        <div className="col-span-2 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-3.5 text-white shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-blue-100 text-[10px] font-bold uppercase tracking-wider">
             <span>Ratio Global</span>
             <TrendingUp className="w-3.5 h-3.5 text-blue-200" />
@@ -40,7 +40,7 @@ export function AttendanceKPIsHeader({ kpis }: AttendanceKPIsHeaderProps) {
         </div>
 
         {/* Presentes */}
-        <div className="min-w-[140px] snap-start bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-emerald-600 text-[10px] font-bold uppercase tracking-wider">
             <span>Presentes</span>
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -50,7 +50,7 @@ export function AttendanceKPIsHeader({ kpis }: AttendanceKPIsHeaderProps) {
         </div>
 
         {/* Ausentes */}
-        <div className="min-w-[140px] snap-start bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-rose-600 text-[10px] font-bold uppercase tracking-wider">
             <span>Ausentes</span>
             <XCircle className="w-3.5 h-3.5" />
@@ -60,7 +60,7 @@ export function AttendanceKPIsHeader({ kpis }: AttendanceKPIsHeaderProps) {
         </div>
 
         {/* Justificados */}
-        <div className="min-w-[140px] snap-start bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-amber-600 text-[10px] font-bold uppercase tracking-wider">
             <span>Justificados</span>
             <AlertCircle className="w-3.5 h-3.5" />
@@ -70,7 +70,7 @@ export function AttendanceKPIsHeader({ kpis }: AttendanceKPIsHeaderProps) {
         </div>
 
         {/* Retrasos */}
-        <div className="min-w-[140px] snap-start bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-sky-600 text-[10px] font-bold uppercase tracking-wider">
             <span>Retrasos</span>
             <Clock className="w-3.5 h-3.5" />
@@ -80,17 +80,17 @@ export function AttendanceKPIsHeader({ kpis }: AttendanceKPIsHeaderProps) {
         </div>
 
         {/* Lesionados */}
-        <div className="min-w-[140px] snap-start bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-purple-600 text-[10px] font-bold uppercase tracking-wider">
             <span>Lesionados</span>
             <HelpCircle className="w-3.5 h-3.5" />
           </div>
           <div className="mt-2 text-2xl font-black text-slate-900">{kpis.lesionados}</div>
-          <div className="text-[10px] text-slate-400">bajas</div>
+          <div className="text-[10px] text-slate-400">en sesión</div>
         </div>
 
         {/* Evaluados */}
-        <div className="min-w-[140px] snap-start bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase tracking-wider">
             <span>Evaluados</span>
             <Users className="w-3.5 h-3.5" />

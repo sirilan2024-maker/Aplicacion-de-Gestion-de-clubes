@@ -320,10 +320,10 @@ export default function AdminAsistenciaPage() {
 
       {/* 4. SELECTOR DE VISTAS */}
       <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
-        <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200/60 max-w-full overflow-x-auto scrollbar-none">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/60 w-full sm:w-auto">
           <button
             onClick={() => setViewMode("days")}
-            className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               viewMode === "days"
                 ? "bg-white text-blue-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"
@@ -335,7 +335,7 @@ export default function AdminAsistenciaPage() {
 
           <button
             onClick={() => setViewMode("matrix")}
-            className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               viewMode === "matrix"
                 ? "bg-white text-blue-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"
@@ -347,7 +347,7 @@ export default function AdminAsistenciaPage() {
 
           <button
             onClick={() => setViewMode("teams")}
-            className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               viewMode === "teams"
                 ? "bg-white text-blue-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"
@@ -359,7 +359,7 @@ export default function AdminAsistenciaPage() {
 
           <button
             onClick={() => setViewMode("records")}
-            className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               viewMode === "records"
                 ? "bg-white text-blue-700 shadow-2xs"
                 : "text-slate-600 hover:text-slate-900"

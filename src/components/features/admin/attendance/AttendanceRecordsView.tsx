@@ -124,9 +124,22 @@ export function AttendanceRecordsView({
             </div>
 
             {r.notes && (
-              <p className="text-[10px] text-slate-500 italic bg-slate-50 p-1.5 rounded-md">
-                {r.notes}
-              </p>
+              <div className="text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100">
+                {(() => {
+                  const match = r.notes.match(/^\[(.*?)\]\s*(.*)$/);
+                  if (match) {
+                    return (
+                      <div className="space-y-1">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded font-black text-[9px] bg-amber-100 text-amber-900 border border-amber-200">
+                          {match[1]}
+                        </span>
+                        {match[2] && <span className="text-slate-600 italic block">{match[2]}</span>}
+                      </div>
+                    );
+                  }
+                  return <span className="text-slate-500 italic">{r.notes}</span>;
+                })()}
+              </div>
             )}
           </div>
         ))}
@@ -205,8 +218,25 @@ export function AttendanceRecordsView({
                   </td>
 
                   {/* Observaciones */}
-                  <td className="py-3 px-4 text-slate-500 text-xs italic max-w-xs truncate">
-                    {r.notes || "-"}
+                  <td className="py-3 px-4 text-xs max-w-xs">
+                    {r.notes ? (
+                      (() => {
+                        const match = r.notes.match(/^\[(.*?)\]\s*(.*)$/);
+                        if (match) {
+                          return (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded font-black text-[10px] bg-amber-100 text-amber-900 border border-amber-200">
+                                {match[1]}
+                              </span>
+                              {match[2] && <span className="text-slate-600 italic text-[11px] block truncate">{match[2]}</span>}
+                            </div>
+                          );
+                        }
+                        return <span className="text-slate-500 italic truncate block">{r.notes}</span>;
+                      })()
+                    ) : (
+                      <span className="text-slate-400 italic">-</span>
+                    )}
                   </td>
                 </tr>
               ))}

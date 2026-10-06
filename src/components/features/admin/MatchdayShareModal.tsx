@@ -652,11 +652,11 @@ export function MatchdayShareModal({
                                   </div>
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="text-sm font-black text-white truncate">
+                                      <span className="text-sm font-black text-white">
                                         {m.equipo?.name}
                                       </span>
                                       <span className="text-[10px] text-slate-400 font-semibold">vs</span>
-                                      <div className="inline-flex items-center gap-1.5 min-w-0">
+                                      <div className="inline-flex items-center gap-1.5 flex-wrap">
                                         {rivalShieldUrl && (
                                           <div className="w-5 h-5 rounded-md bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden shadow-xs">
                                             <img
@@ -670,7 +670,7 @@ export function MatchdayShareModal({
                                             />
                                           </div>
                                         )}
-                                        <span className="text-sm font-bold text-slate-200 truncate">
+                                        <span className="text-sm font-bold text-slate-200 break-words">
                                           {m.rival_nombre}
                                         </span>
                                       </div>

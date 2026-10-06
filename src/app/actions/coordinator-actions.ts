@@ -1351,7 +1351,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
     if (playerIds.length > 0) {
       const { data: attendanceRaw } = await adminClient
         .from('attendance')
-        .select('id, session_id, player_id, status, created_at, date, notes')
+        .select('id, session_id, event_id, player_id, team_id, status, created_at, date, notes')
         .in('player_id', playerIds)
         .gte('created_at', startDate.toISOString())
         .limit(5000);
@@ -1487,6 +1487,8 @@ export async function getCoordinatorFullDashboardAction(params?: {
       .select('id, title, event_type, date, start_time, end_time, location, team_id, teams:team_id(name, category, color, coach_id)')
       .in('team_id', allClubTeams.map(t => t.id))
       .eq('event_type', 'Entrenamiento')
+      .eq('season_id', targetSeasonId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .order('date', { ascending: true })
       .order('start_time', { ascending: true });
 
@@ -1763,6 +1765,62 @@ export async function getCoordinatorFullDashboardAction(params?: {
           playerId: player.id,
         });
       }
+    });
+
+    // Alertas de lista sin pasar: Entrenamientos finalizados o transcurridos sin asistencia registrada
+    const trainingGraceMinutes = 45; // tras 45 min del inicio
+    const sevenDaysAgoDateStr = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const pastTrainings = (allTrainingsRaw || []).filter((e: any) => {
+      if (!e.date || e.date < sevenDaysAgoDateStr || e.date > todayDate) return false;
+      if (e.date < todayDate) return true; // Días anteriores dentro de los últimos 7 días
+      // Hoy: verificar si ya ha comenzado (+ tiempo de gracia de 45m)
+      const [sh, sm] = (e.start_time || '18:00').split(':').map(Number);
+      const evTime = new Date();
+      evTime.setHours(sh || 18, sm || 0, 0, 0);
+      return now.getTime() >= evTime.getTime() + trainingGraceMinutes * 60 * 1000;
+    });
+
+    const unrecordedTrainings: any[] = [];
+    for (const tr of pastTrainings) {
+      const trTeamPlayers = new Set(players.filter(p => p.team_id === tr.team_id).map(p => p.id));
+      const hasAttendance = attList.some(
+        a => a.event_id === tr.id ||
+             a.session_id === tr.id ||
+             (a.date === tr.date && (a.team_id === tr.team_id || trTeamPlayers.has(a.player_id)))
+      );
+      if (!hasAttendance) {
+        unrecordedTrainings.push(tr);
+      }
+    }
+
+    // Ordenar de más reciente a más antiguo
+    unrecordedTrainings.sort((a, b) => {
+      const dtA = new Date(`${a.date}T${a.start_time || '18:00'}`).getTime();
+      const dtB = new Date(`${b.date}T${b.start_time || '18:00'}`).getTime();
+      return dtB - dtA;
+    });
+
+    unrecordedTrainings.slice(0, 4).forEach(tr => {
+      const tm = teamById.get(tr.team_id);
+      const rawCoach = tm?.coach;
+      const coach = Array.isArray(rawCoach) ? rawCoach[0] : rawCoach;
+      const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : null;
+      const coachLabel = coachName ? ` (${coachName})` : '';
+      const dateStr = formatDateDMY(tr.date);
+      const timeStr = (tr.start_time || '18:00').substring(0, 5);
+
+      alerts.push({
+        id: `sin-pasar-lista-${tr.id}`,
+        type: 'sin_pasar_lista',
+        severity: 'warning',
+        title: `Lista sin pasar: ${tm?.name || 'Equipo'}`,
+        message: `El entrenamiento del ${dateStr} a las ${timeStr} no tiene la lista de asistencia registrada${coachLabel}.`,
+        teamId: tr.team_id,
+        actionType: 'link',
+        actionText: 'Pasar Lista',
+        actionUrl: `/dashboard/equipos/${tr.team_id}/asistencia?eventId=${tr.id}&date=${tr.date}`,
+      });
     });
 
     // Alertas de cambios de hora de partido y próximos horarios oficiales (agrupados juntos)

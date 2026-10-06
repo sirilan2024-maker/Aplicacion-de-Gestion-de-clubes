@@ -65,12 +65,12 @@ export function AttendanceFilters({
         </div>
 
         {/* Botones de período */}
-        <div className="flex overflow-x-auto gap-1 sm:gap-1.5 p-1 bg-slate-100/80 rounded-xl scrollbar-none max-w-full">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 p-1 bg-slate-100/80 rounded-xl w-full sm:w-auto">
           {quickPeriods.map((qp) => (
             <button
               key={qp.id}
               onClick={() => setPeriod(qp.id)}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 period === qp.id
                   ? "bg-white text-blue-700 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"

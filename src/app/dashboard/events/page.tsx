@@ -97,7 +97,7 @@ export default function EventsPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("club_id")
+      .select("club_id, role, roles")
       .eq("id", user.id)
       .single()
 
@@ -106,7 +106,12 @@ export default function EventsPage() {
       return
     }
 
-    // Fetch active season
+    const userRole = (profile.role || "").toLowerCase()
+    const userRoles = (profile.roles || []).map((r: string) => r.toLowerCase())
+    const isGlobalAdmin = userRole === "admin" || userRole === "superadmin" || userRole === "coordinador" ||
+      userRoles.includes("admin") || userRoles.includes("superadmin") || userRoles.includes("coordinador")
+
+    // Fetch active season (REGLA DE ORO: AISLAMIENTO PERMANENTE DE TEMPORADAS)
     const { data: activeSeason } = await supabase
       .from('seasons')
       .select('id')
@@ -114,18 +119,40 @@ export default function EventsPage() {
       .eq('is_active', true)
       .single()
 
-    if (activeSeason?.id) {
-      setActiveSeasonId(activeSeason.id)
+    const currentSeasonId = activeSeason?.id || "663ed6ef-1dab-4350-9489-ed50f9e9ac15"
+    setActiveSeasonId(currentSeasonId)
+
+    // Si es entrenador y no admin/coordinador, consultar exclusivamente sus equipos asignados
+    let coachTeamIds: string[] | null = null
+    if (!isGlobalAdmin) {
+      const { data: coachAssignments } = await supabase
+        .from('team_coaches')
+        .select('team_id')
+        .eq('profile_id', user.id)
+
+      if (coachAssignments && coachAssignments.length > 0) {
+        coachTeamIds = coachAssignments.map(ca => ca.team_id).filter(Boolean)
+      } else {
+        coachTeamIds = []
+      }
     }
 
-    // Fetch teams
+    // Fetch teams de la temporada activa únicamente
     let teamsQuery = supabase
       .from('teams')
       .select("id, name, color")
       .eq("club_id", profile.club_id)
-      
-    if (activeSeason?.id) {
-      teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+      .eq('season_id', currentSeasonId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+
+    if (coachTeamIds !== null) {
+      if (coachTeamIds.length === 0) {
+        setDbTeams([])
+        setDbEvents([])
+        setLoading(false)
+        return
+      }
+      teamsQuery = teamsQuery.in('id', coachTeamIds)
     }
 
     const { data: equipos } = await teamsQuery.order("name")
@@ -142,25 +169,23 @@ export default function EventsPage() {
     }))
     setDbTeams(mappedTeams)
 
-    // Fetch events for those teams
+    // Fetch events for those teams (estrictamente temporada activa)
     const teamIds = equipos.map(eq => eq.id)
     if (teamIds.length > 0) {
-      let eventsQuery = supabase
+      const eventsQuery = supabase
         .from("team_events")
         .select("*")
         .in("team_id", teamIds)
+        .eq('season_id', currentSeasonId)
+        .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
 
-      let partidosQuery = supabase
+      const partidosQuery = supabase
         .from("partidos")
         .select("*")
         .in("equipo_id", teamIds)
+        .eq('season_id', currentSeasonId)
+        .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
         .order("fecha_hora", { ascending: true })
-
-      if (activeSeason?.id) {
-        eventsQuery = eventsQuery.eq('season_id', activeSeason.id)
-        // Partidos no tiene season_id directo en este momento, o si lo tiene habría que agregarlo.
-        // Asumo que si no lo tiene, devolvemos los recientes o los vinculamos al equipo.
-      }
 
       const [eventsRes, partidosRes] = await Promise.all([
         eventsQuery,

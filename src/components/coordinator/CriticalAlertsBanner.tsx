@@ -2,11 +2,11 @@
 
 import React from "react";
 import Link from "next/link";
-import { AlertCircle, AlertTriangle, Info, Zap, ShieldAlert, HeartPulse, UserX, Clock, MessageSquare } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, Zap, ShieldAlert, HeartPulse, UserX, Clock, MessageSquare, ClipboardCheck } from "lucide-react";
 
 export interface CoordinatorBannerAlert {
   id: string;
-  type: "sancion" | "apercibido" | "lesion" | "falta_asistencia" | "cambio_horario" | "mensaje_interno" | "horario_solapado" | "sin_entrenador";
+  type: "sancion" | "apercibido" | "lesion" | "falta_asistencia" | "cambio_horario" | "mensaje_interno" | "horario_solapado" | "sin_entrenador" | "sin_pasar_lista";
   severity: "error" | "warning" | "info";
   title: string;
   message: string;
@@ -62,6 +62,9 @@ export function CriticalAlertsBanner({ alerts, onOpenCartelera }: CriticalAlerts
           } else if (alert.type === "cambio_horario") {
             bgClass = "bg-indigo-50/90 border-indigo-200 text-indigo-900";
             IconComponent = Clock;
+          } else if (alert.type === "sin_pasar_lista") {
+            bgClass = "bg-amber-50/90 border-amber-300 text-amber-950";
+            IconComponent = ClipboardCheck;
           } else if (alert.type === "mensaje_interno") {
             bgClass = "bg-sky-50/90 border-sky-200 text-sky-900";
             IconComponent = MessageSquare;
@@ -92,9 +95,17 @@ export function CriticalAlertsBanner({ alerts, onOpenCartelera }: CriticalAlerts
                 >
                   {alert.actionText || "Cartelera Jornada"}
                 </button>
+              ) : alert.actionUrl ? (
+                <Link
+                  href={alert.actionUrl}
+                  className="shrink-0 text-[10px] font-black underline ml-1 self-center hover:opacity-100 bg-white/80 hover:bg-white px-2.5 py-1.5 rounded-lg border border-current/20 shadow-2xs transition-all active:scale-95"
+                  title={alert.actionText || "Ver"}
+                >
+                  {alert.actionText || "Ver"}
+                </Link>
               ) : alert.type === "mensaje_interno" ? (
                 <Link
-                  href={alert.actionUrl || "/dashboard/mensajes"}
+                  href="/dashboard/mensajes"
                   className="shrink-0 text-[10px] font-black underline ml-1 self-center hover:opacity-100 text-sky-700 bg-white/70 hover:bg-white px-2.5 py-1.5 rounded-lg border border-sky-200 shadow-2xs transition-all active:scale-95"
                   title="Abrir Mensajería"
                 >

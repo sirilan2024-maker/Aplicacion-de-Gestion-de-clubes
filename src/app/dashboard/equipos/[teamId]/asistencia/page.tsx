@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Fragment } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Check, X, Stethoscope, Loader2, Calendar as CalendarIcon, ArrowLeft, BarChart2, ListChecks, ChevronDown, ChevronUp, Save, Clock } from "lucide-react";
+import { Check, X, Stethoscope, Loader2, Calendar as CalendarIcon, ArrowLeft, BarChart2, ListChecks, ChevronDown, ChevronUp, Save, Clock, AlertTriangle } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Player {
@@ -26,6 +26,7 @@ interface AttendanceRecord {
   event_id: string | null;
   date: string;
   status: string;
+  notes?: string | null;
 }
 
 export default function AsistenciaEquipoPage() {
@@ -48,9 +49,15 @@ export default function AsistenciaEquipoPage() {
   // Single event recording state
   const [eventDetails, setEventDetails] = useState<any>(null);
   const [singleEventAttendance, setSingleEventAttendance] = useState<Record<string, string>>({});
+  const [singleEventNotes, setSingleEventNotes] = useState<Record<string, string>>({});
   const [savingStatus, setSavingStatus] = useState<Record<string, boolean>>({});
   const [loadingEvent, setLoadingEvent] = useState(false);
   const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
+
+  // Modal para Justificación con motivo
+  const [justifyingPlayer, setJustifyingPlayer] = useState<Player | null>(null);
+  const [justifiedCategory, setJustifiedCategory] = useState<string>("Enfermedad");
+  const [justifiedDetail, setJustifiedDetail] = useState<string>("");
 
   useEffect(() => {
     fetchPlayers();
@@ -179,7 +186,7 @@ export default function AsistenciaEquipoPage() {
       // 4. Cargar asistencias de la tabla attendance
       const { data: atts, error: err2 } = await supabase
         .from('attendance')
-        .select('player_id, event_id, date, status')
+        .select('player_id, event_id, date, status, notes')
         .in('event_id', combinedEventIds.length > 0 ? combinedEventIds : ['none']);
         
       if (err2) throw err2;
@@ -306,12 +313,13 @@ export default function AsistenciaEquipoPage() {
       // 2. Fetch existing attendance records
       const { data: atts, error: attError } = await supabase
         .from('attendance')
-        .select('player_id, status')
+        .select('player_id, status, notes')
         .eq('event_id', queryEventId);
 
       if (attError) throw attError;
 
       const attMap: Record<string, string> = {};
+      const notesMap: Record<string, string> = {};
 
       // Si es un partido, pre-poblar con datos de la convocatoria/acta
       const { data: matchConvs } = await supabase
@@ -340,9 +348,11 @@ export default function AsistenciaEquipoPage() {
       if (atts) {
         atts.forEach(a => {
           attMap[a.player_id] = a.status;
+          if (a.notes) notesMap[a.player_id] = a.notes;
         });
       }
       setSingleEventAttendance(attMap);
+      setSingleEventNotes(notesMap);
     } catch (err: any) {
       toast.error("Error al cargar detalles del evento: " + err.message);
     } finally {
@@ -350,25 +360,33 @@ export default function AsistenciaEquipoPage() {
     }
   };
 
-  const handleStatusChange = async (playerId: string, status: string) => {
+  const handleStatusChange = async (playerId: string, status: string, notes?: string) => {
     if (!queryEventId || !queryDate) return;
     
     // Optimistic update
     setSingleEventAttendance(prev => ({ ...prev, [playerId]: status }));
+    if (notes !== undefined) {
+      setSingleEventNotes(prev => ({ ...prev, [playerId]: notes }));
+    }
     setSavingStatus(prev => ({ ...prev, [playerId]: true }));
 
     const supabase = createClient();
     try {
+      const payload: any = {
+        session_id: queryEventId,
+        event_id: queryEventId,
+        player_id: playerId,
+        status: status, // 'present', 'absent', 'excused'
+        date: queryDate,
+        season_id: activeSeasonId
+      };
+      if (notes !== undefined) {
+        payload.notes = notes;
+      }
+
       const { error } = await supabase
         .from('attendance')
-        .upsert({
-          session_id: queryEventId,
-          event_id: queryEventId,
-          player_id: playerId,
-          status: status, // 'present', 'absent', 'excused'
-          date: queryDate,
-          season_id: activeSeasonId
-        }, { onConflict: 'session_id,player_id' });
+        .upsert(payload, { onConflict: 'session_id,player_id' });
 
       if (error) throw error;
       toast.success("Asistencia guardada correctamente", { id: 'save-toast', duration: 1000 });
@@ -379,6 +397,31 @@ export default function AsistenciaEquipoPage() {
     } finally {
       setSavingStatus(prev => ({ ...prev, [playerId]: false }));
     }
+  };
+
+  const handleOpenJustifyModal = (player: Player) => {
+    setJustifyingPlayer(player);
+    const existing = singleEventNotes[player.id] || "";
+    if (existing.startsWith("[") && existing.includes("]")) {
+      const endBracket = existing.indexOf("]");
+      const cat = existing.substring(1, endBracket);
+      const detail = existing.substring(endBracket + 1).trim();
+      setJustifiedCategory(cat);
+      setJustifiedDetail(detail);
+    } else {
+      setJustifiedCategory("Enfermedad");
+      setJustifiedDetail(existing);
+    }
+  };
+
+  const handleConfirmJustification = async () => {
+    if (!justifyingPlayer) return;
+    const finalNote = justifiedDetail.trim() 
+      ? `[${justifiedCategory}] ${justifiedDetail.trim()}`
+      : `[${justifiedCategory}]`;
+    const pid = justifyingPlayer.id;
+    setJustifyingPlayer(null);
+    await handleStatusChange(pid, 'excused', finalNote);
   };
 
   const getPlayerPercentage = (playerId: string, eventsToUse: PastEvent[]) => {
@@ -482,6 +525,40 @@ export default function AsistenciaEquipoPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900">{player.first_name} {player.last_name}</p>
+                        {currentStatus === 'excused' && singleEventNotes[player.id] && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {(() => {
+                              const noteStr = singleEventNotes[player.id];
+                              const match = noteStr.match(/^\[(.*?)\]\s*(.*)$/);
+                              if (match) {
+                                return (
+                                  <>
+                                    <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+                                      {match[1]}
+                                    </span>
+                                    {match[2] && (
+                                      <span className="text-[11px] text-slate-600 italic">
+                                        {match[2]}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              }
+                              return (
+                                <span className="text-[11px] text-amber-800 italic">
+                                  {noteStr}
+                                </span>
+                              );
+                            })()}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenJustifyModal(player)}
+                              className="text-[10px] text-amber-700 underline font-semibold hover:text-amber-900 ml-1"
+                            >
+                              Editar
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -524,24 +601,116 @@ export default function AsistenciaEquipoPage() {
                         Ausente
                       </button>
                       <button
-                        onClick={() => handleStatusChange(player.id, 'excused')}
+                        onClick={() => handleOpenJustifyModal(player)}
                         disabled={isSaving}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer ${
                           currentStatus === 'excused'
                             ? 'bg-amber-500 text-white shadow-sm shadow-amber-100'
                             : 'text-gray-600 hover:bg-gray-200/60'
                         }`}
+                        title="Marcar como justificado e indicar motivo"
                       >
                         {isSaving && currentStatus === 'excused' ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Stethoscope className="w-3.5 h-3.5" />}
                         Justificado
                       </button>
                     </div>
+
+                    {/* Badge de motivo si está justificado */}
+                    {currentStatus === 'excused' && singleEventNotes[player.id] && (
+                      <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                        <span>💬 Motivo: {singleEventNotes[player.id]}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
         </div>
+
+        {/* Modal de Justificación de Falta */}
+        {justifyingPlayer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden space-y-4 p-5 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <Stethoscope className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Justificar Ausencia</h3>
+                    <p className="text-xs text-slate-500">{justifyingPlayer.first_name} {justifyingPlayer.last_name}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setJustifyingPlayer(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Selector de categoría de justificación */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Motivo principal</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    "Enfermedad",
+                    "Lesión / Molestia",
+                    "Examen / Estudios",
+                    "Motivo Familiar",
+                    "Viaje",
+                    "Otro"
+                  ].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setJustifiedCategory(cat)}
+                      className={`px-3 py-2 text-xs font-semibold rounded-xl border text-left transition-all cursor-pointer ${
+                        justifiedCategory === cat
+                          ? "bg-amber-50 border-amber-400 text-amber-900 font-bold shadow-2xs"
+                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Detalle libre opcional */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Detalle o nota adicional (opcional)</label>
+                <textarea
+                  value={justifiedDetail}
+                  onChange={(e) => setJustifiedDetail(e.target.value)}
+                  placeholder="Ej: Fiebre alta, acudirá a sesión médica, justificante entregado..."
+                  rows={3}
+                  className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white resize-none"
+                />
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setJustifyingPlayer(null)}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmJustification}
+                  className="px-4 py-2 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Guardar Justificación
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -551,10 +720,45 @@ export default function AsistenciaEquipoPage() {
     ? pastEvents 
     : pastEvents.filter(ev => ev.event_type === (attendanceFilter === 'entrenamientos' ? 'Entrenamiento' : 'Partido'));
 
+  const unrecordedTrainings = React.useMemo(() => {
+    return pastEvents.filter(ev => {
+      if (ev.event_type !== 'Entrenamiento') return false;
+      const hasAnyAtt = summaryData.some(a => a.event_id === ev.id || a.date === ev.date);
+      return !hasAnyAtt;
+    });
+  }, [pastEvents, summaryData]);
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="bottom-right" />
       
+      {unrecordedTrainings.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5 sm:mt-0 border border-amber-200">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-amber-950">
+                Sesión sin pasar lista ({unrecordedTrainings.length})
+              </h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                El entrenamiento <b>{unrecordedTrainings[unrecordedTrainings.length - 1].title}</b> ({unrecordedTrainings[unrecordedTrainings.length - 1].date}) aún no tiene registrada la asistencia.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const latest = unrecordedTrainings[unrecordedTrainings.length - 1];
+              router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${latest.id}&date=${latest.date}`);
+            }}
+            className="shrink-0 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer self-end sm:self-center"
+          >
+            <Check className="w-3.5 h-3.5" /> Pasar Lista Ahora
+          </button>
+        </div>
+      )}
+
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
@@ -680,7 +884,10 @@ export default function AsistenciaEquipoPage() {
                         const stat = att?.status;
                         return (
                           <td key={ev.id || i} className="p-4 border-l border-gray-200 text-center">
-                            <div className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center shadow-sm border border-black/5 ${getStatusColor(stat)}`}>
+                            <div 
+                              className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center shadow-sm border border-black/5 ${getStatusColor(stat)}`}
+                              title={att?.notes ? `${stat || 'Registrado'}: ${att.notes}` : stat || 'Sin registrar'}
+                            >
                               {!stat && <span className="text-gray-300">-</span>}
                               {(stat?.toLowerCase() === 'presente' || stat?.toLowerCase() === 'present') && <Check className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'retraso' || stat?.toLowerCase() === 'late') && <Clock className="w-4 h-4" />}
@@ -779,6 +986,32 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 text-sm truncate">{ev.title}</div>
                     <div className="text-xs text-slate-500 truncate">{new Date(ev.date).toLocaleDateString('es-ES')} • {ev.event_type}</div>
+                    {att?.notes && (
+                      <div className="mt-1">
+                        {(() => {
+                          const match = att.notes.match(/^\[(.*?)\]\s*(.*)$/);
+                          if (match) {
+                            return (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+                                  {match[1]}
+                                </span>
+                                {match[2] && (
+                                  <span className="text-[11px] text-slate-600 italic">
+                                    {match[2]}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className="text-[11px] text-amber-800 italic bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              {att.notes}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className={`self-start sm:self-auto px-3 py-1 rounded-full text-[10px] md:text-xs font-bold shrink-0 ${isExcused ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>

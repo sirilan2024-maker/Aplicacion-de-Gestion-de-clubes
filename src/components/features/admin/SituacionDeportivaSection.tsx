@@ -418,7 +418,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
             </div>
 
             {/* Controles de vista */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
                 {teamStats.length} Equipos ({ffcvCount} FFCV · {braveCount} Liga Brave)
               </span>

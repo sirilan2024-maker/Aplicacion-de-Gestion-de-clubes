@@ -219,16 +219,16 @@ export function PlayerAttendanceReportModal({
           </div>
         </div>
 
-        {/* Resumen KPIs del informe (en móvil: tira horizontal scrolleable compacta) */}
-        <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 sm:px-6 sm:py-3.5 shrink-0 overflow-x-auto no-scrollbar">
-          <div className="flex sm:grid sm:grid-cols-6 gap-2 sm:gap-3 min-w-max sm:min-w-0">
-            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[95px] sm:min-w-0">
+        {/* Resumen KPIs del informe (responsive grid con wrap vertical en móvil sin scroll lateral) */}
+        <div className="bg-slate-50 border-b border-slate-200 px-3 py-2.5 sm:px-6 sm:py-3.5 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-slate-400 uppercase">Evaluados</p>
               <p className="text-base sm:text-xl font-black text-slate-900 mt-0.5">{totalEvaluated}</p>
               <p className="text-[9px] sm:text-[10px] text-slate-500">Jugadores</p>
             </div>
 
-            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[100px] sm:min-w-0">
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-slate-400 uppercase">Media Asist.</p>
               <p className={`text-base sm:text-xl font-black mt-0.5 ${avgAttendance >= 85 ? "text-emerald-600" : "text-amber-600"}`}>
                 {avgAttendance}%
@@ -236,13 +236,13 @@ export function PlayerAttendanceReportModal({
               <p className="text-[9px] sm:text-[10px] text-slate-500">Obj: 85%</p>
             </div>
 
-            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[105px] sm:min-w-0">
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-emerald-600 uppercase">≥85% Asist.</p>
               <p className="text-base sm:text-xl font-black text-emerald-600 mt-0.5">{compliantCount}</p>
               <p className="text-[9px] sm:text-[10px] text-slate-500">Cumplen objetivo</p>
             </div>
 
-            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[95px] sm:min-w-0">
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-red-500 uppercase">En Riesgo</p>
               <p className={`text-base sm:text-xl font-black mt-0.5 ${atRiskCount > 0 ? "text-red-600" : "text-slate-900"}`}>
                 {atRiskCount}
@@ -250,13 +250,13 @@ export function PlayerAttendanceReportModal({
               <p className="text-[9px] sm:text-[10px] text-slate-500">&lt;75% o &gt;1 falta</p>
             </div>
 
-            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[105px] sm:min-w-0">
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-amber-600 uppercase">Total Faltas</p>
               <p className="text-base sm:text-xl font-black text-amber-700 mt-0.5">{totalAbsences}</p>
               <p className="text-[9px] sm:text-[10px] text-slate-500">{currentPeriod}</p>
             </div>
 
-            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs min-w-[100px] sm:min-w-0">
+            <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-2xs">
               <p className="text-[9px] sm:text-[10px] font-extrabold text-orange-600 uppercase">Retrasos</p>
               <p className="text-base sm:text-xl font-black text-orange-700 mt-0.5">{totalLates}</p>
               <p className="text-[9px] sm:text-[10px] text-slate-500">{currentPeriod}</p>

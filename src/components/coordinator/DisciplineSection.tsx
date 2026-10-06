@@ -88,16 +88,16 @@ export function DisciplineSection({ records, recentCards = [], onPlayerClick }: 
         </div>
 
         {/* Badges de Contadores y Toggle para esconder el informe */}
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200/70 text-red-700 text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 self-start sm:self-auto w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-50 border border-red-200/70 text-red-700 text-xs font-bold">
             <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
             <span>{suspendedCount} Sancionados</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/70 text-amber-700 text-xs font-bold">
+          <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/70 text-amber-700 text-xs font-bold">
             <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
             <span>{apercibidosCount} Apercibidos (4🟨)</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs font-semibold">
+          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs font-semibold">
             <span>🟨 {totalYellows}</span>
             <span className="text-slate-300">|</span>
             <span>🟥 {totalReds}</span>
@@ -106,7 +106,7 @@ export function DisciplineSection({ records, recentCards = [], onPlayerClick }: 
           {/* Desplegable para esconder o mostrar el informe */}
           <button
             onClick={() => setIsReportOpen(!isReportOpen)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
             title={isReportOpen ? "Esconder informe disciplinario" : "Mostrar informe disciplinario"}
           >
             {isReportOpen ? (
@@ -182,12 +182,12 @@ export function DisciplineSection({ records, recentCards = [], onPlayerClick }: 
               />
             </div>
 
-            <div className="flex items-center gap-1 self-start sm:self-auto overflow-x-auto w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto w-full sm:w-auto">
               {(["ALL", "Sancionado", "Apercibido", "OK"] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     statusFilter === status
                       ? "bg-slate-900 text-white shadow-xs"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"

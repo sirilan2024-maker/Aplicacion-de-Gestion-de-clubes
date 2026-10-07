@@ -243,7 +243,7 @@ export async function getPendingStaffInvitationsAction(clubId: string) {
 }
 
 
-export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string, first_name?: string, last_name?: string, email?: string }) {
+export async function updateStaffProfileAction(staffId: string, data: { phone: string, dni: string, birth_date: string, license_number: string, first_name?: string, last_name?: string, email?: string, avatar_url?: string }) {
 
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
@@ -268,6 +268,7 @@ export async function updateStaffProfileAction(staffId: string, data: { phone: s
   if (data.first_name !== undefined) payload.first_name = data.first_name;
   if (data.last_name !== undefined) payload.last_name = data.last_name;
   if (data.email !== undefined) payload.email = data.email;
+  if (data.avatar_url !== undefined) payload.avatar_url = data.avatar_url;
 
   const { error } = await adminClient
     .from('profiles')
@@ -285,6 +286,33 @@ export async function updateStaffProfileAction(staffId: string, data: { phone: s
     if (authErr) {
       return { success: false, error: authErr.message };
     }
+  }
+
+  return { success: true };
+}
+
+export async function updateStaffAvatarAction(staffId: string, avatarUrl: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+
+  const { createAdminClient } = await import('@/lib/supabase/admin');
+  const adminClient = createAdminClient();
+
+  const access = await canUserUpdateStaffProfile(adminClient, context, staffId);
+  if (!access.allowed) {
+    return { success: false, error: access.reason || "No tienes permisos para modificar este perfil de staff" };
+  }
+
+  const { error } = await adminClient
+    .from('profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', staffId)
+    .eq('club_id', context.profile.club_id);
+
+  if (error) {
+    return { success: false, error: error.message };
   }
 
   return { success: true };

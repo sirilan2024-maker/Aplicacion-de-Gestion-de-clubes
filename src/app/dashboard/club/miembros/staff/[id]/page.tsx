@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { updateUserRoleAction, updateUserRolesAction, updateStaffProfileAction, assignStaffToTeamAction, removeStaffFromClubAction } from "@/app/actions/club-actions"
+import { updateUserRoleAction, updateUserRolesAction, updateStaffProfileAction, updateStaffAvatarAction, assignStaffToTeamAction, removeStaffFromClubAction } from "@/app/actions/club-actions"
 import { getClubStaffAction } from "@/app/actions/player-actions"
 import toast, { Toaster } from "react-hot-toast"
 import { Loader2, ArrowLeft, Shield, Save, User as UserIcon, Phone, CreditCard, Calendar, Award, Camera, Trash2 } from "lucide-react"
@@ -150,7 +150,8 @@ export default function StaffProfilePage() {
         phone,
         dni,
         birth_date: birthDate,
-        license_number: licenseNumber
+        license_number: licenseNumber,
+        avatar_url: staff.avatar_url
       }
       
       const resProfile = await updateStaffProfileAction(staffId, profileData)
@@ -203,15 +204,11 @@ export default function StaffProfilePage() {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', staff.id);
-
-      if (updateError) throw updateError;
+      const resUpdate = await updateStaffAvatarAction(staff.id, publicUrl);
+      if (!resUpdate.success) throw new Error(resUpdate.error || "No se pudo actualizar el perfil con la foto");
 
       setStaff({ ...staff, avatar_url: publicUrl });
-      toast.success("Foto actualizada", { id: toastId });
+      toast.success("Foto actualizada correctamente", { id: toastId });
     } catch (error: any) {
       toast.error("Error al subir la foto: " + error.message, { id: toastId });
     }

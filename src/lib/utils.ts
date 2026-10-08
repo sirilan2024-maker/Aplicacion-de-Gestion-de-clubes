@@ -11,31 +11,64 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Formatea una fecha en formato legible para humanos en español.
- * @example "14 de mayo, 2024"
+ * Formatea una fecha en formato oficial del club: día/mes/año (DD/MM/AAAA).
+ * @example "14/05/2024"
  */
 export function formatDate(date: Date | string | number) {
-  return format(new Date(date), "PPP", { locale: es })
+  return formatDateDMY(date)
 }
 
+const MADRID_TZ = "Europe/Madrid";
+
 /**
- * Formatea una fecha estrictamente en formato día/mes/año (DD/MM/AAAA).
+ * Formatea una fecha estrictamente en formato día/mes/año (DD/MM/AAAA), hora peninsular.
  * @example "18/10/2026"
  */
 export function formatDateDMY(dateInput?: Date | string | number | null): string {
   if (!dateInput) return "";
   if (typeof dateInput === "string") {
-    const match = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    // Fechas puras (sin hora): no aplicar huso horario
+    const match = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (match) {
       return `${match[3]}/${match[2]}/${match[1]}`;
     }
   }
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return String(dateInput);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return new Intl.DateTimeFormat("es-ES", { timeZone: MADRID_TZ, day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
+}
+
+/**
+ * Hora HH:mm en horario peninsular.
+ */
+export function formatTimeHM(dateInput?: Date | string | number | null): string {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-ES", { timeZone: MADRID_TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+}
+
+/**
+ * Fecha y hora: "DD/MM/AAAA HH:mm".
+ */
+export function formatDateTimeDMY(dateInput?: Date | string | number | null): string {
+  const date = formatDateDMY(dateInput);
+  const time = typeof dateInput === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? "" : formatTimeHM(dateInput);
+  return time ? `${date} ${time}` : date;
+}
+
+/**
+ * Ordena por cercanía a hoy: próximos primero (del más cercano al más lejano)
+ * y después los pasados (del más reciente al más antiguo).
+ */
+export function sortByClosestDate<T>(items: T[], getDate: (item: T) => Date | string | number | null | undefined, now: number = Date.now()): T[] {
+  const ts = (i: T) => { const v = getDate(i); const t = v ? new Date(v).getTime() : NaN; return isNaN(t) ? Infinity : t; };
+  return [...items].sort((a, b) => {
+    const ta = ts(a), tb = ts(b);
+    const fa = ta >= now, fb = tb >= now;
+    if (fa !== fb) return fa ? -1 : 1;
+    return fa ? ta - tb : tb - ta;
+  });
 }
 
 /**

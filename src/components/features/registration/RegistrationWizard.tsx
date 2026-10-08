@@ -100,6 +100,8 @@ export function RegistrationWizard({
   const paymentPlan = useWatch({ control: methods.control, name: 'paymentPlan' });
   const playerFirstName = useWatch({ control: methods.control, name: 'playerFirstName' });
   const playerLastName = useWatch({ control: methods.control, name: 'playerLastName' });
+  const watchedIsQuickPinMode = useWatch({ control: methods.control, name: 'isQuickPinMode' as any });
+  const isQuickPinMode = Boolean(watchedIsQuickPinMode);
 
   // Calculate estimated amount to charge on the modal
   let baseFee = wasInClub ? 195 : 250;
@@ -420,6 +422,20 @@ export function RegistrationWizard({
         </div>
       </div>
 
+      {isQuickPinMode && currentStep === 1 && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs sm:text-sm text-emerald-950 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">🔐</span>
+            <div>
+              <span className="font-bold block">Modo: Acceso Familiar Rápido mediante PIN</span>
+              <span className="text-emerald-700 text-xs">
+                No necesitas completar los 5 pasos de inscripción. Introduce tus credenciales en la tarjeta verde para acceder a la App.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FormProvider {...methods}>
         <form onSubmit={methods.handleSubmit(onSubmit, onError)} className="space-y-8">
           <Card className="shadow-2xl border-0 overflow-hidden rounded-2xl">
@@ -472,14 +488,21 @@ export function RegistrationWizard({
                 
                 <div className="flex items-center gap-4">
                   {currentStep < STEPS.length ? (
-                    <Button
-                      type="button"
-                      onClick={nextStep}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      Siguiente
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
+                    currentStep === 1 && isQuickPinMode ? (
+                      <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Completa los datos en la tarjeta superior para entrar a la App</span>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={nextStep}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Siguiente
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    )
                   ) : (
                     <Button
                       type="submit"

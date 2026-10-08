@@ -381,3 +381,202 @@ export async function sendSinglePlayerPinByEmailAction(params: {
   }
 }
 
+export interface LinkTutorWithPinParams {
+  pinCode: string;
+  tutorFirstName: string;
+  tutorLastName: string;
+  tutorEmail: string;
+  tutorPhone?: string;
+  password?: string;
+  consentRgpd: boolean;
+}
+
+export interface LinkTutorWithPinResult {
+  success: boolean;
+  error?: string;
+  playerId?: string;
+  playerName?: string;
+  teamName?: string;
+  email?: string;
+  isExistingUser?: boolean;
+}
+
+/**
+ * Vincula a un padre/madre o segundo tutor con un jugador ya existente mediante el PIN.
+ * Crea el usuario/perfil del tutor y la vinculación en player_tutors sin pedir datos duplicados ni tallas ni cuotas.
+ */
+export async function linkTutorWithPinAction(params: LinkTutorWithPinParams): Promise<LinkTutorWithPinResult> {
+  try {
+    const {
+      pinCode,
+      tutorFirstName,
+      tutorLastName,
+      tutorEmail,
+      tutorPhone,
+      password,
+      consentRgpd,
+    } = params;
+
+    if (!pinCode || pinCode.trim().length < 4) {
+      return { success: false, error: "Introduce un código PIN válido." };
+    }
+
+    if (!tutorFirstName?.trim() || !tutorLastName?.trim()) {
+      return { success: false, error: "Introduce el nombre y apellidos del tutor." };
+    }
+
+    const normalizedEmail = tutorEmail?.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes("@") || !normalizedEmail.includes(".")) {
+      return { success: false, error: "Introduce un correo electrónico válido." };
+    }
+
+    if (!consentRgpd) {
+      return { success: false, error: "Debes aceptar el consentimiento de protección de datos (RGPD) para continuar." };
+    }
+
+    const adminSupabase = await createAdminClient();
+
+    // 1. Localizar jugador por PIN
+    const { data: player, error: playerError } = await adminSupabase
+      .from("players")
+      .select("id, first_name, last_name, club_id, team_id, parent1_email, parent2_email, parent2_phone, teams(name)")
+      .eq("link_code", pinCode.trim().toUpperCase())
+      .maybeSingle();
+
+    if (playerError || !player) {
+      return {
+        success: false,
+        error: "Código PIN no válido o no encontrado. Por favor comprueba el PIN facilitado por el club.",
+      };
+    }
+
+    // 2. Gestionar usuario Auth y Perfil
+    let targetUserId: string | null = null;
+    let isExistingUser = false;
+
+    // Verificar si el usuario actual ya está autenticado con este email
+    const supabase = await createClient();
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    if (currentUser && currentUser.email?.toLowerCase() === normalizedEmail) {
+      targetUserId = currentUser.id;
+      isExistingUser = true;
+    } else {
+      // Buscar en profiles si ya existe cuenta
+      const { data: existingProfile } = await adminSupabase
+        .from("profiles")
+        .select("id, role")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+
+      if (existingProfile) {
+        targetUserId = existingProfile.id;
+        isExistingUser = true;
+      } else {
+        // Usuario nuevo: requiere contraseña
+        if (!password || password.length < 6) {
+          return { success: false, error: "La contraseña debe tener un mínimo de 6 caracteres." };
+        }
+
+        const { data: newAuth, error: createAuthError } = await adminSupabase.auth.admin.createUser({
+          email: normalizedEmail,
+          password: password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: tutorFirstName.trim(),
+            last_name: tutorLastName.trim(),
+            role: "tutor",
+            club_id: player.club_id,
+            team_id: player.team_id,
+          },
+        });
+
+        if (createAuthError) {
+          // Si ya existe en auth pero no tenía perfil en profiles
+          if (
+            createAuthError.message.toLowerCase().includes("already registered") ||
+            createAuthError.message.toLowerCase().includes("already been registered")
+          ) {
+            const { data: userList } = await adminSupabase.auth.admin.listUsers();
+            const match = userList.users.find(u => u.email?.toLowerCase() === normalizedEmail);
+            if (match) {
+              targetUserId = match.id;
+              isExistingUser = true;
+            } else {
+              return {
+                success: false,
+                error: "Este correo ya está registrado en el sistema. Inicia sesión para vincular la ficha.",
+              };
+            }
+          } else {
+            return { success: false, error: createAuthError.message };
+          }
+        } else if (newAuth?.user) {
+          targetUserId = newAuth.user.id;
+        }
+      }
+    }
+
+    if (!targetUserId) {
+      return { success: false, error: "No se pudo identificar ni crear el usuario para el tutor." };
+    }
+
+    // 3. Upsert en profiles para asegurar datos completos y rol tutor
+    await adminSupabase.from("profiles").upsert(
+      {
+        id: targetUserId,
+        email: normalizedEmail,
+        first_name: tutorFirstName.trim(),
+        last_name: tutorLastName.trim(),
+        phone: tutorPhone?.trim() || null,
+        role: "tutor",
+        club_id: player.club_id,
+        team_id: player.team_id,
+      },
+      { onConflict: "id" }
+    );
+
+    // 4. Vincular en player_tutors (sin duplicar)
+    const { data: existingTutorLink } = await adminSupabase
+      .from("player_tutors")
+      .select("id")
+      .eq("player_id", player.id)
+      .eq("tutor_id", targetUserId)
+      .maybeSingle();
+
+    if (!existingTutorLink) {
+      await adminSupabase.from("player_tutors").insert({
+        player_id: player.id,
+        tutor_id: targetUserId,
+      });
+    }
+
+    // 5. Rellenar parent2 en la ficha del jugador si estaba vacía
+    const playerUpdates: any = {};
+    if (!player.parent2_email && normalizedEmail !== player.parent1_email?.toLowerCase()) {
+      playerUpdates.parent2_email = normalizedEmail;
+      playerUpdates.parent2_name = `${tutorFirstName.trim()} ${tutorLastName.trim()}`.trim();
+    }
+    if (!player.parent2_phone && tutorPhone?.trim()) {
+      playerUpdates.parent2_phone = tutorPhone.trim();
+    }
+    if (Object.keys(playerUpdates).length > 0) {
+      await adminSupabase.from("players").update(playerUpdates).eq("id", player.id);
+    }
+
+    const team = Array.isArray(player.teams) ? player.teams[0] : player.teams;
+
+    return {
+      success: true,
+      playerId: player.id,
+      playerName: `${player.first_name} ${player.last_name}`.trim(),
+      teamName: team?.name || "Equipo Asignado",
+      email: normalizedEmail,
+      isExistingUser,
+    };
+  } catch (err: any) {
+    console.error("[linkTutorWithPinAction Error]:", err);
+    return { success: false, error: err.message || "Error al vincular el tutor mediante PIN." };
+  }
+}
+

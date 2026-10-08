@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Input } from "@/components/ui/input";
-import { User, Users, Stethoscope, Trophy, Activity, CreditCard, KeyRound, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { User, Users, Stethoscope, Trophy, Activity, CreditCard, KeyRound, CheckCircle2, Loader2, AlertCircle, ShieldCheck, Mail, Phone, Eye, EyeOff } from "lucide-react";
 import { RegistrationFormData } from "../schema";
+import { createClient } from "@/lib/supabase/client";
+import { linkTutorWithPinAction } from "@/app/actions/pin-distribution-actions";
 import toast from "react-hot-toast";
 
 export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
@@ -16,6 +18,18 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
     pin: string;
   } | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
+
+  // Estados para vinculación rápida de 2º tutor / familiar con PIN
+  const [showFullForm, setShowFullForm] = useState(false);
+  const [tutorFirstName, setTutorFirstName] = useState("");
+  const [tutorLastName, setTutorLastName] = useState("");
+  const [tutorEmail, setTutorEmail] = useState("");
+  const [tutorPhone, setTutorPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [consentRgpd, setConsentRgpd] = useState(false);
+  const [linkingTutor, setLinkingTutor] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const birthDate = useWatch({ control, name: "birthDate" });
   
@@ -54,6 +68,8 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
       const p = data.player;
       setValue("pinCode", code);
       setValue("existingPlayerId", p.id);
+      setValue("isQuickPinMode" as any, true);
+      setShowFullForm(false);
       if (p.firstName) setValue("playerFirstName", p.firstName);
       if (p.lastName) setValue("playerLastName", p.lastName);
       if (p.dni) setValue("playerDni", p.dni);
@@ -71,11 +87,77 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
         pin: code
       });
 
-      toast.success(`Ficha de ${p.firstName} cargada con éxito`);
+      toast.success(`Ficha de ${p.firstName} identificada correctamente`);
     } catch (err: any) {
       setPinError("Error de conexión al verificar el PIN");
     } finally {
       setVerifyingPin(false);
+    }
+  };
+
+  const handleQuickLink = async () => {
+    if (!verifiedPinData) return;
+    if (!tutorFirstName.trim() || !tutorLastName.trim()) {
+      setLinkError("Por favor, introduce tu nombre y apellidos.");
+      return;
+    }
+    const normalizedEmail = tutorEmail.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes("@") || !normalizedEmail.includes(".")) {
+      setLinkError("Introduce un correo electrónico válido.");
+      return;
+    }
+    if (!password || password.length < 6) {
+      setLinkError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (!consentRgpd) {
+      setLinkError("Debes aceptar la casilla de protección de datos (RGPD) para continuar.");
+      return;
+    }
+
+    setLinkingTutor(true);
+    setLinkError(null);
+
+    try {
+      const res = await linkTutorWithPinAction({
+        pinCode: verifiedPinData.pin,
+        tutorFirstName,
+        tutorLastName,
+        tutorEmail: normalizedEmail,
+        tutorPhone,
+        password,
+        consentRgpd,
+      });
+
+      if (!res.success) {
+        setLinkError(res.error || "Error al vincular el tutor.");
+        toast.error(res.error || "Error al vincular el tutor.");
+        return;
+      }
+
+      toast.success(`¡Acceso creado con éxito para ${res.playerName}!`);
+
+      // Iniciar sesión automáticamente en el navegador
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (signInError) {
+        toast.info("Cuenta vinculada con éxito. Redirigiendo a inicio de sesión...");
+        setTimeout(() => {
+          window.location.href = `/login?email=${encodeURIComponent(normalizedEmail)}`;
+        }, 1200);
+      } else {
+        setTimeout(() => {
+          window.location.href = res.playerId ? `/dashboard/family/e/${res.playerId}/perfil` : `/dashboard/family`;
+        }, 800);
+      }
+    } catch (err: any) {
+      setLinkError(err.message || "Error inesperado al conectar.");
+    } finally {
+      setLinkingTutor(false);
     }
   };
   
@@ -109,7 +191,7 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
               ¿El club te ha facilitado un PIN de jugador?
             </h4>
             <p className="text-xs text-blue-700 mt-0.5">
-              Introduce el PIN para rellenar automáticamente la ficha de tu jugador y completar su equipación, documentos y autorizaciones.
+              Introduce el PIN para vincularte a la app como familiar sin tener que rellenar los datos deportivos ni cuotas de nuevo.
             </p>
 
             {verifiedPinData ? (
@@ -132,6 +214,8 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
                     setPinInput("");
                     setValue("pinCode", undefined);
                     setValue("existingPlayerId", undefined);
+                    setValue("isQuickPinMode" as any, false);
+                    setShowFullForm(false);
                   }}
                   className="text-xs font-semibold text-emerald-800 hover:text-red-600 hover:underline ml-3"
                 >
@@ -178,20 +262,208 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
         </div>
       </div>
 
-      <div className="mb-6 border-b pb-4">
-        <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <User className="w-6 h-6 text-blue-600" />
-          Datos Personales del Jugador
-        </h3>
-        <p className="text-sm text-gray-500 mt-1">Información principal de quien se inscribe.</p>
-      </div>
+      {verifiedPinData && !showFullForm ? (
+        /* TARJETA EXCLUSIVA DE VINCULACIÓN DE FAMILIAR / 2º PROGENITOR CON PIN */
+        <div className="bg-white border-2 border-emerald-500 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex items-start gap-4 pb-5 border-b border-gray-100">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider mb-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Ficha Localizada
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-gray-950">
+                {verifiedPinData.name}
+              </h3>
+              <p className="text-sm font-semibold text-emerald-700">
+                Equipo: {verifiedPinData.teamName} · PIN: <span className="font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{verifiedPinData.pin}</span>
+              </p>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700">Nombre</label>
-          <Input {...register("playerFirstName")} placeholder="Nombre del jugador" className={errors.playerFirstName ? "border-red-500" : ""} />
-          {errors.playerFirstName && <p className="text-xs text-red-500">{errors.playerFirstName.message}</p>}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm text-slate-700 leading-relaxed space-y-1">
+            <p className="font-bold text-slate-900 text-sm">
+              👋 Acceso para Padre, Madre o Tutor Familiar
+            </p>
+            <p>
+              La ficha deportiva, tallas de ropa, documentación y pagos de <strong className="text-slate-900">{verifiedPinData.name}</strong> ya están registrados en el club.
+            </p>
+            <p className="text-slate-600">
+              Para darte acceso a ti a la App del club (partidos, convocatorias, asistencias y avisos), solo necesitamos tus datos personales de acceso.
+            </p>
+          </div>
+
+          {linkError && (
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-center gap-2.5 font-medium animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{linkError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Tu Nombre <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={tutorFirstName}
+                onChange={(e) => setTutorFirstName(e.target.value)}
+                placeholder="Ej: Laura"
+                className="bg-white border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Tus Apellidos <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={tutorLastName}
+                onChange={(e) => setTutorLastName(e.target.value)}
+                placeholder="Ej: Gómez Martínez"
+                className="bg-white border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Tu Correo Electrónico (Email) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Input
+                  type="email"
+                  value={tutorEmail}
+                  onChange={(e) => setTutorEmail(e.target.value)}
+                  placeholder="laura@ejemplo.com"
+                  className="bg-white border-gray-300 pl-9 focus:border-emerald-500 focus:ring-emerald-500"
+                />
+                <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Teléfono de Contacto
+              </label>
+              <div className="relative">
+                <Input
+                  type="tel"
+                  value={tutorPhone}
+                  onChange={(e) => setTutorPhone(e.target.value)}
+                  placeholder="600 123 456"
+                  className="bg-white border-gray-300 pl-9 focus:border-emerald-500 focus:ring-emerald-500"
+                />
+                <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+              Contraseña para la App <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="bg-white border-gray-300 pr-10 focus:border-emerald-500 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-500">
+              Esta contraseña te servirá para iniciar sesión en la App del club y en el portal web familiar.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <label className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-2xl cursor-pointer hover:bg-gray-100/70 transition">
+              <input
+                type="checkbox"
+                checked={consentRgpd}
+                onChange={(e) => setConsentRgpd(e.target.checked)}
+                className="w-4 h-4 mt-0.5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+              />
+              <span className="text-xs text-gray-700 leading-snug">
+                Acepto el tratamiento de mis datos personales de acuerdo con la <strong className="text-gray-900">Política de Privacidad y RGPD</strong> del club para el seguimiento deportivo de <strong className="text-gray-900">{verifiedPinData.name}</strong>.
+              </span>
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleQuickLink}
+            disabled={linkingTutor}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-emerald-600/20 transition-all flex items-center justify-center gap-2.5 text-base disabled:opacity-50 cursor-pointer"
+          >
+            {linkingTutor ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Creando acceso y vinculando...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-5 h-5" />
+                <span>Crear mi Acceso y Entrar a la App</span>
+              </>
+            )}
+          </button>
+
+          <div className="pt-3 border-t border-gray-100 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setShowFullForm(true);
+                setValue("isQuickPinMode" as any, false);
+              }}
+              className="text-xs text-blue-700 hover:text-blue-900 font-semibold hover:underline"
+            >
+              ¿Quieres renovar o modificar la ficha completa del jugador (tallas, pagos, IBAN o documentación)? Pulsa aquí para abrir el formulario completo.
+            </button>
+          </div>
         </div>
+      ) : (
+        <>
+          {verifiedPinData && showFullForm && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-900">
+              <span>
+                📝 Editando formulario completo de <strong>{verifiedPinData.name}</strong> (PIN: {verifiedPinData.pin})
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFullForm(false);
+                  setValue("isQuickPinMode" as any, true);
+                }}
+                className="font-bold text-blue-700 hover:text-blue-950 underline shrink-0"
+              >
+                ← Volver a vinculación rápida de acceso
+              </button>
+            </div>
+          )}
+
+          <div className="mb-6 border-b pb-4">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <User className="w-6 h-6 text-blue-600" />
+              Datos Personales del Jugador
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Información principal de quien se inscribe.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Nombre</label>
+              <Input {...register("playerFirstName")} placeholder="Nombre del jugador" className={errors.playerFirstName ? "border-red-500" : ""} />
+              {errors.playerFirstName && <p className="text-xs text-red-500">{errors.playerFirstName.message}</p>}
+            </div>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-700">Apellidos</label>
           <Input {...register("playerLastName")} placeholder="Apellidos" className={errors.playerLastName ? "border-red-500" : ""} />
@@ -472,6 +744,8 @@ export function Step1PersonalData({ isAdult = false }: { isAdult?: boolean }) {
 
         </div>
       </div>
+        </>
+      )}
 
     </div>
   );

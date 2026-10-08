@@ -48,6 +48,8 @@ export default function EntrenamientoDetailPage() {
 
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
+  const [attendanceNotes, setAttendanceNotes] = useState<Record<string, string>>({});
+  const [justifyModal, setJustifyModal] = useState<{ playerId: string; name: string; text: string; prevStatus?: string; kind: 'Justificado' | 'Lesionado' } | null>(null);
   const [showFormativo, setShowFormativo] = useState(false);
   const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
   const [teamCategory, setTeamCategory] = useState<string>('');
@@ -101,18 +103,23 @@ export default function EntrenamientoDetailPage() {
       }
     }
 
-    const { data: attData } = await supabase.from('attendance').select('player_id, status').eq('event_id', eventId);
+    const { data: attData } = await supabase.from('attendance').select('player_id, status, notes').eq('event_id', eventId);
     
     if (plData) {
       setAllPlayers(plData);
       
       const attMap: Record<string, string> = {};
+      const notesMap: Record<string, string> = {};
       let hasAttendance = false;
       if (attData && attData.length > 0) {
         hasAttendance = true;
-        attData.forEach(a => { attMap[a.player_id] = a.status; });
+        attData.forEach(a => {
+          attMap[a.player_id] = a.status;
+          if (a.notes) notesMap[a.player_id] = a.notes;
+        });
       }
       setAttendance(attMap);
+      setAttendanceNotes(notesMap);
 
       if (!hasAttendance) {
         setActiveModule('asistencia');
@@ -231,6 +238,7 @@ export default function EntrenamientoDetailPage() {
       player_id: playerId,
       date: eventDetails?.date,
       status: status,
+      notes: (status === 'Justificado' || status === 'Lesionado' || status === 'excused') ? (attendanceNotes[playerId]?.trim() || null) : null,
       season_id: activeSeasonId
     }));
 
@@ -490,6 +498,11 @@ export default function EntrenamientoDetailPage() {
                               Dorsal {player.dorsal}
                             </span>
                           )}
+                          {(currentStatus === 'Justificado' || currentStatus === 'Lesionado' || currentStatus === 'excused') && (
+                            <p className="mt-1 text-xs text-amber-700 italic line-clamp-2">
+                              {currentStatus === 'Lesionado' ? '⚕️ Lesionado' : '📝 Justificado'}{attendanceNotes[player.id] ? `: ${attendanceNotes[player.id]}` : ''}
+                            </p>
+                          )}
                         </div>
                       </div>
                       
@@ -536,15 +549,24 @@ export default function EntrenamientoDetailPage() {
 
                         <button
                           type="button"
-                          onClick={() => setAttendance(prev => ({ ...prev, [player.id]: 'Lesionado' }))}
+                          onClick={() => {
+                            setJustifyModal({
+                              playerId: player.id,
+                              name: `${player.first_name} ${player.last_name}`,
+                              text: attendanceNotes[player.id] || '',
+                              prevStatus: currentStatus,
+                              kind: currentStatus === 'Lesionado' ? 'Lesionado' : 'Justificado',
+                            });
+                            setAttendance(prev => ({ ...prev, [player.id]: prev[player.id] === 'Lesionado' ? 'Lesionado' : 'Justificado' }));
+                          }}
                           className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${
-                            currentStatus === 'Lesionado' || currentStatus === 'excused'
+                            currentStatus === 'Justificado' || currentStatus === 'Lesionado' || currentStatus === 'excused'
                               ? 'bg-amber-500 text-white shadow-sm shadow-amber-200 scale-[1.02]'
                               : 'text-slate-600 hover:bg-white/60'
                           }`}
                         >
-                          <span className="text-xs leading-none shrink-0">⚕️</span>
-                          <span className="truncate">Justificado</span>
+                          <span className="text-xs leading-none shrink-0">{currentStatus === 'Lesionado' ? '⚕️' : '📝'}</span>
+                          <span className="truncate">{currentStatus === 'Lesionado' ? 'Lesionado' : 'Justificado'}</span>
                         </button>
                       </div>
                     </div>
@@ -737,6 +759,76 @@ export default function EntrenamientoDetailPage() {
           onlyFormative={true}
           onClose={() => setDrawerPlayerId(null)}
         />
+      )}
+
+      {/* Modal de observaciones para ausencias justificadas */}
+      {justifyModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 bg-amber-50">
+              <h3 className="font-black text-slate-900 text-lg">Ausencia justificada</h3>
+              <p className="text-sm text-slate-600">{justifyModal.name}</p>
+            </div>
+            <div className="p-5">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Tipo de ausencia</label>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {(['Justificado', 'Lesionado'] as const).map(k => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setJustifyModal(m => m ? { ...m, kind: k } : m)}
+                    className={`py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                      justifyModal.kind === k
+                        ? (k === 'Lesionado' ? 'bg-rose-500 border-rose-500 text-white' : 'bg-amber-500 border-amber-500 text-white')
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {k === 'Lesionado' ? '⚕️ Lesionado' : '📝 Justificado'}
+                  </button>
+                ))}
+              </div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Observaciones / motivo</label>
+              <textarea
+                autoFocus
+                rows={4}
+                value={justifyModal.text}
+                onChange={e => setJustifyModal(m => m ? { ...m, text: e.target.value } : m)}
+                placeholder="Ej: lesión de tobillo, enfermedad, examen, viaje familiar..."
+                className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <p className="text-[11px] text-slate-400 mt-2">Se guardará al pulsar "Guardar asistencia".</p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const { playerId, prevStatus } = justifyModal;
+                  setAttendance(prev => {
+                    const next = { ...prev };
+                    if (prevStatus) next[playerId] = prevStatus; else delete next[playerId];
+                    return next;
+                  });
+                  setJustifyModal(null);
+                }}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const { playerId, text, kind } = justifyModal;
+                  setAttendanceNotes(prev => ({ ...prev, [playerId]: text }));
+                  setAttendance(prev => ({ ...prev, [playerId]: kind }));
+                  setJustifyModal(null);
+                }}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

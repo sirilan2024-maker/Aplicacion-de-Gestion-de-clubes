@@ -783,7 +783,8 @@ export function getPlayerPinEmailHtml({
   teamName,
   loginUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/login` : 'https://app.clubsportingsaladar.com/login',
 }: PlayerPinEmailParams): string {
-  const registerUrl = process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/register` : 'https://app.clubsportingsaladar.com/register';
+  const baseAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.clubsportingsaladar.com';
+  const registerUrl = `${baseAppUrl}/inscripcion?pin=${encodeURIComponent(pinCode)}`;
 
   return `
   <!DOCTYPE html>

@@ -151,7 +151,10 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
 
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lugar del Partido</label>
-            <Input name="place" defaultValue={match.lugar} className="font-semibold text-slate-800 bg-white border-slate-200" required />
+            <select name="place" defaultValue={match.lugar === 'Local' ? 'Local' : 'Visitante'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
+              <option value="Local">Local</option>
+              <option value="Visitante">Visitante</option>
+            </select>
           </div>
 
           <div className="p-4 bg-slate-100/80 rounded-xl border border-slate-200">

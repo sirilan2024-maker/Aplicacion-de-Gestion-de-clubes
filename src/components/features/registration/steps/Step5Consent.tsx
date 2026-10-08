@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { ShieldCheck, HeartHandshake, UploadCloud, Info, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, HeartHandshake, UploadCloud, Info, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { RegistrationFormData } from "../schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { LegalModal } from "@/components/ui/LegalModal";
 import { Dialog } from "@/components/ui/dialog";
+import toast from "react-hot-toast";
 
 type LegalItem = 'rgpd' | 'tutela' | 'medical' | 'imagen';
 
@@ -77,6 +78,17 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
       if (activeLegalModal === 'imagen') setValue("consentImage", true, { shouldValidate: true, shouldDirty: true });
       setActiveLegalModal(null);
     }
+  };
+
+  const handleAcceptAllMandatory = () => {
+    setValue("consentRgpd", true, { shouldValidate: true, shouldDirty: true });
+    setValue("consentMedical", true, { shouldValidate: true, shouldDirty: true });
+    if (!isAdult) {
+      setValue("consentTutela", true, { shouldValidate: true, shouldDirty: true });
+    }
+    setValue("consentImage", true, { shouldValidate: true, shouldDirty: true });
+    setLegalRead({ rgpd: true, tutela: true, medical: true, imagen: true });
+    toast.success("Consentimientos marcados correctamente");
   };
 
   const getFieldId = (id: LegalItem) => {
@@ -155,11 +167,25 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
           <p className="text-sm text-gray-500 mt-1">Lectura y aceptación obligatoria. Las firmas se registrarán con su respectiva IP y marca de tiempo (Firma Electrónica Simple) para cumplir el RGPD.</p>
         </div>
 
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl">
+          <span className="text-xs text-emerald-950 font-medium">
+            💡 Puedes marcar cada casilla individualmente o pulsar este botón para autorizar todos los consentimientos de una vez:
+          </span>
+          <button
+            type="button"
+            onClick={handleAcceptAllMandatory}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Aceptar todos los consentimientos
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderConsentBox('rgpd', 'Política de Privacidad', 'Tratamiento de datos personales (RGPD)', errors.consentRgpd?.message)}
           {!isAdult && renderConsentBox('tutela', 'Declaración de Tutela', 'Mayoría de edad y normativas', errors.consentTutela?.message)}
           {renderConsentBox('medical', 'Tratamiento Médico Especial', 'Alergias y traslados de urgencia', errors.consentMedical?.message)}
-          {renderConsentBox('imagen', 'Derechos de Imagen', 'Consentimiento para fotos y actividades oficiales', errors.consentImage?.message)}
+          {renderConsentBox('imagen', 'Derechos de Imagen', 'Consentimiento para fotos y actividades oficiales (Opcional)', errors.consentImage?.message, true)}
         </div>
       </div>
 

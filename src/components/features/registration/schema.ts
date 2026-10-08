@@ -62,7 +62,7 @@ export const registrationSchema = z.object({
   isForeign: z.boolean().default(false),
   neverFederated: z.boolean().default(false),
   isSeniorSelection: z.enum(["senior", "minor"]).default("minor"), // Kept for backwards compatibility
-  isSeniorTeam: z.any().transform(val => val === true || val === "true"), // Flag from the form wrapper
+  isSeniorTeam: z.any().optional().default(false).transform(val => val === true || val === "true"), // Flag from the form wrapper
   address: z.string().optional(),
   city: z.string().optional(),
   postalCode: z.string().optional(),
@@ -84,9 +84,9 @@ export const registrationSchema = z.object({
     base64: z.string()
   })).default([]),
   escolarizacion: z.array(z.object({
-    centro: z.string().min(2, "El centro es requerido"),
-    curso: z.string().min(4, "El curso es requerido"),
-  })).optional(),
+    centro: z.string().optional(),
+    curso: z.string().optional(),
+  })).optional().default([]),
   dniFileBase64: z.string().optional(),
   photoFileBase64: z.string().optional(),
 
@@ -141,7 +141,7 @@ export const registrationSchema = z.object({
   consentRgpd: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar la política de privacidad"),
   consentTutela: z.any().transform(v => v === true || v === "true" || v === "on").optional(),
   consentMedical: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar el tratamiento de datos médicos"),
-  consentImage: z.any().transform(v => v === true || v === "true" || v === "on").refine(val => val === true, "Debes leer y aceptar la cesión de derechos de imagen"),
+  consentImage: z.any().transform(v => v === true || v === "true" || v === "on").default(false),
 
   // Autenticación (Opcional en el esquema para permitir reutilizar el form desde dentro)
   password: z.string().optional(),

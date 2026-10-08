@@ -225,7 +225,10 @@ export function RegistrationWizard({
       }
     } catch (error: any) {
       console.error('Error enviando formulario:', error);
-      alert(error.message || "Ocurrió un error al enviar el formulario al servidor.");
+      const msg = error.message || "Ocurrió un error al enviar el formulario al servidor.";
+      toast.error(msg, { duration: 7000 });
+      setFormErrorSummary([msg]);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -245,16 +248,21 @@ export function RegistrationWizard({
 
     // Definimos qué campos pertenecen a qué paso
     const stepFields: Record<number, string[]> = {
-      1: ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode', 'tutor1Name', 'tutor1LastName', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation', 'isSeniorSelection'],
-      2: ['docsUploaded', 'escolarizacion'],
+      1: ['playerFirstName', 'playerLastName', 'playerDni', 'birthDate', 'nationality', 'address', 'city', 'postalCode', 'tutor1Name', 'tutor1LastName', 'tutor1Dni', 'tutor1Email', 'tutor1Phone', 'tutorRelation', 'isSeniorSelection', 'isSeniorTeam', 'playerSip'],
+      2: ['docsUploaded', 'uploadedFiles', 'escolarizacion', 'dniFileBase64', 'photoFileBase64'],
       3: isSeniorEffective ? [] : ['paymentMethod', 'paymentPlan', 'wasInClub', 'paidReservation'],
       4: ['sizeCamisetaJuego', 'sizePantalonJuego', 'sizeChandal', 'sizeSudadera', 'sizeCamisetaPaseo', 'sizePantalonPaseo', 'sizeMedias', 'sizeMochila'],
-      5: !isAdult ? ['consentRgpd', 'consentTutela', 'consentMedical', 'consentImage', 'password', 'confirmPassword'] : ['consentRgpd', 'consentMedical', 'consentImage', 'password', 'confirmPassword']
+      5: ['consentRgpd', 'consentTutela', 'consentMedical', 'consentImage', 'password', 'confirmPassword']
+    };
+
+    const matchesStepField = (errKey: string, fieldName: string) => {
+      return errKey === fieldName || errKey.startsWith(fieldName + '.') || errKey.startsWith(fieldName + '[');
     };
 
     // Buscar el primer paso que tenga un error y saltar a él si es diferente
     for (let step = 1; step <= 5; step++) {
-      if (stepFields[step].some(field => errorFields.includes(field))) {
+      const hasErrorInStep = errorFields.some(ef => stepFields[step].some(sf => matchesStepField(ef, sf)));
+      if (hasErrorInStep) {
         if (currentStep !== step) {
           setCurrentStep(step);
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -265,7 +273,8 @@ export function RegistrationWizard({
             firstErrElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }
-        toast.error(`Revisa los campos requeridos en el Paso ${step}.`);
+        const errorDetail = messages.length > 0 ? messages.slice(0, 2).join(". ") : `Revisa los datos del Paso ${step}`;
+        toast.error(`Revisa el formulario: ${errorDetail}`, { duration: 6000 });
         return;
       }
     }
@@ -273,7 +282,8 @@ export function RegistrationWizard({
     // Si no mapeó a ningún paso (safety net)
     if (errorFields.length > 0) {
       console.warn("Form errors that didn't match any step:", errors);
-      toast.error(`Revisa los campos con error: ${errorFields.join(", ")}`);
+      const detail = messages.length > 0 ? messages.join(". ") : errorFields.join(", ");
+      toast.error(`Revisa los campos requeridos: ${detail}`, { duration: 6000 });
     }
   };
 

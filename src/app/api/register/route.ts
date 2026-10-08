@@ -75,14 +75,30 @@ export async function POST(request: Request) {
         console.error('Error creando usuario Auth:', authError);
         const errorStr = authError.message.toLowerCase();
         if (errorStr.includes('already registered') || errorStr.includes('already been registered') || errorStr.includes('already exists')) {
-          return NextResponse.json({ 
-            error: 'Este email ya está registrado. Por favor, inicia sesión con tu cuenta y usa la opción "Inscribir a otro jugador" desde el Portal de Familia.' 
-          }, { status: 409 });
-        }
-        return NextResponse.json({ error: 'No se pudo crear la cuenta de usuario. Detalle: ' + authError.message }, { status: 500 });
-      }
+          // El email ya existe en Supabase Auth: localizamos su ID para asociar la ficha del menor
+          const { data: existingProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('id, role')
+            .eq('email', email.toLowerCase().trim())
+            .maybeSingle();
 
-      authUserId = authData.user?.id ?? null;
+          if (existingProfile) {
+            authUserId = existingProfile.id;
+          } else {
+            const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+            const match = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase().trim());
+            if (match) {
+              authUserId = match.id;
+            }
+          }
+        }
+
+        if (!authUserId) {
+          return NextResponse.json({ error: 'No se pudo crear o asociar la cuenta de usuario. Detalle: ' + authError.message }, { status: 500 });
+        }
+      } else {
+        authUserId = authData.user?.id ?? null;
+      }
 
       if (authUserId) {
         // Perfil con rol 'familia' para acceder al dashboard familiar

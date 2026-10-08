@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedContext } from '@/lib/auth-helpers';
 import { normalizeImageUrl } from '@/lib/ffcv/parser';
 import { getVerifiedHistoryForPlayer, getRegistryShield } from '@/lib/ffcv/player-history-registry';
+import { fetchFfcvRawUrl } from '@/lib/ffcv/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -140,22 +141,7 @@ function matchFfcvPlayerInRoster(
   return bestCandidate;
 }
 
-async function fetchFfcvJson(url: string) {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/javascript, */*; q=0.01'
-      },
-      cache: 'no-store'
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    console.error('[ffcv-player-info] Error fetching:', url, err);
-    return null;
-  }
-}
+const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
 
 export async function GET(req: Request) {
   try {
@@ -175,7 +161,7 @@ export async function GET(req: Request) {
 
     const { data: player, error: pErr } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, club_id, team_id, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id)')
+      .select('id, first_name, last_name, dorsal, club_id, team_id, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id, season_id)')
       .eq('id', playerId)
       .single();
 
@@ -188,31 +174,40 @@ export async function GET(req: Request) {
     }
 
     const teamRel = player.teams as any;
+    let teamName = teamRel?.name || '';
     let ffcvTeamId = teamRel?.ffcv_team_id;
 
-    if (!ffcvTeamId) {
-      const { data: hist } = await supabase
+    // Si el equipo no es de la temporada activa o no tiene código FFCV, buscar en el historial de la temporada 26/27
+    if (!ffcvTeamId || teamRel?.season_id !== ACTIVE_SEASON_ID) {
+      const { data: activePsh } = await supabase
         .from('player_season_history')
-        .select('teams(ffcv_team_id)')
+        .select('team_id, teams(id, name, ffcv_team_id, season_id)')
         .eq('player_id', playerId)
-        .not('teams.ffcv_team_id', 'is', null)
-        .limit(1)
+        .eq('season_id', ACTIVE_SEASON_ID)
         .maybeSingle();
 
-      if (hist && (hist as any).teams?.ffcv_team_id) {
-        ffcvTeamId = (hist as any).teams.ffcv_team_id;
+      if (activePsh && (activePsh as any).teams) {
+        const activeTeam = (activePsh as any).teams;
+        teamName = activeTeam.name || teamName;
+        ffcvTeamId = activeTeam.ffcv_team_id || ffcvTeamId;
       }
     }
 
-    if (!ffcvTeamId) {
+    // Equipos no federados en FFCV (Cadete B, Infantil B, etc.)
+    const nonFederatedTeams = ['CADETE B', 'INFANTIL B'];
+    const isNonFederated = nonFederatedTeams.some(nft => teamName.toUpperCase().includes(nft));
+
+    if (isNonFederated || !ffcvTeamId) {
       return NextResponse.json({ 
-        error: 'El equipo de este jugador aún no tiene configurado su código federativo FFCV.',
-        found: false 
-      }, { status: 404 });
+        found: false,
+        message: isNonFederated
+          ? `El equipo ${teamName || 'del jugador'} no participa en competiciones oficiales de la FFCV (equipo de fútbol formativo no federado).`
+          : `El equipo ${teamName || 'del jugador'} no dispone de código federativo FFCV para esta temporada.`
+      });
     }
 
     const plantillaUrl = 'https://ffcv.es/competiciones/api/equipos/plantilla_home.php?cod_equipo=' + ffcvTeamId;
-    const plantillaData = await fetchFfcvJson(plantillaUrl);
+    const plantillaData = await fetchFfcvRawUrl(plantillaUrl);
 
     if (!plantillaData || !Array.isArray(plantillaData.jugadores_equipo)) {
       return NextResponse.json({ 
@@ -233,15 +228,15 @@ export async function GET(req: Request) {
       return NextResponse.json({
         found: false,
         message: rosterCount === 0
-          ? 'La FFCV aún no ha publicado la plantilla oficial validada para este equipo en la federación.'
-          : 'El jugador no figura en la plantilla oficial publicada en la FFCV para este equipo (puede estar en trámite de validación).'
+          ? `La FFCV aún no ha publicado la plantilla oficial validada para este equipo (${teamName}) en la federación (inicio de competición previsto para el 17 de octubre). Una vez validada el acta de la jornada 1 por la federación, la ficha estará visible automáticamente.`
+          : `El jugador no figura en la plantilla oficial publicada en la FFCV para este equipo (${teamName}). Puede estar en trámite de validación federativa.`
       });
     }
 
     const codJugador = matchedFfcvPlayer.codjugador;
 
     const playerApiUrl = 'https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=' + codJugador + '&cod_temporada=auto';
-    const fullPlayerData = await fetchFfcvJson(playerApiUrl);
+    const fullPlayerData = await fetchFfcvRawUrl(playerApiUrl);
 
     if (!fullPlayerData) {
       return NextResponse.json({
@@ -264,7 +259,7 @@ export async function GET(req: Request) {
 
       if (!seasonData) {
         const pastUrl = `https://ffcv.es/competiciones/api/jugadores/jugador_api.php?codigo=${codJugador}&cod_temporada=${temp.codigo_temporada}`;
-        seasonData = await fetchFfcvJson(pastUrl);
+        seasonData = await fetchFfcvRawUrl(pastUrl);
       }
 
       if (!seasonData) return [];

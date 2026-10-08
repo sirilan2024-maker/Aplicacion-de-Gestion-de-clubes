@@ -153,6 +153,14 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
     );
   };
 
+  const consentRgpd = watch("consentRgpd");
+  const consentTutela = watch("consentTutela");
+  const consentMedical = watch("consentMedical");
+  const allMandatoryAccepted = 
+    Boolean(consentRgpd) && 
+    Boolean(consentMedical) && 
+    (isAdult || Boolean(consentTutela));
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -167,19 +175,21 @@ export function Step5Consent({ isInternalForm = false, isAdult = false }: { isIn
           <p className="text-sm text-gray-500 mt-1">Lectura y aceptación obligatoria. Las firmas se registrarán con su respectiva IP y marca de tiempo (Firma Electrónica Simple) para cumplir el RGPD.</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl">
-          <span className="text-xs text-emerald-950 font-medium">
-            💡 Puedes marcar cada casilla individualmente o pulsar este botón para autorizar todos los consentimientos de una vez:
-          </span>
-          <button
-            type="button"
-            onClick={handleAcceptAllMandatory}
-            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            Aceptar todos los consentimientos
-          </button>
-        </div>
+        {!allMandatoryAccepted && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl animate-in fade-in transition-all">
+            <span className="text-xs text-emerald-950 font-medium">
+              💡 Puedes marcar cada casilla individualmente o pulsar este botón para autorizar todos los consentimientos de una vez:
+            </span>
+            <button
+              type="button"
+              onClick={handleAcceptAllMandatory}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Aceptar todos los consentimientos
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderConsentBox('rgpd', 'Política de Privacidad', 'Tratamiento de datos personales (RGPD)', errors.consentRgpd?.message)}

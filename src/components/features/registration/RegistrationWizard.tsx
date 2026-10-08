@@ -116,6 +116,16 @@ export function RegistrationWizard({
   const birthYear = birthDateValue ? new Date(birthDateValue).getFullYear() : null;
   const isAdult = isSeniorEffective || (birthYear !== null && !isNaN(birthYear) && birthYear <= 2007);
 
+  // Auto-clear error summary when user corrects fields
+  useEffect(() => {
+    const subscription = methods.watch(() => {
+      if (formErrorSummary.length > 0) {
+        setFormErrorSummary([]);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [methods, formErrorSummary.length]);
+
   const nextStep = async () => {
     setFormErrorSummary([]);
     // Validate current step fields before proceeding
@@ -470,16 +480,27 @@ export function RegistrationWizard({
             </CardContent>
 
             {formErrorSummary.length > 0 && (
-              <div className="p-4 mx-6 mb-2 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm animate-in fade-in">
-                <div className="flex items-center gap-2 font-bold mb-1.5 text-red-900">
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 shrink-0" />
-                  <span>Por favor, revisa o completa los siguientes campos:</span>
+              <div className="p-4 mx-6 mb-2 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm animate-in fade-in flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 font-bold mb-1.5 text-red-900">
+                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 shrink-0" />
+                    <span>Por favor, revisa o completa los siguientes campos:</span>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5 text-red-700">
+                    {formErrorSummary.map((msg, idx) => (
+                      <li key={idx}>{msg}</li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="list-disc pl-5 space-y-0.5 text-red-700">
-                  {formErrorSummary.map((msg, idx) => (
-                    <li key={idx}>{msg}</li>
-                  ))}
-                </ul>
+                <button
+                  type="button"
+                  onClick={() => setFormErrorSummary([])}
+                  className="text-red-500 hover:text-red-700 font-bold p-1 rounded hover:bg-red-100 transition-colors shrink-0 text-sm"
+                  title="Cerrar aviso"
+                  aria-label="Cerrar aviso"
+                >
+                  ✕
+                </button>
               </div>
             )}
             

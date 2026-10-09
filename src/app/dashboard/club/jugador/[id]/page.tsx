@@ -20,6 +20,7 @@ import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjur
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { ManagePlayerPinModal } from "@/components/features/players/ManagePlayerPinModal";
 import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
+import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 
 interface PlayerData {
   id: string;
@@ -140,6 +141,10 @@ export default function GlobalPlayerProfilePage() {
   const [openInjuryModal, setOpenInjuryModal] = useState<boolean>(false);
   const [showFfcvModal, setShowFfcvModal] = useState<boolean>(false);
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
+
+  // Foto oficial FFCV en vivo (efímera en memoria, sin almacenar en BD)
+  const ephemeralAvatar = useEphemeralFfcvAvatar(player?.id, Boolean(player?.avatar_url));
+  const effectiveAvatar = player?.avatar_url || ephemeralAvatar;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -762,9 +767,9 @@ export default function GlobalPlayerProfilePage() {
             <div className="flex items-center gap-3 sm:gap-6 w-full">
               <div className="relative min-w-20 w-20 h-20 sm:min-w-28 sm:w-28 sm:h-28 md:min-w-32 md:w-32 md:h-32 bg-white rounded-2xl sm:rounded-3xl shadow-xl border-2 sm:border-4 border-white flex items-center justify-center overflow-hidden -mt-7 sm:-mt-12 group flex-shrink-0">
                 <label className="w-full h-full cursor-pointer flex items-center justify-center" title="Toca para cambiar foto">
-                  {player.avatar_url ? (
+                  {effectiveAvatar ? (
                     <img
-                      src={player.avatar_url}
+                      src={effectiveAvatar}
                       alt={player.first_name}
                       className="w-full h-full object-cover object-[center_25%]"
                     />
@@ -1381,7 +1386,7 @@ export default function GlobalPlayerProfilePage() {
                 playerNumber={player.dorsal || undefined}
                 playerPosition={player.posicion || undefined}
                 playerStatus={player.status === "active" ? "Disponible" : player.status}
-                playerAvatarUrl={player.avatar_url || undefined}
+                playerAvatarUrl={effectiveAvatar || undefined}
                 isOpenDirectly={openInjuryModal}
                 onCloseDirect={() => setOpenInjuryModal(false)}
                 onInjuriesChange={(hasActive) => setHasActiveInjury(hasActive)}

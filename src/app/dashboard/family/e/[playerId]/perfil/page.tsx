@@ -16,6 +16,7 @@ import { GoalsModal } from "@/components/features/matches/GoalsModal"
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal"
 import { getApparelForPlayerAction } from "@/app/actions/apparel-actions"
 import { Shirt, Shield } from "lucide-react"
+import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar"
 
 export default function PlayerDashboardPage() {
   const router = useRouter()
@@ -28,6 +29,10 @@ export default function PlayerDashboardPage() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [showFfcvModal, setShowFfcvModal] = useState(false)
+
+  // Foto oficial FFCV en vivo (efímera en memoria, sin almacenar en BD)
+  const ephemeralAvatar = useEphemeralFfcvAvatar(player?.id, Boolean(player?.avatar_url))
+  const effectiveAvatar = player?.avatar_url || ephemeralAvatar
   const [stats, setStats] = useState({
     asistencia: 0,
     faltas: 0,
@@ -580,10 +585,10 @@ export default function PlayerDashboardPage() {
 
       <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-6 w-full text-center md:text-left">
-          {player.avatar_url ? (
+          {effectiveAvatar ? (
             <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden flex-shrink-0">
               <img 
-                src={player.avatar_url} 
+                src={effectiveAvatar} 
                 alt={`Foto de ${player.first_name}`} 
                 className="w-full h-full object-cover object-[center_25%]"
               />

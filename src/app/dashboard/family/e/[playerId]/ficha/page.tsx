@@ -16,6 +16,7 @@ import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import Subscriptions from "@/components/features/treasury/Subscriptions";
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
+import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 
 interface PlayerData {
   id: string;
@@ -134,6 +135,10 @@ export default function PlayerProfilePage() {
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
   const [showFfcvModal, setShowFfcvModal] = useState(false);
+
+  // Foto oficial FFCV en vivo (efímera en memoria, sin almacenar en BD)
+  const ephemeralAvatar = useEphemeralFfcvAvatar(player?.id, Boolean(player?.avatar_url));
+  const effectiveAvatar = player?.avatar_url || ephemeralAvatar;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -576,8 +581,8 @@ export default function PlayerProfilePage() {
             <div className="flex items-center gap-6 sm:gap-8">
               <div className="relative min-w-28 w-28 h-28 sm:min-w-32 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl border-4 border-white flex items-center justify-center overflow-hidden -mt-10 sm:-mt-12 group flex-shrink-0">
                 <label className="w-full h-full cursor-pointer flex items-center justify-center" title="Toca para cambiar foto">
-                  {player.avatar_url ? (
-                    <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                  {effectiveAvatar ? (
+                    <img src={effectiveAvatar} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
                   ) : (
                     <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
                       <UserIcon size={64} />

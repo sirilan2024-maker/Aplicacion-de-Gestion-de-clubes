@@ -199,6 +199,41 @@ export async function POST(request: Request) {
       }
     }
 
+    // Subir avatar al bucket público 'avatars' para que quede automáticamente como foto de perfil del jugador
+    let avatarPublicUrl: string | null = null;
+    const rawPhotoBase64 = formData.photoFileBase64 || 
+      formData.uploadedFiles?.find((f: any) => f.label === 'Foto_Carnet' || f.label?.toLowerCase()?.includes('foto_carnet') || f.label?.toLowerCase()?.includes('foto carnet'))?.base64;
+
+    if (rawPhotoBase64) {
+      try {
+        const matches = rawPhotoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const mimeType = matches[1];
+          const buffer = Buffer.from(matches[2], 'base64');
+          const ext = mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+          const avatarFileName = `jugadores/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
+          
+          const { error: avatarUploadError } = await supabaseAdmin.storage
+            .from('avatars')
+            .upload(avatarFileName, buffer, {
+              contentType: mimeType,
+              upsert: true
+            });
+
+          if (!avatarUploadError) {
+            const { data: { publicUrl } } = supabaseAdmin.storage
+              .from('avatars')
+              .getPublicUrl(avatarFileName);
+            avatarPublicUrl = publicUrl;
+          } else {
+            console.warn('[register] Failed to upload avatar to public bucket:', avatarUploadError);
+          }
+        }
+      } catch (e) {
+        console.warn('[register] Exception uploading avatar image:', e);
+      }
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // FASE 3 (cont.): Crear/Actualizar registro de Familia
     // El DNI del tutor va a families.tutor_1_dni_url
@@ -370,6 +405,7 @@ export async function POST(request: Request) {
       consent_image_at: formData.consentImage ? new Date().toISOString() : null,
       consent_ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '0.0.0.0',
       consent_user_agent: request.headers.get('user-agent') || 'Unknown',
+      ...(avatarPublicUrl ? { avatar_url: avatarPublicUrl } : {}),
     };
 
     if (targetPlayerId) {

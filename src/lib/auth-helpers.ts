@@ -655,11 +655,15 @@ export async function getEffectiveSelectedSeasonId(
   clubId: string,
   overrideSeasonId?: string | null
 ): Promise<{ seasonId: string; seasonName?: string; isActive: boolean }> {
-  if (overrideSeasonId && overrideSeasonId.trim() !== '') {
+  const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+  const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+  if (overrideSeasonId && overrideSeasonId.trim() !== '' && overrideSeasonId !== CLOSED_SEASON_ID) {
     const { data: s } = await adminClient
       .from('seasons')
       .select('id, name, is_active')
       .eq('id', overrideSeasonId)
+      .neq('id', CLOSED_SEASON_ID)
       .maybeSingle();
 
     if (s) {
@@ -672,11 +676,12 @@ export async function getEffectiveSelectedSeasonId(
     const { cookies } = await import('next/headers');
     const cookieStore = await cookies();
     const cookieSeasonId = cookieStore.get('sporting_selected_season_id')?.value;
-    if (cookieSeasonId && cookieSeasonId.trim() !== '') {
+    if (cookieSeasonId && cookieSeasonId.trim() !== '' && cookieSeasonId !== CLOSED_SEASON_ID) {
       const { data: s } = await adminClient
         .from('seasons')
         .select('id, name, is_active')
         .eq('id', cookieSeasonId)
+        .neq('id', CLOSED_SEASON_ID)
         .maybeSingle();
 
       if (s && s.is_active) {
@@ -692,6 +697,7 @@ export async function getEffectiveSelectedSeasonId(
     .from('seasons')
     .select('id, name, is_active')
     .eq('club_id', clubId)
+    .neq('id', CLOSED_SEASON_ID)
     .eq('is_active', true)
     .maybeSingle();
 
@@ -699,7 +705,7 @@ export async function getEffectiveSelectedSeasonId(
     return { seasonId: activeSeason.id, seasonName: activeSeason.name, isActive: true };
   }
 
-  return { seasonId: '', seasonName: undefined, isActive: false };
+  return { seasonId: ACTIVE_SEASON_ID, seasonName: 'TEMPORADA 26/27', isActive: true };
 }
 
 /**

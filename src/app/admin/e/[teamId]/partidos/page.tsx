@@ -75,12 +75,14 @@ export default async function AdminTeamMatchesPage({ params }: { params: Promise
     teamsQuery,
     adminClient
       .from('players')
-      .select('*')
+      .select('*, team:teams!inner(id, season_id)')
       .eq('team_id', currentTeamId)
+      .neq('team.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .neq('status', 'inactive'),
     adminClient
       .from('convocatorias')
-      .select('*'),
+      .select('*, partido:partidos!inner(id, season_id)')
+      .neq('partido.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c'),
   ]);
 
   // 5. Cargar información de la competición/grupo FFCV oficial

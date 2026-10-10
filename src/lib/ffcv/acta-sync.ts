@@ -298,15 +298,20 @@ export async function syncFFCVActaToConvocatorias(
       .eq('season_id', ACTIVE_SEASON_ID);
     const activeTeamIds = (activeTeams || []).map((t: any) => t.id);
 
-    const { data: allPlayers } = await supabase
+    const { data: allPlayersData } = await supabase
       .from('players')
       .select('id, first_name, last_name, dorsal, team_id, status, is_senior, teams:teams(id, name, category)')
       .in('team_id', activeTeamIds)
       .neq('status', 'inactive');
 
+    const allPlayers = (allPlayersData || []).filter((p: any) => {
+      const s = (p.status || '').toLowerCase();
+      return !s.includes('inactiv') && !s.includes('baja');
+    });
+
     const matchTeam = (activeTeams || []).find((t: any) => t.id === partido.equipo_id);
     const isSeniorMatch = Boolean((matchTeam?.name || '').toUpperCase().includes('SENIOR'));
-    const teamPlayers = (allPlayers || []).filter((p: any) => p.team_id === partido.equipo_id);
+    const teamPlayers = allPlayers.filter((p: any) => p.team_id === partido.equipo_id);
 
     // 3. Build convocatorias payload
     const rowsToUpsert: any[] = [];
@@ -490,22 +495,31 @@ export async function syncFFCVActaToConvocatorias(
 
     const nonActaConvs = (existingConvs || []).filter((c: any) => !syncedPlayerIds.has(c.player_id));
     if (nonActaConvs.length > 0) {
-      const nonActaIds = nonActaConvs.map((c: any) => c.id);
-      await supabase
-        .from('convocatorias')
-        .update({
-          status: 'no_convocado',
-          titular: false,
-          minutes_played: 0,
-          minutos_jugados: 0,
-          goals: 0,
-          goles: 0,
-          yellow_cards: 0,
-          tarjetas_amarillas: 0,
-          red_cards: 0,
-          tarjetas_rojas: 0
-        })
-        .in('id', nonActaIds);
+      // Purge rows belonging to archived 25/26 or non-active players completely
+      const activePlayerIdSet = new Set(allPlayers.map((p: any) => p.id));
+      const contaminatedIds = nonActaConvs.filter((c: any) => !activePlayerIdSet.has(c.player_id)).map((c: any) => c.id);
+      if (contaminatedIds.length > 0) {
+        await supabase.from('convocatorias').delete().in('id', contaminatedIds);
+      }
+
+      const validNonActaIds = nonActaConvs.filter((c: any) => activePlayerIdSet.has(c.player_id)).map((c: any) => c.id);
+      if (validNonActaIds.length > 0) {
+        await supabase
+          .from('convocatorias')
+          .update({
+            status: 'no_convocado',
+            titular: false,
+            minutes_played: 0,
+            minutos_jugados: 0,
+            goals: 0,
+            goles: 0,
+            yellow_cards: 0,
+            tarjetas_amarillas: 0,
+            red_cards: 0,
+            tarjetas_rojas: 0
+          })
+          .in('id', validNonActaIds);
+      }
     }
 
     // Also ensure partido status and score are up to date

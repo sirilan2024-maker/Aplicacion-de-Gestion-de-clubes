@@ -157,12 +157,12 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
 
             // Fetch equipos strictly for the active/selected season (never past 25/26 unless in archive)
             if (profile.role === 'admin' || profile.role === 'coordinador' || profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
-              let query = supabaseClient.from('teams').select("id, name, category").eq("club_id", profile.club_id)
+              let query = supabaseClient.from('teams').select("id, name, category, season_id").eq("club_id", profile.club_id)
               const effectiveSeasonId = selectedSeason?.id || activeSeason?.id
-              if (effectiveSeasonId) {
+              if (effectiveSeasonId && effectiveSeasonId !== "584f508a-fc1a-4339-b5b2-4296ffde2f4c") {
                 query = query.eq("season_id", effectiveSeasonId)
               } else {
-                query = query.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c")
+                query = query.neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c").eq("season_id", "663ed6ef-1dab-4350-9489-ed50f9e9ac15")
               }
               query = query.order("name")
 
@@ -184,12 +184,12 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
             if (profile.role === 'jugador') {
               const { data: playerRec } = await supabaseClient
                 .from('players')
-                .select('id, first_name, last_name, status, teams(id, name)')
+                .select('id, first_name, last_name, status, teams(id, name, season_id)')
                 .eq('user_auth_id', user.id)
                 .neq('status', 'inactive')
                 .maybeSingle()
 
-              if (playerRec && !isCancelled) {
+              if (playerRec && playerRec.teams?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' && !isCancelled) {
                 setLinkedPlayers([{
                   player_id: playerRec.id,
                   players: {
@@ -202,22 +202,22 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
               } else {
                 const { data: tutors } = await supabaseClient
                   .from('player_tutors')
-                  .select('player_id, players(first_name, last_name, status, teams(id, name))')
+                  .select('player_id, players(first_name, last_name, status, teams(id, name, season_id))')
                   .eq('tutor_id', user.id)
                 
                 if (tutors && !isCancelled) {
-                  const activeTutors = tutors.filter((t: any) => t.players?.status !== 'inactive')
+                  const activeTutors = tutors.filter((t: any) => t.players?.status !== 'inactive' && t.players?.teams?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
                   setLinkedPlayers(activeTutors)
                 }
               }
             } else {
               const { data: tutors } = await supabaseClient
                 .from('player_tutors')
-                .select('player_id, players(first_name, last_name, status, teams(id, name))')
+                .select('player_id, players(first_name, last_name, status, teams(id, name, season_id))')
                 .eq('tutor_id', user.id)
               
               if (tutors && !isCancelled) {
-                const activeTutors = tutors.filter((t: any) => t.players?.status !== 'inactive')
+                const activeTutors = tutors.filter((t: any) => t.players?.status !== 'inactive' && t.players?.teams?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
                 setLinkedPlayers(activeTutors)
               }
             }

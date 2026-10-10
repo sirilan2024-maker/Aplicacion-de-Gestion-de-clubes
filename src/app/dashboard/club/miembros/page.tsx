@@ -1080,6 +1080,12 @@ function GlobalMembersContent() {
           targetSeasonId = activeSeason?.id || null;
         }
 
+        const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+        const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+        if (!targetSeasonId || targetSeasonId === CLOSED_SEASON_ID) {
+          targetSeasonId = ACTIVE_SEASON_ID;
+        }
+
         // 2. Fetch all players for this club directly from players table
         let playersData: any[] = []
         

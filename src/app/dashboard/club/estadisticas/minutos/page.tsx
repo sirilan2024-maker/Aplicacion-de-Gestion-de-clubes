@@ -58,9 +58,16 @@ function MinutosPageContent() {
         return
       }
 
-      // 2. Fetch teams
-      let teamsQuery = supabase.from('teams').select('id, name').eq('club_id', profile?.club_id)
-      if (activeSeason?.id) teamsQuery = teamsQuery.eq('season_id', activeSeason.id)
+      // 2. Fetch teams (strictly active season 26/27, never 25/26)
+      const effectiveSeasonId = activeSeason?.id && activeSeason.id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c'
+        ? activeSeason.id
+        : '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+      let teamsQuery = supabase.from('teams')
+        .select('id, name')
+        .eq('club_id', profile?.club_id)
+        .eq('season_id', effectiveSeasonId)
+        .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
       const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
@@ -137,9 +144,10 @@ function MinutosPageContent() {
         while (true) {
           const { data: convs, error } = await supabase
             .from('convocatorias')
-            .select('player_id, minutes_played, partidos!inner(equipo_id, estado)')
+            .select('player_id, minutes_played, partidos!inner(equipo_id, estado, season_id)')
             .in('partidos.equipo_id', teamIds)
             .eq('partidos.estado', 'Finalizado')
+            .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
             .range(page * pageSize, (page + 1) * pageSize - 1);
           if (error || !convs || convs.length === 0) break;
           matchMinutes = matchMinutes.concat(convs);

@@ -5,10 +5,20 @@ import { X, Save, ClipboardList, Plus, Minus, Info } from "lucide-react"
 import { updateMatchFullReportBatch } from "@/app/actions/match-actions"
 import { useRouter } from "next/navigation"
 
+const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+
 interface Player {
   id: string
   first_name: string
   last_name: string
+  status?: string
+  posicion?: string
+  posicion_principal?: string
+  team_id?: string
+  team?: {
+    id?: string
+    season_id?: string
+  }
 }
 
 interface MatchFullReportModalProps {
@@ -25,10 +35,46 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
   const [isPending, startTransition] = useTransition();
   const [success, setSuccess] = useState(false);
 
-  // Filtrar jugadores convocados (o plantilla activa del equipo si aún no se ha pasado convocatoria)
-  const playerList = convocatorias.length > 0 && convocatorias.some(c => c.status !== 'no_convocado')
-    ? players.filter(p => convocatorias.some(c => c.player_id === p.id && c.status !== 'no_convocado'))
-    : players;
+  // 1. Filtrar estrictamente jugadores válidos (excluir temporada cerrada 25/26, bajas/inactivos y staff)
+  const eligiblePlayers = (players || []).filter(p => {
+    const sId = p.team?.season_id;
+    if (sId === CLOSED_SEASON_ID) return false;
+
+    const st = (p.status || '').toLowerCase().trim();
+    if (st.includes('inactiv') || st.includes('baja')) return false;
+
+    const pos = (p.posicion || p.posicion_principal || '').toLowerCase();
+    if (pos.includes('entrenador') || pos.includes('delegado') || pos.includes('tecnico') || pos.includes('staff')) return false;
+
+    return true;
+  });
+
+  // 2. Convocatorias válidas de jugadores activos
+  const convocadosSet = new Set(
+    (convocatorias || [])
+      .filter(c => c.status !== 'no_convocado')
+      .map(c => c.player_id)
+  );
+
+  const rawList = convocadosSet.size > 0
+    ? eligiblePlayers.filter(p => convocadosSet.has(p.id))
+    : eligiblePlayers.filter(p => p.team_id === teamId || p.team?.id === teamId || !p.team_id);
+
+  // 3. Deduplicar por ID y por nombre normalizado
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  const playerList = rawList.filter(p => {
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+
+    const normName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (normName) {
+      if (seenNames.has(normName)) return false;
+      seenNames.add(normName);
+    }
+
+    return true;
+  });
 
   // Estado inicial desde convocatorias
   const initialReports: Record<string, {

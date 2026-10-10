@@ -30,20 +30,39 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
   const convPlayerIds = (convocatoriasData || []).map(c => c.player_id).filter(Boolean);
 
   // Strictly enforce active season: players must belong to active season teams and never be inactive
-  let playersQuery = supabase
+  const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+  const { data: teamPlayers } = await supabase
     .from("players")
-    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion, team:teams!inner(id, season_id)")
-    .neq("status", "inactive")
+    .select("id, first_name, last_name, dorsal, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
+    .eq("team_id", teamId)
     .neq("team.season_id", CLOSED_SEASON_ID)
+    .eq("team.season_id", ACTIVE_SEASON_ID)
+    .neq("status", "inactive")
     .order("first_name");
 
-  if (convPlayerIds.length > 0) {
-    playersQuery = playersQuery.or(`team_id.eq.${teamId},id.in.(${convPlayerIds.join(',')})`);
-  } else {
-    playersQuery = playersQuery.eq("team_id", teamId);
+  let extraPlayers: any[] = [];
+  const foreignConvIds = convPlayerIds.filter(id => !(teamPlayers || []).some((tp: any) => tp.id === id));
+  if (foreignConvIds.length > 0) {
+    const { data: extra } = await supabase
+      .from("players")
+      .select("id, first_name, last_name, dorsal, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
+      .in("id", foreignConvIds)
+      .neq("team.season_id", CLOSED_SEASON_ID)
+      .eq("team.season_id", ACTIVE_SEASON_ID)
+      .neq("status", "inactive");
+    extraPlayers = extra || [];
   }
 
-  const { data: playersData } = await playersQuery;
+  const seenPlayerIds = new Set<string>();
+  const playersData: any[] = [];
+  for (const p of [...(teamPlayers || []), ...extraPlayers]) {
+    const st = (p.status || '').toLowerCase();
+    if (!seenPlayerIds.has(p.id) && !st.includes('inactiv') && !st.includes('baja')) {
+      seenPlayerIds.add(p.id);
+      playersData.push(p);
+    }
+  }
 
   const { data: eventsData } = await supabase
     .from("match_events")

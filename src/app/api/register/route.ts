@@ -334,6 +334,67 @@ export async function POST(request: Request) {
       if (foundByPin?.id) targetPlayerId = foundByPin.id;
     }
 
+    // ── GESTIÓN DE JUGADORES EXISTENTES Y PREVENCIÓN DE DUPLICADOS/MODIFICACIÓN INDEBIDA ──
+    const cleanDni = formData.playerDni?.trim().toUpperCase();
+    const cleanSip = formData.playerSip?.trim();
+    const cleanFirstName = formData.playerFirstName?.trim();
+    const cleanLastName = formData.playerLastName?.trim();
+    const cleanBirthDate = formData.birthDate?.trim();
+
+    let matchedExistingPlayer: any = null;
+
+    // Buscar si ya existe este menor en el club por DNI, SIP o Nombre+Apellidos+Fecha de nacimiento
+    if (cleanDni) {
+      const { data: foundByDni } = await supabaseAdmin
+        .from('players')
+        .select('id, first_name, last_name, link_code, registration_status')
+        .eq('club_id', clubId)
+        .ilike('dni', cleanDni)
+        .limit(1)
+        .maybeSingle();
+      if (foundByDni?.id) matchedExistingPlayer = foundByDni;
+    }
+
+    if (!matchedExistingPlayer && cleanSip) {
+      const { data: foundBySip } = await supabaseAdmin
+        .from('players')
+        .select('id, first_name, last_name, link_code, registration_status')
+        .eq('club_id', clubId)
+        .eq('sip', cleanSip)
+        .limit(1)
+        .maybeSingle();
+      if (foundBySip?.id) matchedExistingPlayer = foundBySip;
+    }
+
+    if (!matchedExistingPlayer && cleanFirstName && cleanLastName && cleanBirthDate) {
+      const { data: foundByNameAndBirth } = await supabaseAdmin
+        .from('players')
+        .select('id, first_name, last_name, link_code, registration_status')
+        .eq('club_id', clubId)
+        .ilike('first_name', cleanFirstName)
+        .ilike('last_name', cleanLastName)
+        .eq('birth_date', cleanBirthDate)
+        .limit(1)
+        .maybeSingle();
+      if (foundByNameAndBirth?.id) matchedExistingPlayer = foundByNameAndBirth;
+    }
+
+    if (matchedExistingPlayer) {
+      const providedPin = formData.pinCode ? formData.pinCode.trim().toUpperCase() : null;
+      const expectedPin = matchedExistingPlayer.link_code ? matchedExistingPlayer.link_code.trim().toUpperCase() : null;
+
+      // Si no introdujo PIN o el PIN introducido no coincide con el código de vinculación oficial del jugador:
+      if (!providedPin || (expectedPin && providedPin !== expectedPin)) {
+        console.warn(`[register] Intento de re-inscripción o modificación no autorizada del jugador existente: ${matchedExistingPlayer.id}`);
+        return NextResponse.json({
+          error: `Este usuario ya está registrado y no se puede modificar la ficha.`
+        }, { status: 409 });
+      }
+
+      // Si proporcionó el PIN correcto, se fija como targetPlayerId para vincular al nuevo tutor
+      targetPlayerId = matchedExistingPlayer.id;
+    }
+
     const playerPayload: any = {
       // Datos personales del jugador
       first_name: formData.playerFirstName || formData.tutor1Name || email.split('@')[0],

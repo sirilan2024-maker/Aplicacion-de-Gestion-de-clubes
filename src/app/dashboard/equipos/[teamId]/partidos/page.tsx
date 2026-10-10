@@ -80,23 +80,39 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
 
   const convPlayerIds = [...new Set((convocatorias || []).map((c: any) => c.player_id).filter(Boolean))];
 
-  let playersQuery = adminClient
+  // 4. Cargar jugadores activos exclusivamente de la temporada activa (nunca 25/26)
+  const effectiveSeason = targetSeasonId || '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+  const { data: teamPlayers } = await adminClient
     .from('players')
     .select('*, team:teams!inner(id, season_id)')
-    .neq('status', 'inactive')
-    .neq('team.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+    .eq('team_id', currentTeamId)
+    .neq('team.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+    .eq('team.season_id', effectiveSeason)
+    .neq('status', 'inactive');
 
-  if (targetSeasonId) {
-    playersQuery = playersQuery.eq('team.season_id', targetSeasonId);
+  let extraPlayers: any[] = [];
+  const foreignConvIds = convPlayerIds.filter(id => !(teamPlayers || []).some((tp: any) => tp.id === id));
+  if (foreignConvIds.length > 0) {
+    const { data: extra } = await adminClient
+      .from('players')
+      .select('*, team:teams!inner(id, season_id)')
+      .in('id', foreignConvIds)
+      .neq('team.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .eq('team.season_id', effectiveSeason)
+      .neq('status', 'inactive');
+    extraPlayers = extra || [];
   }
 
-  if (convPlayerIds.length > 0) {
-    playersQuery = playersQuery.or(`team_id.eq.${currentTeamId},id.in.(${convPlayerIds.join(',')})`);
-  } else {
-    playersQuery = playersQuery.eq('team_id', currentTeamId);
+  const seenPlayerIds = new Set<string>();
+  const players: any[] = [];
+  for (const p of [...(teamPlayers || []), ...extraPlayers]) {
+    const st = (p.status || '').toLowerCase();
+    if (!seenPlayerIds.has(p.id) && !st.includes('inactiv') && !st.includes('baja')) {
+      seenPlayerIds.add(p.id);
+      players.push(p);
+    }
   }
-
-  const { data: players } = await playersQuery;
 
   // 5. Cargar información de la competición/grupo FFCV oficial
   let groupInfo = null;

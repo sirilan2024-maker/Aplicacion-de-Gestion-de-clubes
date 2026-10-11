@@ -312,40 +312,41 @@ export default function RendimientoGlobalPage() {
         </div>
 
         {/* Toggle Switch Píldora (3 Vistas) */}
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner w-full lg:w-auto">
+        <div className={`grid ${isFormative() ? 'grid-cols-3' : 'grid-cols-2'} sm:flex bg-gray-100 p-1 sm:p-1.5 rounded-2xl border border-gray-200 shadow-inner w-full lg:w-auto gap-1`}>
           <button
             onClick={() => setViewMode('entrenamientos')}
-            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0 ${
               viewMode === 'entrenamientos' 
                 ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            <TrendingUp size={16} className={viewMode === 'entrenamientos' ? 'text-emerald-500' : 'text-gray-400'} />
-            <span>Entrenamientos</span>
+            <TrendingUp size={15} className={`shrink-0 ${viewMode === 'entrenamientos' ? 'text-emerald-500' : 'text-gray-400'}`} />
+            <span className="sm:hidden truncate">Entrenos</span>
+            <span className="hidden sm:inline">Entrenamientos</span>
           </button>
           <button
             onClick={() => setViewMode('partidos')}
-            className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0 ${
               viewMode === 'partidos' 
                 ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            <Target size={16} className={viewMode === 'partidos' ? 'text-indigo-500' : 'text-gray-400'} />
-            <span>Partidos</span>
+            <Target size={15} className={`shrink-0 ${viewMode === 'partidos' ? 'text-indigo-500' : 'text-gray-400'}`} />
+            <span className="truncate">Partidos</span>
           </button>
           {isFormative() && (
             <button
               onClick={() => setViewMode('formativo')}
-              className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+              className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 viewMode === 'formativo' 
                   ? 'bg-white text-purple-700 shadow-sm border border-gray-200/50' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <BrainCircuit size={16} className={viewMode === 'formativo' ? 'text-purple-600' : 'text-gray-400'} />
-              <span>Formativo</span>
+              <BrainCircuit size={15} className={`shrink-0 ${viewMode === 'formativo' ? 'text-purple-600' : 'text-gray-400'}`} />
+              <span className="truncate">Formativo</span>
             </button>
           )}
         </div>
@@ -749,11 +750,11 @@ function TeamPerformanceBanner({ trainingStats }: { trainingStats: TrainingStats
   }
 
   return (
-    <div className={`mb-8 p-6 rounded-2xl border ${globalStatusBorder} ${globalStatusBg} flex flex-col md:flex-row items-center gap-6 shadow-sm`}>
+    <div className={`mb-6 sm:mb-8 p-3.5 sm:p-6 rounded-2xl border ${globalStatusBorder} ${globalStatusBg} flex flex-col md:flex-row items-center gap-4 sm:gap-6 shadow-sm overflow-hidden`}>
       {/* Left side: Global Number */}
-      <div className="flex flex-col items-center justify-center bg-white p-5 rounded-xl border border-white/50 shadow-sm min-w-[160px] text-center">
+      <div className="flex flex-col items-center justify-center bg-white p-3.5 sm:p-5 rounded-xl border border-white/50 shadow-sm w-full md:w-auto md:min-w-[160px] text-center">
         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Media Global ACWR</span>
-        <span className={`text-4xl font-black ${globalStatusColor}`}>{teamAcwr.toFixed(2)}</span>
+        <span className={`text-3xl sm:text-4xl font-black ${globalStatusColor}`}>{teamAcwr.toFixed(2)}</span>
         <span className={`text-xs font-bold uppercase mt-1 px-3 py-1 rounded-full ${globalStatusColor} bg-white border ${globalStatusBorder}`}>{globalStatusText}</span>
       </div>
 

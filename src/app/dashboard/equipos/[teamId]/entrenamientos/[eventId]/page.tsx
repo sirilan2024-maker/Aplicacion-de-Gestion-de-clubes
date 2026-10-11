@@ -566,7 +566,8 @@ export default function EntrenamientoDetailPage() {
                           }`}
                         >
                           <span className="text-xs leading-none shrink-0">{currentStatus === 'Lesionado' ? '⚕️' : '📝'}</span>
-                          <span className="truncate">{currentStatus === 'Lesionado' ? 'Lesionado' : 'Justificado'}</span>
+                          <span className="sm:hidden truncate">{currentStatus === 'Lesionado' ? 'Lesión' : 'Justif.'}</span>
+                          <span className="hidden sm:inline truncate">{currentStatus === 'Lesionado' ? 'Lesionado' : 'Justificado'}</span>
                         </button>
                       </div>
                     </div>

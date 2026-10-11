@@ -103,9 +103,9 @@ export function PlayerPerformanceDrawer({
       <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right overflow-hidden border-l border-slate-200">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-full border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
+        <div className="p-3.5 sm:p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-full border border-slate-200 shadow-xs flex items-center justify-center overflow-hidden shrink-0">
               {avatarUrl ? (
                 <img 
                   src={avatarUrl} 
@@ -113,32 +113,32 @@ export function PlayerPerformanceDrawer({
                   className="w-full h-full object-cover object-[center_25%]" 
                 />
               ) : (
-                <UserIcon className="text-slate-400" />
+                <UserIcon className="text-slate-400 w-5 h-5 sm:w-6 sm:h-6" />
               )}
             </div>
-            <div>
-              <h2 className="text-lg font-black text-slate-900">{pName}</h2>
-              <div className="text-xs font-bold text-slate-500 uppercase">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 truncate leading-tight">{pName}</h2>
+              <div className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mt-0.5">
                 {onlyFormative ? 'Informe Formativo & Evolución' : `Dorsal ${dorsal || '-'}`}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm">
+          <button onClick={onClose} className="p-1.5 sm:p-2 bg-white border border-slate-200 rounded-full text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors shadow-xs shrink-0 cursor-pointer">
             <X size={18} />
           </button>
         </div>
 
         {/* Tabs (Solo se muestran si no estamos en modo exclusivo formativo) */}
         {!onlyFormative && (
-          <div className="flex border-b border-slate-100 bg-slate-50/50">
-            <button onClick={() => setActiveTab('entrenamientos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'entrenamientos' ? 'border-emerald-500 text-emerald-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+          <div className="flex border-b border-slate-100 bg-slate-50/50 shrink-0">
+            <button onClick={() => setActiveTab('entrenamientos')} className={`flex-1 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'entrenamientos' ? 'border-emerald-500 text-emerald-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
               Entrenamientos
             </button>
-            <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+            <button onClick={() => setActiveTab('partidos')} className={`flex-1 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-indigo-500 text-indigo-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
               Partidos
             </button>
             {isFormative && (
-              <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
+              <button onClick={() => setActiveTab('formativo')} className={`flex-1 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${activeTab === 'formativo' ? 'border-purple-500 text-purple-700 bg-white' : 'border-transparent text-slate-500 hover:bg-slate-100/50'}`}>
                 🧠 Formativo
               </button>
             )}
@@ -146,21 +146,21 @@ export function PlayerPerformanceDrawer({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 bg-white">
           {(activeTab === 'formativo' || onlyFormative) && (
             <div className="animate-in fade-in">
               <PlayerProgressView playerId={playerId} playerName={pName} />
             </div>
           )}
           {!onlyFormative && activeTab === 'entrenamientos' && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                  <div className="text-2xl font-black text-slate-900">{globalTrainingStats?.acwr > 0 ? globalTrainingStats.acwr.toFixed(2) : '-'}</div>
+            <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 text-center">
+                  <div className="text-xl sm:text-2xl font-black text-slate-900">{globalTrainingStats?.acwr > 0 ? globalTrainingStats.acwr.toFixed(2) : '-'}</div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ratio ACWR</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                  <div className="text-2xl font-black text-slate-900">{globalTrainingStats?.trainingMinutes || 0}</div>
+                <div className="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100 text-center">
+                  <div className="text-xl sm:text-2xl font-black text-slate-900">{globalTrainingStats?.trainingMinutes || 0}</div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mins Totales</div>
                 </div>
               </div>

@@ -96,93 +96,93 @@ export function PlayerProgressView({ playerId, playerName }: PlayerProgressViewP
   return (
     <div className="space-y-6">
       {/* ─── Control de Unificación Temporal (Sesión, Semanas, Trimestres, Anual) ─── */}
-      <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-sm">
-            <Clock size={18} />
+      <div className="bg-slate-50 p-2.5 sm:p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 sm:w-9 sm:h-9 bg-blue-600 text-white rounded-lg sm:rounded-xl flex items-center justify-center shadow-xs shrink-0">
+            <Clock size={16} />
           </div>
           <div>
-            <h4 className="font-black text-slate-900 text-sm leading-tight">Unificación y Progresión Temporal</h4>
-            <p className="text-slate-500 text-xs font-medium">Agrupa los datos según el marco evolutivo deseado</p>
+            <h4 className="font-black text-slate-900 text-xs sm:text-sm leading-tight">Progresión Temporal</h4>
+            <p className="text-slate-500 text-[10px] sm:text-xs font-medium hidden sm:block">Agrupa los datos según el marco evolutivo deseado</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:flex p-1 bg-white rounded-2xl border border-slate-200 shadow-xs gap-1 w-full sm:w-auto">
+        <div className="grid grid-cols-4 sm:flex p-0.5 sm:p-1 bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs gap-0.5 sm:gap-1 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setGrouping("sesion")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
-              grouping === "sesion" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            className={`px-1 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
+              grouping === "sesion" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            Diario / Sesión
+            Sesión
           </button>
           <button
             type="button"
             onClick={() => setGrouping("semana")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
-              grouping === "semana" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            className={`px-1 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
+              grouping === "semana" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            Por Semanas
+            Semanas
           </button>
           <button
             type="button"
             onClick={() => setGrouping("trimestre")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
-              grouping === "trimestre" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            className={`px-1 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
+              grouping === "trimestre" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            Por Trimestres
+            Trimestres
           </button>
           <button
             type="button"
             onClick={() => setGrouping("anual")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-center ${
-              grouping === "anual" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
+            className={`px-1 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all text-center truncate ${
+              grouping === "anual" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            Visión Anual
+            Anual
           </button>
         </div>
       </div>
 
       {/* ─── 1. Tarjetas Resumen por Módulos ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-3xl text-white shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-100">Técnico-Analítico</span>
-            <Flame size={18} className="text-amber-200" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-3.5 sm:p-5 rounded-2xl text-white shadow-sm">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-amber-100">Técnico</span>
+            <Flame size={16} className="text-amber-200 shrink-0" />
           </div>
-          <div className="text-3xl font-black">{tecnicoSummary?.average_score || "-"} <span className="text-base font-bold text-amber-200">/ 5</span></div>
-          <div className="text-[11px] text-amber-100 mt-1 font-medium">{tecnicoSummary?.evaluated_concepts} conceptos evaluados</div>
+          <div className="text-2xl sm:text-3xl font-black">{tecnicoSummary?.average_score || "-"} <span className="text-xs sm:text-base font-bold text-amber-200">/ 5</span></div>
+          <div className="text-[10px] sm:text-[11px] text-amber-100 mt-0.5 sm:mt-1 font-medium truncate">{tecnicoSummary?.evaluated_concepts} conceptos</div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-5 rounded-3xl text-white shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-100">Táctico-Global</span>
-            <Compass size={18} className="text-blue-200" />
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-3.5 sm:p-5 rounded-2xl text-white shadow-sm">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-blue-100">Táctico</span>
+            <Compass size={16} className="text-blue-200 shrink-0" />
           </div>
-          <div className="text-3xl font-black">{tacticoSummary?.average_score || "-"} <span className="text-base font-bold text-blue-200">/ 5</span></div>
-          <div className="text-[11px] text-blue-100 mt-1 font-medium">{tacticoSummary?.evaluated_concepts} conceptos evaluados</div>
+          <div className="text-2xl sm:text-3xl font-black">{tacticoSummary?.average_score || "-"} <span className="text-xs sm:text-base font-bold text-blue-200">/ 5</span></div>
+          <div className="text-[10px] sm:text-[11px] text-blue-100 mt-0.5 sm:mt-1 font-medium truncate">{tacticoSummary?.evaluated_concepts} conceptos</div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-5 rounded-3xl text-white shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">Físico-Motriz</span>
-            <Activity size={18} className="text-emerald-200" />
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-3.5 sm:p-5 rounded-2xl text-white shadow-sm">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">Físico</span>
+            <Activity size={16} className="text-emerald-200 shrink-0" />
           </div>
-          <div className="text-3xl font-black">{fisicoSummary?.average_score || "-"} <span className="text-base font-bold text-emerald-200">/ 5</span></div>
-          <div className="text-[11px] text-emerald-100 mt-1 font-medium">{fisicoSummary?.evaluated_concepts} conceptos evaluados</div>
+          <div className="text-2xl sm:text-3xl font-black">{fisicoSummary?.average_score || "-"} <span className="text-xs sm:text-base font-bold text-emerald-200">/ 5</span></div>
+          <div className="text-[10px] sm:text-[11px] text-emerald-100 mt-0.5 sm:mt-1 font-medium truncate">{fisicoSummary?.evaluated_concepts} conceptos</div>
         </div>
 
-        <div className="bg-gradient-to-br from-rose-500 to-pink-600 p-5 rounded-3xl text-white shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-100">Socio-Afectivo</span>
-            <HeartHandshake size={18} className="text-rose-200" />
+        <div className="bg-gradient-to-br from-rose-500 to-pink-600 p-3.5 sm:p-5 rounded-2xl text-white shadow-sm">
+          <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-rose-100">Socio-Af.</span>
+            <HeartHandshake size={16} className="text-rose-200 shrink-0" />
           </div>
-          <div className="text-3xl font-black">{socioSummary?.average_score || "-"} <span className="text-base font-bold text-rose-200">/ 5</span></div>
-          <div className="text-[11px] text-rose-100 mt-1 font-medium">{socioSummary?.evaluated_concepts} conceptos evaluados</div>
+          <div className="text-2xl sm:text-3xl font-black">{socioSummary?.average_score || "-"} <span className="text-xs sm:text-base font-bold text-rose-200">/ 5</span></div>
+          <div className="text-[10px] sm:text-[11px] text-rose-100 mt-0.5 sm:mt-1 font-medium truncate">{socioSummary?.evaluated_concepts} conceptos</div>
         </div>
       </div>
 

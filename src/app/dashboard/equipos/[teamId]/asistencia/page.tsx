@@ -563,55 +563,56 @@ export default function AsistenciaEquipoPage() {
                     </div>
                     
                     {/* Status selectors */}
-                    <div className="flex bg-gray-100 p-1 rounded-xl self-start sm:self-auto relative border border-gray-200/50 shadow-inner">
-                        <button
-                          onClick={() => handleStatusChange(player.id, 'present')}
-                          disabled={isSaving}
-                          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
-                            currentStatus === 'present' || currentStatus === 'Presente'
-                              ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
-                              : 'text-gray-600 hover:bg-gray-200/60'
-                          }`}
-                        >
-                          {isSaving && (currentStatus === 'present' || currentStatus === 'Presente') ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Check className="w-3.5 h-3.5" />}
-                          Presente
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(player.id, 'retraso')}
-                          disabled={isSaving}
-                          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
-                            currentStatus === 'retraso' || currentStatus === 'Retraso'
-                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-100'
-                              : 'text-gray-600 hover:bg-gray-200/60'
-                          }`}
-                        >
-                          {isSaving && (currentStatus === 'retraso' || currentStatus === 'Retraso') ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Clock className="w-3.5 h-3.5" />}
-                          Retraso
-                        </button>
+                    <div className="grid grid-cols-4 sm:flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto gap-1 border border-gray-200/50 shadow-inner">
+                      <button
+                        onClick={() => handleStatusChange(player.id, 'present')}
+                        disabled={isSaving}
+                        className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all disabled:opacity-50 ${
+                          currentStatus === 'present' || currentStatus === 'Presente'
+                            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
+                            : 'text-gray-600 hover:bg-gray-200/60'
+                        }`}
+                      >
+                        {isSaving && (currentStatus === 'present' || currentStatus === 'Presente') ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <Check className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="truncate">Presente</span>
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(player.id, 'retraso')}
+                        disabled={isSaving}
+                        className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all disabled:opacity-50 ${
+                          currentStatus === 'retraso' || currentStatus === 'Retraso'
+                            ? 'bg-orange-500 text-white shadow-sm shadow-orange-100'
+                            : 'text-gray-600 hover:bg-gray-200/60'
+                        }`}
+                      >
+                        {isSaving && (currentStatus === 'retraso' || currentStatus === 'Retraso') ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <Clock className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="truncate">Retraso</span>
+                      </button>
                       <button
                         onClick={() => handleStatusChange(player.id, 'absent')}
                         disabled={isSaving}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
+                        className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all disabled:opacity-50 ${
                           currentStatus === 'absent'
                             ? 'bg-red-500 text-white shadow-sm shadow-red-100'
                             : 'text-gray-600 hover:bg-gray-200/60'
                         }`}
                       >
-                        {isSaving && currentStatus === 'absent' ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <X className="w-3.5 h-3.5" />}
-                        Ausente
+                        {isSaving && currentStatus === 'absent' ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <X className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="truncate">Ausente</span>
                       </button>
                       <button
                         onClick={() => handleOpenJustifyModal(player)}
                         disabled={isSaving}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer ${
+                        className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all disabled:opacity-50 cursor-pointer ${
                           currentStatus === 'excused'
                             ? 'bg-amber-500 text-white shadow-sm shadow-amber-100'
                             : 'text-gray-600 hover:bg-gray-200/60'
                         }`}
                         title="Marcar como justificado e indicar motivo"
                       >
-                        {isSaving && currentStatus === 'excused' ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Stethoscope className="w-3.5 h-3.5" />}
-                        Justificado
+                        {isSaving && currentStatus === 'excused' ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <Stethoscope className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="sm:hidden truncate">Justif.</span>
+                        <span className="hidden sm:inline truncate">Justificado</span>
                       </button>
                     </div>
 
@@ -760,42 +761,43 @@ export default function AsistenciaEquipoPage() {
       )}
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Análisis de Asistencia</h2>
-            <p className="text-gray-500 text-sm mt-1">Cuadrícula con el historial de los últimos eventos. Pulsa en el título de un evento para pasar lista o editarlo.</p>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Análisis de Asistencia</h2>
+            <p className="text-gray-500 text-xs sm:text-sm mt-1">Cuadrícula con el historial de los últimos eventos. Pulsa en el título de un evento para pasar lista o editarlo.</p>
           </div>
           
-          <div className="flex bg-gray-100 p-1 rounded-full border border-gray-200 shadow-inner">
+          <div className="w-full sm:w-auto grid grid-cols-3 sm:flex bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner gap-1">
             <button
               onClick={() => setAttendanceFilter('todos')}
-              className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 attendanceFilter === 'todos' 
                   ? 'bg-white text-slate-800 shadow-sm border border-gray-200/50' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Todos
+              <span>Todos</span>
             </button>
             <button
               onClick={() => setAttendanceFilter('entrenamientos')}
-              className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 attendanceFilter === 'entrenamientos' 
                   ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Entrenamientos
+              <span className="sm:hidden truncate">Entrenos</span>
+              <span className="hidden sm:inline">Entrenamientos</span>
             </button>
             <button
               onClick={() => setAttendanceFilter('partidos')}
-              className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 attendanceFilter === 'partidos' 
                   ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Partidos
+              <span className="truncate">Partidos</span>
             </button>
           </div>
         </div>
@@ -933,38 +935,38 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
   const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 0;
 
   return (
-    <div className="sticky left-0 p-3 md:p-6 bg-slate-50/50 w-full max-w-[95vw] md:max-w-[calc(100vw-300px)] lg:max-w-5xl mx-auto md:mx-0 overflow-hidden">
-      <h4 className="font-bold text-blue-900 mb-6 flex items-center gap-2">
-        <CalendarIcon className="w-5 h-5 text-blue-500" />
+    <div className="sticky left-0 p-2.5 sm:p-5 bg-slate-50/70 w-full max-w-[95vw] md:max-w-[calc(100vw-300px)] lg:max-w-5xl mx-auto md:mx-0 overflow-hidden">
+      <h4 className="font-bold text-blue-900 mb-2.5 sm:mb-4 flex items-center gap-2 text-xs sm:text-sm">
+        <CalendarIcon className="w-4 h-4 text-blue-500 shrink-0" />
         Resumen de Asistencia
       </h4>
       
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center relative overflow-hidden text-center">
-          <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-50 rounded-bl-full -z-10"></div>
-          <div className="text-2xl md:text-3xl font-black text-slate-800 mb-1">{pct}%</div>
-          <div className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wide leading-tight">Asistencia Total</div>
-          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-            <div className={`h-1.5 rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }}></div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-5">
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col items-center justify-center relative overflow-hidden text-center">
+          <div className="absolute top-0 right-0 w-10 h-10 bg-emerald-50 rounded-bl-full -z-10"></div>
+          <div className="text-xl sm:text-2xl font-black text-slate-800 mb-0.5">{pct}%</div>
+          <div className="text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide leading-tight">Asistencia Total</div>
+          <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5">
+            <div className={`h-1 rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }}></div>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm flex flex-col items-center justify-center text-center">
-          <div className="text-2xl md:text-3xl font-black text-emerald-600 mb-1">{presents}</div>
-          <div className="text-[10px] md:text-xs font-bold text-emerald-800 uppercase tracking-wide leading-tight">Asistencias</div>
-          <div className="text-[9px] md:text-[10px] text-emerald-500 mt-1 leading-tight">Completadas</div>
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-emerald-100 shadow-xs flex flex-col items-center justify-center text-center">
+          <div className="text-xl sm:text-2xl font-black text-emerald-600 mb-0.5">{presents}</div>
+          <div className="text-[9px] sm:text-xs font-bold text-emerald-800 uppercase tracking-wide leading-tight">Asistencias</div>
+          <div className="text-[8px] sm:text-[10px] text-emerald-500 mt-0.5 leading-tight">Completadas</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm flex flex-col items-center justify-center text-center">
-          <div className="text-2xl md:text-3xl font-black text-red-600 mb-1">{absents}</div>
-          <div className="text-[10px] md:text-xs font-bold text-red-800 uppercase tracking-wide leading-tight">Injustificadas</div>
-          <div className="text-[9px] md:text-[10px] text-red-500 mt-1 leading-tight">Ausencias</div>
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-red-100 shadow-xs flex flex-col items-center justify-center text-center">
+          <div className="text-xl sm:text-2xl font-black text-red-600 mb-0.5">{absents}</div>
+          <div className="text-[9px] sm:text-xs font-bold text-red-800 uppercase tracking-wide leading-tight">Injustificadas</div>
+          <div className="text-[8px] sm:text-[10px] text-red-500 mt-0.5 leading-tight">Ausencias</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm flex flex-col items-center justify-center text-center">
-          <div className="text-2xl md:text-3xl font-black text-amber-600 mb-1">{excused}</div>
-          <div className="text-[10px] md:text-xs font-bold text-amber-800 uppercase tracking-wide leading-tight">Justificadas</div>
-          <div className="text-[9px] md:text-[10px] text-amber-500 mt-1 leading-tight">Lesión/Permiso</div>
+        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-amber-100 shadow-xs flex flex-col items-center justify-center text-center">
+          <div className="text-xl sm:text-2xl font-black text-amber-600 mb-0.5">{excused}</div>
+          <div className="text-[9px] sm:text-xs font-bold text-amber-800 uppercase tracking-wide leading-tight">Justificadas</div>
+          <div className="text-[8px] sm:text-[10px] text-amber-500 mt-0.5 leading-tight">Lesión/Permiso</div>
         </div>
       </div>
 

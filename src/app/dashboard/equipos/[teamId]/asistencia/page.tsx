@@ -816,20 +816,20 @@ export default function AsistenciaEquipoPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr>
-                  <th className="p-4 border-b border-gray-200 bg-gray-50 sticky left-0 z-10 font-bold text-gray-700 w-64 shadow-[1px_0_0_0_#e5e7eb]">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 sticky left-0 z-20 font-bold text-gray-700 min-w-[210px] sm:min-w-[270px] w-[210px] sm:w-[270px] shadow-[1px_0_0_0_#e5e7eb]">
                     Jugador
                   </th>
-                  <th className="p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-24 border-l border-gray-200">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-20 sm:w-24 border-l border-gray-200">
                     Faltas
                   </th>
-                  <th className="p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-32 border-l border-gray-200">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-24 sm:w-32 border-l border-gray-200">
                     % Total
                   </th>
                   {filteredPastEvents.map((ev, i) => (
                     <th 
                       key={ev.id || i} 
                       onClick={() => router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${ev.id}&date=${ev.date}`)}
-                      className="p-4 border-b border-l border-gray-200 bg-gray-50 text-center text-xs font-bold text-gray-600 w-24 cursor-pointer hover:bg-gray-100/80 transition-colors group"
+                      className="p-3 sm:p-4 border-b border-l border-gray-200 bg-gray-50 text-center text-xs font-bold text-gray-600 w-24 cursor-pointer hover:bg-gray-100/80 transition-colors group"
                     >
                       <div className="truncate w-full max-w-[80px] mx-auto text-blue-600 group-hover:underline" title={ev.title}>
                         {ev.title}
@@ -854,38 +854,44 @@ export default function AsistenciaEquipoPage() {
                       onClick={() => setExpandedPlayerId(isExpanded ? null : player.id)}
                       className={`hover:bg-blue-50/20 transition-colors cursor-pointer ${faltas >= 3 ? 'bg-red-50/10' : ''} ${isExpanded ? 'bg-blue-50/40' : ''}`}
                     >
-                      <td className="p-4 font-semibold text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] z-10 flex items-center gap-3">
-                        {isExpanded ? <ChevronUp className="w-4 h-4 text-blue-500 shrink-0"/> : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0"/>}
-                        <div className="w-7 h-7 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
-                          {player.avatar_url ? (
-                            <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                      <td className="p-3 sm:p-4 font-semibold text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] z-10 min-w-[210px] sm:min-w-[270px] w-[210px] sm:w-[270px]">
+                        <div className="flex items-center gap-2 sm:gap-2.5">
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-blue-600 shrink-0"/> : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0"/>}
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                            {player.avatar_url ? (
+                              <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                            ) : (
+                              <span className="text-[10px] font-bold text-slate-500">
+                                {player.first_name?.charAt(0)}{player.last_name?.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          {player.dorsal ? (
+                            <span className="text-xs text-gray-500 font-black w-4 text-right shrink-0">{player.dorsal}</span>
                           ) : (
-                            <span className="text-[10px] font-bold text-slate-500">
-                              {player.first_name?.charAt(0)}{player.last_name?.charAt(0)}
-                            </span>
+                            <span className="text-xs text-gray-400 font-bold w-4 text-right shrink-0"></span>
                           )}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 whitespace-normal break-words leading-tight block group-hover:text-blue-600 transition-colors">
+                              {player.first_name} {player.last_name}
+                            </span>
+                          </div>
+                          {faltas >= 3 && <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" title="Múltiples faltas"></div>}
                         </div>
-                        {player.dorsal ? (
-                          <span className="text-xs text-gray-500 font-extrabold w-4 text-right shrink-0">{player.dorsal}</span>
-                        ) : (
-                          <span className="text-xs text-gray-400 font-bold w-4 text-right shrink-0"></span>
-                        )}
-                        <span className="truncate group-hover:text-blue-600 transition-colors">{player.first_name} {player.last_name}</span>
-                        {faltas >= 3 && <div className="w-2 h-2 rounded-full bg-red-500 ml-1" title="Múltiples faltas"></div>}
                       </td>
                       
-                      <td className="p-4 text-center border-l border-gray-100 font-bold text-red-600 bg-red-50/30">
+                      <td className="p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-red-600 bg-red-50/30">
                         {faltas > 0 ? faltas : '-'}
                       </td>
                       
-                      <td className="p-4 text-center font-black text-gray-900 border-l border-gray-200 bg-gray-50/50">
+                      <td className="p-3 sm:p-4 text-center font-black text-gray-900 border-l border-gray-200 bg-gray-50/50">
                         {pct}%
                       </td>
                       {filteredPastEvents.map((ev, i) => {
                         const att = summaryData.find(a => a.player_id === player.id && (a.event_id === ev.id || a.date === ev.date));
                         const stat = att?.status;
                         return (
-                          <td key={ev.id || i} className="p-4 border-l border-gray-200 text-center">
+                          <td key={ev.id || i} className="p-3 sm:p-4 border-l border-gray-200 text-center">
                             <div 
                               className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center shadow-sm border border-black/5 ${getStatusColor(stat)}`}
                               title={att?.notes ? `${stat || 'Registrado'}: ${att.notes}` : stat || 'Sin registrar'}
@@ -902,7 +908,7 @@ export default function AsistenciaEquipoPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={filteredPastEvents.length + 3} className="p-0 border-b border-blue-100 bg-slate-50/80 shadow-inner">
+                        <td colSpan={filteredPastEvents.length + 3} className="p-0 border-b border-blue-100 bg-slate-50/90 shadow-inner">
                           <PlayerAttendanceSummary 
                             playerId={player.id} 
                             events={filteredPastEvents} 
@@ -923,9 +929,9 @@ export default function AsistenciaEquipoPage() {
   );
 }
 
-// Subcomponente para mostrar un resumen visual de la asistencia
+// Subcomponente para mostrar un resumen visual de la asistencia (ultracompacto sin scroll)
 function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: string, events: PastEvent[], summaryData: AttendanceRecord[] }) {
-  if (events.length === 0) return <div className="p-8 text-center text-slate-500">No hay eventos para mostrar.</div>;
+  if (events.length === 0) return <div className="p-3 text-center text-xs text-slate-500">No hay eventos para mostrar.</div>;
 
   const totalEvents = events.length;
   const presents = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && ['presente', 'present', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
@@ -934,101 +940,87 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
 
   const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 0;
 
+  const absencesList = events.filter(ev => {
+    const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
+    return att && ['ausente', 'absent', 'lesionado', 'excused'].includes(att.status?.toLowerCase() || '');
+  });
+
   return (
-    <div className="sticky left-0 p-2.5 sm:p-5 bg-slate-50/70 w-full max-w-[95vw] md:max-w-[calc(100vw-300px)] lg:max-w-5xl mx-auto md:mx-0 overflow-hidden">
-      <h4 className="font-bold text-blue-900 mb-2.5 sm:mb-4 flex items-center gap-2 text-xs sm:text-sm">
-        <CalendarIcon className="w-4 h-4 text-blue-500 shrink-0" />
-        Resumen de Asistencia
-      </h4>
-      
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-5">
-        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col items-center justify-center relative overflow-hidden text-center">
-          <div className="absolute top-0 right-0 w-10 h-10 bg-emerald-50 rounded-bl-full -z-10"></div>
-          <div className="text-xl sm:text-2xl font-black text-slate-800 mb-0.5">{pct}%</div>
-          <div className="text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide leading-tight">Asistencia Total</div>
-          <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5">
-            <div className={`h-1 rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }}></div>
-          </div>
+    <div className="sticky left-0 p-3 sm:p-4 bg-slate-50/95 border-r border-slate-200/80 w-full max-w-[calc(100vw-36px)] sm:max-w-3xl">
+      {/* Fila compacta de 4 métricas clave */}
+      <div className="grid grid-cols-4 gap-2 mb-2.5">
+        <div className="bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-2xs text-center">
+          <div className="text-base sm:text-lg font-black text-slate-900 leading-tight">{pct}%</div>
+          <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-tight">Total</div>
         </div>
 
-        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-emerald-100 shadow-xs flex flex-col items-center justify-center text-center">
-          <div className="text-xl sm:text-2xl font-black text-emerald-600 mb-0.5">{presents}</div>
-          <div className="text-[9px] sm:text-xs font-bold text-emerald-800 uppercase tracking-wide leading-tight">Asistencias</div>
-          <div className="text-[8px] sm:text-[10px] text-emerald-500 mt-0.5 leading-tight">Completadas</div>
+        <div className="bg-white px-2 py-1.5 rounded-lg border border-emerald-100 shadow-2xs text-center">
+          <div className="text-base sm:text-lg font-black text-emerald-600 leading-tight">{presents}</div>
+          <div className="text-[9px] sm:text-[10px] font-bold text-emerald-700 uppercase tracking-tight">Asistencias</div>
         </div>
 
-        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-red-100 shadow-xs flex flex-col items-center justify-center text-center">
-          <div className="text-xl sm:text-2xl font-black text-red-600 mb-0.5">{absents}</div>
-          <div className="text-[9px] sm:text-xs font-bold text-red-800 uppercase tracking-wide leading-tight">Injustificadas</div>
-          <div className="text-[8px] sm:text-[10px] text-red-500 mt-0.5 leading-tight">Ausencias</div>
+        <div className="bg-white px-2 py-1.5 rounded-lg border border-red-100 shadow-2xs text-center">
+          <div className="text-base sm:text-lg font-black text-red-600 leading-tight">{absents}</div>
+          <div className="text-[9px] sm:text-[10px] font-bold text-red-700 uppercase tracking-tight">Injustificadas</div>
         </div>
 
-        <div className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-amber-100 shadow-xs flex flex-col items-center justify-center text-center">
-          <div className="text-xl sm:text-2xl font-black text-amber-600 mb-0.5">{excused}</div>
-          <div className="text-[9px] sm:text-xs font-bold text-amber-800 uppercase tracking-wide leading-tight">Justificadas</div>
-          <div className="text-[8px] sm:text-[10px] text-amber-500 mt-0.5 leading-tight">Lesión/Permiso</div>
+        <div className="bg-white px-2 py-1.5 rounded-lg border border-amber-100 shadow-2xs text-center">
+          <div className="text-base sm:text-lg font-black text-amber-600 leading-tight">{excused}</div>
+          <div className="text-[9px] sm:text-[10px] font-bold text-amber-700 uppercase tracking-tight">Justificadas</div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 font-bold text-slate-700 text-sm">
-          Últimas Ausencias Registradas
-        </div>
-        <div className="divide-y divide-slate-100">
-          {events.filter(ev => {
-            const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
-            return att && ['ausente', 'absent', 'lesionado', 'excused'].includes(att.status?.toLowerCase() || '');
-          }).slice(0, 5).map(ev => {
+      {/* Historial ultracompacto en chips horizontales (sin tablas gigantes ni scroll vertical) */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">Últimas incidencias:</span>
+        {absencesList.length === 0 ? (
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+            ✅ 100% Asistencia regular (sin ausencias)
+          </span>
+        ) : (
+          absencesList.slice(-3).reverse().map(ev => {
             const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
             const isExcused = ['lesionado', 'excused'].includes(att?.status?.toLowerCase() || '');
+            let noteTag = '';
+            let noteText = '';
+            if (att?.notes) {
+              const match = att.notes.match(/^\[(.*?)\]\s*(.*)$/);
+              if (match) {
+                noteTag = match[1];
+                noteText = match[2];
+              } else {
+                noteText = att.notes;
+              }
+            }
+
             return (
-              <div key={ev.id} className="p-3 md:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
-                <div className="flex items-start sm:items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 sm:mt-0 shrink-0 ${isExcused ? 'bg-amber-500' : 'bg-red-500'}`}></div>
-                  <div className="min-w-0">
-                    <div className="font-bold text-slate-800 text-sm truncate">{ev.title}</div>
-                    <div className="text-xs text-slate-500 truncate">{new Date(ev.date).toLocaleDateString('es-ES')} • {ev.event_type}</div>
-                    {att?.notes && (
-                      <div className="mt-1">
-                        {(() => {
-                          const match = att.notes.match(/^\[(.*?)\]\s*(.*)$/);
-                          if (match) {
-                            return (
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
-                                  {match[1]}
-                                </span>
-                                {match[2] && (
-                                  <span className="text-[11px] text-slate-600 italic">
-                                    {match[2]}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          }
-                          return (
-                            <span className="text-[11px] text-amber-800 italic bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                              {att.notes}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className={`self-start sm:self-auto px-3 py-1 rounded-full text-[10px] md:text-xs font-bold shrink-0 ${isExcused ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                  {isExcused ? 'Falta Justificada' : 'Ausencia'}
-                </div>
+              <div 
+                key={ev.id} 
+                className={`text-[11px] px-2 py-1 rounded-md border flex items-center gap-1.5 ${
+                  isExcused 
+                    ? 'bg-amber-50/90 border-amber-200 text-amber-900' 
+                    : 'bg-red-50/90 border-red-200 text-red-900'
+                }`}
+              >
+                <span className="font-extrabold">{new Date(ev.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</span>
+                <span>•</span>
+                <span className="font-semibold">{ev.title}</span>
+                <span>•</span>
+                <span className="font-bold">{isExcused ? 'Justif.' : 'Falta'}</span>
+                {noteTag && (
+                  <span className="text-[9px] font-black uppercase bg-amber-200/80 px-1 py-0.2 rounded text-amber-950">
+                    {noteTag}
+                  </span>
+                )}
+                {noteText && !noteTag && (
+                  <span className="text-[10px] italic text-slate-600 truncate max-w-[120px]">
+                    ({noteText})
+                  </span>
+                )}
               </div>
             );
-          }).reverse()}
-          {events.filter(ev => {
-            const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
-            return att && ['ausente', 'absent', 'lesionado', 'excused'].includes(att.status?.toLowerCase() || '');
-          }).length === 0 && (
-            <div className="p-8 text-center text-slate-400 text-sm">No se han registrado ausencias recientes en este filtro.</div>
-          )}
-        </div>
+          })
+        )}
       </div>
     </div>
   );

@@ -39,7 +39,7 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
       // 3. Fetch all team players AND valid call-ups strictly in active season
       let query = supabase
         .from("players")
-        .select("id, first_name, last_name, dorsal, status, medical_notes, team_id, teams:teams!inner(name, category, season_id)")
+        .select("id, first_name, last_name, dorsal, avatar_url, status, medical_notes, team_id, teams:teams!inner(name, category, season_id)")
         .neq('status', 'inactive')
         .neq('teams.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
         .order("first_name")
@@ -125,16 +125,27 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                 className={`p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between transition-colors gap-3 sm:gap-4 ${!isAvailable ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}
               >
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs border-2 shrink-0
-                    ${isConvocado ? 'bg-blue-600 text-white border-blue-700' : 
+                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs border-2 shrink-0
+                    ${isConvocado ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-500/20' : 
                       !isAvailable ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-white text-slate-600 border-gray-200'}`}>
-                    {p.dorsal || '-'}
+                    {p.avatar_url ? (
+                      <img src={p.avatar_url} alt={p.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                    ) : (
+                      <span className={isConvocado ? 'text-blue-700 font-black' : 'text-slate-600 font-bold'}>
+                        {p.dorsal || `${p.first_name?.charAt(0) || ''}${p.last_name?.charAt(0) || ''}`}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h4 className={`font-bold text-sm sm:text-base truncate ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
                         {p.first_name} {p.last_name}
                       </h4>
+                      {p.dorsal && (
+                        <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                          #{p.dorsal}
+                        </span>
+                      )}
                       {(p.teams?.category?.toLowerCase().includes('juvenil') || p.team_id !== teamId) && (
                         <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
                           {p.teams?.name || 'Juvenil'}

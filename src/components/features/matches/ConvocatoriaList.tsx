@@ -13,6 +13,8 @@ export interface Player {
   status: AttendanceStatus;
   teamName?: string;
   isJuvenile?: boolean;
+  avatarUrl?: string | null;
+  dorsal?: number | null;
 }
 
 export function ConvocatoriaList({ players = [], matchId, convocatorias = [], onCloseModal }: { players?: any[], matchId?: string, convocatorias?: any[], onCloseModal?: () => void }) {
@@ -47,7 +49,9 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
       position: (p.posicion || 'Jugador').toLowerCase(),
       status: status,
       teamName: p.teams?.name || (isJuv ? 'Juvenil' : undefined),
-      isJuvenile: isJuv
+      isJuvenile: isJuv,
+      avatarUrl: p.avatar_url,
+      dorsal: p.dorsal
     });
   });
 
@@ -237,16 +241,32 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                     : 'border-slate-100 bg-white hover:bg-slate-50'
                 }`}
               >
-                <div className="min-w-0 w-full sm:w-auto pr-0 sm:pr-4">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
-                    {player.isJuvenile && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded border border-indigo-200 shrink-0">
-                        {player.teamName || 'JUVENIL'}
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 w-full sm:w-auto pr-0 sm:pr-4">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                    {player.avatarUrl ? (
+                      <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
+                    ) : (
+                      <span className="text-slate-600 font-extrabold text-[11px]">
+                        {player.dorsal || player.name.slice(0, 2)}
                       </span>
                     )}
                   </div>
-                  <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
+                      {player.dorsal && (
+                        <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-200 shrink-0">
+                          #{player.dorsal}
+                        </span>
+                      )}
+                      {player.isJuvenile && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded border border-indigo-200 shrink-0">
+                          {player.teamName || 'JUVENIL'}
+                        </span>
+                      )}
+                    </div>
+                    <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-4 sm:flex sm:flex-nowrap gap-1.5 w-full sm:w-auto shrink-0 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">

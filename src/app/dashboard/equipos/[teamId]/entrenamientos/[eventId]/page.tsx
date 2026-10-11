@@ -401,18 +401,22 @@ export default function EntrenamientoDetailPage() {
                 <button
                   key={player.id}
                   onClick={() => setSelectedPlayerId(player.id)}
-                  className={`w-full text-left p-4 flex items-center gap-3 transition-colors ${
+                  className={`w-full text-left p-3.5 flex items-center gap-3 transition-colors ${
                     selectedPlayerId === player.id 
                       ? 'bg-blue-50/80 border-l-4 border-blue-600' 
                       : 'hover:bg-gray-50 border-l-4 border-transparent'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                    selectedPlayerId === player.id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                  <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs shrink-0 border ${
+                    selectedPlayerId === player.id ? 'border-blue-600 bg-blue-100 text-blue-800' : 'border-slate-200 bg-slate-100 text-slate-600'
                   }`}>
-                    {player.dorsal || '-'}
+                    {player.avatar_url ? (
+                      <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                    ) : (
+                      <span>{player.dorsal || `${player.first_name?.charAt(0) || ''}${player.last_name?.charAt(0) || ''}`}</span>
+                    )}
                   </div>
-                  <span className={`font-semibold truncate ${selectedPlayerId === player.id ? 'text-blue-900' : 'text-gray-700'}`}>
+                  <span className={`font-semibold truncate text-sm ${selectedPlayerId === player.id ? 'text-blue-900 font-bold' : 'text-gray-700'}`}>
                     {player.first_name} {player.last_name}
                   </span>
                 </button>

@@ -12,6 +12,7 @@ interface Player {
   avatar: string
   demarcation: string
   number?: number | string
+  avatarUrl?: string | null
 }
 
 const INITIAL_PLAYERS: Player[] = []
@@ -130,7 +131,8 @@ export function LineupTab({
     pos: p.posicion_principal || "N/A",
     avatar: `${(p.first_name && p.first_name[0]) || ''}${(p.last_name && p.last_name[0]) || ''}`,
     demarcation: "Mediocampista",
-    number: p.dorsal 
+    number: p.dorsal,
+    avatarUrl: p.avatar_url
   }))
   
   const initialPlayersList = mappedPlayers.length > 0 ? mappedPlayers : INITIAL_PLAYERS;
@@ -713,9 +715,13 @@ export function LineupTab({
                       onClick={() => handleQuickAddPlayer(player.id)}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-bold text-slate-800 shadow-2xs active:scale-95 transition-all"
                     >
-                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center">
-                        {player.number || "?"}
-                      </span>
+                      <div className="w-5 h-5 rounded-full overflow-hidden bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center shrink-0">
+                        {player.avatarUrl ? (
+                          <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
+                        ) : (
+                          <span>{player.number || "?"}</span>
+                        )}
+                      </div>
                       <span className="truncate max-w-[90px]">{player.name}</span>
                       <Plus className="w-3.5 h-3.5 text-blue-600 ml-0.5 stroke-[2.5]" />
                     </button>
@@ -804,8 +810,12 @@ export function LineupTab({
                   className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
-                      {player.avatar}
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 border border-blue-200 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
+                      {player.avatarUrl ? (
+                        <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
+                      ) : (
+                        <span>{player.number || player.avatar}</span>
+                      )}
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-slate-900">{player.name}</h4>

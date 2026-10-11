@@ -519,12 +519,25 @@ export default function AsistenciaEquipoPage() {
                 
                 return (
                   <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-sm border border-gray-200 shrink-0">
-                        {player.dorsal || '-'}
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                        {player.avatar_url ? (
+                          <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                        ) : (
+                          <span className="text-slate-600 font-extrabold text-xs">
+                            {player.dorsal || `${player.first_name?.charAt(0) || ''}${player.last_name?.charAt(0) || ''}`}
+                          </span>
+                        )}
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">{player.first_name} {player.last_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-900 text-sm sm:text-base leading-tight">{player.first_name} {player.last_name}</p>
+                          {player.dorsal && (
+                            <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                              #{player.dorsal}
+                            </span>
+                          )}
+                        </div>
                         {currentStatus === 'excused' && singleEventNotes[player.id] && (
                           <div className="flex items-center gap-1.5 mt-1">
                             {(() => {

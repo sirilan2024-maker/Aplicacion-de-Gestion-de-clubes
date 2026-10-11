@@ -146,7 +146,7 @@ export default function RendimientoGlobalPage() {
           const res = await fetch('/api/player-metrics', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ eventIds })
+            body: JSON.stringify({ teamId, eventIds })
           });
           const json = await res.json();
           ptData = json.data || [];

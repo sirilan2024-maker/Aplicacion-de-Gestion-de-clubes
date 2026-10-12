@@ -106,7 +106,7 @@ export async function getClubFeesAction() {
   // Include players to get player_name, amount_paid_cents and fee_payments
   const { data, error } = await adminSupabase
     .from("fees")
-    .select("id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, receipt_path, players(id, first_name, last_name, status), fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
+    .select("id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en, tipo_cargo, payment_method, payment_reference, receipt_path, players(id, first_name, last_name, status), fee_payments(id, amount_cents, payment_method, receipt_path, created_at)")
     .eq("club_id", profile.club_id)
     .order("creado_en", { ascending: false });
 
@@ -122,12 +122,16 @@ export async function getClubFeesAction() {
     return true;
   });
 
+  const currentYear = new Date().getFullYear();
+
   return activeFees.map((f: any) => {
     let paidCents = f.amount_paid_cents || 0;
     // Si la cuota figura como pagada pero amount_paid_cents es 0, asignarle el total de la cuota
     if (f.estado === 'pagado' && paidCents === 0) {
       paidCents = f.amount_cents;
     }
+
+    const paymentRef = f.payment_reference || (f.player_id ? `PAY-${currentYear}-${f.player_id.substring(0, 8).toUpperCase()}` : null);
 
     return {
       id: f.id,
@@ -141,6 +145,7 @@ export async function getClubFeesAction() {
       tipo_cargo: f.tipo_cargo || 'one_time',
       player_name: f.players ? `${f.players.first_name} ${f.players.last_name}`.trim() : "–",
       payment_method: f.payment_method,
+      payment_reference: paymentRef,
       receipt_path: f.receipt_path,
       payments: f.fee_payments || []
     };

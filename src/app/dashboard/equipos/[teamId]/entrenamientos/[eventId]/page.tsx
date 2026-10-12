@@ -8,6 +8,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { FormativeEvaluationForm } from "@/components/features/formative/FormativeEvaluationForm";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { isFormativeCategory } from "@/lib/utils";
+import { calculatePlannedTrainingDuration } from "@/lib/performance/minutes-service";
 
 interface Player {
   id: string;
@@ -206,7 +207,8 @@ export default function EntrenamientoDetailPage() {
         if (existingRpe) await supabase.from('player_training_metrics').update(rpePayload).eq('id', existingRpe.id);
         else await supabase.from('player_training_metrics').insert(rpePayload);
 
-        const finalMinVal = minVal !== undefined && minVal !== '' ? minVal : 90;
+        const plannedDuration = calculatePlannedTrainingDuration(eventDetails?.start_time, eventDetails?.end_time).durationMinutes;
+        const finalMinVal = minVal !== undefined && minVal !== '' ? minVal : plannedDuration;
         const { data: existingMin } = await supabase.from('player_training_metrics').select('id').eq('event_id', eventId).eq('player_id', player.id).eq('metric_id', minMetric.id).maybeSingle();
         const minPayload = { event_id: eventId, player_id: player.id, metric_id: minMetric.id, value_number: parseFloat(finalMinVal as string) };
         if (existingMin) await supabase.from('player_training_metrics').update(minPayload).eq('id', existingMin.id);

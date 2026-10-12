@@ -3,11 +3,46 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Target, Crosshair, BarChart2, X, BrainCircuit, Sparkles, Flame, Compass, HeartHandshake, CheckCircle2, ChevronRight } from "lucide-react";
+import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Target, Crosshair, BarChart2, X, BrainCircuit, Sparkles, Flame, Compass, HeartHandshake, CheckCircle2, ChevronRight, Smile, AlertTriangle, Moon, Battery, ThumbsUp, ShieldAlert, AlertCircle } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
 import { isFormativeCategory } from "@/lib/utils";
+import { InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
+
+export interface TeamWellnessSummary {
+  date: string;
+  totalSquad: number;
+  completedCount: number;
+  pendingCount: number;
+  averageHooperScore: number | null;
+  averages: {
+    sleepQuality: number;
+    fatigue: number;
+    soreness: number;
+    stress: number;
+    mood: number;
+  };
+  discomfortCount: number;
+  alerts: {
+    playerId: string;
+    playerName: string;
+    dorsal: number | null;
+    avatarUrl: string | null;
+    alert: InformationalAlert;
+  }[];
+  playerEntries: {
+    playerId: string;
+    playerName: string;
+    dorsal: number | null;
+    avatarUrl: string | null;
+    status: 'completed' | 'pending';
+    hooperScore: number | null;
+    ratings?: HooperRatings;
+    discomfort?: DiscomfortDetails;
+    submittedAt?: string;
+  }[];
+}
 
 interface TrainingStats {
   id: string;
@@ -50,10 +85,11 @@ export default function RendimientoGlobalPage() {
   const [trainingStats, setTrainingStats] = useState<TrainingStats[]>([]);
   const [matchStats, setMatchStats] = useState<MatchStats[]>([]);
   const [formativeStats, setFormativeStats] = useState<TeamPlayerFormativeSummary[]>([]);
+  const [wellnessSummary, setWellnessSummary] = useState<TeamWellnessSummary | null>(null);
   const [teamCategory, setTeamCategory] = useState<string>('');
   const [teamName, setTeamName] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
+  const [viewMode, setViewMode] = useState<'bienestar' | 'entrenamientos' | 'partidos' | 'formativo'>('bienestar');
   const [drawerPlayerId, setDrawerPlayerId] = useState<string | null>(null);
   const [drawerTab, setDrawerTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
 
@@ -116,11 +152,19 @@ export default function RendimientoGlobalPage() {
       const eventIds = allEvents?.map(e => e.id) || [];
 
       // Fetch official team matches and their convocatorias
-      const { data: teamOfficialMatches } = await supabase
+      let matchQuery = supabase
         .from('partidos')
         .select('id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival')
-        .eq('equipo_id', teamId)
-        .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+        .eq('equipo_id', teamId);
+
+      if (activeSeason?.id) {
+        matchQuery = matchQuery.eq('season_id', activeSeason.id);
+      } else {
+        // Fallback defensivo: excluir temporada cerrada si no se resolviera activeSeason
+        matchQuery = matchQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+      }
+
+      const { data: teamOfficialMatches } = await matchQuery;
 
       const officialMatchIds = (teamOfficialMatches || []).map(m => m.id);
       let officialConvocatorias: any[] = [];
@@ -270,6 +314,37 @@ export default function RendimientoGlobalPage() {
 
       setTrainingStats(tResults.sort((a, b) => b.acwr - a.acwr));
       setMatchStats(mResults.sort((a, b) => b.matchMinutes - a.matchMinutes));
+
+      // --- WELLNESS SUMMARY (Cálculo y Presentación del Centro de Rendimiento) ---
+      // Si la migración aún no está aplicada en base de datos, estructuramos el modelo
+      // con los jugadores del equipo actual, marcando el estado de respuestas pendientes o disponibles.
+      const todayStr = new Date().toISOString().split('T')[0];
+      const wellnessPlayerEntries = players.map(p => ({
+        playerId: p.id,
+        playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        dorsal: p.dorsal || null,
+        avatarUrl: p.avatar_url || null,
+        status: 'pending' as const,
+        hooperScore: null,
+      }));
+
+      setWellnessSummary({
+        date: todayStr,
+        totalSquad: players.length,
+        completedCount: 0,
+        pendingCount: players.length,
+        averageHooperScore: null,
+        averages: {
+          sleepQuality: 0,
+          fatigue: 0,
+          soreness: 0,
+          stress: 0,
+          mood: 0
+        },
+        discomfortCount: 0,
+        alerts: [],
+        playerEntries: wellnessPlayerEntries
+      });
     } catch (err) {
       console.error("Error fetching global stats:", err);
     } finally {
@@ -311,8 +386,20 @@ export default function RendimientoGlobalPage() {
           <p className="text-gray-500 text-sm mt-1">Análisis detallado de sesiones preparatorias, competición oficial y evaluación formativa.</p>
         </div>
 
-        {/* Toggle Switch Píldora (3 Vistas) */}
-        <div className={`grid ${isFormative() ? 'grid-cols-3' : 'grid-cols-2'} sm:flex bg-gray-100 p-1 sm:p-1.5 rounded-2xl border border-gray-200 shadow-inner w-full lg:w-auto gap-1`}>
+        {/* Toggle Switch Píldora (4 Vistas: Bienestar, Entrenamientos, Partidos, Formativo) */}
+        <div className={`grid ${isFormative() ? 'grid-cols-4' : 'grid-cols-3'} sm:flex bg-gray-100 p-1 sm:p-1.5 rounded-2xl border border-gray-200 shadow-inner w-full lg:w-auto gap-1`}>
+          <button
+            onClick={() => setViewMode('bienestar')}
+            className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0 ${
+              viewMode === 'bienestar'
+                ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Smile size={15} className={`shrink-0 ${viewMode === 'bienestar' ? 'text-blue-500' : 'text-gray-400'}`} />
+            <span className="sm:hidden truncate">Bienestar</span>
+            <span className="hidden sm:inline">Bienestar Diario</span>
+          </button>
           <button
             onClick={() => setViewMode('entrenamientos')}
             className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0 ${
@@ -351,6 +438,246 @@ export default function RendimientoGlobalPage() {
           )}
         </div>
       </div>
+
+      {/* BLOQUE BIENESTAR DIARIO & PREVENCIÓN */}
+      {viewMode === 'bienestar' && wellnessSummary && (
+        <section className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+          {/* Banner de estado de persistencia */}
+          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 text-amber-700">
+                <AlertCircle size={18} />
+              </div>
+              <div className="text-xs">
+                <span className="font-extrabold uppercase tracking-wide block">Módulo de Bienestar — Pendiente de activar la persistencia</span>
+                <span className="text-amber-700">
+                  Las tablas y políticas RLS locales están estructuradas y probadas. La persistencia en base de datos se activará automáticamente al aplicar la migración en el entorno correspondiente.
+                </span>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100/90 text-amber-800 border border-amber-300 self-start sm:self-auto shrink-0">
+              Persistencia no activa
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100 text-blue-600">
+                <Smile size={22} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Estado de Bienestar y Disponibilidad Diaria</h3>
+                <p className="text-sm text-gray-500">Cuestionario previo al entrenamiento (sueño, fatiga, estrés, dolor muscular y molestias).</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200/80 px-3.5 py-1.5 rounded-2xl">
+                <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Completados:</span>
+                <span className="text-base font-black text-blue-900">{wellnessSummary.completedCount}/{wellnessSummary.totalSquad}</span>
+              </div>
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 px-3.5 py-1.5 rounded-2xl">
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Pendientes:</span>
+                <span className="text-base font-black text-amber-900">{wellnessSummary.pendingCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tarjetas Informativas / Alertas de la Plantilla */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Calidad del Sueño</span>
+                <span className="text-2xl font-black text-gray-900">
+                  {wellnessSummary.averages.sleepQuality > 0 ? `${wellnessSummary.averages.sleepQuality.toFixed(1)} / 5` : 'Pendiente'}
+                </span>
+                <span className="text-[11px] text-gray-500 block mt-0.5">Media reportada hoy</span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Moon size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Nivel de Fatiga</span>
+                <span className="text-2xl font-black text-gray-900">
+                  {wellnessSummary.averages.fatigue > 0 ? `${wellnessSummary.averages.fatigue.toFixed(1)} / 5` : 'Pendiente'}
+                </span>
+                <span className="text-[11px] text-gray-500 block mt-0.5">Media biológica</span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Battery size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Dolor Muscular</span>
+                <span className="text-2xl font-black text-gray-900">
+                  {wellnessSummary.averages.soreness > 0 ? `${wellnessSummary.averages.soreness.toFixed(1)} / 5` : 'Pendiente'}
+                </span>
+                <span className="text-[11px] text-gray-500 block mt-0.5">Tirantez / DOMS</span>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <Flame size={22} />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Molestias Activas</span>
+                <span className={`text-2xl font-black ${wellnessSummary.discomfortCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {wellnessSummary.discomfortCount}
+                </span>
+                <span className="text-[11px] text-gray-500 block mt-0.5">
+                  {wellnessSummary.discomfortCount > 0 ? 'Requieren atención técnica' : 'Sin molestias reportadas'}
+                </span>
+              </div>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                wellnessSummary.discomfortCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                {wellnessSummary.discomfortCount > 0 ? <AlertTriangle size={22} /> : <ThumbsUp size={22} />}
+              </div>
+            </div>
+          </div>
+
+          {/* Panel Informativo: Alertas sobrevenidas y molestias no clínicas */}
+          {wellnessSummary.alerts.length > 0 ? (
+            <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-5 shadow-sm space-y-3">
+              <h4 className="text-sm font-extrabold text-amber-900 flex items-center gap-2 uppercase tracking-wide">
+                <ShieldAlert size={18} className="text-amber-600" />
+                <span>Alertas Físicas Informativas ({wellnessSummary.alerts.length})</span>
+              </h4>
+              <p className="text-xs text-amber-700">
+                Avisos orientativos basados en la percepción reportada por el jugador. No sustituyen al criterio médico ni modifican automáticamente la disponibilidad.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                {wellnessSummary.alerts.map((al, idx) => (
+                  <div key={`al-${idx}`} className="bg-white rounded-xl p-3.5 border border-amber-200 flex items-start gap-3">
+                    <AlertCircle size={18} className={al.alert.level === 'attention' ? 'text-rose-500 shrink-0 mt-0.5' : 'text-amber-500 shrink-0 mt-0.5'} />
+                    <div className="text-xs">
+                      <span className="font-bold text-gray-900">{al.playerName}</span>
+                      {al.dorsal && <span className="text-gray-400 font-semibold ml-1.5">(#{al.dorsal})</span>}
+                      <p className="text-gray-600 mt-0.5">{al.alert.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between text-xs text-slate-600">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-500" />
+                <span>No hay alertas de sobrecarga extrema ni molestias comunicadas para el día de hoy.</span>
+              </span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Seguimiento Activo</span>
+            </div>
+          )}
+
+          {/* Lista de Futbolistas y Estado de su Cuestionario */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            <h4 className="font-extrabold text-gray-900 text-base mb-4 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <UserIcon size={18} className="text-blue-600" />
+                <span>Seguimiento Individual de la Plantilla ({wellnessSummary.playerEntries.length} Jugadores)</span>
+              </span>
+              <span className="text-xs font-semibold text-gray-400">
+                {wellnessSummary.completedCount === 0 ? "Esperando recepción de respuestas" : `${wellnessSummary.completedCount} respuestas recibidas`}
+              </span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {wellnessSummary.playerEntries.map(player => {
+                const isDone = player.status === 'completed';
+
+                return (
+                  <div
+                    key={`well-${player.playerId}`}
+                    className={`rounded-2xl p-4 border transition-all flex flex-col justify-between ${
+                      isDone
+                        ? 'bg-white border-blue-200 hover:border-blue-400 hover:shadow-md'
+                        : 'bg-slate-50/60 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-white border border-gray-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
+                            {player.avatarUrl ? (
+                              <img src={player.avatarUrl} alt={player.playerName} className="w-full h-full object-cover object-[center_25%]" />
+                            ) : (
+                              <span>{player.dorsal || player.playerName.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div className="overflow-hidden">
+                            <h5 className="font-bold text-gray-900 text-sm truncate leading-tight">
+                              {player.playerName}
+                            </h5>
+                            <span className="text-[11px] font-medium text-gray-400">
+                              {player.dorsal ? `Dorsal #${player.dorsal}` : 'Sin dorsal'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          isDone
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {isDone ? 'Completado' : 'Pendiente'}
+                        </span>
+                      </div>
+
+                      {isDone && player.ratings ? (
+                        <div className="grid grid-cols-5 gap-1.5 text-center my-3 p-2 rounded-xl bg-blue-50/50 border border-blue-100">
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase">Sue</span>
+                            <span className="font-black text-xs text-gray-900">{player.ratings.sleepQuality}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase">Fat</span>
+                            <span className="font-black text-xs text-gray-900">{player.ratings.fatigue}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase">Dol</span>
+                            <span className="font-black text-xs text-gray-900">{player.ratings.soreness}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase">Est</span>
+                            <span className="font-black text-xs text-gray-900">{player.ratings.stress}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold text-gray-400 uppercase">Áni</span>
+                            <span className="font-black text-xs text-gray-900">{player.ratings.mood}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="my-3 py-2 px-3 rounded-xl bg-slate-100/70 text-slate-400 text-center text-xs font-medium">
+                          Sin cuestionario recibido hoy
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
+                      <span>{player.discomfort?.hasDiscomfort ? `Molestia: ${player.discomfort.zone}` : 'Sin molestias'}</span>
+                      <button
+                        onClick={() => {
+                          setDrawerPlayerId(player.playerId);
+                          setDrawerTab('entrenamientos');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 transition-colors"
+                      >
+                        Ficha <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* BLOQUE FORMATIVO & APRENDIZAJE COLECTIVO */}
       {viewMode === 'formativo' && isFormative() && (

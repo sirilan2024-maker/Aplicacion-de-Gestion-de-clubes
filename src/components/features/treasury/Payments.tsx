@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getClubFeesAction, getClubPlayersAction, createFeeAction, getInscriptionFeesAction, updateFeeStatusAction, getReceiptSignedUrlAction, sendPaymentNotificationAction, generateAndUploadReceiptAction, addPartialPaymentAction, downloadFeeReceiptAction, updateFeeDetailsAction, deleteFeeAction, verifyAndApproveReservationFeeAction, rejectReservationFeeAction } from "@/app/actions/treasury-actions";
-import { CheckCircle, Users, FileText, Calendar, Bell, Download, Coins, Pencil, Trash2, CheckCircle2, X } from "lucide-react";
+import { CheckCircle, Users, FileText, Calendar, Bell, Download, Coins, Pencil, Trash2, CheckCircle2, X, Search } from "lucide-react";
 import toast from "react-hot-toast";
 
 function EstadoBadge({ estado }: { estado: string }) {
@@ -38,6 +38,7 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState<string>("todos");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"cuotas" | "inscripciones">("cuotas");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -281,11 +282,20 @@ export default function Payments() {
   if (loading) return <div className="p-6 text-center">Cargando cuotas...</div>;
 
   const filteredFees = fees.filter(f => {
-    if (filter === "todos") return true;
-    if (filter === "pendiente") return f.estado === "pendiente";
-    if (filter === "pagado") return f.estado === "pagado";
-    if (filter === "pdte_verif") return f.estado === "pdte_verif" || f.estado === "pendiente_verificacion";
-    return f.estado === filter;
+    if (filter === "pendiente" && f.estado !== "pendiente") return false;
+    if (filter === "pagado" && f.estado !== "pagado") return false;
+    if (filter === "pdte_verif" && (f.estado !== "pdte_verif" && f.estado !== "pendiente_verificacion")) return false;
+    if (filter !== "todos" && filter !== "pendiente" && filter !== "pagado" && filter !== "pdte_verif" && f.estado !== filter) return false;
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      const matchPlayer = (f.player_name || "").toLowerCase().includes(term);
+      const matchConcept = (f.concept || "").toLowerCase().includes(term);
+      const matchRef = (f.payment_reference || "").toLowerCase().includes(term);
+      if (!matchPlayer && !matchConcept && !matchRef) return false;
+    }
+
+    return true;
   });
 
   const totalFacturado = fees.reduce((sum, f) => sum + (f.amount_cents / 100), 0);
@@ -390,6 +400,28 @@ export default function Payments() {
           </button>
         </div>
 
+        {/* Search Input */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 border border-slate-200 bg-white px-3 py-2 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-400 transition-all shadow-xs">
+            <Search size={15} className="text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Buscar por jugador, concepto o código de referencia (ej: PAY-2026-6ED20A8F)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs sm:text-sm w-full text-slate-700 placeholder-slate-400"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="text-xs text-slate-400 hover:text-slate-600 px-1 font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* ===== VISTA MÓVIL: Tarjetas Touch-Friendly sin scroll horizontal (block md:hidden) ===== */}
         <div className="block md:hidden divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-white">
           {filteredFees.length === 0 ? (
@@ -401,7 +433,14 @@ export default function Payments() {
               <div key={fee.id} className="p-3.5 space-y-2.5 hover:bg-slate-50 transition-colors">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{fee.player_name || "Ingreso Extraordinario"}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-bold text-gray-900">{fee.player_name || "Ingreso Extraordinario"}</p>
+                      {fee.payment_reference && (
+                        <span className="font-mono text-[10px] font-black bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
+                          {fee.payment_reference}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5">{fee.concept}</p>
                   </div>
                   <EstadoBadge estado={fee.estado} />
@@ -512,37 +551,60 @@ export default function Payments() {
           )}
         </div>
 
-        {/* ===== VISTA ESCRITORIO: Tabla Completa (hidden md:block) ===== */}
-        <div className="hidden md:block overflow-x-auto w-full rounded-lg border border-gray-200">
-          <table className="w-full divide-y divide-gray-200 whitespace-nowrap">
+        {/* ===== VISTA ESCRITORIO: Tabla Completa Optimizada (hidden md:block) ===== */}
+        <div className="hidden md:block w-full rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full divide-y divide-gray-200 text-left">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Jugador</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Método</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Importe</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Jugador</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Referencia</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Concepto</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Método</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Importe</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredFees.map((fee) => (
-                  <tr key={fee.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3 text-sm font-medium text-gray-900 min-w-[120px]">{fee.player_name || '–'}</td>
-                    <td className="px-3 py-3 text-sm text-gray-900 min-w-[140px]">{fee.concept}</td>
-                    <td className="px-3 py-3 text-sm text-gray-500 whitespace-nowrap">{fee.payment_method || '–'}</td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <tr key={fee.id} className="hover:bg-gray-50/80 transition-colors">
+                    <td className="px-3 py-3 text-sm font-semibold text-gray-900">
+                      {fee.player_name || '–'}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-xs">
+                      {fee.payment_reference ? (
+                        <span className="font-mono font-black text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                          {fee.payment_reference}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">–</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-800 font-medium">
+                      <span className="line-clamp-2" title={fee.concept}>
+                        {fee.concept}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-600 whitespace-nowrap">
+                      {fee.payment_method || '–'}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       <div className="font-bold">{(fee.amount_cents / 100).toFixed(2)} €</div>
                       {(fee.amount_paid_cents || 0) > 0 && (
-                        <div className="text-xs text-green-600 font-medium">
+                        <div className="text-[11px] text-green-600 font-semibold">
                           Abonado: {(fee.amount_paid_cents / 100).toFixed(2)} €
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm"><EstadoBadge estado={fee.estado} /></td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}</td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm flex gap-1">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm">
+                      <EstadoBadge estado={fee.estado} />
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
+                      {fee.fecha_pago ? new Date(fee.fecha_pago).toLocaleDateString('es-ES') : "–"}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-1">
                       {(fee.estado === "pdte_verif" || fee.estado === "pendiente_verificacion") ? (
                         <>
                           <button
@@ -600,8 +662,9 @@ export default function Payments() {
                       <button onClick={() => handleDeleteFee(fee.id)} className="flex items-center justify-center w-8 h-8 bg-red-50 text-red-600 rounded hover:bg-red-100" title="Eliminar">
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </td>
+                </tr>
                 ))}
               </tbody>
             </table>

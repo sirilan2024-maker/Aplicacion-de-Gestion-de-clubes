@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTrainingFeedback } from "@/app/actions/feedback-actions";
+import { calculatePlannedTrainingDuration } from "@/lib/performance/minutes-service";
 import { Activity, Clock, CheckCircle2, Loader2, Target } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO } from "date-fns";
@@ -17,16 +18,23 @@ interface Player {
 
 export default function PlayerFeedbackPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const eventId = typeof params.eventId === 'string' ? params.eventId : '';
+
+  const initialPlayerId = searchParams.get('p') || '';
+  const token = searchParams.get('token') || '';
+  const tokenExp = searchParams.get('exp') ? parseInt(searchParams.get('exp')!) : undefined;
 
   const [loading, setLoading] = useState(true);
   const [eventDetails, setEventDetails] = useState<any>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [teamName, setTeamName] = useState("");
 
-  const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [selectedPlayerId, setSelectedPlayerId] = useState(initialPlayerId);
+  const [isLockedPlayer, setIsLockedPlayer] = useState(Boolean(initialPlayerId));
   const [rpe, setRpe] = useState<number>(0);
-  const [minutes, setMinutes] = useState<number>(90); // Default to 90
+  const [minutes, setMinutes] = useState<number>(90);
+  const [isFallbackDuration, setIsFallbackDuration] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -53,6 +61,11 @@ export default function PlayerFeedbackPage() {
     setEventDetails(evData);
     setTeamName(evData.teams?.name || "Equipo");
 
+    // Calcular duración prevista a partir de horarios
+    const planned = calculatePlannedTrainingDuration(evData.start_time, evData.end_time);
+    setMinutes(planned.durationMinutes);
+    setIsFallbackDuration(planned.isFallback);
+
     // Fetch Players
     const { data: plData } = await supabase
       .from('players')
@@ -62,6 +75,10 @@ export default function PlayerFeedbackPage() {
       
     if (plData) {
       setPlayers(plData);
+      if (initialPlayerId && plData.some(p => p.id === initialPlayerId)) {
+        setSelectedPlayerId(initialPlayerId);
+        setIsLockedPlayer(true);
+      }
     }
     
     setLoading(false);
@@ -75,13 +92,19 @@ export default function PlayerFeedbackPage() {
     }
 
     setSubmitting(true);
-    const result = await submitTrainingFeedback(eventId, selectedPlayerId, rpe, minutes);
+    const result = await submitTrainingFeedback(
+      eventId,
+      selectedPlayerId,
+      rpe,
+      minutes,
+      token && tokenExp ? { token, tokenExp } : undefined
+    );
     setSubmitting(false);
 
     if (result.success) {
       setSubmitted(true);
     } else {
-      toast.error(result.error || "Error al enviar los datos.");
+      toast.error(result.error || "No se pudo registrar la evaluación.");
     }
   };
 
@@ -151,17 +174,27 @@ export default function PlayerFeedbackPage() {
               <label className="block text-sm font-bold text-gray-700">
                 1. ¿Quién eres?
               </label>
-              <select
-                value={selectedPlayerId}
-                onChange={(e) => setSelectedPlayerId(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-900 font-medium focus:ring-0 focus:border-blue-500 outline-none transition-colors"
-                required
-              >
-                <option value="">Selecciona tu nombre...</option>
-                {players.map(p => (
-                  <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
-                ))}
-              </select>
+              {isLockedPlayer ? (
+                <div className="w-full bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-3 text-gray-900 font-bold flex items-center justify-between">
+                  <span>
+                    {players.find(p => p.id === selectedPlayerId)?.first_name}{' '}
+                    {players.find(p => p.id === selectedPlayerId)?.last_name || ''}
+                  </span>
+                  <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">Verificado</span>
+                </div>
+              ) : (
+                <select
+                  value={selectedPlayerId}
+                  onChange={(e) => setSelectedPlayerId(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-900 font-medium focus:ring-0 focus:border-blue-500 outline-none transition-colors"
+                  required
+                >
+                  <option value="">Selecciona tu nombre...</option>
+                  {players.map(p => (
+                    <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* RPE */}
@@ -210,7 +243,11 @@ export default function PlayerFeedbackPage() {
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-900 font-bold text-lg focus:ring-0 focus:border-blue-500 outline-none transition-colors"
                 required
               />
-              <p className="text-xs text-gray-500">Normalmente 90 mins. Cámbialo solo si llegaste tarde o te retiraste antes.</p>
+              <p className="text-xs text-gray-500">
+                {isFallbackDuration
+                  ? "Duración estimada (90 min). Modifícalo si tu tiempo real de participación fue distinto."
+                  : `Duración prevista de la sesión: ${minutes} min. Modifícalo si terminaste antes o llegaste tarde.`}
+              </p>
             </div>
 
             <button

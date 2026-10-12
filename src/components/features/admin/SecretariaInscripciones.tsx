@@ -225,7 +225,16 @@ function ExpedienteModal({
             <div><span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">DNI/NIE</span><span className="font-bold text-slate-800">{player.dni || "–"}</span></div>
             <div><span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">Tutor</span><span className="font-bold text-slate-800">{player.parent1_name || "–"}</span></div>
             <div><span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">Contacto</span><span className="font-bold text-slate-800">{player.parent1_phone || player.parent1_email || "–"}</span></div>
-            <div><span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">Pago</span><span className="font-bold text-slate-800">{player.payment_method || "–"} {player.payment_plan ? `(${player.payment_plan})` : ""}</span></div>
+            <div>
+              <span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">Pago</span>
+              <span className="font-bold text-slate-800">{player.payment_method || "–"} {player.payment_plan ? `(${player.payment_plan})` : ""}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">Referencia Oficial (Transferencia)</span>
+              <span className="font-mono text-xs font-black text-blue-900 bg-blue-100/70 border border-blue-200 px-2 py-0.5 rounded inline-block mt-0.5">
+                PAY-{new Date(player.created_at || Date.now()).getFullYear()}-{player.id.substring(0, 8).toUpperCase()}
+              </span>
+            </div>
             <div>
               <span className="text-slate-500 block text-xs font-semibold uppercase tracking-wide">Condición</span>
               <div className="flex flex-wrap gap-1 mt-0.5">
@@ -508,7 +517,13 @@ export function SecretariaInscripciones() {
   }
 
   const filtered = requests.filter(r => {
-    const matchesSearch = `${r.first_name} ${r.last_name}`.toLowerCase().includes(search.toLowerCase())
+    const term = search.toLowerCase().trim()
+    const refCode = `PAY-${new Date(r.created_at || Date.now()).getFullYear()}-${r.id.substring(0, 8).toUpperCase()}`.toLowerCase()
+    const matchesSearch = 
+      `${r.first_name} ${r.last_name}`.toLowerCase().includes(term) ||
+      (r.dni || "").toLowerCase().includes(term) ||
+      refCode.includes(term) ||
+      r.id.toLowerCase().startsWith(term)
     
     let matchesStatus = false
     if (statusFilter === "all") matchesStatus = true
@@ -580,7 +595,7 @@ export function SecretariaInscripciones() {
           <Search size={15} className="text-slate-400 shrink-0" />
           <input
             type="text"
-            placeholder="Buscar jugador..."
+            placeholder="Buscar por jugador, DNI o código de referencia (PAY-...)..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="bg-transparent border-none outline-none text-sm w-full text-slate-700 placeholder-slate-400"
@@ -598,7 +613,7 @@ export function SecretariaInscripciones() {
         </select>
       </div>
 
-      {/* Tabla */}
+      {/* Contenedor Listado de Inscripciones */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-16 text-center">
@@ -606,28 +621,48 @@ export function SecretariaInscripciones() {
             <p className="text-slate-500 font-medium">No hay inscripciones que coincidan</p>
           </div>
         ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="px-4 py-3">Jugador</th>
-                  <th className="px-4 py-3">Equipo</th>
-                  <th className="px-4 py-3">Documentación</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Fecha</th>
-                  <th className="px-4 py-3">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map(req => (
-                  <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3">
-                      <a href={`/dashboard/club/jugador/${req.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-slate-900 hover:text-indigo-600 transition-colors">
-                        {req.first_name} {req.last_name}
-                      </a>
-                      <div className="text-xs text-slate-400 mt-0.5">{req.parent1_phone || req.parent1_email || "–"}</div>
-                    </td>
-                    <td className="px-4 py-3">
+          <>
+            {/* VISTA MÓVIL: Tarjetas intuitivas sin scroll horizontal (block md:hidden) */}
+            <div className="block md:hidden divide-y divide-slate-100">
+              {filtered.map(req => {
+                const refCode = `PAY-${new Date(req.created_at || Date.now()).getFullYear()}-${req.id.substring(0, 8).toUpperCase()}`;
+                return (
+                  <div key={req.id} className="p-4 space-y-3 hover:bg-slate-50/60 transition-colors">
+                    {/* Header: Jugador y Estado */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={`/dashboard/club/jugador/${req.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-slate-900 hover:text-indigo-600 transition-colors text-sm truncate block"
+                        >
+                          {req.first_name} {req.last_name}
+                        </a>
+                        <div className="text-xs text-slate-400 mt-0.5 truncate">
+                          {req.parent1_phone || req.parent1_email || "–"}
+                        </div>
+                      </div>
+                      <StatusBadge status={req.registration_status} />
+                    </div>
+
+                    {/* Fila intermedia: Referencia, Fecha y Documentación */}
+                    <div className="flex items-center justify-between gap-2 bg-slate-50 px-3 py-2 rounded-xl text-xs">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[10px] font-black text-blue-900 bg-blue-100/70 border border-blue-200 px-1.5 py-0.5 rounded">
+                          {refCode}
+                        </span>
+                        <span className="text-slate-500 text-[11px]">
+                          {new Date(req.created_at).toLocaleDateString("es-ES")}
+                        </span>
+                      </div>
+                      <div className="shrink-0">
+                        <DocTrafficLight docs={req.player_documents} />
+                      </div>
+                    </div>
+
+                    {/* Selector de Equipo */}
+                    <div>
                       <select
                         onClick={(e) => e.stopPropagation()}
                         value={req.team_id || (req.teams as any)?.id || ""}
@@ -644,10 +679,10 @@ export function SecretariaInscripciones() {
                             toast.error("Error al asignar equipo", { id: toastId })
                           }
                         }}
-                        className={`text-xs border rounded-lg px-2.5 py-1.5 font-medium outline-none transition-colors shadow-sm cursor-pointer ${
+                        className={`w-full text-xs border rounded-lg px-2.5 py-2 font-medium outline-none transition-colors shadow-xs cursor-pointer ${
                           req.teams || req.team_id 
-                            ? "bg-blue-50/80 border-blue-200 text-blue-800 font-semibold hover:bg-blue-100" 
-                            : "bg-red-50 border-red-200 text-red-700 font-bold hover:bg-red-100"
+                            ? "bg-blue-50/80 border-blue-200 text-blue-800 font-semibold" 
+                            : "bg-red-50 border-red-200 text-red-700 font-bold"
                         }`}
                       >
                         <option value="">⚠️ Sin equipo (Asignar...)</option>
@@ -657,37 +692,125 @@ export function SecretariaInscripciones() {
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <DocTrafficLight docs={req.player_documents} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={req.registration_status} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">
-                      {new Date(req.created_at).toLocaleDateString("es-ES")}
-                    </td>
-                    <td className="px-4 py-3 flex items-center gap-2">
+                    </div>
+
+                    {/* Botones de acción móvil */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
                       <button
                         onClick={() => handleDownloadPdf(req.id)}
                         disabled={downloadingPdf === req.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
                       >
                         {downloadingPdf === req.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                         PDF Ficha
                       </button>
                       <button
                         onClick={() => setSelectedPlayer(req)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
                       >
                         <Eye size={12} /> Ver Expediente
                       </button>
-                    </td>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* VISTA ESCRITORIO: Tabla fluida que aprovecha el 100% del ancho sin forzar scroll (hidden md:block) */}
+            <div className="hidden md:block w-full">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="px-4 py-3">Jugador / Contacto</th>
+                    <th className="px-3 py-3">Ref. Pago</th>
+                    <th className="px-3 py-3">Equipo</th>
+                    <th className="px-3 py-3 text-center">Documentación</th>
+                    <th className="px-3 py-3 text-center">Estado</th>
+                    <th className="px-3 py-3">Fecha</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map(req => {
+                    const refCode = `PAY-${new Date(req.created_at || Date.now()).getFullYear()}-${req.id.substring(0, 8).toUpperCase()}`;
+                    return (
+                      <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3">
+                          <a href={`/dashboard/club/jugador/${req.id}`} target="_blank" rel="noopener noreferrer" className="font-bold text-slate-900 hover:text-indigo-600 transition-colors">
+                            {req.first_name} {req.last_name}
+                          </a>
+                          <div className="text-xs text-slate-400 mt-0.5">{req.parent1_phone || req.parent1_email || "–"}</div>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className="font-mono text-xs font-black text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                            {refCode}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <select
+                            onClick={(e) => e.stopPropagation()}
+                            value={req.team_id || (req.teams as any)?.id || ""}
+                            onChange={async (e) => {
+                              e.stopPropagation()
+                              const newTeamId = e.target.value
+                              const { assignPlayerToTeamAction } = await import("@/app/actions/player-actions")
+                              const toastId = toast.loading("Asignando equipo...")
+                              const res = await assignPlayerToTeamAction(req.id, newTeamId)
+                              if (res.success) {
+                                toast.success("Equipo asignado", { id: toastId })
+                                fetchRequests()
+                              } else {
+                                toast.error("Error al asignar equipo", { id: toastId })
+                              }
+                            }}
+                            className={`text-xs border rounded-lg px-2.5 py-1.5 font-medium outline-none transition-colors shadow-xs cursor-pointer max-w-[190px] truncate ${
+                              req.teams || req.team_id 
+                                ? "bg-blue-50/80 border-blue-200 text-blue-800 font-semibold hover:bg-blue-100" 
+                                : "bg-red-50 border-red-200 text-red-700 font-bold hover:bg-red-100"
+                            }`}
+                          >
+                            <option value="">⚠️ Sin equipo (Asignar...)</option>
+                            {allTeams.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                ⚽ {t.name} {t.category ? `(${t.category})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <DocTrafficLight docs={req.player_documents} />
+                        </td>
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                          <StatusBadge status={req.registration_status} />
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
+                          {new Date(req.created_at).toLocaleDateString("es-ES")}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleDownloadPdf(req.id)}
+                              disabled={downloadingPdf === req.id}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors shadow-xs disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {downloadingPdf === req.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                              PDF Ficha
+                            </button>
+                            <button
+                              onClick={() => setSelectedPlayer(req)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs whitespace-nowrap"
+                            >
+                              <Eye size={12} /> Ver
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

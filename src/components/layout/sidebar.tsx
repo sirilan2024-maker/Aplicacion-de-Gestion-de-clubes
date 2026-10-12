@@ -403,6 +403,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
         label: hasTeam ? `Mi Equipo: ${activeFamilyPlayer.players.teams.name}` : 'Sin equipo',
         items: [
           ...teamItems,
+          { name: "Mi Rendimiento", href: `/dashboard/family/e/${activeFamilyPlayerId}/rendimiento`, icon: Activity },
           { name: "Mensajes",     href: `/dashboard/family/e/${activeFamilyPlayerId}/mensajes`, icon: MessageSquare },
           { name: "Equipación/Ropa", href: `/dashboard/family/e/${activeFamilyPlayerId}/ropa`, icon: Shirt },
           { name: "Ficha Técnica",href: `/dashboard/family/e/${activeFamilyPlayerId}/ficha`, icon: User },

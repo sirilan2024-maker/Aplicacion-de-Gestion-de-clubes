@@ -15,7 +15,9 @@ export type NotificationType =
   | 'DISCIPLINE_ALERT'
   | 'ATTENDANCE_ALERT'
   | 'FEE_ALERT'
-  | 'GENERAL_ALERT';
+  | 'GENERAL_ALERT'
+  | 'WELLNESS_REMINDER'
+  | 'SESSION_FEEDBACK_REMINDER';
 
 export type NotificationDeliveryStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
 

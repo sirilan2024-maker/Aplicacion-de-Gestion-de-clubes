@@ -115,6 +115,17 @@ export function TeamMatchesView({
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncRefreshTrigger, setSyncRefreshTrigger] = useState(0)
 
+  const isLigaBrave = Boolean(
+    ffcvUrl?.includes('apuntamelo') || 
+    ffcvGroupId === '4624' || 
+    ffcvGroupId === '4623' || 
+    teamId === '7123c91a-69c1-4b94-9f85-0914dee8bbdc' || 
+    teamId === '5633f710-7707-40d7-b812-c51a44b90d9e' ||
+    serverTeamData?.category?.toLowerCase().includes('brave') ||
+    teamName?.toLowerCase().includes('infantil b') ||
+    teamName?.toLowerCase().includes('cadete b')
+  );
+
   const handleSyncFFCV = async () => {
     if (!teamId || isSyncing) return
     setIsSyncing(true)
@@ -122,7 +133,7 @@ export function TeamMatchesView({
     try {
       const res = await syncTeamFFCVAction(teamId)
       if (res.success) {
-        setSyncMessage("¡Sincronizado con éxito con la FFCV!")
+        setSyncMessage(isLigaBrave ? "¡Sincronizado con éxito con la Liga Brave!" : "¡Sincronizado con éxito con la FFCV!")
         setSyncRefreshTrigger(prev => prev + 1)
         const supabase = createClient()
         const { data: updatedMatches } = await supabase
@@ -331,7 +342,7 @@ export function TeamMatchesView({
                   }`}
                 >
                   <Trophy className="w-3.5 h-3.5" />
-                  Calendario Oficial FFCV
+                  {isLigaBrave ? 'Calendario Oficial Liga Brave' : 'Calendario Oficial FFCV'}
                 </button>
               </div>
 
@@ -345,10 +356,10 @@ export function TeamMatchesView({
                   onClick={handleSyncFFCV}
                   disabled={isSyncing}
                   className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs hover:shadow-xs transition-all flex items-center gap-2 disabled:opacity-50"
-                  title="Sincronizar horarios y resultados oficiales con la FFCV"
+                  title={isLigaBrave ? "Sincronizar horarios y resultados con la Liga Brave" : "Sincronizar horarios y resultados oficiales con la FFCV"}
                 >
                   <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar FFCV'}</span>
+                  <span>{isSyncing ? 'Sincronizando...' : (isLigaBrave ? 'Sincronizar Liga Brave' : 'Sincronizar FFCV')}</span>
                 </button>
               </div>
             </div>

@@ -7,8 +7,9 @@ import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Targe
 import { differenceInDays, parseISO } from "date-fns";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
+import { getAuthorizedTeamWellnessSummary } from "@/app/actions/feedback-actions";
 import { isFormativeCategory } from "@/lib/utils";
-import { InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
+import { generateInformationalAlerts, InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
 
 export interface TeamWellnessSummary {
   date: string;
@@ -36,11 +37,13 @@ export interface TeamWellnessSummary {
     playerName: string;
     dorsal: number | null;
     avatarUrl: string | null;
-    status: 'completed' | 'pending';
+    attendanceStatus: 'confirmed' | 'pending' | 'absent';
+    wellnessStatus: 'completed' | 'pending' | 'not_required';
     hooperScore: number | null;
     ratings?: HooperRatings;
     discomfort?: DiscomfortDetails;
     submittedAt?: string;
+    canViewDiscomfort: boolean;
   }[];
 }
 
@@ -315,34 +318,155 @@ export default function RendimientoGlobalPage() {
       setTrainingStats(tResults.sort((a, b) => b.acwr - a.acwr));
       setMatchStats(mResults.sort((a, b) => b.matchMinutes - a.matchMinutes));
 
-      // --- WELLNESS SUMMARY (Cálculo y Presentación del Centro de Rendimiento) ---
-      // Si la migración aún no está aplicada en base de datos, estructuramos el modelo
-      // con los jugadores del equipo actual, marcando el estado de respuestas pendientes o disponibles.
+      // --- WELLNESS & ASISTENCIA SUMMARY (Cálculo y Presentación del Centro de Rendimiento) ---
       const todayStr = new Date().toISOString().split('T')[0];
-      const wellnessPlayerEntries = players.map(p => ({
-        playerId: p.id,
-        playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-        dorsal: p.dorsal || null,
-        avatarUrl: p.avatar_url || null,
-        status: 'pending' as const,
-        hooperScore: null,
-      }));
+      const todayEvent = allEvents?.find(e => e.date === todayStr);
+
+      // Comprobar rol de usuario actual para visibilidad de molestias (personal técnico autorizado)
+      const { data: { user } } = await supabase.auth.getUser();
+      let canViewDiscomfort = false;
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        const role = profile?.role || '';
+        canViewDiscomfort = ['admin', 'superadmin', 'coordinador', 'metodologo', 'preparador_fisico', 'fisio', 'entrenador', 'coach'].includes(role);
+      }
+
+      // Consultar asistencia registrada para el evento de hoy si existe
+      let todayAttendanceMap: Record<string, 'confirmed' | 'pending' | 'absent'> = {};
+      if (todayEvent) {
+        const { data: todayAtt } = await supabase.from('attendance').select('player_id, status').eq('event_id', todayEvent.id);
+        (todayAtt || []).forEach((att: any) => {
+          const s = (att.status || '').toLowerCase();
+          if (['presente', 'present', 'confirmado', 'confirmed', 'retraso', 'late'].includes(s)) {
+            todayAttendanceMap[att.player_id] = 'confirmed';
+          } else if (['ausente', 'absent', 'no_asiste'].includes(s)) {
+            todayAttendanceMap[att.player_id] = 'absent';
+          } else {
+            todayAttendanceMap[att.player_id] = 'pending';
+          }
+        });
+      }
+
+      // 6. Consultar bienestar diario del equipo mediante Server Action autorizada (protege molestias en origen)
+      let dailyWellnessRows: any[] = [];
+      try {
+        const wellnessServerRes = await getAuthorizedTeamWellnessSummary(teamId, todayStr);
+        if (wellnessServerRes.success) {
+          canViewDiscomfort = wellnessServerRes.canViewDiscomfort;
+          dailyWellnessRows = wellnessServerRes.entries;
+        }
+      } catch (err) {
+        // Fallback silencioso defensivo
+      }
+
+      const wellnessPlayerEntries = players.map(p => {
+        const pAtt = todayAttendanceMap[p.id] || (todayEvent ? 'pending' : 'pending');
+        const pWellnessRow = dailyWellnessRows.find(w => (w.playerId || w.player_id) === p.id);
+
+        let wellnessStatus: 'completed' | 'pending' | 'not_required' = 'pending';
+        if (pWellnessRow) {
+          wellnessStatus = 'completed';
+        } else if (pAtt === 'absent') {
+          // Si el jugador confirmó ausencia justificada previa, el wellness se marca como no requerido
+          wellnessStatus = 'not_required';
+        } else {
+          wellnessStatus = 'pending';
+        }
+
+        const ratings = pWellnessRow ? {
+          sleepQuality: pWellnessRow.sleepQuality ?? pWellnessRow.sleep_quality,
+          fatigue: pWellnessRow.fatigue,
+          soreness: pWellnessRow.soreness,
+          stress: pWellnessRow.stress,
+          mood: pWellnessRow.mood,
+        } : undefined;
+
+        const discomfort = pWellnessRow ? {
+          hasDiscomfort: Boolean(pWellnessRow.hasDiscomfort ?? pWellnessRow.has_discomfort),
+          zone: pWellnessRow.discomfortZone ?? pWellnessRow.discomfort_zone,
+          intensity: pWellnessRow.discomfortIntensity ?? pWellnessRow.discomfort_intensity,
+          notes: pWellnessRow.notes
+        } : undefined;
+
+        return {
+          playerId: p.id,
+          playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+          dorsal: p.dorsal || null,
+          avatarUrl: p.avatar_url || null,
+          attendanceStatus: pAtt,
+          wellnessStatus,
+          hooperScore: pWellnessRow?.wellnessScore ?? pWellnessRow?.wellness_score ?? null,
+          ratings,
+          discomfort,
+          submittedAt: pWellnessRow?.submittedAt ?? pWellnessRow?.submitted_at,
+          canViewDiscomfort
+        };
+      });
+
+      const completedEntries = wellnessPlayerEntries.filter(e => e.wellnessStatus === 'completed');
+      const completedCount = completedEntries.length;
+      const pendingCount = wellnessPlayerEntries.filter(e => e.wellnessStatus === 'pending').length;
+
+      let avgSleep = 0, avgFatigue = 0, avgSoreness = 0, avgStress = 0, avgMood = 0;
+      if (completedCount > 0) {
+        avgSleep = completedEntries.reduce((s, e) => s + (e.ratings?.sleepQuality || 0), 0) / completedCount;
+        avgFatigue = completedEntries.reduce((s, e) => s + (e.ratings?.fatigue || 0), 0) / completedCount;
+        avgSoreness = completedEntries.reduce((s, e) => s + (e.ratings?.soreness || 0), 0) / completedCount;
+        avgStress = completedEntries.reduce((s, e) => s + (e.ratings?.stress || 0), 0) / completedCount;
+        avgMood = completedEntries.reduce((s, e) => s + (e.ratings?.mood || 0), 0) / completedCount;
+      }
+
+      const discomfortCount = completedEntries.filter(e => e.discomfort?.hasDiscomfort).length;
+
+      // Calcular alertas informativas dinámicas únicamente para jugadores con wellness completado hoy
+      const computedAlerts: {
+        playerId: string;
+        playerName: string;
+        dorsal: number | null;
+        avatarUrl: string | null;
+        alert: InformationalAlert;
+      }[] = [];
+
+      for (const entry of completedEntries) {
+        // Sanitizar información de molestias si el rol actual no está autorizado a ver detalles clínicos
+        let discomfortForAlert: DiscomfortDetails | undefined = undefined;
+        if (entry.discomfort?.hasDiscomfort) {
+          discomfortForAlert = {
+            hasDiscomfort: true,
+            // Si tiene permiso canViewDiscomfort ve la zona e intensidad reales; si no, se redacta
+            zone: entry.canViewDiscomfort ? entry.discomfort.zone : null,
+            intensity: entry.canViewDiscomfort ? entry.discomfort.intensity : null,
+            notes: entry.canViewDiscomfort ? entry.discomfort.notes : null,
+          };
+        }
+
+        const playerAlerts = generateInformationalAlerts(entry.ratings, discomfortForAlert);
+        for (const al of playerAlerts) {
+          computedAlerts.push({
+            playerId: entry.playerId,
+            playerName: entry.playerName,
+            dorsal: entry.dorsal,
+            avatarUrl: entry.avatarUrl,
+            alert: al
+          });
+        }
+      }
 
       setWellnessSummary({
         date: todayStr,
         totalSquad: players.length,
-        completedCount: 0,
-        pendingCount: players.length,
-        averageHooperScore: null,
+        completedCount,
+        pendingCount,
+        averageHooperScore: completedCount > 0 ? (avgSleep + avgFatigue + avgSoreness + avgStress + avgMood) : null,
         averages: {
-          sleepQuality: 0,
-          fatigue: 0,
-          soreness: 0,
-          stress: 0,
-          mood: 0
+          sleepQuality: avgSleep,
+          fatigue: avgFatigue,
+          soreness: avgSoreness,
+          stress: avgStress,
+          mood: avgMood
         },
-        discomfortCount: 0,
-        alerts: [],
+        discomfortCount,
+        alerts: computedAlerts,
         playerEntries: wellnessPlayerEntries
       });
     } catch (err) {
@@ -589,7 +713,7 @@ export default function RendimientoGlobalPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {wellnessSummary.playerEntries.map(player => {
-                const isDone = player.status === 'completed';
+                const isDone = player.wellnessStatus === 'completed';
 
                 return (
                   <div
@@ -620,13 +744,29 @@ export default function RendimientoGlobalPage() {
                           </div>
                         </div>
 
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                          isDone
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                          {isDone ? 'Completado' : 'Pendiente'}
-                        </span>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {/* Badge de Asistencia */}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            player.attendanceStatus === 'confirmed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : player.attendanceStatus === 'absent'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {player.attendanceStatus === 'confirmed' ? 'Asiste' : player.attendanceStatus === 'absent' ? 'Ausente' : 'Asistencia Pte.'}
+                          </span>
+
+                          {/* Badge de Wellness */}
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                            isDone
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : player.wellnessStatus === 'not_required'
+                              ? 'bg-gray-100 text-gray-500 border-gray-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {isDone ? 'Wellness OK' : player.wellnessStatus === 'not_required' ? 'No requerido' : 'Wellness Pte.'}
+                          </span>
+                        </div>
                       </div>
 
                       {isDone && player.ratings ? (
@@ -654,19 +794,39 @@ export default function RendimientoGlobalPage() {
                         </div>
                       ) : (
                         <div className="my-3 py-2 px-3 rounded-xl bg-slate-100/70 text-slate-400 text-center text-xs font-medium">
-                          Sin cuestionario recibido hoy
+                          {player.wellnessStatus === 'not_required' ? 'No requerido (ausencia confirmada)' : 'Sin cuestionario recibido hoy'}
                         </div>
                       )}
                     </div>
 
                     <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
-                      <span>{player.discomfort?.hasDiscomfort ? `Molestia: ${player.discomfort.zone}` : 'Sin molestias'}</span>
+                      <div className="truncate pr-2">
+                        {player.canViewDiscomfort ? (
+                          player.discomfort?.hasDiscomfort ? (
+                            <span className="text-amber-700 font-bold flex items-center gap-1">
+                              <AlertTriangle size={12} className="shrink-0" />
+                              <span className="truncate">{player.discomfort.zone} ({player.discomfort.intensity}/10)</span>
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-medium flex items-center gap-1">
+                              <CheckCircle2 size={12} className="shrink-0" /> Sin molestias
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-gray-400 italic">Molestias confidenciales</span>
+                        )}
+                        {player.submittedAt && (
+                          <span className="text-[10px] text-gray-400 block truncate">
+                            {new Date(player.submittedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
                       <button
                         onClick={() => {
                           setDrawerPlayerId(player.playerId);
                           setDrawerTab('entrenamientos');
                         }}
-                        className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 transition-colors"
+                        className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 transition-colors shrink-0"
                       >
                         Ficha <ChevronRight size={14} />
                       </button>
@@ -1031,6 +1191,8 @@ export default function RendimientoGlobalPage() {
           onClose={() => setDrawerPlayerId(null)} 
           globalTrainingStats={trainingStats.find(p => p.id === drawerPlayerId)}
           globalMatchStats={matchStats.find(p => p.id === drawerPlayerId)}
+          playerWellnessEntry={wellnessSummary?.playerEntries.find(p => p.playerId === drawerPlayerId)}
+          playerWellnessAlerts={wellnessSummary?.alerts.filter(a => a.playerId === drawerPlayerId).map(a => a.alert)}
         />
       )}
     </div>

@@ -55,8 +55,11 @@ console.log("=== INICIANDO PRUEBAS UNITARIAS AISLADAS (MODELO DE MINUTOS Y TOKEN
   const invalidRpeHigh = validateTrainingFeedbackInputs(15, 60);
   assert(invalidRpeHigh.isValid === false, "RPE 15 (>10) debe ser rechazado");
 
-  const invalidRpeZero = validateTrainingFeedbackInputs(0, 60);
-  assert(invalidRpeZero.isValid === false, "RPE 0 (<1) debe ser rechazado");
+  const invalidRpeNegative = validateTrainingFeedbackInputs(-1, 60);
+  assert(invalidRpeNegative.isValid === false, "RPE negativo (-1) debe ser rechazado");
+
+  const validRpeZero = validateTrainingFeedbackInputs(0, 60);
+  assert(validRpeZero.isValid === true && validRpeZero.cleanRpe === 0, "RPE 0 (sin esfuerzo/reposo) debe ser admitido");
 
   const invalidMinutesNeg = validateTrainingFeedbackInputs(6, -10);
   assert(invalidMinutesNeg.isValid === false, "Minutos negativos deben ser rechazados");
@@ -65,22 +68,31 @@ console.log("=== INICIANDO PRUEBAS UNITARIAS AISLADAS (MODELO DE MINUTOS Y TOKEN
   assert(invalidMinutesHuge.isValid === false, "Minutos absurdos (999) deben ser rechazados");
 }
 
-// 5. RPE válido con minutos pendientes (conservación de RPE sin carga confirmada) y 0 minutos explícitos
+// 5. RPE válido (0 a 10), distinción de 0 minutos (0 UA) y estados pendientes
 {
+  const rpeZero = validateTrainingFeedbackInputs(0, 45);
+  assert(rpeZero.isValid === true && rpeZero.cleanRpe === 0, "RPE 0 (reposo/sin esfuerzo) debe ser admitido legítimamente");
+
   const noMinutes = validateTrainingFeedbackInputs(8, null);
   assert(noMinutes.isValid === true && noMinutes.cleanMinutes === null, "RPE 8 sin minutos debe ser aceptado con cleanMinutes = null");
 
   const zeroMinutes = validateTrainingFeedbackInputs(8, 0);
   assert(zeroMinutes.isValid === true && zeroMinutes.cleanMinutes === 0, "RPE 8 con 0 minutos debe ser aceptado preservando 0 explícito");
 
-  const loadPendingNull = calculateTrainingLoad(8, null);
-  assert(loadPendingNull.load === null && loadPendingNull.status === 'pending', "Sin minutos (null), la carga debe ser null y estado 'pending'");
+  const loadPendingMinutes = calculateTrainingLoad(8, null);
+  assert(loadPendingMinutes.load === null && loadPendingMinutes.status === 'pending_minutes', "Sin minutos (null), la carga debe ser null y estado 'pending_minutes'");
 
-  const loadZero = calculateTrainingLoad(8, 0);
-  assert(loadZero.load === null && loadZero.status === 'pending', "Con 0 minutos explícitos, la carga no es positiva y permanece null y estado 'pending'");
+  const loadPendingRpe = calculateTrainingLoad(null, 60);
+  assert(loadPendingRpe.load === null && loadPendingRpe.status === 'pending_rpe', "Sin RPE (null), la carga debe ser null y estado 'pending_rpe'");
+
+  const loadZeroMinutes = calculateTrainingLoad(8, 0);
+  assert(loadZeroMinutes.load === 0 && loadZeroMinutes.status === 'confirmed', "Con 0 minutos reales y RPE 8, la carga es exactamente 0 UA confirmada");
+
+  const loadZeroRpeZeroMin = calculateTrainingLoad(0, 0);
+  assert(loadZeroRpeZeroMin.load === 0 && loadZeroRpeZeroMin.status === 'confirmed', "Con 0 minutos reales y RPE 0, la carga es exactamente 0 UA confirmada");
 
   const loadConfirmed = calculateTrainingLoad(8, 60);
-  assert(loadConfirmed.load === 480 && loadConfirmed.status === 'confirmed', "RPE 8 * 60 min debe resultar en carga confirmada de 480");
+  assert(loadConfirmed.load === 480 && loadConfirmed.status === 'confirmed', "RPE 8 * 60 min debe resultar en carga confirmada de 480 UA");
 }
 
 // 6. Precedencia de minutos de partido y detección de discrepancias
@@ -180,7 +192,7 @@ console.log("=== INICIANDO PRUEBAS UNITARIAS AISLADAS (MODELO DE MINUTOS Y TOKEN
 }
 
 // 9. Pruebas de seguridad aisladas para verifyFeedbackToken
-{
+(async () => {
   const testSecret = "test-secret-salt-strictly-isolated";
   process.env.FEEDBACK_SIGNING_SECRET = testSecret;
 
@@ -197,46 +209,46 @@ console.log("=== INICIANDO PRUEBAS UNITARIAS AISLADAS (MODELO DE MINUTOS Y TOKEN
   const validWellnessToken = generateToken('wellness', eventId, playerId, validExp, testSecret);
 
   // 9.1 Token válido por tipo de formulario
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, validRpeToken) === true, "Token válido de RPE y no expirado debe ser verificado con éxito");
-  assert(verifyFeedbackToken('wellness', eventId, playerId, validExp, validWellnessToken) === true, "Token válido de Wellness y no expirado debe ser verificado con éxito");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, validRpeToken) === true, "Token válido de RPE y no expirado debe ser verificado con éxito");
+  assert(await verifyFeedbackToken('wellness', eventId, playerId, validExp, validWellnessToken) === true, "Token válido de Wellness y no expirado debe ser verificado con éxito");
 
   // 9.1.1 Aislamiento estricto entre tipos de formulario (rechazo cruzado)
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, validWellnessToken) === false, "Token de Wellness debe ser estrictamente rechazado al presentarse para RPE");
-  assert(verifyFeedbackToken('wellness', eventId, playerId, validExp, validRpeToken) === false, "Token de RPE debe ser estrictamente rechazado al presentarse para Wellness");
-  assert(verifyFeedbackToken('invalid_type' as any, eventId, playerId, validExp, validRpeToken) === false, "Tipo de formulario no canónico debe ser rechazado inmediatamente");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, validWellnessToken) === false, "Token de Wellness debe ser estrictamente rechazado al presentarse para RPE");
+  assert(await verifyFeedbackToken('wellness', eventId, playerId, validExp, validRpeToken) === false, "Token de RPE debe ser estrictamente rechazado al presentarse para Wellness");
+  assert(await verifyFeedbackToken('invalid_type' as any, eventId, playerId, validExp, validRpeToken) === false, "Tipo de formulario no canónico debe ser rechazado inmediatamente");
 
   // 9.2 Firma manipulada
   const tamperedToken = validRpeToken.substring(0, validRpeToken.length - 2) + "aa";
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, tamperedToken) === false, "Token con firma manipulada debe ser rechazado");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, tamperedToken) === false, "Token con firma manipulada debe ser rechazado");
 
   // 9.3 Token caducado
   const expiredToken = generateToken('rpe', eventId, playerId, expiredExp, testSecret);
-  assert(verifyFeedbackToken('rpe', eventId, playerId, expiredExp, expiredToken) === false, "Token con timestamp expirado debe ser rechazado");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, expiredExp, expiredToken) === false, "Token con timestamp expirado debe ser rechazado");
 
   // 9.4 Token con longitud incorrecta (incluyendo cadena vacía o longitud impar)
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, "") === false, "Token vacío debe ser rechazado sin lanzar excepción");
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, "abc") === false, "Token con longitud corta/dispar debe ser rechazado sin RangeError");
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, "a".repeat(128)) === false, "Token con longitud excesiva debe ser rechazado sin RangeError");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, "") === false, "Token vacío debe ser rechazado sin lanzar excepción");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, "abc") === false, "Token con longitud corta/dispar debe ser rechazado sin RangeError");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, "a".repeat(128)) === false, "Token con longitud excesiva debe ser rechazado sin RangeError");
 
   // 9.5 eventId distinto
   const wrongEventId = "33333333-3333-3333-3333-333333333333";
-  assert(verifyFeedbackToken('rpe', wrongEventId, playerId, validExp, validRpeToken) === false, "Token generado para otro eventId debe ser rechazado");
+  assert(await verifyFeedbackToken('rpe', wrongEventId, playerId, validExp, validRpeToken) === false, "Token generado para otro eventId debe ser rechazado");
 
   // 9.6 playerId distinto
   const wrongPlayerId = "44444444-4444-4444-4444-444444444444";
-  assert(verifyFeedbackToken('rpe', eventId, wrongPlayerId, validExp, validRpeToken) === false, "Token generado para otro playerId debe ser rechazado");
+  assert(await verifyFeedbackToken('rpe', eventId, wrongPlayerId, validExp, validRpeToken) === false, "Token generado para otro playerId debe ser rechazado");
 
   // 9.7 Secreto ausente (fallo cerrado)
   delete process.env.FEEDBACK_SIGNING_SECRET;
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, validRpeToken) === false, "Sin FEEDBACK_SIGNING_SECRET configurado, verifyFeedbackToken debe fallar de forma cerrada (false)");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, validRpeToken) === false, "Sin FEEDBACK_SIGNING_SECRET configurado, verifyFeedbackToken debe fallar de forma cerrada (false)");
 
   // Restaurar testSecret para evitar residuos
   delete process.env.FEEDBACK_SIGNING_SECRET;
 
   // 9.8 Entradas malformadas (undefined, null, NaN)
-  assert(verifyFeedbackToken('rpe', null as any, playerId, validExp, validRpeToken) === false, "eventId null no debe provocar excepciones");
-  assert(verifyFeedbackToken('rpe', eventId, playerId, NaN, validRpeToken) === false, "exp NaN no debe provocar excepciones");
-  assert(verifyFeedbackToken('rpe', eventId, playerId, validExp, null as any) === false, "token null no debe provocar excepciones");
-}
+  assert(await verifyFeedbackToken('rpe', null as any, playerId, validExp, validRpeToken) === false, "eventId null no debe provocar excepciones");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, NaN, validRpeToken) === false, "exp NaN no debe provocar excepciones");
+  assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, null as any) === false, "token null no debe provocar excepciones");
 
-console.log("\n=== TODAS LAS PRUEBAS UNITARIAS AISLADAS FINALIZARON CON ÉXITO ===");
+  console.log("\n=== TODAS LAS PRUEBAS UNITARIAS AISLADAS FINALIZARON CON ÉXITO ===");
+})();

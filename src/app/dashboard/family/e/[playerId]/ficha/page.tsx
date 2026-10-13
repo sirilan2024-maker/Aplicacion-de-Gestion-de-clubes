@@ -206,8 +206,9 @@ export default function PlayerProfilePage() {
   const fetchPlayerACWR = async () => {
     const supabase = createClient();
     try {
-      const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
+      const { data: pData } = await supabase.from('players').select('team_id, teams:team_id(name)').eq('id', playerId).single();
       const teamId = pData?.team_id;
+      const currentTeamName = (pData?.teams as any)?.name || 'Sporting Saladar';
 
       // Partidos y Convocatorias (NUNCA de la temporada cerrada 25/26)
       const { data: convocatoriasData } = await supabase
@@ -250,10 +251,16 @@ export default function PlayerProfilePage() {
             const rawM = c.minutes_played ?? c.minutos_jugados;
             const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 90 : 0);
 
+            const isLocal = c.partidos.lugar === 'Local' || (c.partidos.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(c.partidos.lugar || ''));
+            const baseTitle = isLocal
+              ? `${currentTeamName} vs ${c.partidos.rival_nombre} (Local)`
+              : `${c.partidos.rival_nombre} vs ${currentTeamName} (Visitante)`;
+            const titleWithAmistoso = c.partidos.tipo_partido === 'amistoso' ? `${baseTitle} · Amistoso` : baseTitle;
+
             mHistory.push({
               id: c.partido_id,
               date: c.partidos.fecha_hora,
-              title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar})`,
+              title: titleWithAmistoso,
               attendance: c.estado_asistencia || 'Pendiente',
               minutes: mins,
               goles: gCount,
@@ -273,10 +280,16 @@ export default function PlayerProfilePage() {
 
       teamMatches.forEach(m => {
         if (!processedMatches.has(m.id)) {
+          const isLocal = m.lugar === 'Local' || (m.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(m.lugar || ''));
+          const baseTitle = isLocal
+            ? `${currentTeamName} vs ${m.rival_nombre} (Local)`
+            : `${m.rival_nombre} vs ${currentTeamName} (Visitante)`;
+          const titleWithAmistoso = m.tipo_partido === 'amistoso' ? `${baseTitle} · Amistoso` : baseTitle;
+
           mHistory.push({
             id: m.id,
             date: m.fecha_hora,
-            title: `vs ${m.rival_nombre} (${m.lugar})`,
+            title: titleWithAmistoso,
             attendance: 'No convocado',
             minutes: 0,
             goles: 0,

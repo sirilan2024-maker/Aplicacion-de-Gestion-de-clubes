@@ -99,29 +99,115 @@ CREATE POLICY "player_daily_wellness_insert"
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
         AND (
+            -- Roles con potestad de gestión o preparación física pueden registrar justificadamente
             EXISTS (
                 SELECT 1 FROM public.profiles pr
                 WHERE pr.id = auth.uid()
                 AND pr.role IN ('admin', 'superadmin', 'coordinador', 'preparador_fisico')
             )
-            OR
-            EXISTS (
-                SELECT 1 FROM public.players p
-                WHERE p.id = player_daily_wellness.player_id
+            OR (
+                -- Jugadores, tutores y entrenadores solo pueden registrar para la fecha biológica del día en curso (peninsular)
+                date = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE
                 AND (
                     EXISTS (
-                        SELECT 1 FROM public.team_coaches tc
-                        WHERE tc.team_id = p.team_id AND tc.profile_id = auth.uid()
+                        SELECT 1 FROM public.players p
+                        WHERE p.id = player_daily_wellness.player_id
+                        AND (
+                            EXISTS (
+                                SELECT 1 FROM public.team_coaches tc
+                                WHERE tc.team_id = p.team_id AND tc.profile_id = auth.uid()
+                            )
+                            OR
+                            EXISTS (
+                                SELECT 1 FROM public.teams t
+                                WHERE t.id = p.team_id AND t.coach_id = auth.uid()
+                            )
+                        )
                     )
-                    OR
-                    EXISTS (
-                        SELECT 1 FROM public.teams t
-                        WHERE t.id = p.team_id AND t.coach_id = auth.uid()
+                    OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_daily_wellness.player_id AND pt.tutor_id = auth.uid()
                     )
                 )
             )
-            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
-            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+        )
+    );
+
+CREATE POLICY "player_daily_wellness_update"
+    ON public.player_daily_wellness FOR UPDATE TO authenticated
+    USING (
+        club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND (
+            EXISTS (
+                SELECT 1 FROM public.profiles pr
+                WHERE pr.id = auth.uid()
+                AND pr.role IN ('admin', 'superadmin', 'coordinador', 'preparador_fisico')
+            )
+            OR (
+                date = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE
+                AND (
+                    EXISTS (
+                        SELECT 1 FROM public.players p
+                        WHERE p.id = player_daily_wellness.player_id
+                        AND (
+                            EXISTS (
+                                SELECT 1 FROM public.team_coaches tc
+                                WHERE tc.team_id = p.team_id AND tc.profile_id = auth.uid()
+                            )
+                            OR
+                            EXISTS (
+                                SELECT 1 FROM public.teams t
+                                WHERE t.id = p.team_id AND t.coach_id = auth.uid()
+                            )
+                        )
+                    )
+                    OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_daily_wellness.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
+            )
+        )
+    )
+    WITH CHECK (
+        club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND (
+            EXISTS (
+                SELECT 1 FROM public.profiles pr
+                WHERE pr.id = auth.uid()
+                AND pr.role IN ('admin', 'superadmin', 'coordinador', 'preparador_fisico')
+            )
+            OR (
+                -- Impide cambiar la fecha a una fecha pasada o futura mediante UPDATE
+                date = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE
+                AND (
+                    EXISTS (
+                        SELECT 1 FROM public.players p
+                        WHERE p.id = player_daily_wellness.player_id
+                        AND (
+                            EXISTS (
+                                SELECT 1 FROM public.team_coaches tc
+                                WHERE tc.team_id = p.team_id AND tc.profile_id = auth.uid()
+                            )
+                            OR
+                            EXISTS (
+                                SELECT 1 FROM public.teams t
+                                WHERE t.id = p.team_id AND t.coach_id = auth.uid()
+                            )
+                        )
+                    )
+                    OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_daily_wellness.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_daily_wellness.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
+            )
         )
     );
 
@@ -183,6 +269,10 @@ CREATE POLICY "discomfort_incidents_select"
             )
             OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
             OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+            OR EXISTS (
+                SELECT 1 FROM public.player_tutors pt
+                WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+            )
         )
     );
 
@@ -214,6 +304,45 @@ CREATE POLICY "discomfort_incidents_insert"
             )
             OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
             OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+            OR EXISTS (
+                SELECT 1 FROM public.player_tutors pt
+                WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+            )
+        )
+    );
+
+CREATE POLICY "discomfort_incidents_update"
+    ON public.player_session_discomfort_incidents FOR UPDATE TO authenticated
+    USING (
+        club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND (
+            EXISTS (
+                SELECT 1 FROM public.profiles pr
+                WHERE pr.id = auth.uid()
+                AND pr.role IN ('admin', 'superadmin', 'coordinador', 'preparador_fisico')
+            )
+            OR
+            EXISTS (
+                SELECT 1 FROM public.players p
+                WHERE p.id = player_session_discomfort_incidents.player_id
+                AND (
+                    EXISTS (
+                        SELECT 1 FROM public.team_coaches tc
+                        WHERE tc.team_id = p.team_id AND tc.profile_id = auth.uid()
+                    )
+                    OR
+                    EXISTS (
+                        SELECT 1 FROM public.teams t
+                        WHERE t.id = p.team_id AND t.coach_id = auth.uid()
+                    )
+                )
+            )
+            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+            OR EXISTS (
+                SELECT 1 FROM public.player_tutors pt
+                WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+            )
         )
     );
 
@@ -283,6 +412,10 @@ CREATE POLICY "player_session_feedback_select"
             )
             OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
             OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+            OR EXISTS (
+                SELECT 1 FROM public.player_tutors pt
+                WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+            )
         )
     );
 
@@ -314,5 +447,44 @@ CREATE POLICY "player_session_feedback_insert"
             )
             OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
             OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+            OR EXISTS (
+                SELECT 1 FROM public.player_tutors pt
+                WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+            )
+        )
+    );
+
+CREATE POLICY "player_session_feedback_update"
+    ON public.player_session_feedback FOR UPDATE TO authenticated
+    USING (
+        club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND (
+            EXISTS (
+                SELECT 1 FROM public.profiles pr
+                WHERE pr.id = auth.uid()
+                AND pr.role IN ('admin', 'superadmin', 'coordinador', 'preparador_fisico')
+            )
+            OR
+            EXISTS (
+                SELECT 1 FROM public.players p
+                WHERE p.id = player_session_feedback.player_id
+                AND (
+                    EXISTS (
+                        SELECT 1 FROM public.team_coaches tc
+                        WHERE tc.team_id = p.team_id AND tc.profile_id = auth.uid()
+                    )
+                    OR
+                    EXISTS (
+                        SELECT 1 FROM public.teams t
+                        WHERE t.id = p.team_id AND t.coach_id = auth.uid()
+                    )
+                )
+            )
+            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+            OR EXISTS (
+                SELECT 1 FROM public.player_tutors pt
+                WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+            )
         )
     );

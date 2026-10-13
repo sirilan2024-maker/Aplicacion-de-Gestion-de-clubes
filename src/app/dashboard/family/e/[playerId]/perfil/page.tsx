@@ -705,11 +705,13 @@ export default function PlayerDashboardPage() {
               </div>
               <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
                 <p className="text-white font-bold text-lg">
-                  {nextMatch.equipo?.name || player.teams?.name} vs {nextMatch.rival_nombre}
+                  {(nextMatch.lugar === 'Local' || (nextMatch.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(nextMatch.lugar || '')))
+                    ? `${nextMatch.equipo?.name || player.teams?.name} vs ${nextMatch.rival_nombre}`
+                    : `${nextMatch.rival_nombre} vs ${nextMatch.equipo?.name || player.teams?.name}`}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-blue-200 text-sm flex items-center gap-1">
-                    <MapPin size={14} /> {nextMatch.lugar === 'Local' ? 'En casa' : 'Fuera de casa'}
+                    <MapPin size={14} /> {(nextMatch.lugar === 'Local' || (nextMatch.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(nextMatch.lugar || ''))) ? 'En casa (Local)' : 'Fuera de casa (Visitante)'}
                   </p>
                   {nextMatch.equipo_id && nextMatch.equipo_id !== player.team_id && (
                     <span className="px-2 py-0.5 bg-amber-400 text-slate-950 font-black text-[10px] rounded uppercase tracking-wider">

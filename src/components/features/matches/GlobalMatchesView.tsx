@@ -277,7 +277,17 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
       }
 
       if (res.success) {
-        setSyncMessage("¡Sincronizado con éxito con la FFCV!")
+        const currentTeam = teams.find((t: any) => t.id === (fixedTeamId || (selectedTeamId !== 'all' ? selectedTeamId : null)));
+        const isCurrentTeamBrave = currentTeam?.ffcv_url?.includes('apuntamelo') ||
+          currentTeam?.category?.toLowerCase().includes('brave') ||
+          currentTeam?.ffcv_group_id === '4624' ||
+          currentTeam?.ffcv_group_id === '4623' ||
+          currentTeam?.id === '7123c91a-69c1-4b94-9f85-0914dee8bbdc' ||
+          currentTeam?.id === '5633f710-7707-40d7-b812-c51a44b90d9e' ||
+          (currentTeam?.name?.toLowerCase().includes('infantil b')) ||
+          (currentTeam?.name?.toLowerCase().includes('cadete b'));
+
+        setSyncMessage(isCurrentTeamBrave ? "¡Sincronizado con éxito con la Liga Brave!" : "¡Sincronizado con éxito con la FFCV!")
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
@@ -466,26 +476,38 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
           </h1>
           <p className="text-slate-500 mt-1">Aqui tienes toda la informacion de calendarios, partidos y clasificaciones de los equipos tu club.</p>
         </div>
-        {!isReadOnly && (
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            <button
-              onClick={handleSyncFFCV}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
-              title="Sincronizar partidos con la FFCV"
-            >
-              <RefreshCw className={`w-4 h-4 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar FFCV'}</span>
-            </button>
-            <button
-              onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              Nuevo Partido
-            </button>
-          </div>
-        )}
+        {!isReadOnly && (() => {
+          const currentTeam = teams.find((t: any) => t.id === (fixedTeamId || (selectedTeamId !== 'all' ? selectedTeamId : null)));
+          const isCurrentTeamBrave = currentTeam?.ffcv_url?.includes('apuntamelo') ||
+            currentTeam?.category?.toLowerCase().includes('brave') ||
+            currentTeam?.ffcv_group_id === '4624' ||
+            currentTeam?.ffcv_group_id === '4623' ||
+            currentTeam?.id === '7123c91a-69c1-4b94-9f85-0914dee8bbdc' ||
+            currentTeam?.id === '5633f710-7707-40d7-b812-c51a44b90d9e' ||
+            (currentTeam?.name?.toLowerCase().includes('infantil b')) ||
+            (currentTeam?.name?.toLowerCase().includes('cadete b'));
+
+          return (
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={handleSyncFFCV}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all shadow-sm disabled:opacity-50"
+                title={isCurrentTeamBrave ? "Sincronizar partidos con la Liga Brave" : "Sincronizar partidos con la FFCV"}
+              >
+                <RefreshCw className={`w-4 h-4 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Sincronizando...' : (isCurrentTeamBrave ? 'Sincronizar Liga Brave' : 'Sincronizar FFCV')}</span>
+              </button>
+              <button
+                onClick={() => setEditingMatch({ id: 'new', equipo_id: selectedTeamId !== 'all' ? selectedTeamId : sortedTeams[0]?.id, fecha_hora: new Date().toISOString() })}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Nuevo Partido
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {syncMessage && (
@@ -834,14 +856,21 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
             >
               <div className="p-5 flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-2">
-                  <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
-                    match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
-                      ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                      : match.estado === 'En Curso'
-                      ? "bg-amber-50 text-amber-600 border border-amber-200"
-                      : "bg-slate-100 text-slate-500 border border-slate-200"
-                  }`}>
-                    {(match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {match.tipo_partido === 'amistoso' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider bg-purple-100 text-purple-700 border border-purple-200">
+                        Amistoso
+                      </span>
+                    )}
+                    <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
+                      match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                        : match.estado === 'En Curso'
+                        ? "bg-amber-50 text-amber-600 border border-amber-200"
+                        : "bg-slate-100 text-slate-500 border border-slate-200"
+                    }`}>
+                      {(match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
+                    </div>
                   </div>
                   <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -906,11 +935,22 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 font-medium bg-slate-50 p-2 rounded-lg border border-slate-100">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="truncate max-w-[140px] font-semibold text-slate-700">{match.lugar || 'Polideportivo Municipal'}</span>
+                      <span className="truncate max-w-[160px] font-semibold text-slate-700" title={ffcvMatch?.pitch_name || (isLocal ? 'Polideportivo Municipal del Saladar' : 'Campo rival')}>
+                        {ffcvMatch?.pitch_name || (isLocal ? 'Polideportivo Municipal del Saladar' : (match.lugar || 'Campo rival'))}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <span className="font-semibold text-slate-700">{match.competicion_nombre || 'LIGA FFCV'}</span>
+                      <span className="font-semibold text-slate-700">
+                        {match.competicion_nombre || (
+                          match.acta_oficial_url?.includes('apuntamelo') ||
+                          match.equipo?.category?.toLowerCase().includes('brave') ||
+                          match.equipo?.name?.toLowerCase().includes('infantil b') ||
+                          match.equipo?.name?.toLowerCase().includes('cadete b')
+                            ? 'LIGA BRAVE'
+                            : 'LIGA FFCV'
+                        )}
+                      </span>
                     </div>
                   </div>
 

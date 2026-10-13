@@ -229,12 +229,18 @@ export async function syncTeamFFCV(
   // 1. Fetch team's FFCV configuration
   const { data: team, error: teamErr } = await supabase
     .from('teams')
-    .select('id, name, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id')
+    .select('id, name, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url')
     .eq('id', teamId)
     .single();
 
   if (teamErr || !team) {
     throw new Error(`Team not found: ${teamErr?.message || teamId}`);
+  }
+
+  // Check if this is a Liga Brave / Apuntamelo team (Infantil B, Cadete B)
+  const { isApuntameloTeam, syncApuntameloTeam } = await import('../apuntamelo/sync');
+  if (isApuntameloTeam(team)) {
+    return await syncApuntameloTeam(teamId, supabase);
   }
 
   if (!team.ffcv_season_id || !team.ffcv_competition_id || !team.ffcv_group_id) {
@@ -321,13 +327,21 @@ export async function syncAllConfiguredFFCVTeams(
   // 2. Process each unique group once
   for (const [key, groupInfo] of Array.from(groupMap.entries())) {
     try {
-      const syncRes = await syncGroupFFCV({
-        seasonId: groupInfo.seasonId,
-        competitionId: groupInfo.competitionId,
-        groupId: groupInfo.groupId,
-        syncAllMatchdays: options.syncAllMatchdays,
-        specificMatchday: options.specificMatchday
-      }, supabase);
+      let syncRes: FFCVSyncResult;
+      const { isApuntameloTeam, syncApuntameloTeam } = await import('../apuntamelo/sync');
+      const sampleTeam = configuredTeams.find((t: any) => t.id === groupInfo.teamIds[0]);
+      
+      if (sampleTeam && isApuntameloTeam(sampleTeam)) {
+        syncRes = await syncApuntameloTeam(groupInfo.teamIds[0], supabase);
+      } else {
+        syncRes = await syncGroupFFCV({
+          seasonId: groupInfo.seasonId,
+          competitionId: groupInfo.competitionId,
+          groupId: groupInfo.groupId,
+          syncAllMatchdays: options.syncAllMatchdays,
+          specificMatchday: options.specificMatchday
+        }, supabase);
+      }
 
       if (syncRes.success) {
         groupsSuccess++;

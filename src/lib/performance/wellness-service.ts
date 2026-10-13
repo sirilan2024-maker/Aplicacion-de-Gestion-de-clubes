@@ -208,8 +208,8 @@ export function validateSessionFeedbackInput(input: any): SessionFeedbackValidat
 
   const { rpe, minutes, hasDiscomfort, zone, intensity, notes } = input;
 
-  if (typeof rpe !== 'number' || rpe < 1 || rpe > 10) {
-    errors.push('El RPE debe ser un valor numérico entre 1 y 10');
+  if (typeof rpe !== 'number' || isNaN(rpe) || rpe < 0 || rpe > 10) {
+    errors.push('El RPE debe ser un valor numérico entre 0 y 10');
   }
 
   let cleanMinutes: number | null = null;
@@ -246,7 +246,8 @@ export function validateSessionFeedbackInput(input: any): SessionFeedbackValidat
     return { isValid: false, errors };
   }
 
-  const trainingLoad = cleanMinutes !== null && cleanMinutes > 0 ? rpe * cleanMinutes : null;
+  // Si minutos reales están definidos: si minutos = 0 => 0 UA; si minutos > 0 => rpe * minutos; si no hay minutos => null (pendiente)
+  const trainingLoad = cleanMinutes !== null ? (cleanMinutes === 0 ? 0 : rpe * cleanMinutes) : null;
 
   return {
     isValid: true,
@@ -261,9 +262,12 @@ export function validateSessionFeedbackInput(input: any): SessionFeedbackValidat
   };
 }
 
+import { WELLNESS_CONFIG } from './wellness-config';
+
 /**
  * Genera alertas estrictamente informativas para el preparador físico.
  * REGLA: Nunca modifican la disponibilidad deportiva del jugador ni crean episodios clínicos.
+ * Utiliza centralizadamente los umbrales aprobados por Joaquín en WELLNESS_CONFIG.
  */
 export function generateInformationalAlerts(
   ratings?: HooperRatings,
@@ -271,9 +275,10 @@ export function generateInformationalAlerts(
   rpeFeedback?: { rpe: number }
 ): InformationalAlert[] {
   const alerts: InformationalAlert[] = [];
+  const thresholds = WELLNESS_CONFIG.alertThresholds;
 
   if (ratings) {
-    if (ratings.fatigue >= 4) {
+    if (ratings.fatigue >= thresholds.fatigueAttentionThreshold) {
       alerts.push({
         type: 'fatigue_warning',
         level: 'attention',
@@ -281,7 +286,7 @@ export function generateInformationalAlerts(
       });
     }
 
-    if (ratings.soreness >= 4) {
+    if (ratings.soreness >= thresholds.sorenessAttentionThreshold) {
       alerts.push({
         type: 'soreness_warning',
         level: 'attention',
@@ -291,15 +296,21 @@ export function generateInformationalAlerts(
   }
 
   if (discomfort && discomfort.hasDiscomfort) {
+    const isSevere = discomfort.intensity !== undefined && 
+      discomfort.intensity !== null && 
+      discomfort.intensity >= thresholds.discomfortSevereIntensityThreshold;
+
     alerts.push({
       type: 'discomfort_reported',
-      level: discomfort.intensity && discomfort.intensity >= 7 ? 'attention' : 'info',
-      message: `Molestia comunicada en ${discomfort.zone || 'zona no indicada'} (Intensidad ${discomfort.intensity || 'N/A'}/10).`,
+      level: isSevere ? 'attention' : 'info',
+      message: discomfort.zone 
+        ? `Molestia comunicada en ${discomfort.zone} (Intensidad ${discomfort.intensity ?? 'N/A'}/10).`
+        : `Molestia comunicada antes del entrenamiento (Intensidad ${discomfort.intensity ?? 'N/A'}/10).`,
       zone: discomfort.zone,
     });
   }
 
-  if (rpeFeedback && rpeFeedback.rpe >= 9) {
+  if (rpeFeedback && rpeFeedback.rpe >= thresholds.highRpeThreshold) {
     alerts.push({
       type: 'high_exertion',
       level: 'info',

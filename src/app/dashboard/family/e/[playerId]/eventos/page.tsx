@@ -68,11 +68,14 @@ export default function FamilyEventsPage() {
           });
         }
         
-        mergedEvents.sort((a, b) => {
-          const timeA = new Date(`${a.date}T${a.start_time || '00:00'}:00`).getTime();
-          const timeB = new Date(`${b.date}T${b.start_time || '00:00'}:00`).getTime();
-          return timeA - timeB; // Orden del más cercano en fecha al más lejano
-        });
+        const getEventTimestamp = (e: any) => {
+          if (!e.date) return 0;
+          const time = (e.start_time || '00:00').substring(0, 5);
+          const t = new Date(`${e.date}T${time}:00`).getTime();
+          return isNaN(t) ? new Date(e.date).getTime() : t;
+        };
+
+        mergedEvents.sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b));
 
         setEvents(mergedEvents);
       }
@@ -115,6 +118,14 @@ export default function FamilyEventsPage() {
               const date = new Date(e.date);
               const eventAttendance = e.attendance?.find((a: any) => a.player_id === playerId) || null;
               
+              const now = new Date();
+              now.setHours(0, 0, 0, 0);
+              const evDateOnly = new Date(e.date);
+              evDateOnly.setHours(0, 0, 0, 0);
+              const diffDays = Math.ceil((evDateOnly.getTime() - now.getTime()) / (1000 * 3600 * 24));
+              const isFutureLocked = diffDays > 7;
+              const isPast = diffDays < 0;
+
               return (
                 <div key={e.id} className="p-6 flex flex-col md:flex-row md:items-start justify-between gap-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-4 flex-1">
@@ -146,53 +157,68 @@ export default function FamilyEventsPage() {
                   
                   {/* Attendance Controls */}
                   <div className="flex items-center gap-2 mt-4 md:mt-0 shrink-0">
-                    {e.isOfficialMatch && (
+                    {e.isOfficialMatch ? (
                       <button
                         onClick={() => router.push(`/dashboard/family/e/${playerId}/partidos/${e.id}`)}
                         className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm w-full md:w-auto text-center"
                       >
                         Ver Partido
                       </button>
+                    ) : isFutureLocked ? (
+                      <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-3 py-2 rounded-lg flex items-center gap-1.5">
+                        <Clock size={13} className="text-slate-400 shrink-0" />
+                        Convocatoria abierta 7 días antes
+                      </span>
+                    ) : isPast ? (
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
+                        eventAttendance?.status === 'present'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : eventAttendance?.status === 'absent'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-slate-50 text-slate-500 border-slate-200'
+                      }`}>
+                        {eventAttendance?.status === 'present' ? '✅ Asistió' : eventAttendance?.status === 'absent' ? '❌ No asistió' : 'Finalizado'}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/events/${e.id}/attendance`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ playerId, status: 'present' })
+                            });
+                            if (res.ok) fetchEvents();
+                            else toast.error("Error al confirmar asistencia");
+                          }}
+                          className={`flex-1 md:flex-none font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm ${
+                            eventAttendance?.status === 'present' 
+                              ? 'bg-emerald-600 text-white ring-2 ring-emerald-600 ring-offset-2' 
+                              : 'bg-white text-gray-700 border border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
+                          }`}
+                        >
+                          {eventAttendance?.status === 'present' ? '✅ Asistencia Confirmada' : 'Sí, asistiré'}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/events/${e.id}/attendance`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ playerId, status: 'absent' })
+                            });
+                            if (res.ok) fetchEvents();
+                            else toast.error("Error al rechazar asistencia");
+                          }}
+                          className={`flex-1 md:flex-none font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm ${
+                            eventAttendance?.status === 'absent'
+                              ? 'bg-rose-600 text-white ring-2 ring-rose-600 ring-offset-2'
+                              : 'bg-white text-gray-700 border border-gray-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
+                          }`}
+                        >
+                          {eventAttendance?.status === 'absent' ? '❌ No asistiré' : 'No podré'}
+                        </button>
+                      </>
                     )}
-                    
-                    <>
-                      <button
-                        onClick={async () => {
-                          const res = await fetch(`/api/events/${e.id}/attendance`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ playerId, status: 'present' })
-                          });
-                          if (res.ok) fetchEvents();
-                          else toast.error("Error al confirmar asistencia");
-                        }}
-                        className={`flex-1 md:flex-none font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm ${
-                          eventAttendance?.status === 'present' 
-                            ? 'bg-emerald-600 text-white ring-2 ring-emerald-600 ring-offset-2' 
-                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
-                        }`}
-                      >
-                        {eventAttendance?.status === 'present' ? '✅ Asistencia Confirmada' : 'Sí, asistiré'}
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const res = await fetch(`/api/events/${e.id}/attendance`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ playerId, status: 'absent' })
-                          });
-                          if (res.ok) fetchEvents();
-                          else toast.error("Error al rechazar asistencia");
-                        }}
-                        className={`flex-1 md:flex-none font-bold py-2 px-4 rounded-lg shadow-sm transition-colors text-sm ${
-                          eventAttendance?.status === 'absent'
-                            ? 'bg-rose-600 text-white ring-2 ring-rose-600 ring-offset-2'
-                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
-                        }`}
-                      >
-                        {eventAttendance?.status === 'absent' ? '❌ No asistiré' : 'No podré'}
-                      </button>
-                    </>
                   </div>
 
                 </div>

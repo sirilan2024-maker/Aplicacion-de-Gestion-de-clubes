@@ -177,6 +177,133 @@ export async function POST(request: Request) {
       }
     }
 
+    // 3. PROCESAR RECORDATORIOS DE RENDIMIENTO (Bienestar Previo y Feedback Post-Entrenamiento)
+    try {
+      const { evaluateReminderEligibility } = await import('@/lib/performance/reminders-service')
+      const { getSpainDateString } = await import('@/lib/performance/wellness-service')
+      const todayISO = getSpainDateString(new Date())
+
+      // Consultar sesiones de entrenamiento de hoy con horarios definidos
+      const { data: todayTrainings } = await supabase
+        .from('team_events')
+        .select('id, title, date, start_time, end_time, team_id, teams(name, club_id)')
+        .eq('date', todayISO)
+        .not('start_time', 'is', null)
+
+      if (todayTrainings && todayTrainings.length > 0) {
+        for (const training of todayTrainings) {
+          const clubId = (training.teams as any)?.club_id
+          const teamName = (training.teams as any)?.name || 'Equipo'
+          const schedule = {
+            eventId: training.id,
+            date: training.date,
+            startTime: training.start_time,
+            endTime: training.end_time,
+            title: training.title,
+            teamId: training.team_id,
+            teamName,
+            clubId
+          }
+
+          const { data: players } = await supabase
+            .from('players')
+            .select('id, first_name, last_name, tutor_id, user_auth_id, email, tutor_email, parent1_email, tutor:profiles!players_tutor_id_fkey(email)')
+            .eq('team_id', training.team_id)
+
+          if (!players || players.length === 0) continue
+
+          // Consultar registros ya completados para esta sesión
+          const { data: completedWellness } = await supabase
+            .from('player_daily_wellness')
+            .select('player_id')
+            .eq('date', training.date)
+            .in('player_id', players.map(p => p.id))
+
+          const completedWellnessIds = new Set((completedWellness || []).map(w => w.player_id))
+
+          const { data: completedFeedback } = await supabase
+            .from('player_session_feedback')
+            .select('player_id')
+            .eq('event_id', training.id)
+            .in('player_id', players.map(p => p.id))
+
+          const completedFeedbackIds = new Set((completedFeedback || []).map(f => f.player_id))
+
+          const performanceNotifications: any[] = []
+
+          for (const player of players) {
+            const playerInfo = {
+              id: player.id,
+              firstName: player.first_name,
+              lastName: player.last_name,
+              userAuthId: player.user_auth_id,
+              tutorId: player.tutor_id,
+              email: player.email,
+              tutorEmail: (player.tutor as any)?.email || player.tutor_email || player.parent1_email,
+            }
+
+            // A. Evaluar aviso de Bienestar Previo
+            const wellnessEval = evaluateReminderEligibility({
+              reminderType: 'WELLNESS_REMINDER',
+              schedule,
+              player: playerInfo,
+              isFormCompleted: completedWellnessIds.has(player.id)
+            })
+
+            if (wellnessEval.eligible && wellnessEval.recipient?.userId) {
+              performanceNotifications.push({
+                userId: wellnessEval.recipient.userId,
+                userEmail: wellnessEval.recipient.email,
+                clubId,
+                type: 'WELLNESS_REMINDER' as const,
+                title: `🔋 Cuestionario de Bienestar: ${training.title || 'Entrenamiento'}`,
+                content: `Hola ${wellnessEval.recipient.displayName}. Por favor completa el estado físico previo de ${player.first_name} antes del entrenamiento.`,
+                link: `/wellness/${training.id}?p=${player.id}`,
+                channels: ['IN_APP' as const, 'EMAIL' as const],
+                idempotencyKey: wellnessEval.idempotencyKey,
+                emailSubject: `🔋 Bienestar previo: ${training.title || 'Entrenamiento'} - ${teamName}`,
+              })
+            }
+
+            // B. Evaluar aviso de Feedback Post-Entrenamiento (RPE)
+            if (training.end_time) {
+              const feedbackEval = evaluateReminderEligibility({
+                reminderType: 'SESSION_FEEDBACK_REMINDER',
+                schedule,
+                player: playerInfo,
+                isFormCompleted: completedFeedbackIds.has(player.id)
+              })
+
+              if (feedbackEval.eligible && feedbackEval.recipient?.userId) {
+                performanceNotifications.push({
+                  userId: feedbackEval.recipient.userId,
+                  userEmail: feedbackEval.recipient.email,
+                  clubId,
+                  type: 'SESSION_FEEDBACK_REMINDER' as const,
+                  title: `📊 Valoración de Esfuerzo (RPE): ${training.title || 'Entrenamiento'}`,
+                  content: `Hola ${feedbackEval.recipient.displayName}. Registra el esfuerzo percibido y minutos de ${player.first_name} en la sesión.`,
+                  link: `/feedback/${training.id}?p=${player.id}`,
+                  channels: ['IN_APP' as const, 'EMAIL' as const],
+                  idempotencyKey: feedbackEval.idempotencyKey,
+                  emailSubject: `📊 Valoración de sesión (RPE): ${training.title || 'Entrenamiento'} - ${teamName}`,
+                })
+              }
+            }
+          }
+
+          if (performanceNotifications.length > 0) {
+            totalProcessed += performanceNotifications.length
+            const res = await NotificationService.dispatchBatch({ notifications: performanceNotifications })
+            totalSent += res.successful
+            totalFailed += res.failed
+            totalSkipped += res.skipped
+          }
+        }
+      }
+    } catch (perfRemError: any) {
+      console.warn('[send-reminders] Error evaluando recordatorios de rendimiento:', perfRemError?.message || perfRemError)
+    }
+
     const duration = Date.now() - startTime
     console.log(`[send-reminders OK] ${totalProcessed} actividades procesadas (${totalSent} enviados, ${totalSkipped} omitidos, ${totalFailed} fallidos) en ${duration}ms`)
 

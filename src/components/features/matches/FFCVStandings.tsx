@@ -150,9 +150,9 @@ export function FFCVStandings({
         <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
           <Trophy className="w-6 h-6" />
         </div>
-        <h3 className="font-bold text-slate-800 text-base">Sin Clasificación FFCV Vinculada</h3>
+        <h3 className="font-bold text-slate-800 text-base">Sin Clasificación Oficial Vinculada</h3>
         <p className="text-xs text-slate-500 max-w-md mx-auto">
-          Este equipo no tiene asignado un enlace de la FFCV. Puedes configurarlo des de el panel de administración de equipos.
+          Este equipo no tiene asignado un enlace de competición oficial (FFCV o Liga Brave). Puedes configurarlo desde el panel de administración de equipos.
         </p>
       </div>
     );
@@ -168,7 +168,7 @@ export function FFCVStandings({
           </div>
           <div>
             <span className="text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-              Oficial FFCV
+              {(ffcvUrl?.includes('apuntamelo') || ffcvGroupId === '4624' || ffcvGroupId === '4623' || teamName?.toLowerCase().includes('infantil b') || teamName?.toLowerCase().includes('cadete b')) ? 'Oficial Liga Brave' : 'Oficial FFCV'}
             </span>
             <h3 className="font-extrabold text-slate-900 text-base mt-0.5">
               Clasificación Oficial del Grupo

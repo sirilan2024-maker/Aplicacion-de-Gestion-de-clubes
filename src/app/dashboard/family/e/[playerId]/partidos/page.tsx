@@ -377,6 +377,11 @@ export default function FamilyMatchesPage() {
                   {/* Fila superior: Estado y Fecha / Hora */}
                   <div className="flex justify-between items-start mb-2 gap-2">
                     <div className="flex gap-1.5 flex-wrap items-center">
+                      {match.tipo_partido === 'amistoso' && (
+                        <div className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider bg-purple-100 text-purple-700 border border-purple-200">
+                          Amistoso
+                        </div>
+                      )}
                       <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
                         match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"

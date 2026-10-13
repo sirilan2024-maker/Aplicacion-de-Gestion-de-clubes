@@ -701,6 +701,7 @@ export interface ExecutiveDashboardData {
       jornada?: number | string;
       esLocal?: boolean;
       estado?: string;
+      tipoPartido?: string;
       resultadoPropio?: number | null;
       resultadoRival?: number | null;
       teamName: string;
@@ -734,6 +735,7 @@ export interface ExecutiveDashboardData {
     jornada?: number | string;
     esLocal?: boolean;
     estado?: string;
+    tipoPartido?: string;
     resultadoPropio?: number | null;
     resultadoRival?: number | null;
     teamName: string;
@@ -853,13 +855,17 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const teamIds = teams.map(t => t.id);
     const { data: rawPartidos } = await adminClient
       .from('partidos')
-      .select('id, estado, resultado_propio, resultado_rival, equipo_id, rival_nombre, lugar, fecha_hora')
+      .select('id, estado, resultado_propio, resultado_rival, equipo_id, rival_nombre, lugar, fecha_hora, tipo_partido')
       .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .order('fecha_hora', { ascending: false });
 
     const allMatches = rawPartidos || [];
-    const playedMatches = allMatches.filter(p => p.estado === 'Finalizado' || (p.resultado_propio !== null && p.resultado_rival !== null));
+    // REGLA: Los partidos amistosos no computan para los registros, estadísticas ni clasificaciones de liga
+    const playedMatches = allMatches.filter(p => 
+      (p.estado === 'Finalizado' || (p.resultado_propio !== null && p.resultado_rival !== null)) && 
+      p.tipo_partido !== 'amistoso'
+    );
 
     let totalPlayedMatches = playedMatches.length;
     let wins = 0;
@@ -909,19 +915,23 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const groupMap = new Map<string, { competition_name: string; group_name: string; total_teams: number; total_matchdays: number }>();
     (groupsData || []).forEach(g => groupMap.set(g.ffcv_group_id, g));
 
-    const { data: allStandings } = await adminClient
-      .from('ffcv_standings')
-      .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id, played, won, drawn, lost, goals_for, goals_against')
-      .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none'])
-      .order('matchday', { ascending: false });
-
-    // Mapear clasificación más reciente por ffcv_group_id
+    // Mapear clasificación más reciente por ffcv_group_id (consultando por grupo con límite para evitar truncamiento de 1.000 filas de Supabase)
     const standingsByGroup = new Map<string, any[]>();
-    (allStandings || []).forEach(s => {
-      const list = standingsByGroup.get(s.ffcv_group_id) || [];
-      list.push(s);
-      standingsByGroup.set(s.ffcv_group_id, list);
-    });
+    if (groupIds.length > 0) {
+      const standingsResults = await Promise.all(
+        groupIds.map(async (gid) => {
+          const { data } = await adminClient
+            .from('ffcv_standings')
+            .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id, played, won, drawn, lost, goals_for, goals_against')
+            .neq('ffcv_season_id', '21')
+            .eq('ffcv_group_id', gid)
+            .order('matchday', { ascending: false })
+            .limit(30);
+          return { gid, data: data || [] };
+        })
+      );
+      standingsResults.forEach(r => standingsByGroup.set(r.gid, r.data));
+    }
 
     for (const team of federatedTeams) {
       const groupInfo = team.ffcv_group_id ? groupMap.get(team.ffcv_group_id) : undefined;
@@ -1198,7 +1208,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .from('partidos')
       .select(`
         id, fecha_hora, rival_nombre, lugar, estado,
-        resultado_propio, resultado_rival,
+        resultado_propio, resultado_rival, tipo_partido,
         teams:equipo_id (name, category, color)
       `)
       .eq('club_id', clubId)
@@ -1206,7 +1216,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
       .gte('fecha_hora', yesterday)
       .order('fecha_hora', { ascending: true })
-      .limit(6);
+      .limit(30);
 
     interface TeamRel {
       name?: string;
@@ -1216,14 +1226,16 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
 
     const upcomingMatches = (rawMatches || []).map(m => {
       const team = m.teams as unknown as TeamRel | null;
+      const isLocal = m.lugar === 'Local' || (m.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(m.lugar || ''));
       return {
         id: m.id,
         fechaHora: m.fecha_hora,
         rivalNombre: m.rival_nombre || 'Rival por definir',
-        lugar: m.lugar || 'Por determinar',
+        lugar: m.lugar || (isLocal ? 'Local' : 'Visitante'),
         jornada: undefined,
-        esLocal: true,
+        esLocal: isLocal,
         estado: m.estado || 'Programado',
+        tipoPartido: (m as any).tipo_partido || 'liga',
         resultadoPropio: m.resultado_propio,
         resultadoRival: m.resultado_rival,
         teamName: team?.name || 'Equipo del Club',
@@ -1232,7 +1244,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       };
     });
 
-    // 12. Próximos Entrenamientos / Eventos
+    // 12. Próximos Entrenamientos / Eventos (Todos los equipos del club)
     const todayDate = new Date().toISOString().split('T')[0];
     const { data: rawTrainings } = await adminClient
       .from('team_events')
@@ -1240,14 +1252,15 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .in('team_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
       .gte('date', todayDate)
       .order('date', { ascending: true })
-      .limit(6);
+      .order('start_time', { ascending: true })
+      .limit(14);
 
     const upcomingTrainings = (rawTrainings || []).map((e: any) => ({
       id: e.id,
       title: e.title || 'Entrenamiento',
       date: e.date,
-      startTime: e.start_time || '',
-      endTime: e.end_time || '',
+      startTime: (e.start_time || '').slice(0, 5),
+      endTime: (e.end_time || '').slice(0, 5),
       location: e.location || 'Campo de fútbol',
       teamName: e.teams?.name || 'Equipo',
       eventType: e.event_type || 'entrenamiento',

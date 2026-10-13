@@ -315,11 +315,16 @@ export default function GlobalPlayerProfilePage() {
             totalGoalsCount += gCount;
             totalYellowsCount += yCount;
             totalRedsCount += rCount;
+            const isLocal = c.partidos.lugar === 'Local' || (c.partidos.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(c.partidos.lugar || ''));
+            const baseTitle = isLocal
+              ? `${teamName || 'Sporting Saladar'} vs ${c.partidos.rival_nombre} (Local)`
+              : `${c.partidos.rival_nombre} vs ${teamName || 'Sporting Saladar'} (Visitante)`;
+            const titleWithAmistoso = c.partidos.tipo_partido === 'amistoso' ? `${baseTitle} · Amistoso` : baseTitle;
 
             mHistory.push({
               id: c.partido_id,
               date: c.partidos.fecha_hora,
-              title: `vs ${c.partidos.rival_nombre} (${c.partidos.lugar})`,
+              title: titleWithAmistoso,
               attendance: c.status === 'convocado' ? 'Convocado' : (c.estado_asistencia || 'Convocado'),
               minutes: mins,
               goles: gCount,
@@ -339,6 +344,12 @@ export default function GlobalPlayerProfilePage() {
 
       teamMatches.forEach(m => {
         if (!processedMatches.has(m.id)) {
+          const isLocal = m.lugar === 'Local' || (m.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(m.lugar || ''));
+          const baseTitle = isLocal
+            ? `${teamName || 'Sporting Saladar'} vs ${m.rival_nombre} (Local)`
+            : `${m.rival_nombre} vs ${teamName || 'Sporting Saladar'} (Visitante)`;
+          const titleWithAmistoso = m.tipo_partido === 'amistoso' ? `${baseTitle} · Amistoso` : baseTitle;
+
           const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === m.id);
           if (mEvs.length > 0) {
             const gCount = mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
@@ -355,7 +366,7 @@ export default function GlobalPlayerProfilePage() {
             mHistory.push({
               id: m.id,
               date: m.fecha_hora,
-              title: `vs ${m.rival_nombre} (${m.lugar})`,
+              title: titleWithAmistoso,
               attendance: 'Convocado',
               minutes: mins,
               goles: gCount,
@@ -373,7 +384,7 @@ export default function GlobalPlayerProfilePage() {
             mHistory.push({
               id: m.id,
               date: m.fecha_hora,
-              title: `vs ${m.rival_nombre} (${m.lugar})`,
+              title: titleWithAmistoso,
               attendance: 'No convocado',
               minutes: 0,
               goles: 0,

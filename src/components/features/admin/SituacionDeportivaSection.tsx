@@ -413,7 +413,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Resumen consolidado y clasificación en competición oficial FFCV
+                Resumen consolidado y clasificación en competición oficial (FFCV y Liga Brave)
               </p>
             </div>
 
@@ -538,10 +538,10 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                                 href={`/dashboard/equipos/${team.teamId}/partidos?view=clasificacion`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
-                                title="Ver clasificación general de su grupo en la FFCV"
+                                title={team.competitionName === 'Liga Brave' || team.teamCategory?.includes('Liga Brave') ? "Ver clasificación oficial de la Liga Brave" : "Ver clasificación general de su grupo en la FFCV"}
                               >
                                 <Trophy className="w-3 h-3 text-amber-500 shrink-0" />
-                                <span>Clasificación FFCV</span>
+                                <span>{team.competitionName === 'Liga Brave' || team.teamCategory?.includes('Liga Brave') ? "Clasificación Liga Brave" : "Clasificación FFCV"}</span>
                               </Link>
                               <span className="text-xs font-bold text-slate-400 group-hover:text-indigo-600 transition-colors">
                                 Ver
@@ -820,7 +820,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                   className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                 >
                   <Trophy className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Clasificación FFCV</span>
+                  <span>{selectedTeamDetail.competitionName === 'Liga Brave' || selectedTeamDetail.teamCategory?.includes('Liga Brave') ? 'Clasificación Liga Brave' : 'Clasificación FFCV'}</span>
                 </button>
               </div>
             </div>

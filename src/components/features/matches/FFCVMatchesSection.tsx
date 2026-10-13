@@ -139,15 +139,17 @@ export function FFCVMatchesSection({
     }
   };
 
+  const isLigaBrave = ffcvGroupId === '4624' || ffcvGroupId === '4623' || groupInfo?.competition_name?.toLowerCase().includes('brave') || false;
+
   if (!ffcvGroupId) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3 shadow-sm">
         <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
           <Trophy className="w-6 h-6" />
         </div>
-        <h3 className="font-bold text-slate-800 text-base">Sin Competición FFCV Vinculada</h3>
+        <h3 className="font-bold text-slate-800 text-base">Sin Competición Oficial Vinculada</h3>
         <p className="text-xs text-slate-500 max-w-md mx-auto">
-          Este equipo no tiene asignado un grupo de la FFCV. Cuando se configure en la base de datos, aparecerá aquí el calendario oficial de partidos.
+          Este equipo no tiene asignado un grupo de competición oficial (FFCV o Liga Brave). Cuando se configure en la base de datos, aparecerá aquí el calendario oficial de partidos.
         </p>
       </div>
     );
@@ -164,7 +166,7 @@ export function FFCVMatchesSection({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                Calendario Oficial FFCV
+                {isLigaBrave ? 'Calendario Oficial Liga Brave' : 'Calendario Oficial FFCV'}
               </span>
               {groupInfo?.competition_name && (
                 <span className="text-xs font-bold text-slate-500">
@@ -348,7 +350,17 @@ export function FFCVMatchesSection({
                     <span className="truncate font-medium">{m.pitch_name || "Campo por determinar"}</span>
                   </div>
 
-                  {m.codacta && (
+                  {isLigaBrave ? (
+                    <a
+                      href={`https://apuntamelo.com/partido/${m.ffcv_match_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Ficha en Apúntamelo</span>
+                    </a>
+                  ) : m.codacta ? (
                     <button
                       onClick={() => setViewingActa({
                         codacta: m.codacta!,
@@ -361,7 +373,7 @@ export function FFCVMatchesSection({
                       <FileText className="w-3.5 h-3.5 text-blue-600" />
                       <span>Ver acta oficial FFCV</span>
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );

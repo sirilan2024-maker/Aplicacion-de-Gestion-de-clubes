@@ -6,8 +6,6 @@ import { ClubNotificationPolicy, NotificationType } from '@/lib/notifications/ty
 import { NOTIFICATION_TYPE_REGISTRY } from '@/lib/notifications/registry';
 import type { NotificationPolicyMetadata } from '@/lib/notifications/registry';
 
-export type { NotificationPolicyMetadata };
-
 function checkAdminPermission(ctx: AuthenticatedContext): boolean {
   if (!ctx || !ctx.profile) return false;
   return true;
@@ -513,6 +511,17 @@ export async function adminSaveUserPreferencesAction(params: {
 
     if (upsertErr) {
       console.error('[adminSaveUserPreferencesAction upsertErr]:', upsertErr);
+      if (
+        upsertErr.code === 'PGRST205' ||
+        upsertErr.code === '42P01' ||
+        upsertErr.message?.includes('schema cache') ||
+        upsertErr.message?.includes('does not exist')
+      ) {
+        return {
+          success: false,
+          error: "La tabla 'user_notification_preferences' aún no está creada en Supabase. Ejecuta la migración 00033_normalize_notifications_and_preferences.sql.",
+        };
+      }
       // Fallback si la migración de columnas can_view/can_modify aún no se ha corrido
       if (upsertErr.message?.includes('column "can_view"') || upsertErr.message?.includes('column "can_modify"')) {
         const fallbackRows = params.preferences.map(p => ({

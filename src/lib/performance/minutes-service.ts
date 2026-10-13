@@ -47,15 +47,26 @@ export function calculatePlannedTrainingDuration(
 }
 
 /**
+ */
+export type TrainingLoadStatus = 'confirmed' | 'pending_rpe' | 'pending_minutes';
+
+export interface CalculatedTrainingLoadResult {
+  load: number | null; // en UA (Unidades Arbitrarias)
+  status: TrainingLoadStatus;
+  notes?: string;
+}
+
+/**
  * 2. Valida los valores numéricos de RPE y minutos para entrenamiento.
  * Permite participaciones parciales legítimas (ej. 15, 30 minutos).
+ * Admite RPE de 0 (reposo/sin esfuerzo) a 10 (esfuerzo máximo).
  */
 export function validateTrainingFeedbackInputs(
   rpe: unknown,
   minutes: unknown
 ): { isValid: boolean; error?: string; cleanRpe?: number; cleanMinutes?: number | null } {
-  if (typeof rpe !== 'number' || isNaN(rpe) || rpe < 1 || rpe > 10) {
-    return { isValid: false, error: 'El RPE debe ser un valor numérico entre 1 y 10.' };
+  if (typeof rpe !== 'number' || isNaN(rpe) || rpe < 0 || rpe > 10) {
+    return { isValid: false, error: 'El RPE debe ser un valor numérico entre 0 y 10.' };
   }
 
   let cleanMinutes: number | null = null;
@@ -76,17 +87,30 @@ export function validateTrainingFeedbackInputs(
 }
 
 /**
- * 3. Calcula la carga de entrenamiento:
- * Carga confirmada = RPE * Minutos reales.
- * Si los minutos son nulos o pendientes, la carga queda como pendiente.
+ * 3. Calcula la carga de entrenamiento en Unidades Arbitrarias (UA):
+ * Reglas estrictas:
+ * - Si RPE es nulo o ausente: 'pending_rpe' (carga null, nunca 0 inventado).
+ * - Si minutos son nulos o pendientes: 'pending_minutes' (carga null, nunca 0 inventado).
+ * - Si minutos reales = 0 (participó 0 minutos) con RPE registrado (incluso RPE 0): Carga = 0 UA, status: 'confirmed'.
+ * - Ambos válidos: minutos * RPE en UA, status: 'confirmed'.
  */
 export function calculateTrainingLoad(
-  rpe: number,
-  minutes: number | null
-): { load: number | null; status: 'confirmed' | 'pending' } {
-  if (minutes === null || minutes === undefined || minutes <= 0) {
-    return { load: null, status: 'pending' };
+  rpe: number | null | undefined,
+  minutes: number | null | undefined
+): CalculatedTrainingLoadResult {
+  if (rpe === null || rpe === undefined || isNaN(rpe)) {
+    return { load: null, status: 'pending_rpe', notes: 'Pendiente de RPE' };
   }
+
+  if (minutes === null || minutes === undefined || isNaN(minutes)) {
+    return { load: null, status: 'pending_minutes', notes: 'Pendiente de confirmación de minutos' };
+  }
+
+  // Si minutos reales son 0, la carga real disputada es exactamente 0 UA
+  if (minutes === 0) {
+    return { load: 0, status: 'confirmed', notes: '0 minutos reales (0 UA)' };
+  }
+
   return { load: rpe * minutes, status: 'confirmed' };
 }
 

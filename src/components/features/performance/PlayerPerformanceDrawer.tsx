@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, User as UserIcon, X, Calendar, Activity, Clock, Flame, CheckCircle2, AlertCircle, TrendingUp, Target } from "lucide-react";
+import { Loader2, User as UserIcon, X, Calendar, Activity, Clock, Flame, CheckCircle2, AlertCircle, TrendingUp, Target, ShieldAlert, AlertTriangle, Moon, Battery, Smile, Brain } from "lucide-react";
 
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
+import { InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
 
 export interface PlayerPerformanceDrawerProps {
   playerId: string;
@@ -15,6 +16,16 @@ export interface PlayerPerformanceDrawerProps {
   globalTrainingStats?: any;
   globalMatchStats?: any;
   onlyFormative?: boolean;
+  playerWellnessEntry?: {
+    attendanceStatus: 'confirmed' | 'pending' | 'absent';
+    wellnessStatus: 'completed' | 'pending' | 'not_required';
+    hooperScore: number | null;
+    ratings?: HooperRatings;
+    discomfort?: DiscomfortDetails;
+    submittedAt?: string;
+    canViewDiscomfort: boolean;
+  };
+  playerWellnessAlerts?: InformationalAlert[];
 }
 
 export function PlayerPerformanceDrawer({ 
@@ -24,7 +35,9 @@ export function PlayerPerformanceDrawer({
   onClose, 
   globalTrainingStats, 
   globalMatchStats,
-  onlyFormative = false
+  onlyFormative = false,
+  playerWellnessEntry,
+  playerWellnessAlerts = [],
 }: PlayerPerformanceDrawerProps) {
   const [activeTab, setActiveTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>(
     onlyFormative ? 'formativo' : (initialTab || 'entrenamientos')
@@ -111,7 +124,7 @@ export function PlayerPerformanceDrawer({
           const { data: officialConvs } = await convsQuery.order('created_at', { ascending: false });
 
           if (officialConvs) {
-            const sortedConvs = [...officialConvs].sort((a, b) => {
+            const sortedConvs = [...officialConvs].sort((a: any, b: any) => {
               const timeA = new Date(a.partidos?.fecha_hora || 0).getTime();
               const timeB = new Date(b.partidos?.fecha_hora || 0).getTime();
               return timeA - timeB;
@@ -245,6 +258,107 @@ export function PlayerPerformanceDrawer({
 
           {!onlyFormative && activeTab === 'entrenamientos' && (
             <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Sección de Bienestar Previo y Alertas Físicas del Día */}
+              {playerWellnessEntry && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity size={14} className="text-blue-600" />
+                      Estado de Bienestar Hoy
+                    </span>
+                    <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                      playerWellnessEntry.wellnessStatus === 'completed'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : playerWellnessEntry.wellnessStatus === 'not_required'
+                        ? 'bg-slate-100 text-slate-500 border-slate-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {playerWellnessEntry.wellnessStatus === 'completed'
+                        ? 'Cuestionario Completado'
+                        : playerWellnessEntry.wellnessStatus === 'not_required'
+                        ? 'No requerido (ausencia)'
+                        : 'Pendiente de respuesta'}
+                    </span>
+                  </div>
+
+                  {playerWellnessEntry.wellnessStatus === 'completed' && playerWellnessEntry.ratings && (
+                    <div className="grid grid-cols-5 gap-1.5 text-center p-3 rounded-2xl bg-blue-50/50 border border-blue-100">
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-400 uppercase">Sueño</span>
+                        <span className="font-black text-sm text-slate-900">{playerWellnessEntry.ratings.sleepQuality}</span>
+                        <span className="block text-[8px] text-slate-400">/5</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-400 uppercase">Fatiga</span>
+                        <span className="font-black text-sm text-slate-900">{playerWellnessEntry.ratings.fatigue}</span>
+                        <span className="block text-[8px] text-slate-400">/5</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-400 uppercase">Dolor</span>
+                        <span className="font-black text-sm text-slate-900">{playerWellnessEntry.ratings.soreness}</span>
+                        <span className="block text-[8px] text-slate-400">/5</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-400 uppercase">Estrés</span>
+                        <span className="font-black text-sm text-slate-900">{playerWellnessEntry.ratings.stress}</span>
+                        <span className="block text-[8px] text-slate-400">/5</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-400 uppercase">Ánimo</span>
+                        <span className="font-black text-sm text-slate-900">{playerWellnessEntry.ratings.mood}</span>
+                        <span className="block text-[8px] text-slate-400">/5</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alertas Físicas Informativas Específicas del Jugador */}
+                  {playerWellnessAlerts.length > 0 && (
+                    <div className="space-y-2">
+                      {playerWellnessAlerts.map((al, idx) => (
+                        <div
+                          key={`drw-al-${idx}`}
+                          className={`rounded-xl p-3 border flex items-start gap-2.5 text-xs ${
+                            al.level === 'attention'
+                              ? 'bg-rose-50/80 border-rose-200 text-rose-900'
+                              : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                          }`}
+                        >
+                          <ShieldAlert
+                            size={16}
+                            className={`shrink-0 mt-0.5 ${
+                              al.level === 'attention' ? 'text-rose-600' : 'text-amber-600'
+                            }`}
+                          />
+                          <div className="flex-1">
+                            <span className="font-bold block">
+                              {al.type === 'fatigue_warning' && 'Alerta de Fatiga Elevada'}
+                              {al.type === 'soreness_warning' && 'Alerta de Dolor Muscular / Agujetas'}
+                              {al.type === 'discomfort_reported' && 'Molestia Física Reportada'}
+                              {al.type === 'high_exertion' && 'Esfuerzo Máximo Percibido'}
+                            </span>
+                            <p className="mt-0.5 text-slate-700 leading-relaxed">{al.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Molestia informada si está autorizada */}
+                  {playerWellnessEntry.wellnessStatus === 'completed' && playerWellnessEntry.discomfort?.hasDiscomfort && (
+                    <div className="text-xs p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between">
+                      <span className="font-semibold flex items-center gap-1.5">
+                        <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                        {playerWellnessEntry.canViewDiscomfort && playerWellnessEntry.discomfort.zone ? (
+                          <span>Molestia: <strong>{playerWellnessEntry.discomfort.zone}</strong> (Intensidad {playerWellnessEntry.discomfort.intensity}/10)</span>
+                        ) : (
+                          <span>Molestia comunicada antes del entrenamiento (confidencial)</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Tarjetas de Métricas Globales del Jugador */}
               <div className="grid grid-cols-3 gap-2.5">
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">

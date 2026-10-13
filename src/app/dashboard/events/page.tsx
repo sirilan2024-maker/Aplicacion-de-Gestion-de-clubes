@@ -250,7 +250,14 @@ export default function EventsPage() {
           })
         })
       }
-      
+
+      mappedEvents.sort((a, b) => {
+        const timeA = new Date(`${a.date}T${a.time}:00`).getTime();
+        const timeB = new Date(`${b.date}T${b.time}:00`).getTime();
+        const diff = (isNaN(timeA) ? 0 : timeA) - (isNaN(timeB) ? 0 : timeB);
+        return diff !== 0 ? diff : a.title.localeCompare(b.title);
+      });
+
       setDbEvents(mappedEvents)
     }
     setLoading(false)

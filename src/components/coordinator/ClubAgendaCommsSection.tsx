@@ -351,7 +351,7 @@ export function ClubAgendaCommsSection({
                             {m.teamCategory && (
                               <span className="text-slate-400 shrink-0">· {m.teamCategory}</span>
                             )}
-                            {m.lugar && (
+                            {m.lugar && !['local', 'visitante'].includes(m.lugar.toLowerCase()) && (
                               <span className="hidden md:inline text-slate-400 truncate">
                                 · {m.lugar}
                               </span>
@@ -371,9 +371,20 @@ export function ClubAgendaCommsSection({
                             {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
                           </span>
                         ) : (
-                          <span className="text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg">
-                            {m.esLocal ? "Local" : "Visitante"}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {(m as any).tipoPartido === 'amistoso' && (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
+                                Amistoso
+                              </span>
+                            )}
+                            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
+                              m.esLocal
+                                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                : "text-amber-700 bg-amber-50 border-amber-200"
+                            }`}>
+                              {m.esLocal ? "Local" : "Visitante"}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -426,7 +437,7 @@ export function ClubAgendaCommsSection({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-16 text-center shrink-0">
                         <div className="text-[10px] font-bold text-indigo-600 uppercase">{formatDateDMY(t.date)}</div>
-                        <div className="text-xs font-black text-slate-800">{t.startTime || "18:00"}</div>
+                        <div className="text-xs font-black text-slate-800">{(t.startTime || "18:00").slice(0, 5)}</div>
                       </div>
                       <div className="space-y-0.5 min-w-0">
                         <p className="text-xs font-bold text-slate-900 truncate">{t.title}</p>

@@ -34,6 +34,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           const timeStr = formData.get("time") as string;
           const placeStr = formData.get("place") as string;
           const equipoIdStr = formData.get("equipo_id") as string || defaultTeamId;
+          const tipoPartidoStr = (formData.get("tipo_partido") as string) || match.tipo_partido || 'liga';
           
           const golesPropiosStr = formData.get("resultado_propio") as string;
           const golesRivalStr = formData.get("resultado_rival") as string;
@@ -62,6 +63,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               lugar: placeStr,
               rival_nombre: rivalStr,
               equipo_id: equipoIdStr,
+              tipo_partido: tipoPartidoStr,
               resultado_propio: golesPropios,
               resultado_rival: golesRival,
               estado: estado,
@@ -149,12 +151,21 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lugar del Partido</label>
-            <select name="place" defaultValue={match.lugar === 'Local' ? 'Local' : 'Visitante'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
-              <option value="Local">Local</option>
-              <option value="Visitante">Visitante</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lugar del Partido</label>
+              <select name="place" defaultValue={match.lugar === 'Local' ? 'Local' : 'Visitante'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <option value="Local">Local</option>
+                <option value="Visitante">Visitante</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo de Partido</label>
+              <select name="tipo_partido" defaultValue={match.tipo_partido || 'liga'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <option value="liga">Oficial de Liga</option>
+                <option value="amistoso">Amistoso (no computa en liga)</option>
+              </select>
+            </div>
           </div>
 
           <div className="p-4 bg-slate-100/80 rounded-xl border border-slate-200">

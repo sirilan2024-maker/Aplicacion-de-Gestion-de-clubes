@@ -725,19 +725,23 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
     const groupMap = new Map<string, any>()
     ;(groupsData || []).forEach(g => groupMap.set(g.ffcv_group_id, g))
 
-    const { data: allStandings } = await adminClient
-      .from('ffcv_standings')
-      .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id, played, won, drawn, lost, goals_for, goals_against')
-      .neq('ffcv_season_id', '21')
-      .in('ffcv_group_id', groupIds.length > 0 ? groupIds : ['none'])
-      .order('matchday', { ascending: false })
-
+    // Mapear clasificación más reciente por ffcv_group_id (consultando por grupo para evitar truncamiento de 1.000 filas de Supabase)
     const standingsByGroup = new Map<string, any[]>()
-    ;(allStandings || []).forEach(s => {
-      const list = standingsByGroup.get(s.ffcv_group_id) || []
-      list.push(s)
-      standingsByGroup.set(s.ffcv_group_id, list)
-    })
+    if (groupIds.length > 0) {
+      const standingsResults = await Promise.all(
+        groupIds.map(async (gid) => {
+          const { data } = await adminClient
+            .from('ffcv_standings')
+            .select('ffcv_group_id, matchday, position, points, team_name, team_ffcv_id, played, won, drawn, lost, goals_for, goals_against')
+            .neq('ffcv_season_id', '21')
+            .eq('ffcv_group_id', gid)
+            .order('matchday', { ascending: false })
+            .limit(30)
+          return { gid, data: data || [] }
+        })
+      )
+      standingsResults.forEach(r => standingsByGroup.set(r.gid, r.data))
+    }
 
     const teamStatsList: any[] = []
     for (const team of federatedTeams) {

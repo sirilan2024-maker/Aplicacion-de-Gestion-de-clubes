@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTrainingFeedback } from "@/app/actions/feedback-actions";
 import { calculatePlannedTrainingDuration } from "@/lib/performance/minutes-service";
+import { DailyWellnessForm } from "@/components/features/performance/DailyWellnessForm";
 import { Activity, Clock, CheckCircle2, Loader2, Target } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO } from "date-fns";
@@ -24,6 +25,7 @@ export default function PlayerFeedbackPage() {
   const initialPlayerId = searchParams.get('p') || '';
   const token = searchParams.get('token') || '';
   const tokenExp = searchParams.get('exp') ? parseInt(searchParams.get('exp')!) : undefined;
+  const formTypeParam = (searchParams.get('type') || 'rpe') as 'rpe' | 'wellness';
 
   const [loading, setLoading] = useState(true);
   const [eventDetails, setEventDetails] = useState<any>(null);
@@ -35,6 +37,13 @@ export default function PlayerFeedbackPage() {
   const [rpe, setRpe] = useState<number>(0);
   const [minutes, setMinutes] = useState<number>(90);
   const [isFallbackDuration, setIsFallbackDuration] = useState(true);
+  
+  // Molestias sobrevenidas post-entrenamiento
+  const [hasDiscomfort, setHasDiscomfort] = useState(false);
+  const [discomfortZone, setDiscomfortZone] = useState("");
+  const [discomfortIntensity, setDiscomfortIntensity] = useState<number>(5);
+  const [discomfortNotes, setDiscomfortNotes] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -97,7 +106,16 @@ export default function PlayerFeedbackPage() {
       selectedPlayerId,
       rpe,
       minutes,
-      token && tokenExp ? { token, tokenExp } : undefined
+      {
+        token: token && tokenExp ? token : undefined,
+        tokenExp: token && tokenExp ? tokenExp : undefined,
+        discomfort: hasDiscomfort ? {
+          hasDiscomfort: true,
+          zone: discomfortZone || 'Sobrecarga general',
+          intensity: discomfortIntensity,
+          notes: discomfortNotes || null
+        } : undefined
+      }
     );
     setSubmitting(false);
 
@@ -139,6 +157,23 @@ export default function PlayerFeedbackPage() {
             Gracias por rellenar tu evaluación. Tus datos han sido guardados correctamente en el sistema.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (formTypeParam === 'wellness') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 py-8">
+        <DailyWellnessForm
+          eventId={eventId}
+          eventDetails={eventDetails}
+          players={players}
+          initialPlayerId={selectedPlayerId}
+          isLockedPlayer={isLockedPlayer}
+          token={token || undefined}
+          tokenExp={tokenExp || undefined}
+          teamName={teamName}
+        />
       </div>
     );
   }
@@ -248,6 +283,77 @@ export default function PlayerFeedbackPage() {
                   ? "Duración estimada (90 min). Modifícalo si tu tiempo real de participación fue distinto."
                   : `Duración prevista de la sesión: ${minutes} min. Modifícalo si terminaste antes o llegaste tarde.`}
               </p>
+            </div>
+
+            {/* 4. MOLESTIAS SOBREVENIDAS (OPCIONAL) */}
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-gray-700">
+                  4. ¿Has sentido alguna molestia durante el entreno?
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setHasDiscomfort(!hasDiscomfort)}
+                  className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${
+                    hasDiscomfort ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {hasDiscomfort ? 'Sí, reportar' : 'No, todo bien'}
+                </button>
+              </div>
+
+              {hasDiscomfort && (
+                <div className="space-y-3 bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900 mb-1">
+                      Zona anatómica de la molestia:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Isquiotibial izquierdo, aductor, tobillo..."
+                      value={discomfortZone}
+                      onChange={(e) => setDiscomfortZone(e.target.value)}
+                      className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-bold text-amber-900">Intensidad del dolor/molestia:</span>
+                      <span className="text-xs font-black text-amber-900">{discomfortIntensity} / 10</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={discomfortIntensity}
+                      onChange={(e) => setDiscomfortIntensity(parseInt(e.target.value) || 1)}
+                      className="w-full accent-amber-600 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-amber-700/80 font-bold">
+                      <span>1 (Leve)</span>
+                      <span>5 (Moderada)</span>
+                      <span>10 (Muy aguda)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900 mb-1">
+                      Observaciones / Cuándo ocurrió (opcional):
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ej: En un sprint al final del partidillo, sobrecarga tras golpe..."
+                      value={discomfortNotes}
+                      onChange={(e) => setDiscomfortNotes(e.target.value)}
+                      className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-gray-800 outline-none focus:border-amber-400 resize-none"
+                    />
+                  </div>
+                  <p className="text-[11px] text-amber-700 italic">
+                    * Aviso preventivo para el cuerpo técnico y preparador físico. No sustituye la valoración médica.
+                  </p>
+                </div>
+              )}
             </div>
 
             <button

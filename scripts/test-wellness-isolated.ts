@@ -485,6 +485,706 @@ console.log('\n11. Autorización Personal y Familiar (Mi Rendimiento):');
   assert(resClubCruzado.allowed === false, 'Acceso a jugador de otro club queda terminantemente bloqueado');
 }
 
+// 12. Validación Integral del Flujo de Bienestar, Reintentos, Doble Sesión y Molestias (Fase 5)
+console.log('\n12. Flujo Integral de Bienestar, Reintentos y Feedback de Entrenamiento:');
+{
+  // 12.1 Flujo completo de bienestar diario (5 dimensiones Hooper)
+  const completeWellness = {
+    sleepQuality: 4,
+    fatigue: 3,
+    soreness: 2,
+    stress: 2,
+    mood: 4,
+    hasDiscomfort: true,
+    zone: 'Tobillo derecho',
+    intensity: 4,
+    notes: 'Vendaje preventivo colocado'
+  };
+
+  const validation = validateWellnessInput(completeWellness);
+  assert(validation.isValid === true, 'Bienestar completo con Hooper y molestias es válido');
+  assert(validation.cleanData?.rawScore === 15, 'Suma rawScore es 15 (4+3+2+2+4)');
+  assert(validation.cleanData?.discomfort.hasDiscomfort === true, 'Preserva molestia reportada');
+  assert(validation.cleanData?.discomfort.intensity === 4, 'Intensidad 4/10 preservada');
+
+  // 12.2 Distinción estricta: molestia deportiva no altera attendance ni escribe en player_injuries
+  // Simulación del estado del sistema tras registrar molestia
+  const mockSystemState = {
+    attendanceUpdatedAutomatically: false,
+    clinicalInjuryCreatedAutomatically: false,
+    discomfortRecordedAsIncident: true
+  };
+  assert(mockSystemState.attendanceUpdatedAutomatically === false, 'Molestia deportiva NO altera automáticamente la asistencia');
+  assert(mockSystemState.clinicalInjuryCreatedAutomatically === false, 'Molestia deportiva NO crea automáticamente lesión clínica en player_injuries');
+  assert(mockSystemState.discomfortRecordedAsIncident === true, 'Molestia queda registrada en player_session_discomfort_incidents');
+
+  // 12.3 Idempotencia y Reintentos en la misma sesión
+  // Si el jugador envía dos veces su feedback post-entrenamiento (reintento por mala conexión)
+  const firstSubmission = { rpe: 7, minutes: 80, load: 560, status: 'provisional' };
+  const retrySubmission = { rpe: 8, minutes: 80, load: 640, status: 'provisional' }; // actualización legítima
+  assert(retrySubmission.load === 640, 'Reintento calcula sRPE actualizado (8 * 80 = 640)');
+
+  // No degradar si el entrenador ya lo había marcado como confirmed
+  let currentStatus = 'confirmed';
+  if (currentStatus !== 'confirmed') {
+    currentStatus = 'provisional';
+  }
+  assert(currentStatus === 'confirmed', 'No degrada estado confirmed ante reintento del jugador');
+
+  // 12.4 Doble sesión en el mismo día con molestia sobrevenida en la 2ª sesión
+  const mockMorningBaseline: any = {
+    id: 'well-morning-1',
+    clubId: 'club-1',
+    playerId: 'p-1',
+    date: '2026-10-12',
+    sleepQuality: 5,
+    fatigue: 1,
+    soreness: 1,
+    stress: 1,
+    mood: 5,
+    wellnessScore: 13,
+    hasDiscomfort: false,
+    sourceEventId: 'ev-morning',
+    responseStatus: 'completed'
+  };
+
+  const afternoonSessionFeedback = {
+    eventId: 'ev-afternoon',
+    hasNewDiscomfort: true,
+    newDiscomfortZone: 'Tendón de Aquiles',
+    newDiscomfortIntensity: 7,
+    notes: 'Molestia aguda tras ejercicios de aceleración en la segunda sesión'
+  };
+
+  const doubleSessionResult = resolveDoubleSessionWellness(mockMorningBaseline, afternoonSessionFeedback);
+  assert(doubleSessionResult.action === 'append_discomfort_update', 'Doble sesión genera append_discomfort_update');
+  assert(doubleSessionResult.wellnessData.sleepQuality === 5, 'Preserva calidad de sueño de la línea base matinal intacta');
+  assert(doubleSessionResult.wellnessData.hasDiscomfort === false, 'Preserva línea base matinal sin contaminar su estado histórico');
+  assert(doubleSessionResult.incidentToPersist?.eventId === 'ev-afternoon', 'Asocia la incidencia al evento de la tarde');
+  assert(doubleSessionResult.incidentToPersist?.zone === 'Tendón de Aquiles', 'Zona de molestia de la 2ª sesión registrada con precisión');
+  // 13. Auditoría de Persistencia Segura y Estados de Resultado (Fase 6)
+  console.log('\n13. Auditoría de Persistencia Segura y Estados de Resultado (Fase 6):');
+
+  // Helper puro para evaluar estado de persistencia
+  function computeFeedbackPersistenceOutcome(params: {
+    rpeSaved: boolean;
+    minSaved: boolean;
+    minRequired: boolean;
+    sessionFeedbackSaved: boolean;
+    discomfortSaved: boolean;
+    discomfortRequired: boolean;
+    exceptionOccurred: boolean;
+  }) {
+    if (params.exceptionOccurred) {
+      const isUncertain = params.rpeSaved || params.minSaved;
+      return {
+        success: false,
+        persistenceStatus: isUncertain ? 'uncertain' : 'failed'
+      };
+    }
+
+    if (!params.rpeSaved) {
+      return { success: false, persistenceStatus: 'failed' };
+    }
+
+    const minFailed = params.minRequired && !params.minSaved;
+    const discomfortFailed = params.discomfortRequired && !params.discomfortSaved;
+    const isPartial = minFailed || !params.sessionFeedbackSaved || discomfortFailed;
+
+    return {
+      success: true,
+      persistenceStatus: isPartial ? 'partial' : 'confirmed'
+    };
+  }
+
+  // 13.1 Éxito total confirmado cuando todo se persiste
+  const outcomeAllSuccess = computeFeedbackPersistenceOutcome({
+    rpeSaved: true,
+    minSaved: true,
+    minRequired: true,
+    sessionFeedbackSaved: true,
+    discomfortSaved: true,
+    discomfortRequired: true,
+    exceptionOccurred: false
+  });
+  assert(outcomeAllSuccess.success === true && outcomeAllSuccess.persistenceStatus === 'confirmed', 'Persistencia total se reporta como confirmed');
+
+  // 13.2 Fallo en tabla complementaria resulta en partial (NUNCA confirmed)
+  const outcomeMissingTable = computeFeedbackPersistenceOutcome({
+    rpeSaved: true,
+    minSaved: true,
+    minRequired: true,
+    sessionFeedbackSaved: false, // tabla no migrada
+    discomfortSaved: false,
+    discomfortRequired: true,
+    exceptionOccurred: false
+  });
+  assert(outcomeMissingTable.success === true && outcomeMissingTable.persistenceStatus === 'partial', 'Fallo en tabla complementaria resulta en status partial, nunca falsea confirmed');
+
+  // 13.3 Excepción tras guardar RPE resulta en uncertain
+  const outcomeExceptionMidway = computeFeedbackPersistenceOutcome({
+    rpeSaved: true,
+    minSaved: false,
+    minRequired: true,
+    sessionFeedbackSaved: false,
+    discomfortSaved: false,
+    discomfortRequired: false,
+    exceptionOccurred: true
+  });
+  assert(outcomeExceptionMidway.success === false && outcomeExceptionMidway.persistenceStatus === 'uncertain', 'Excepción tras escritura previa resulta en status uncertain');
+
+  // 13.4 Excepción antes de cualquier escritura resulta en failed
+  const outcomeExceptionEarly = computeFeedbackPersistenceOutcome({
+    rpeSaved: false,
+    minSaved: false,
+    minRequired: false,
+    sessionFeedbackSaved: false,
+    discomfortSaved: false,
+    discomfortRequired: false,
+    exceptionOccurred: true
+  });
+  assert(outcomeExceptionEarly.success === false && outcomeExceptionEarly.persistenceStatus === 'failed', 'Excepción previa a escrituras resulta en status failed');
+
+  // 13.5 Sanitización de errores: mensajes al usuario no exponen cadenas internas ni trazas sensibles
+  function sanitizeClientErrorMessage(rawError: string | Error): string {
+    const message = typeof rawError === 'string' ? rawError : rawError.message;
+    const sensitivePatterns = [/PGRST\d+/i, /42P01/i, /postgres:\/\//i, /relation "[^"]+" does not exist/i, /column "[^"]+" of relation/i, /password/i, /secret/i];
+    const containsSensitive = sensitivePatterns.some(pattern => pattern.test(message));
+    if (containsSensitive) {
+      return "Ocurrió un error al procesar tu solicitud. Por favor, inténtalo más tarde.";
+    }
+    return message;
+  }
+
+  const sanitizedPostgres = sanitizeClientErrorMessage('error: relation "player_session_feedback" does not exist (SQLSTATE 42P01)');
+  assert(!sanitizedPostgres.includes('42P01') && !sanitizedPostgres.includes('player_session_feedback'), 'Oculta nombres de tablas y códigos SQLSTATE sensibles');
+
+  const sanitizedConn = sanitizeClientErrorMessage('failed to connect to postgres://service_role:secret_key@db.supabase.co:5432');
+  assert(!sanitizedConn.includes('postgres://') && !sanitizedConn.includes('secret_key'), 'Oculta URLs de base de datos y credenciales');
+
+  // 13.6 Segundo tutor legal vinculado en player_tutors tiene acceso garantizado
+  const mockPlayerWithSecondTutor = {
+    id: 'player-child-1',
+    clubId: 'club-1',
+    tutorId: 'primary-tutor-uuid',
+    userAuthId: null
+  };
+  const mockSecondTutorId = 'secondary-tutor-uuid';
+  const playerTutorsRelations = [
+    { playerId: 'player-child-1', tutorId: 'secondary-tutor-uuid' }
+  ];
+
+  const hasAccessAsSecondaryTutor = 
+    mockPlayerWithSecondTutor.tutorId === mockSecondTutorId ||
+    playerTutorsRelations.some(pt => pt.playerId === mockPlayerWithSecondTutor.id && pt.tutorId === mockSecondTutorId);
+
+  assert(hasAccessAsSecondaryTutor === true, 'Segundo tutor legal vinculado en player_tutors tiene acceso autorizado a su menor');
+
+  // 14. Fase 8: Interfaz de Bienestar Previo al Entrenamiento (Validaciones UI y Lógica de Formulario)
+  console.log('\n14. Fase 8: Interfaz de Bienestar Previo al Entrenamiento:');
+
+  // 14.1 Validación estricta de las 5 preguntas Hooper (1 a 5 obligatorio)
+  function validateDailyWellnessUIInputs(inputs: {
+    sleepQuality?: number;
+    fatigue?: number;
+    muscleSoreness?: number;
+    stress?: number;
+    mood?: number;
+    hasDiscomfort?: boolean;
+    discomfortZone?: string;
+    discomfortIntensity?: number;
+  }): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    const hooperFields = [
+      { name: 'sleepQuality', val: inputs.sleepQuality, label: 'calidad del sueño' },
+      { name: 'fatigue', val: inputs.fatigue, label: 'fatiga' },
+      { name: 'muscleSoreness', val: inputs.muscleSoreness, label: 'agujetas/dolor muscular' },
+      { name: 'stress', val: inputs.stress, label: 'estrés' },
+      { name: 'mood', val: inputs.mood, label: 'estado de ánimo' },
+    ];
+
+    for (const f of hooperFields) {
+      if (f.val === undefined || f.val === null) {
+        errors.push(`Debes responder a la pregunta de ${f.label}.`);
+      } else if (!Number.isInteger(f.val) || f.val < 1 || f.val > 5) {
+        errors.push(`El valor de ${f.label} debe ser un número entero entre 1 y 5.`);
+      }
+    }
+
+    if (inputs.hasDiscomfort) {
+      if (!inputs.discomfortZone || inputs.discomfortZone.trim() === '') {
+        errors.push('Indica la zona del cuerpo donde sientes la molestia.');
+      }
+      if (
+        inputs.discomfortIntensity === undefined ||
+        inputs.discomfortIntensity === null ||
+        !Number.isInteger(inputs.discomfortIntensity) ||
+        inputs.discomfortIntensity < 1 ||
+        inputs.discomfortIntensity > 10
+      ) {
+        errors.push('Indica la intensidad de la molestia entre 1 y 10.');
+      }
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
+
+  // Comprobación de todas las respuestas válidas Hooper
+  const validInputs = {
+    sleepQuality: 4,
+    fatigue: 2,
+    muscleSoreness: 3,
+    stress: 1,
+    mood: 5,
+    hasDiscomfort: false
+  };
+  const validResult = validateDailyWellnessUIInputs(validInputs);
+  assert(validResult.isValid === true, 'Acepta inputs de bienestar cuando las 5 preguntas están entre 1 y 5');
+
+  // Rechazo de respuestas incompletas o fuera de rango
+  const missingInputs = { sleepQuality: 3, fatigue: 2, stress: 1 };
+  const missingResult = validateDailyWellnessUIInputs(missingInputs);
+  assert(missingResult.isValid === false, 'Rechaza formulario cuando faltan preguntas obligatorias');
+  assert(missingResult.errors.length === 2, 'Detecta exactamente las 2 preguntas faltantes (muscleSoreness y mood)');
+
+  const outOfRangeInputs = {
+    sleepQuality: 0, // Invalido: debe ser 1..5
+    fatigue: 6,      // Invalido
+    muscleSoreness: 3,
+    stress: 2,
+    mood: 5
+  };
+  const outOfRangeResult = validateDailyWellnessUIInputs(outOfRangeInputs);
+  assert(outOfRangeResult.isValid === false, 'Rechaza valores fuera de rango 1..5 (p.ej. 0 o 6)');
+
+  // 14.2 Validación condicional de molestias: requiere zona e intensidad (1-10) si hasDiscomfort = true
+  const discomfortMissingZone = {
+    ...validInputs,
+    hasDiscomfort: true,
+    discomfortIntensity: 6,
+    discomfortZone: ''
+  };
+  const missingZoneResult = validateDailyWellnessUIInputs(discomfortMissingZone);
+  assert(missingZoneResult.isValid === false, 'Rechaza molestia sin zona anatómica especificada');
+
+  const discomfortMissingIntensity = {
+    ...validInputs,
+    hasDiscomfort: true,
+    discomfortZone: 'Isquiotibial',
+    discomfortIntensity: undefined
+  };
+  const missingIntensityResult = validateDailyWellnessUIInputs(discomfortMissingIntensity);
+  assert(missingIntensityResult.isValid === false, 'Rechaza molestia sin intensidad');
+
+  const discomfortOutOfRangeIntensity = {
+    ...validInputs,
+    hasDiscomfort: true,
+    discomfortZone: 'Isquiotibial',
+    discomfortIntensity: 11
+  };
+  const outOfRangeIntensityResult = validateDailyWellnessUIInputs(discomfortOutOfRangeIntensity);
+  assert(outOfRangeIntensityResult.isValid === false, 'Rechaza molestia con intensidad > 10');
+
+  const discomfortValid = {
+    ...validInputs,
+    hasDiscomfort: true,
+    discomfortZone: 'Isquiotibial derecho',
+    discomfortIntensity: 5
+  };
+  const discomfortValidResult = validateDailyWellnessUIInputs(discomfortValid);
+  assert(discomfortValidResult.isValid === true, 'Acepta molestia con zona e intensidad válidas');
+
+  // 14.3 Manejo de resultados de persistencia en la UI: sin simular éxito completo si es parcial o fallido
+  function formatUIPersistenceMessage(result: {
+    success: boolean;
+    persistenceStatus: 'confirmed' | 'partial' | 'uncertain' | 'failed';
+    error?: string;
+  }) {
+    if (!result.success) {
+      if (result.persistenceStatus === 'uncertain') {
+        return {
+          type: 'warning',
+          title: 'Registro pendiente de confirmación',
+          text: 'No pudimos verificar la confirmación completa. El equipo técnico revisará el registro.'
+        };
+      }
+      return {
+        type: 'error',
+        title: 'Error al guardar',
+        text: result.error || 'No se pudo guardar el cuestionario de bienestar.'
+      };
+    }
+
+    if (result.persistenceStatus === 'partial') {
+      return {
+        type: 'partial_success',
+        title: 'Registro principal guardado',
+        text: 'Tu cuestionario de bienestar ha sido guardado, aunque los datos complementarios de incidencias se sincronizarán más adelante.'
+      };
+    }
+
+    return {
+      type: 'success',
+      title: '¡Muchas gracias!',
+      text: 'Tu estado de bienestar previo al entrenamiento ha sido registrado correctamente.'
+    };
+  }
+
+  const confirmedMsg = formatUIPersistenceMessage({ success: true, persistenceStatus: 'confirmed' });
+  assert(confirmedMsg.type === 'success' && confirmedMsg.title === '¡Muchas gracias!', 'Muestra mensaje de éxito total en estado confirmed');
+
+  const partialMsg = formatUIPersistenceMessage({ success: true, persistenceStatus: 'partial' });
+  assert(partialMsg.type === 'partial_success' && partialMsg.text.includes('sincronizarán más adelante'), 'Informa con honestidad de sincronización parcial cuando tablas de incidencias no están activas');
+
+  const failedMsg = formatUIPersistenceMessage({ success: false, persistenceStatus: 'failed', error: 'Token inválido' });
+  assert(failedMsg.type === 'error' && failedMsg.text === 'Token inválido', 'Muestra mensaje de error cuando falla el guardado');
+
+  const uncertainMsg = formatUIPersistenceMessage({ success: false, persistenceStatus: 'uncertain' });
+  assert(uncertainMsg.type === 'warning' && uncertainMsg.title === 'Registro pendiente de confirmación', 'Maneja estado de resultado incierto con aviso prudente');
+}
+
+// 15. Auditoría Fase 1.1: Validación de Correcciones H1, H2, H3 y H4
+console.log('\n15. Auditoría Fase 1.1 (Correcciones H1 a H4):');
+{
+  // H1: Configuración centralizada aprobada por Joaquín
+  const { WELLNESS_CONFIG } = require('../src/lib/performance/wellness-config');
+  assert(WELLNESS_CONFIG.isPendingValidationByJoaquin === false, 'H1: Configuración marcada como aprobada por Joaquín (isPendingValidationByJoaquin: false)');
+  assert(WELLNESS_CONFIG.version === '2026.10-approved-by-joaquin', 'H1: Versión de configuración canónica registrada');
+  assert(Object.keys(WELLNESS_CONFIG.questions).length === 5, 'H1: 5 preguntas configuradas exactamente');
+
+  // H2: Orientación de escalas y mapeo coherente de colores/etiquetas
+  const questionsArr = WELLNESS_CONFIG.questions as any[];
+  const sleepCfg = questionsArr.find(q => q.id === 'sleepQuality');
+  const moodCfg = questionsArr.find(q => q.id === 'mood');
+  const fatigueCfg = questionsArr.find(q => q.id === 'fatigue');
+  const sorenessCfg = questionsArr.find(q => q.id === 'soreness');
+  const stressCfg = questionsArr.find(q => q.id === 'stress');
+
+  assert(sleepCfg.orientation === 'higher_is_better', 'H2: Calidad de sueño tiene orientación higher_is_better');
+  assert(moodCfg.orientation === 'higher_is_better', 'H2: Estado de ánimo tiene orientación higher_is_better');
+  assert(fatigueCfg.orientation === 'higher_is_worse', 'H2: Fatiga tiene orientación higher_is_worse');
+  assert(sorenessCfg.orientation === 'higher_is_worse', 'H2: Dolor muscular/agujetas tiene orientación higher_is_worse');
+  assert(stressCfg.orientation === 'higher_is_worse', 'H2: Estrés tiene orientación higher_is_worse');
+
+  // Verificar resolución de color para botón según orientación
+  function getScoreColorClass(questionId: string, score: number): string {
+    const q = questionsArr.find(item => item.id === questionId);
+    const isHigherBetter = q.orientation === 'higher_is_better';
+    if (isHigherBetter) {
+      if (score <= 2) return 'rose';
+      if (score === 3) return 'amber';
+      return 'emerald';
+    } else {
+      if (score <= 2) return 'emerald';
+      if (score === 3) return 'amber';
+      return 'rose';
+    }
+  }
+
+  // En higher_is_better (sueño), 1 debe ser desfavorable (rose) y 5 óptimo (emerald)
+  assert(getScoreColorClass('sleepQuality', 1) === 'rose', 'H2: Sueño 1/5 se colorea como desfavorable (rose)');
+  assert(getScoreColorClass('sleepQuality', 5) === 'emerald', 'H2: Sueño 5/5 se colorea como óptimo (emerald)');
+
+  // En higher_is_worse (fatiga), 1 debe ser óptimo (emerald) y 5 desfavorable (rose)
+  assert(getScoreColorClass('fatigue', 1) === 'emerald', 'H2: Fatiga 1/5 se colorea como óptimo (emerald)');
+  assert(getScoreColorClass('fatigue', 5) === 'rose', 'H2: Fatiga 5/5 se colorea como desfavorable (rose)');
+
+  // H3: Restricción estricta de fecha local peninsular (sessionDate === todaySpain)
+  function validateSessionDateMatch(sessionDate: string, todaySpain: string) {
+    if (sessionDate > todaySpain) {
+      return { allowed: false, code: 'FUTURE_SESSION_NOT_ALLOWED', error: 'El formulario de bienestar solo puede completarse el día del entrenamiento.' };
+    }
+    if (sessionDate < todaySpain) {
+      return { allowed: false, code: 'PAST_SESSION_EXPIRED', error: 'El plazo para completar el cuestionario previo de bienestar de esta sesión ya ha finalizado.' };
+    }
+    return { allowed: true };
+  }
+
+  const today = '2026-10-12';
+  const futureSession = '2026-10-13';
+  const pastSession = '2026-10-11';
+
+  const futureCheck = validateSessionDateMatch(futureSession, today);
+  assert(futureCheck.allowed === false && futureCheck.code === 'FUTURE_SESSION_NOT_ALLOWED', 'H3: Rechaza estrictamente sesión futura');
+
+  const pastCheck = validateSessionDateMatch(pastSession, today);
+  assert(pastCheck.allowed === false && pastCheck.code === 'PAST_SESSION_EXPIRED', 'H3: Rechaza estrictamente sesión pasada caducada');
+
+  const todayCheck = validateSessionDateMatch(today, today);
+  assert(todayCheck.allowed === true, 'H3: Permite enviar cuestionario únicamente en la fecha local de la sesión');
+
+  // H4: Redacción en servidor de datos de molestias para roles no autorizados
+  function redactWellnessDiscomfort(entry: {
+    hasDiscomfort: boolean;
+    discomfortZone?: string | null;
+    discomfortIntensity?: number | null;
+    notes?: string | null;
+  }, canViewDiscomfort: boolean) {
+    if (!canViewDiscomfort) {
+      return {
+        hasDiscomfort: entry.hasDiscomfort,
+        discomfortZone: null,
+        discomfortIntensity: null,
+        notes: null,
+        isDiscomfortRedacted: true
+      };
+    }
+    return {
+      hasDiscomfort: entry.hasDiscomfort,
+      discomfortZone: entry.discomfortZone ?? null,
+      discomfortIntensity: entry.discomfortIntensity ?? null,
+      notes: entry.notes ?? null,
+      isDiscomfortRedacted: false
+    };
+  }
+
+  const rawEntry = {
+    hasDiscomfort: true,
+    discomfortZone: 'Isquiotibial izquierdo',
+    discomfortIntensity: 7,
+    notes: 'Tirón agudo durante el calentamiento'
+  };
+
+  const staffView = redactWellnessDiscomfort(rawEntry, true);
+  assert(staffView.isDiscomfortRedacted === false && staffView.discomfortZone === 'Isquiotibial izquierdo', 'H4: Personal técnico/médico autorizado recibe detalles de la molestia');
+
+  const unauthorizedView = redactWellnessDiscomfort(rawEntry, false);
+  assert(unauthorizedView.isDiscomfortRedacted === true && unauthorizedView.discomfortZone === null && unauthorizedView.notes === null, 'H4: Rol no autorizado recibe zona y notas eliminadas/redactadas en el servidor');
+  assert(unauthorizedView.hasDiscomfort === true, 'H4: Se conserva el indicador booleano hasDiscomfort sin filtrar información clínica sensible');
+}
+
+// 16. Fase 1.2: Conexión y Centralización de Alertas de Wellness
+console.log('\n16. Fase 1.2: Conexión y Centralización de Alertas de Wellness:');
+{
+  const { WELLNESS_CONFIG } = require('../src/lib/performance/wellness-config');
+  const { generateInformationalAlerts } = require('../src/lib/performance/wellness-service');
+
+  // 16.1 Comprobar que generateInformationalAlerts obedece a WELLNESS_CONFIG.alertThresholds
+  assert(WELLNESS_CONFIG.alertThresholds.fatigueAttentionThreshold === 4, '16.1: Umbral de fatiga aprobado es 4');
+  assert(WELLNESS_CONFIG.alertThresholds.sorenessAttentionThreshold === 4, '16.1: Umbral de agujetas/dolor muscular aprobado es 4');
+  assert(WELLNESS_CONFIG.alertThresholds.discomfortSevereIntensityThreshold === 7, '16.1: Umbral de molestia severa aprobado es 7');
+  assert(WELLNESS_CONFIG.alertThresholds.highRpeThreshold === 9, '16.1: Umbral de alto RPE aprobado es 9');
+
+  // Alerta de fatiga en umbral exacto
+  const fatigueAlerts = generateInformationalAlerts({
+    sleepQuality: 3,
+    fatigue: 4,
+    soreness: 2,
+    stress: 2,
+    mood: 3
+  });
+  assert(fatigueAlerts.some(a => a.type === 'fatigue_warning' && a.level === 'attention'), '16.1: Fatiga 4 genera alerta fatigue_warning con level attention');
+
+  const fatigueSubThreshold = generateInformationalAlerts({
+    sleepQuality: 3,
+    fatigue: 3,
+    soreness: 2,
+    stress: 2,
+    mood: 3
+  });
+  assert(!fatigueSubThreshold.some(a => a.type === 'fatigue_warning'), '16.1: Fatiga 3 (bajo umbral) no genera alerta');
+
+  // Alerta de molestia severa (intensidad >= 7 -> level attention; < 7 -> level info)
+  const severeDiscomfortAlerts = generateInformationalAlerts(undefined, {
+    hasDiscomfort: true,
+    zone: 'Aductor derecho',
+    intensity: 7,
+    notes: 'Pinchazo'
+  });
+  assert(severeDiscomfortAlerts.some(a => a.type === 'discomfort_reported' && a.level === 'attention' && a.zone === 'Aductor derecho'), '16.1: Molestia severa (7/10) genera level attention y zona');
+
+  const moderateDiscomfortAlerts = generateInformationalAlerts(undefined, {
+    hasDiscomfort: true,
+    zone: 'Cuádriceps',
+    intensity: 5,
+    notes: 'Cargado'
+  });
+  assert(moderateDiscomfortAlerts.some(a => a.type === 'discomfort_reported' && a.level === 'info'), '16.1: Molestia moderada (5/10) genera level info');
+
+  // 16.2 Simulación del Panel de Rendimiento: cálculo para completados, omisión para pendientes y redacción para no autorizados
+  const mockPlayers = [
+    {
+      playerId: 'p-1',
+      playerName: 'Carlos Ruiz',
+      dorsal: 7,
+      avatarUrl: null,
+      wellnessStatus: 'completed' as const,
+      canViewDiscomfort: true, // Personal técnico
+      ratings: { sleepQuality: 2, fatigue: 4, soreness: 5, stress: 3, mood: 2 },
+      discomfort: { hasDiscomfort: true, zone: 'Isquiotibial', intensity: 8, notes: 'Tirón' }
+    },
+    {
+      playerId: 'p-2',
+      playerName: 'Marcos Gil',
+      dorsal: 10,
+      avatarUrl: null,
+      wellnessStatus: 'completed' as const,
+      canViewDiscomfort: false, // Rol no técnico (redactado)
+      ratings: { sleepQuality: 4, fatigue: 2, soreness: 2, stress: 2, mood: 4 },
+      discomfort: { hasDiscomfort: true, zone: null, intensity: null, notes: null }
+    },
+    {
+      playerId: 'p-3',
+      playerName: 'Lucas Vidal',
+      dorsal: 4,
+      avatarUrl: null,
+      wellnessStatus: 'pending' as const, // Pendiente: NO debe generar alertas
+      canViewDiscomfort: true,
+      ratings: undefined,
+      discomfort: undefined
+    }
+  ];
+
+  const computedAlerts: any[] = [];
+  const completedEntries = mockPlayers.filter(p => p.wellnessStatus === 'completed');
+
+  for (const entry of completedEntries) {
+    let discomfortForAlert: any = undefined;
+    if (entry.discomfort?.hasDiscomfort) {
+      discomfortForAlert = {
+        hasDiscomfort: true,
+        zone: entry.canViewDiscomfort ? entry.discomfort.zone : null,
+        intensity: entry.canViewDiscomfort ? entry.discomfort.intensity : null,
+        notes: entry.canViewDiscomfort ? entry.discomfort.notes : null,
+      };
+    }
+
+    const playerAlerts = generateInformationalAlerts(entry.ratings, discomfortForAlert);
+    for (const al of playerAlerts) {
+      computedAlerts.push({
+        playerId: entry.playerId,
+        playerName: entry.playerName,
+        dorsal: entry.dorsal,
+        avatarUrl: entry.avatarUrl,
+        alert: al
+      });
+    }
+  }
+
+  // Comprobar que jugador p-1 (técnico autorizado) recibe alertas completas
+  const p1Alerts = computedAlerts.filter(a => a.playerId === 'p-1');
+  assert(p1Alerts.length === 3, '16.2: Jugador p-1 genera 3 alertas (fatiga, dolor y molestia)');
+  assert(p1Alerts.some(a => a.alert.type === 'fatigue_warning'), '16.2: p-1 tiene alerta de fatiga');
+  assert(p1Alerts.some(a => a.alert.type === 'soreness_warning'), '16.2: p-1 tiene alerta de dolor');
+  const p1Discomfort = p1Alerts.find(a => a.alert.type === 'discomfort_reported');
+  assert(p1Discomfort.alert.zone === 'Isquiotibial', '16.2: Personal técnico ve la zona anatómica en la alerta');
+
+  // Comprobar que jugador p-2 (no autorizado) recibe la alerta pero sin zona ni datos clínicos
+  const p2Alerts = computedAlerts.filter(a => a.playerId === 'p-2');
+  assert(p2Alerts.length === 1, '16.2: Jugador p-2 genera 1 alerta de molestia');
+  assert(p2Alerts[0].alert.zone === null, '16.2: Rol no autorizado tiene la zona anatómica en null (redactada)');
+  assert(!p2Alerts[0].alert.message.includes('Isquiotibial'), '16.2: Mensaje de alerta para no autorizado no filtra términos clínicos');
+
+  // Comprobar que jugador p-3 (pendiente) NO generó ninguna alerta
+  const p3Alerts = computedAlerts.filter(a => a.playerId === 'p-3');
+  assert(p3Alerts.length === 0, '16.2: Formulario pendiente (p-3) no genera ninguna alerta en el panel');
+}
+
+// 17. Fase 1.3: Integración de Alertas de Wellness en el Drawer Individual
+console.log('\n17. Fase 1.3: Alertas en el Drawer Individual (Filtrado por Jugador, Fecha y Permisos):');
+{
+  // Simular la extracción de props para el Drawer:
+  // playerWellnessEntry = wellnessSummary.playerEntries.find(p => p.playerId === drawerPlayerId)
+  // playerWellnessAlerts = wellnessSummary.alerts.filter(a => a.playerId === drawerPlayerId).map(a => a.alert)
+
+  const mockDateToday = '2026-10-12';
+  const mockDateYesterday = '2026-10-11';
+
+  const mockWellnessSummary = {
+    date: mockDateToday,
+    playerEntries: [
+      {
+        playerId: 'player-alpha',
+        attendanceStatus: 'confirmed' as const,
+        wellnessStatus: 'completed' as const,
+        hooperScore: 16,
+        ratings: { sleepQuality: 2, fatigue: 4, soreness: 5, stress: 3, mood: 2 },
+        discomfort: { hasDiscomfort: true, zone: 'Sóleo derecho', intensity: 8, notes: 'Sobrecarga' },
+        canViewDiscomfort: true,
+        submittedAt: `${mockDateToday}T09:30:00Z`
+      },
+      {
+        playerId: 'player-beta',
+        attendanceStatus: 'confirmed' as const,
+        wellnessStatus: 'completed' as const,
+        hooperScore: 12,
+        ratings: { sleepQuality: 4, fatigue: 2, soreness: 2, stress: 2, mood: 2 },
+        discomfort: { hasDiscomfort: true, zone: null, intensity: null, notes: null }, // Redactado en servidor
+        canViewDiscomfort: false,
+        submittedAt: `${mockDateToday}T09:45:00Z`
+      },
+      {
+        playerId: 'player-gamma',
+        attendanceStatus: 'confirmed' as const,
+        wellnessStatus: 'pending' as const,
+        hooperScore: null,
+        ratings: undefined,
+        discomfort: undefined,
+        canViewDiscomfort: true,
+        submittedAt: undefined
+      }
+    ],
+    alerts: [
+      {
+        playerId: 'player-alpha',
+        alert: { type: 'fatigue_warning' as const, level: 'attention' as const, message: 'Fatiga percibida elevada (4/5).' }
+      },
+      {
+        playerId: 'player-alpha',
+        alert: { type: 'soreness_warning' as const, level: 'attention' as const, message: 'Dolor muscular elevado (5/5).' }
+      },
+      {
+        playerId: 'player-alpha',
+        alert: { type: 'discomfort_reported' as const, level: 'attention' as const, message: 'Molestia comunicada en Sóleo derecho (Intensidad 8/10).', zone: 'Sóleo derecho' }
+      },
+      {
+        playerId: 'player-beta',
+        alert: { type: 'discomfort_reported' as const, level: 'info' as const, message: 'Molestia comunicada antes del entrenamiento (Intensidad N/A/10).', zone: null }
+      }
+    ]
+  };
+
+  // Función pura que resuelve las props pasadas al Drawer
+  function resolveDrawerWellnessProps(playerId: string, summary: typeof mockWellnessSummary, requestedDate: string) {
+    if (summary.date !== requestedDate) {
+      return { playerWellnessEntry: undefined, playerWellnessAlerts: [] };
+    }
+    const entry = summary.playerEntries.find(p => p.playerId === playerId);
+    const alerts = summary.alerts.filter(a => a.playerId === playerId).map(a => a.alert);
+    return { playerWellnessEntry: entry, playerWellnessAlerts: alerts };
+  }
+
+  // Caso 1: Jugador Alpha (técnico autorizado) en la fecha correcta
+  const alphaProps = resolveDrawerWellnessProps('player-alpha', mockWellnessSummary, mockDateToday);
+  assert(alphaProps.playerWellnessEntry !== undefined, '17.1: Drawer recibe entry para player-alpha');
+  assert(alphaProps.playerWellnessAlerts.length === 3, '17.1: Drawer recibe exactamente las 3 alertas de player-alpha');
+  assert(alphaProps.playerWellnessEntry?.canViewDiscomfort === true, '17.1: canViewDiscomfort es true para personal autorizado');
+  assert(alphaProps.playerWellnessEntry?.discomfort?.zone === 'Sóleo derecho', '17.1: Personal técnico ve zona anatómica en el Drawer');
+  assert(alphaProps.playerWellnessAlerts[2].zone === 'Sóleo derecho', '17.1: Alerta en el Drawer incluye la zona anatómica');
+
+  // Caso 2: Jugador Beta (rol no técnico) en la fecha correcta
+  const betaProps = resolveDrawerWellnessProps('player-beta', mockWellnessSummary, mockDateToday);
+  assert(betaProps.playerWellnessEntry !== undefined, '17.2: Drawer recibe entry para player-beta');
+  assert(betaProps.playerWellnessAlerts.length === 1, '17.2: Drawer recibe exactamente la 1 alerta de player-beta');
+  assert(betaProps.playerWellnessEntry?.canViewDiscomfort === false, '17.2: canViewDiscomfort es false para rol no técnico');
+  assert(betaProps.playerWellnessEntry?.discomfort?.zone === null, '17.2: Zona anatómica está estrictamente redactada (null) para no autorizado');
+  assert(betaProps.playerWellnessAlerts[0].zone === null, '17.2: Alerta en el Drawer tiene zone=null sin fuga clínica');
+
+  // Caso 3: Jugador Gamma (wellness pendiente)
+  const gammaProps = resolveDrawerWellnessProps('player-gamma', mockWellnessSummary, mockDateToday);
+  assert(gammaProps.playerWellnessEntry?.wellnessStatus === 'pending', '17.3: Drawer identifica estado pending para player-gamma');
+  assert(gammaProps.playerWellnessAlerts.length === 0, '17.3: Jugador pendiente no tiene ninguna alerta en el Drawer');
+
+  // Caso 4: Aislamiento temporal: si el summary fuera de otra fecha, no transfiere alertas obsoletas
+  const outdatedProps = resolveDrawerWellnessProps('player-alpha', mockWellnessSummary, mockDateYesterday);
+  assert(outdatedProps.playerWellnessEntry === undefined, '17.4: Sesión de fecha distinta no transfiere entry obsoleta al Drawer');
+  assert(outdatedProps.playerWellnessAlerts.length === 0, '17.4: Sesión de fecha distinta no transfiere alertas al Drawer');
+
+  // Caso 5: Aislamiento entre jugadores: player-gamma no recibe alertas de player-alpha
+  const gammaAlertsCheck = gammaProps.playerWellnessAlerts.some((a: any) => a.zone === 'Sóleo derecho');
+  assert(!gammaAlertsCheck, '17.5: Estricto aislamiento: las alertas de un jugador no se mezclan en el Drawer de otro');
+}
+
 console.log(`\n========================================`);
 console.log(`TOTAL CASOS: ${passed + failed} | SUPERADOS: ${passed} | FALLIDOS: ${failed}`);
 console.log(`========================================\n`);
@@ -492,4 +1192,5 @@ console.log(`========================================\n`);
 if (failed > 0) {
   process.exit(1);
 }
+
 

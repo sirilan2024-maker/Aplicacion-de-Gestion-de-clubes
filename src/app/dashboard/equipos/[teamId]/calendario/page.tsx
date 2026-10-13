@@ -165,11 +165,14 @@ export default function CalendarioEquipoPage() {
       });
     }
 
-    mergedEvents.sort((a, b) => {
-      const timeA = new Date(`${a.date}T${a.start_time}:00`).getTime();
-      const timeB = new Date(`${b.date}T${b.start_time}:00`).getTime();
-      return timeA - timeB;
-    });
+    const getEventTimestamp = (e: any) => {
+      if (!e.date) return 0;
+      const time = (e.start_time || '00:00').substring(0, 5);
+      const t = new Date(`${e.date}T${time}:00`).getTime();
+      return isNaN(t) ? new Date(e.date).getTime() : t;
+    };
+
+    mergedEvents.sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b));
 
     setEvents(mergedEvents);
     setLoading(false);
@@ -572,7 +575,12 @@ export default function CalendarioEquipoPage() {
                         const val = e.target.value;
                         if (val === 'Partido') {
                           setShowModal(false);
-                          setEditingMatch({ id: 'new', fecha_hora: new Date(selectedDate || new Date()).toISOString() });
+                          setEditingMatch({ id: 'new', fecha_hora: new Date(selectedDate || new Date()).toISOString(), tipo_partido: 'liga' });
+                          setShowMatchModal(true);
+                          setEventType('Entrenamiento');
+                        } else if (val === 'Partido Amistoso') {
+                          setShowModal(false);
+                          setEditingMatch({ id: 'new', fecha_hora: new Date(selectedDate || new Date()).toISOString(), tipo_partido: 'amistoso' });
                           setShowMatchModal(true);
                           setEventType('Entrenamiento');
                         } else {
@@ -582,7 +590,8 @@ export default function CalendarioEquipoPage() {
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value="Entrenamiento">Entrenamiento</option>
-                      <option value="Partido">Partido</option>
+                      <option value="Partido">Partido de Liga</option>
+                      <option value="Partido Amistoso">Partido Amistoso</option>
                       <option value="Reunión">Reunión</option>
                       <option value="Otro">Otro</option>
                     </select>

@@ -342,7 +342,7 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
   return { success: true, players: sortedPlayers };
 }
 
-export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null }) {
+export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null, tipo_partido?: string }) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
     return { success: false, error: authError || "No autenticado" };
@@ -576,7 +576,7 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
 }
 
 
-export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string, season_id?: string }) {
+export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string, season_id?: string, tipo_partido?: string, estado?: string, resultado_propio?: number | null, resultado_rival?: number | null, rsvp_reminder_time?: string | null }) {
   const supabase = await createClient()
 
   // Obtener el club_id del usuario autenticado
@@ -619,9 +619,12 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
       fecha_hora: data.fecha_hora,
       lugar: data.lugar,
       rival_nombre: data.rival_nombre,
-      estado: 'Programado',
+      estado: data.estado || 'Programado',
+      resultado_propio: data.resultado_propio ?? null,
+      resultado_rival: data.resultado_rival ?? null,
+      tipo_partido: data.tipo_partido || 'liga',
       season_id: finalSeasonId,
-      rsvp_reminder_time: (data as any).rsvp_reminder_time || null
+      rsvp_reminder_time: data.rsvp_reminder_time || null
     })
     .select()
     .single()

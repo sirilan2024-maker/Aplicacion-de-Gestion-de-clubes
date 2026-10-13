@@ -98,16 +98,24 @@ Los usuarios (familias, entrenadores, directivos) pueden personalizar qué notif
 
 ## 6. Scheduler y Automatización de Recordatorios (Cron)
 
-Para cumplir con la antelación de **24 horas** de recordatorios sin depender de una única hora fija, se han implementado dos mecanismos complementarios:
+Para cumplir con la antelación de **24 horas** de eventos y evaluar de forma dinámica las ventanas de **Bienestar Previo** (3h antes de la sesión) y **Feedback Post-Entrenamiento RPE** (4h tras finalizar) a lo largo del día, se han implementado dos mecanismos complementarios:
 
 1. **Vercel Cron (`vercel.json`):**
    * Endpoint: `/api/events/send-reminders`
-   * Frecuencia: Diario a las 08:00 UTC (`0 8 * * *`).
-2. **GitHub Actions Workflow (`.github/workflows/reminders-cron.yml`):**
-   * Frecuencia: Cada 3 horas (`0 */3 * * *`).
-   * Autenticación: Cabecera `Authorization: Bearer ${{ secrets.CRON_SECRET }}`.
+   * Frecuencia: Diario a las 08:00 UTC (`0 8 * * *`). Compatible con el plan Vercel Hobby (máximo 1 ejecución diaria).
 
-Ambos disparadores son completamente seguros de ejecutar simultáneamente gracias a la deduplicación por clave de idempotencia y al flag `rsvp_reminder_sent = true`.
+2. **GitHub Actions Workflow (`.github/workflows/reminders-cron.yml`):**
+   * Endpoint: `/api/events/send-reminders` (método `POST`)
+   * Frecuencia: Cada 30 minutos (`*/30 * * * *`).
+   * Activación manual: Soporta `workflow_dispatch`.
+   * Requisitos para activación futura en GitHub Actions:
+     * **`APP_BASE_URL`**: Debe configurarse explícitamente en los *Repository Secrets* de GitHub (`https://<dominio-canonico>`). El workflow no utiliza ningún fallback hardcodeado y aborta de inmediato si no está definida o si no cumple el formato estricto (protocolo `https://`, sin credenciales, sin rutas adicionales, sin parámetros ni fragmentos). El administrador debe confirmar manualmente el dominio canónico exacto antes de configurarla.
+     * **`CRON_SECRET`**: Secreto de autenticación que debe configurarse en los *Repository Secrets* de GitHub y coincidir exactamente con el valor de la variable `CRON_SECRET` configurada en Vercel. Se transmite vía cabecera `Authorization: Bearer ${{ secrets.CRON_SECRET }}` sin exponerse en los logs de ejecución.
+     * **Rama Predeterminada**: Los workflows programados (`schedule`) de GitHub Actions solo se ejecutan cuando el archivo está publicado en la rama predeterminada del repositorio (`main`).
+     * **Alcance de Pruebas**: Las pruebas locales existentes verifican exhaustivamente la lógica estática, la idempotencia en memoria y la sintaxis del runner. **No prueban la ejecución real por red ni el envío efectivo de notificaciones a proveedores externos**.
+
+Ambos disparadores son completamente seguros de ejecutar simultáneamente gracias a la deduplicación por clave de idempotencia (`notification_deliveries.idempotency_key`), el índice UNIQUE en base de datos y los flags `rsvp_reminder_sent = true`.
+
 
 ---
 

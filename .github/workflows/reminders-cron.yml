@@ -1,26 +1,95 @@
-name: Recordatorios 24h Sporting Saladar (Cron)
+name: Recordatorios Sporting Saladar (Cron)
 
 on:
   schedule:
-    # Se ejecuta cada 10 minutos (*/10 * * * *)
-    - cron: '*/10 * * * *'
-  workflow_dispatch: # Permite ejecución manual desde GitHub Actions
+    # Se ejecuta cada 30 minutos para evaluar ventanas de bienestar y feedback a lo largo del día
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Permite ejecución manual desde la consola de GitHub Actions
+
+# Evita ejecuciones simultáneas del workflow si una tarea previa se demora
+concurrency:
+  group: reminders-cron-pipeline
+  cancel-in-progress: false
 
 jobs:
   send-reminders:
-    name: Despachar Recordatorios 24h (Entrenamientos, Eventos y Partidos)
+    name: Despachar Recordatorios (Eventos, Partidos, Bienestar y Feedback)
     runs-on: ubuntu-latest
     steps:
-      - name: Disparar endpoint de recordatorios de calendario
+      - name: Invocar endpoint de recordatorios
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
         run: |
-          echo "Iniciando despacho de recordatorios para Sporting Saladar..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://app.clubsportingsaladar.com/api/events/send-reminders" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json")
-          echo "$RESPONSE"
-          HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "Aviso / Error en el cron: Codigo HTTP $HTTP_STATUS"
+          set -euo pipefail
+          echo "Iniciando evaluacion y despacho de recordatorios programados..."
+
+          # 1. Comprobar que APP_BASE_URL está configurada explícitamente sin fallback
+          if [ -z "${APP_BASE_URL:-}" ]; then
+            echo "::error::El secreto APP_BASE_URL no está configurado en GitHub Actions. Debe definirse explícitamente la URL base autorizada."
             exit 1
           fi
-          echo "Recordatorios procesados exitosamente."
+
+          # 2. Validar formato estricto de la URL antes de realizar cualquier llamada
+          # Reglas RFC: https obligatorio, hostname con etiquetas válidas separadas por punto (sin guiones iniciales/finales ni puntos dobles), TLD alfabético >= 2 letras, puerto opcional, sin credenciales (@), sin query (?), sin fragmento (#), sin path adicional salvo opcionalmente barra final
+          URL_INPUT="${APP_BASE_URL}"
+VALID_URL_REGEX='^https://([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(:[0-9]+)?/?$'
+
+          if ! echo "$URL_INPUT" | grep -Eq "$VALID_URL_REGEX"; then
+            echo "::error::Formato de APP_BASE_URL inválido. Debe comenzar con https://, contener un host/dominio válido y no incluir credenciales, rutas, parámetros de consulta ni fragmentos."
+            exit 1
+          fi
+
+          # 3. Eliminar barra final tras validación
+          BASE_URL="${URL_INPUT%/}"
+          ENDPOINT="${BASE_URL}/api/events/send-reminders"
+
+          # 4. Comprobar secreto CRON_SECRET
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::El secreto CRON_SECRET no está configurado en GitHub Actions."
+            exit 1
+          fi
+
+          # 5. Directorio temporal aislado con permisos restringidos y limpieza garantizada
+          TMP_WORK_DIR=$(mktemp -d)
+          chmod 700 "$TMP_WORK_DIR"
+
+          cleanup() {
+            rm -rf "$TMP_WORK_DIR"
+          }
+          trap cleanup EXIT
+          trap 'cleanup; trap - INT; kill -INT $$' INT
+          trap 'cleanup; trap - TERM; kill -TERM $$' TERM
+
+          # Archivo de cabecera efímero con permisos 600 para evitar exponer el secreto como argumento visible en ps/argv
+          AUTH_HEADER_FILE="$TMP_WORK_DIR/auth.header"
+          touch "$AUTH_HEADER_FILE"
+          chmod 600 "$AUTH_HEADER_FILE"
+          printf "Authorization: Bearer %s\n" "$CRON_SECRET" > "$AUTH_HEADER_FILE"
+
+          HTTP_BODY_FILE="$TMP_WORK_DIR/response.body"
+          HTTP_STATUS=0
+          CURL_EXIT=0
+
+          # 6. Invocar endpoint mediante POST con timeouts y pasando la cabecera mediante @archivo efímero
+          set +e
+          HTTP_STATUS=$(curl -s -S --connect-timeout 15 --max-time 120 -o "$HTTP_BODY_FILE" -w "%{http_code}" -X POST "$ENDPOINT" \
+            -H "@$AUTH_HEADER_FILE" \
+            -H "Content-Type: application/json")
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::Error de conexión o timeout al invocar el endpoint (curl exit code: $CURL_EXIT)"
+            exit "$CURL_EXIT"
+          fi
+
+          echo "Petición completada con código HTTP: $HTTP_STATUS"
+
+          # 7. Verificar que la respuesta sea 200 sin imprimir el cuerpo HTTP
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Error en el endpoint de recordatorios: Código HTTP $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "Recordatorios evaluados y procesados exitosamente."

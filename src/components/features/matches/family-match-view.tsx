@@ -7,6 +7,7 @@ import { ChevronLeft, Clock, MapPin, Activity, CheckCircle2, Trophy } from "luci
 import { createClient } from "@/lib/supabase/client";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
 import { findRivalShield } from "@/lib/ffcv/rival-shields";
+import { fetchLatestStandingsForGroups, getMatchPositions } from "@/lib/ffcv/standings-helper";
 
 function formatTime(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60);
@@ -24,9 +25,14 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   const [match, setMatch] = useState<any>(initialMatch);
   const [matchEvents, setMatchEvents] = useState<any[]>(initialMatchEvents);
   const [rivalShield, setRivalShield] = useState<string | null>(initialMatch?.rival_escudo || null);
+  const [positions, setPositions] = useState<{
+    homePosition: number | null;
+    awayPosition: number | null;
+  }>({ homePosition: null, awayPosition: null });
 
   const supabase = createClient();
   const matchId = match?.id;
+  const isLocal = match?.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match?.lugar || '');
 
   useEffect(() => {
     if (match?.rival_escudo) {
@@ -48,6 +54,31 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
     }
     loadShield();
   }, [match?.rival_nombre, match?.rival_escudo]);
+
+  useEffect(() => {
+    async function loadPositions() {
+      const groupId = match?.equipo?.ffcv_group_id;
+      if (!groupId) return;
+      try {
+        const standingsMap = await fetchLatestStandingsForGroups(supabase, [groupId]);
+        const res = getMatchPositions({
+          groupId,
+          isLocal,
+          clubTeamName: match?.equipo?.name,
+          clubFfcvId: match?.equipo?.ffcv_team_id,
+          rivalTeamName: match?.rival_nombre,
+          standingsMap,
+        });
+        setPositions({
+          homePosition: res.homePosition,
+          awayPosition: res.awayPosition,
+        });
+      } catch (err) {
+        console.error('Error resolving standings in FamilyMatchView:', err);
+      }
+    }
+    loadPositions();
+  }, [match?.equipo?.ffcv_group_id, match?.equipo?.name, match?.rival_nombre, isLocal]);
 
   // Real-time subscriptions
   useEffect(() => {
@@ -87,7 +118,6 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   // Live Timer
   const { seconds } = useLiveTimer(matchId, match?.live_timer_elapsed_seconds || 0, match?.live_timer_started_at || null);
 
-  const isLocal = match?.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match?.lugar || '');
   const teamName = match?.equipo?.name || "Sporting Saladar";
   const rivalName = match?.rival_nombre || "Rival por definir";
   
@@ -383,7 +413,14 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-950 leading-tight">{localName}</h2>
-                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">Local</span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-center md:justify-start mt-1">
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block">Local</span>
+                  {positions.homePosition && (
+                    <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full inline-block shadow-2xs">
+                      {positions.homePosition}º Clasificado
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -452,7 +489,14 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-950 leading-tight">{awayName}</h2>
-                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">Visitante</span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-center md:justify-end mt-1">
+                  {positions.awayPosition && (
+                    <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full inline-block shadow-2xs">
+                      {positions.awayPosition}º Clasificado
+                    </span>
+                  )}
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block">Visitante</span>
+                </div>
               </div>
             </div>
           </div>

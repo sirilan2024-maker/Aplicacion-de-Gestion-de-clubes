@@ -22,7 +22,7 @@ export default async function FamilyMatchPage({ params }: { params: Promise<{ pl
     .from("partidos")
     .select(`
       *,
-      equipo:teams(id, name, color)
+      equipo:teams(id, name, color, ffcv_group_id, ffcv_team_id)
     `)
     .eq("id", matchId)
     .single()

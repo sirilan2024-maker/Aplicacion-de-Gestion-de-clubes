@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { getAuthenticatedContext, ADMIN_ROLES, canUserManageClubStaff, canUserUpdateStaffProfile, getEffectiveSelectedSeasonId } from "@/lib/auth-helpers"
+import { fetchLatestStandingsForGroups, getMatchPositions } from "@/lib/ffcv/standings-helper"
 
 export async function updateUserRoleAction(userId: string, newRole: string) {
   const { context, error: authError } = await getAuthenticatedContext()
@@ -707,6 +708,10 @@ export interface ExecutiveDashboardData {
       teamName: string;
       teamCategory?: string;
       teamColor?: string;
+      teamPosition?: number | null;
+      rivalPosition?: number | null;
+      homePosition?: number | null;
+      awayPosition?: number | null;
       equipacionAsignada?: string | null;
       equipacionPreparada?: boolean | null;
       rivalCamisetaColor?: string | null;
@@ -745,6 +750,10 @@ export interface ExecutiveDashboardData {
     teamName: string;
     teamCategory?: string;
     teamColor?: string;
+    teamPosition?: number | null;
+    rivalPosition?: number | null;
+    homePosition?: number | null;
+    awayPosition?: number | null;
     equipacionAsignada?: string | null;
     equipacionPreparada?: boolean | null;
     rivalCamisetaColor?: string | null;
@@ -1218,7 +1227,8 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         id, fecha_hora, rival_nombre, lugar, estado,
         resultado_propio, resultado_rival, tipo_partido,
         equipacion_asignada, equipacion_preparada, rival_camiseta_color, conflicto_equipacion,
-        teams:equipo_id (name, category, color)
+        equipo_id,
+        teams:equipo_id (id, name, category, color, ffcv_group_id, ffcv_team_id)
       `)
       .eq('club_id', clubId)
       .in('equipo_id', teamIds.length > 0 ? teamIds : ['00000000-0000-0000-0000-000000000000'])
@@ -1228,14 +1238,33 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .limit(30);
 
     interface TeamRel {
+      id?: string;
       name?: string;
       category?: string;
       color?: string;
+      ffcv_group_id?: string;
+      ffcv_team_id?: string;
     }
+
+    const matchGroupIds = Array.from(new Set(
+      (rawMatches || [])
+        .map(m => (m.teams as unknown as TeamRel | null)?.ffcv_group_id)
+        .filter(Boolean) as string[]
+    ));
+    const standingsMap = await fetchLatestStandingsForGroups(adminClient, matchGroupIds);
 
     const upcomingMatches = (rawMatches || []).map(m => {
       const team = m.teams as unknown as TeamRel | null;
       const isLocal = m.lugar === 'Local' || (m.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(m.lugar || ''));
+      const posResult = getMatchPositions({
+        groupId: team?.ffcv_group_id,
+        isLocal,
+        clubTeamName: team?.name,
+        clubFfcvId: team?.ffcv_team_id,
+        rivalTeamName: m.rival_nombre,
+        standingsMap,
+      });
+
       return {
         id: m.id,
         fechaHora: m.fecha_hora,
@@ -1250,6 +1279,10 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         teamName: team?.name || 'Equipo del Club',
         teamCategory: team?.category || '',
         teamColor: team?.color || '#4F46E5',
+        teamPosition: posResult.clubPosition,
+        rivalPosition: posResult.rivalPosition,
+        homePosition: posResult.homePosition,
+        awayPosition: posResult.awayPosition,
         equipacionAsignada: (m as any).equipacion_asignada || null,
         equipacionPreparada: Boolean((m as any).equipacion_preparada),
         rivalCamisetaColor: (m as any).rival_camiseta_color || null,

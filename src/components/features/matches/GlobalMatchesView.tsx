@@ -19,6 +19,7 @@ import { ActaConciliationModal } from "./ActaConciliationModal"
 import { findRivalShield } from "@/lib/ffcv/rival-shields"
 import { normalizeImageUrl } from "@/lib/ffcv/parser"
 import { MatchKitBadge } from "./MatchKitBadge"
+import { fetchLatestStandingsForGroups, getMatchPositions, StandingItem } from "@/lib/ffcv/standings-helper"
 
 interface GlobalMatchesViewProps {
   initialMatches: any[];
@@ -262,6 +263,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
 
   const [ffcvMatches, setFfcvMatches] = useState<any[]>([])
   const [ffcvStandings, setFfcvStandings] = useState<any[]>([])
+  const [latestStandingsMap, setLatestStandingsMap] = useState<Map<string, StandingItem[]>>(new Map())
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
@@ -339,15 +341,18 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
         const groupIds = Array.from(new Set(teams.map(t => t.ffcv_group_id).filter(Boolean)));
         if (groupIds.length === 0) return;
         const supabase = createClient();
-        const [mRes, sRes] = await Promise.all([
+        const [mRes, standingsMap] = await Promise.all([
           supabase.from('ffcv_matches').select('*').in('ffcv_group_id', groupIds).neq('ffcv_season_id', '21'),
-          supabase.from('ffcv_standings').select('*').in('ffcv_group_id', groupIds).neq('ffcv_season_id', '21')
+          fetchLatestStandingsForGroups(supabase, groupIds)
         ]);
         if (!mRes.error && mRes.data) {
           setFfcvMatches(mRes.data);
         }
-        if (!sRes.error && sRes.data) {
-          setFfcvStandings(sRes.data);
+        if (standingsMap) {
+          setLatestStandingsMap(standingsMap);
+          const allStandingsRows: any[] = [];
+          standingsMap.forEach(rows => allStandingsRows.push(...rows));
+          setFfcvStandings(allStandingsRows);
         }
       } catch (err) {
         console.error('Error loading FFCV matches/standings in GlobalMatchesView:', err);
@@ -795,6 +800,15 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
           filteredMatches.map(match => {
             const ffcvMatch = findMatchingFfcvMatch(match, ffcvMatches, teams);
             const isLocal = match.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match.lugar || '');
+            const team = teams.find(t => t.id === match.equipo_id) || match.equipo;
+            const posResult = getMatchPositions({
+              groupId: team?.ffcv_group_id,
+              isLocal,
+              clubTeamName: team?.name,
+              clubFfcvId: team?.ffcv_team_id,
+              rivalTeamName: match.rival_nombre,
+              standingsMap: latestStandingsMap,
+            });
             const homeTeamName = isLocal ? (match.equipo?.name || 'Mi Equipo') : (match.rival_nombre || 'Rival');
             const awayTeamName = isLocal ? (match.rival_nombre || 'Rival') : (match.equipo?.name || 'Mi Equipo');
             const internalHomeScore = isLocal ? (match.resultado_propio ?? null) : (match.resultado_rival ?? null);
@@ -902,6 +916,11 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                       )}
                     </div>
                     <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug line-clamp-2 break-words">{homeTeamName}</span>
+                    {posResult.homePosition && (
+                      <span className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                        {posResult.homePosition}º
+                      </span>
+                    )}
                   </div>
                   
                   {/* MARCADOR O VS */}
@@ -937,6 +956,11 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                       )}
                     </div>
                     <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug line-clamp-2 break-words">{awayTeamName}</span>
+                    {posResult.awayPosition && (
+                      <span className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                        {posResult.awayPosition}º
+                      </span>
+                    )}
                   </div>
                 </div>
 

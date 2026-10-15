@@ -306,6 +306,10 @@ export interface CoordinatorUpcomingMatch {
   teamName: string;
   teamCategory: string;
   teamColor: string;
+  teamPosition?: number | null;
+  rivalPosition?: number | null;
+  homePosition?: number | null;
+  awayPosition?: number | null;
 }
 
 export interface CoordinatorCommunications {

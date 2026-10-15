@@ -5,6 +5,7 @@ import { getAuthenticatedContext, ADMIN_ROLES, getEffectiveSelectedSeasonId, can
 import { NotificationService } from '@/lib/notifications/notification-service'
 import { findRivalShield } from '@/lib/ffcv/rival-shields'
 import { formatDateDMY } from '@/lib/utils'
+import { fetchLatestStandingsForGroups, getMatchPositions } from '@/lib/ffcv/standings-helper'
 
 export interface CoordinatorTeamSummary {
   teamId: string
@@ -35,6 +36,10 @@ export interface CoordinatorUpcomingMatch {
   resultadoPropio?: number | null
   resultadoRival?: number | null
   jornada?: number
+  teamPosition?: number | null
+  rivalPosition?: number | null
+  homePosition?: number | null
+  awayPosition?: number | null
 }
 
 export interface CoordinatorAlert {
@@ -658,10 +663,26 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
       }
     })
 
-    // 14. Upcoming matches con datos de equipo
+    // 14. Upcoming matches con datos de equipo y clasificación
+    const matchGroupIds = Array.from(new Set(
+      (upcomingMatchesRaw || [])
+        .map(m => teams.find(t => t.id === m.equipo_id)?.ffcv_group_id)
+        .filter(Boolean) as string[]
+    ));
+    const standingsMap = await fetchLatestStandingsForGroups(adminClient, matchGroupIds);
+
     const upcomingMatchesMapped: CoordinatorUpcomingMatch[] = (upcomingMatchesRaw || []).map(m => {
       const team = teams.find(t => t.id === m.equipo_id)
       const esLocal = m.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(m.lugar || '')
+      const posResult = getMatchPositions({
+        groupId: team?.ffcv_group_id,
+        isLocal: esLocal,
+        clubTeamName: team?.name,
+        clubFfcvId: team?.ffcv_team_id,
+        rivalTeamName: m.rival_nombre,
+        standingsMap,
+      })
+
       return {
         id: m.id,
         fechaHora: m.fecha_hora,
@@ -673,6 +694,10 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         teamName: team?.name || 'Equipo',
         teamCategory: team?.category || '',
         teamColor: team?.color || null,
+        teamPosition: posResult.clubPosition,
+        rivalPosition: posResult.rivalPosition,
+        homePosition: posResult.homePosition,
+        awayPosition: posResult.awayPosition,
         convocadosCount: convocadosByMatch.get(m.id) || 0,
       }
     })
@@ -1914,7 +1939,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
       .select(`
         id, equipo_id, fecha_hora, rival_nombre, lugar, estado,
         resultado_propio, resultado_rival,
-        teams:equipo_id (name, category, color)
+        teams:equipo_id (id, name, category, color, ffcv_group_id, ffcv_team_id)
       `)
       .eq('club_id', clubId)
       .in('equipo_id', allClubTeamIds.length > 0 ? allClubTeamIds : ['00000000-0000-0000-0000-000000000000'])
@@ -1923,9 +1948,25 @@ export async function getCoordinatorFullDashboardAction(params?: {
       .order('fecha_hora', { ascending: true })
       .limit(50);
 
+    const agendaGroupIds = Array.from(new Set(
+      (rawUpcomingMatches || [])
+        .map(m => (m.teams as any)?.ffcv_group_id)
+        .filter(Boolean) as string[]
+    ));
+    const agendaStandingsMap = await fetchLatestStandingsForGroups(adminClient, agendaGroupIds);
+
     const agendaMatchesList: CoordinatorUpcomingMatch[] = (rawUpcomingMatches || []).map(m => {
       const tm = m.teams as any;
       const isLocal = m.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(m.lugar || '');
+      const posResult = getMatchPositions({
+        groupId: tm?.ffcv_group_id,
+        isLocal,
+        clubTeamName: tm?.name,
+        clubFfcvId: tm?.ffcv_team_id,
+        rivalTeamName: m.rival_nombre,
+        standingsMap: agendaStandingsMap,
+      });
+
       return {
         id: m.id,
         teamId: m.equipo_id,
@@ -1940,6 +1981,10 @@ export async function getCoordinatorFullDashboardAction(params?: {
         teamName: tm?.name || 'Equipo del Club',
         teamCategory: tm?.category || '',
         teamColor: tm?.color || '#4F46E5',
+        teamPosition: posResult.clubPosition,
+        rivalPosition: posResult.rivalPosition,
+        homePosition: posResult.homePosition,
+        awayPosition: posResult.awayPosition,
       };
     });
 

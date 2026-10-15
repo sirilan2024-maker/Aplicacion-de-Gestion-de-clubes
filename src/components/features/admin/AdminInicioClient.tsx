@@ -604,7 +604,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                 {/* Enfrentamiento centrado con nombres completos sin recortar */}
                                 <div className="py-1 px-1 space-y-1.5">
                                   {/* Equipo Local */}
-                                  <div className="flex items-center justify-center gap-1.5">
+                                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     {m.esLocal && (
                                       <span
                                         className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
@@ -615,6 +615,11 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                     <span className={`text-sm font-extrabold leading-snug break-words ${m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
                                       {m.esLocal ? m.teamName : m.rivalNombre}
                                     </span>
+                                    {m.homePosition && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                                        {m.homePosition}º
+                                      </span>
+                                    )}
                                   </div>
 
                                   {/* Divisor central con VS o Marcador */}
@@ -633,7 +638,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   </div>
 
                                   {/* Equipo Visitante */}
-                                  <div className="flex items-center justify-center gap-1.5">
+                                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                     {!m.esLocal && (
                                       <span
                                         className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
@@ -644,6 +649,11 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                     <span className={`text-sm font-extrabold leading-snug break-words ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
                                       {m.esLocal ? m.rivalNombre : m.teamName}
                                     </span>
+                                    {m.awayPosition && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                                        {m.awayPosition}º
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
@@ -680,12 +690,26 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
 
                                   <div className="space-y-0.5 min-w-0 flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <span className={`text-xs font-extrabold ${m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
-                                        {m.esLocal ? m.teamName : m.rivalNombre}
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <span className={`text-xs font-extrabold ${m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                                          {m.esLocal ? m.teamName : m.rivalNombre}
+                                        </span>
+                                        {m.homePosition && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                                            {m.homePosition}º
+                                          </span>
+                                        )}
                                       </span>
                                       <span className="text-[10px] text-slate-400 font-bold shrink-0">vs</span>
-                                      <span className={`text-xs font-extrabold ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
-                                        {m.esLocal ? m.rivalNombre : m.teamName}
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <span className={`text-xs font-extrabold ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                                          {m.esLocal ? m.rivalNombre : m.teamName}
+                                        </span>
+                                        {m.awayPosition && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                                            {m.awayPosition}º
+                                          </span>
+                                        )}
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">

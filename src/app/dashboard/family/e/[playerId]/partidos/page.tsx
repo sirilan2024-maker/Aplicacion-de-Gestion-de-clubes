@@ -11,6 +11,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { FFCVActaModal } from "@/components/features/matches/FFCVActaModal";
 import { findRivalShield } from "@/lib/ffcv/rival-shields";
 import { normalizeImageUrl } from "@/lib/ffcv/parser";
+import { fetchLatestStandingsForGroups, getMatchPositions, StandingItem } from "@/lib/ffcv/standings-helper";
 
 function normalizeTeamName(name: string): string {
   return (name || '')
@@ -109,6 +110,7 @@ export default function FamilyMatchesPage() {
   const [teams, setTeams] = useState<any[]>([]);
   const [ffcvMatches, setFfcvMatches] = useState<any[]>([]);
   const [ffcvStandings, setFfcvStandings] = useState<any[]>([]);
+  const [latestStandingsMap, setLatestStandingsMap] = useState<Map<string, StandingItem[]>>(new Map());
   const [statusFilter, setStatusFilter] = useState<'Finalizado' | 'Todos'>('Finalizado');
   const [playerConvs, setPlayerConvs] = useState<Map<string, string>>(new Map());
   const [viewingFfcvActa, setViewingFfcvActa] = useState<{
@@ -180,23 +182,22 @@ export default function FamilyMatchesPage() {
           .eq('ffcv_season_id', '22')
           .limit(2000);
 
-        const ffcvStandingsQuery = supabase
-          .from('ffcv_standings')
-          .select('*')
-          .eq('ffcv_season_id', '22')
-          .limit(1000);
-
-        const [{ data: mData, error: mError }, { data: tData }, { data: fmData }, { data: fsData }] = await Promise.all([
+        const [{ data: mData, error: mError }, { data: tData }, { data: fmData }] = await Promise.all([
           query,
           teamsQuery,
-          ffcvMatchesQuery,
-          ffcvStandingsQuery
+          ffcvMatchesQuery
         ]);
 
         if (mError) throw mError;
         if (tData) setTeams(tData);
         if (fmData) setFfcvMatches(fmData);
-        if (fsData) setFfcvStandings(fsData);
+
+        const groupIds = Array.from(new Set((tData || []).map((t: any) => t.ffcv_group_id).filter(Boolean)));
+        const standingsMap = await fetchLatestStandingsForGroups(supabase, groupIds);
+        setLatestStandingsMap(standingsMap);
+        const allStandingsRows: any[] = [];
+        standingsMap.forEach(rows => allStandingsRows.push(...rows));
+        setFfcvStandings(allStandingsRows);
 
         // Orden cronológico estricto: del más cercano en fecha al más lejano
         const sorted = (mData || []).sort((a: any, b: any) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
@@ -324,6 +325,15 @@ export default function FamilyMatchesPage() {
             
             const currentMatchTeamName = match.equipo?.name || teamName;
             const isDifferentTeam = match.equipo_id && playerTeamId && match.equipo_id !== playerTeamId;
+            const team = teams.find(t => t.id === match.equipo_id) || match.equipo;
+            const posResult = getMatchPositions({
+              groupId: team?.ffcv_group_id,
+              isLocal,
+              clubTeamName: team?.name || currentMatchTeamName,
+              clubFfcvId: team?.ffcv_team_id,
+              rivalTeamName: match.rival_nombre,
+              standingsMap: latestStandingsMap,
+            });
 
             const homeTeamName = isLocal ? currentMatchTeamName : (match.rival_nombre || 'Rival');
             const awayTeamName = isLocal ? (match.rival_nombre || 'Rival') : currentMatchTeamName;
@@ -482,6 +492,11 @@ export default function FamilyMatchesPage() {
                         )}
                       </div>
                       <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug line-clamp-2 min-h-[2.25rem]">{homeTeamName}</span>
+                      {posResult.homePosition && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs mt-1">
+                          {posResult.homePosition}º
+                        </span>
+                      )}
                     </div>
                     
                     {/* Marcador o VS */}
@@ -512,6 +527,11 @@ export default function FamilyMatchesPage() {
                         )}
                       </div>
                       <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug line-clamp-2 min-h-[2.25rem]">{awayTeamName}</span>
+                      {posResult.awayPosition && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs mt-1">
+                          {posResult.awayPosition}º
+                        </span>
+                      )}
                     </div>
                   </div>
 

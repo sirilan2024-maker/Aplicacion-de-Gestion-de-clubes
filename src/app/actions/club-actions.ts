@@ -707,6 +707,10 @@ export interface ExecutiveDashboardData {
       teamName: string;
       teamCategory?: string;
       teamColor?: string;
+      equipacionAsignada?: string | null;
+      equipacionPreparada?: boolean | null;
+      rivalCamisetaColor?: string | null;
+      conflictoEquipacion?: boolean | null;
     }>;
     upcomingTrainings: Array<{
       id: string;
@@ -741,6 +745,10 @@ export interface ExecutiveDashboardData {
     teamName: string;
     teamCategory?: string;
     teamColor?: string;
+    equipacionAsignada?: string | null;
+    equipacionPreparada?: boolean | null;
+    rivalCamisetaColor?: string | null;
+    conflictoEquipacion?: boolean | null;
   }>;
 }
 
@@ -1209,6 +1217,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       .select(`
         id, fecha_hora, rival_nombre, lugar, estado,
         resultado_propio, resultado_rival, tipo_partido,
+        equipacion_asignada, equipacion_preparada, rival_camiseta_color, conflicto_equipacion,
         teams:equipo_id (name, category, color)
       `)
       .eq('club_id', clubId)
@@ -1241,6 +1250,10 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         teamName: team?.name || 'Equipo del Club',
         teamCategory: team?.category || '',
         teamColor: team?.color || '#4F46E5',
+        equipacionAsignada: (m as any).equipacion_asignada || null,
+        equipacionPreparada: Boolean((m as any).equipacion_preparada),
+        rivalCamisetaColor: (m as any).rival_camiseta_color || null,
+        conflictoEquipacion: Boolean((m as any).conflicto_equipacion),
       };
     });
 

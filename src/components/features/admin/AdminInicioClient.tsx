@@ -18,6 +18,7 @@ import {
 } from "@/app/actions/club-actions";
 import toast from "react-hot-toast";
 import { useSeason } from "@/components/providers/SeasonProvider";
+import { MatchKitBadge } from "@/components/features/matches/MatchKitBadge";
 
 function formatMadridMatchDate(isoStr: string) {
   try {
@@ -580,13 +581,23 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                       Finalizado {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
                                     </span>
                                   ) : (
-                                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
-                                      m.esLocal
-                                        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                        : "text-amber-700 bg-amber-50 border-amber-200"
-                                    }`}>
-                                      {m.esLocal ? "Local" : "Visitante"}
-                                    </span>
+                                    <>
+                                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
+                                        m.esLocal
+                                          ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                          : "text-amber-700 bg-amber-50 border-amber-200"
+                                      }`}>
+                                        {m.esLocal ? "Local" : "Visitante"}
+                                      </span>
+                                      <MatchKitBadge
+                                        equipacionAsignada={m.equipacionAsignada}
+                                        equipacionPreparada={m.equipacionPreparada}
+                                        conflictoEquipacion={m.conflictoEquipacion}
+                                        rivalCamisetaColor={m.rivalCamisetaColor}
+                                        esLocal={m.esLocal}
+                                        size="xs"
+                                      />
+                                    </>
                                   )}
                                 </div>
 
@@ -719,6 +730,14 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                       }`}>
                                         {m.esLocal ? "Local" : "Visitante"}
                                       </span>
+                                      <MatchKitBadge
+                                        equipacionAsignada={m.equipacionAsignada}
+                                        equipacionPreparada={m.equipacionPreparada}
+                                        conflictoEquipacion={m.conflictoEquipacion}
+                                        rivalCamisetaColor={m.rivalCamisetaColor}
+                                        esLocal={m.esLocal}
+                                        size="sm"
+                                      />
                                     </div>
                                   )}
                                 </div>

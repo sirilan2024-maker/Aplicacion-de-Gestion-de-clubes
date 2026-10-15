@@ -18,6 +18,7 @@ import { ActasView } from "./ActasView"
 import { ActaConciliationModal } from "./ActaConciliationModal"
 import { findRivalShield } from "@/lib/ffcv/rival-shields"
 import { normalizeImageUrl } from "@/lib/ffcv/parser"
+import { MatchKitBadge } from "./MatchKitBadge"
 
 interface GlobalMatchesViewProps {
   initialMatches: any[];
@@ -871,6 +872,14 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                     }`}>
                       {(match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
                     </div>
+                    <MatchKitBadge
+                      equipacionAsignada={match.equipacion_asignada}
+                      equipacionPreparada={match.equipacion_preparada}
+                      conflictoEquipacion={match.conflicto_equipacion}
+                      rivalCamisetaColor={match.rival_camiseta_color}
+                      esLocal={isLocal}
+                      size="xs"
+                    />
                   </div>
                   <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
                     <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />

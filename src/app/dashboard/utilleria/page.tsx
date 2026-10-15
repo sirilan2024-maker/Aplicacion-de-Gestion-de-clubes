@@ -5,6 +5,7 @@ import { Loader2, Search, Shirt, CheckSquare, BarChart3, AlertCircle, ShoppingBa
 import toast from "react-hot-toast"
 import { createClient } from "@/lib/supabase/client"
 import { getApparelDashboardDataAction, getApparelSummaryReportAction, toggleApparelDeliveryAction, updatePlayerApparelSizesAction, updateApparelStockAction, updatePlayerDorsalAction } from "@/app/actions/apparel-actions"
+import { UtilleroMatchKitPlanner } from "@/components/features/utilleria/UtilleroMatchKitPlanner"
 
 const CLOTHING_SIZES = [
   'Talla 116',
@@ -87,7 +88,7 @@ export default function UtilleriaDashboardPage() {
   const [selectedTeam, setSelectedTeam] = useState("")
   const [deliveryFilter, setDeliveryFilter] = useState("")
   const [reportFilter, setReportFilter] = useState<'all' | 'to_order' | 'in_stock'>('all')
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'report'>('deliveries')
+  const [activeTab, setActiveTab] = useState<'matches' | 'deliveries' | 'report'>('matches')
   const [showTrainingBreakdown, setShowTrainingBreakdown] = useState(false)
 
   // Clickable Summary Modal State
@@ -462,8 +463,18 @@ export default function UtilleriaDashboardPage() {
         {/* CONTROLES TABS */}
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
           <button
+            onClick={() => setActiveTab('matches')}
+            className={`flex items-center gap-2 px-3.5 py-2 font-bold text-xs rounded-lg transition-all ${
+              activeTab === 'matches'
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Shirt size={14} /> Partidos (Equipaciones)
+          </button>
+          <button
             onClick={() => setActiveTab('deliveries')}
-            className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 font-bold text-xs rounded-lg transition-all ${
               activeTab === 'deliveries'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -473,7 +484,7 @@ export default function UtilleriaDashboardPage() {
           </button>
           <button
             onClick={() => setActiveTab('report')}
-            className={`flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 font-bold text-xs rounded-lg transition-all ${
               activeTab === 'report'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -484,119 +495,126 @@ export default function UtilleriaDashboardPage() {
         </div>
       </div>
 
-      {/* METRICAS DE RESUMEN (Estáticas en PC) */}
-      <div className="lg:flex-none grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button
-          onClick={() => setSummaryModal('total')}
-          className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-slate-50/50 shadow-sm flex items-center gap-4 text-left transition-all group"
-        >
-          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
-            <ShoppingBag size={20} />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Solicitado (Ver Tallas)</span>
-            <span className="text-lg font-black text-slate-800">{totalItemsNeeded}</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setSummaryModal('delivered')}
-          className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-emerald-400 hover:bg-slate-50/50 shadow-sm flex items-center gap-4 text-left transition-all group"
-        >
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 group-hover:scale-105 transition-transform">
-            <CheckSquare size={20} />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prendas Entregadas (Ver Tallas)</span>
-            <span className="text-lg font-black text-slate-800">{totalItemsDelivered}</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setSummaryModal('pending')}
-          className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-slate-50/50 shadow-sm flex items-center gap-4 text-left transition-all group"
-        >
-          <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0 group-hover:scale-105 transition-transform">
-            <AlertCircle size={20} />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prendas Pendientes (A Pedir)</span>
-            <span className="text-lg font-black text-slate-800">{pendingDeliveries}</span>
-          </div>
-        </button>
-      </div>
-
-      {/* FILTROS GLOBAL (Estáticos en PC) */}
-      <div className="lg:flex-none bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
-        {activeTab === 'deliveries' && (
-          <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-1.5 rounded-lg w-full sm:max-w-xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-            <Search size={16} className="text-slate-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Buscar jugador..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full placeholder-slate-400 text-slate-700 font-semibold"
-            />
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
-          <select
-            value={selectedTeam}
-            onChange={(e) => setSelectedTeam(e.target.value)}
-            className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
-          >
-            <option value="">Todos los Equipos</option>
-            {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-
-          {activeTab === 'deliveries' ? (
-            <select
-              value={deliveryFilter}
-              onChange={(e) => setDeliveryFilter(e.target.value)}
-              className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
+      {/* METRICAS DE RESUMEN Y FILTROS (Solo en Entrega de Ropa e Informe) */}
+      {activeTab !== 'matches' && (
+        <>
+          <div className="lg:flex-none grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              onClick={() => setSummaryModal('total')}
+              className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-slate-50/50 shadow-sm flex items-center gap-4 text-left transition-all group"
             >
-              <option value="">Estado entrega: Todos</option>
-              <option value="all_delivered">📦 Con todo entregado</option>
-              <option value="pending_any">⚠️ Con alguna prenda pendiente</option>
-              <option value="missing_all_sizes">❌ Sin tallas registradas</option>
-              <option disabled>─────────────────────────</option>
-              {APPAREL_ITEMS.map(item => {
-                const cleanLabel = item.label.split(' ').slice(1).join(' ') || item.key;
-                return (
-                  <option key={item.key} value={`missing_${item.key}`}>
-                    ❌ Falta: {cleanLabel}
-                  </option>
-                )
-              })}
-            </select>
-          ) : (
-            <select
-              value={reportFilter}
-              onChange={(e) => setReportFilter(e.target.value as any)}
-              className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
-            >
-              <option value="all">Filtro: Todas las tallas</option>
-              <option value="to_order">🔴 Solo "A Pedir"</option>
-              <option value="in_stock">🟢 Solo "En Stock"</option>
-            </select>
-          )}
+              <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+                <ShoppingBag size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Solicitado (Ver Tallas)</span>
+                <span className="text-lg font-black text-slate-800">{totalItemsNeeded}</span>
+              </div>
+            </button>
 
-          <button
-            onClick={exportToExcel}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all shadow-sm shrink-0"
-          >
-            📥 Descargar Excel
-          </button>
-        </div>
-      </div>
+            <button
+              onClick={() => setSummaryModal('delivered')}
+              className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-emerald-400 hover:bg-slate-50/50 shadow-sm flex items-center gap-4 text-left transition-all group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 group-hover:scale-105 transition-transform">
+                <CheckSquare size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prendas Entregadas (Ver Tallas)</span>
+                <span className="text-lg font-black text-slate-800">{totalItemsDelivered}</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSummaryModal('pending')}
+              className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-slate-50/50 shadow-sm flex items-center gap-4 text-left transition-all group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0 group-hover:scale-105 transition-transform">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prendas Pendientes (A Pedir)</span>
+                <span className="text-lg font-black text-slate-800">{pendingDeliveries}</span>
+              </div>
+            </button>
+          </div>
+
+          <div className="lg:flex-none bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+            {activeTab === 'deliveries' && (
+              <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-1.5 rounded-lg w-full sm:max-w-xs focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+                <Search size={16} className="text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Buscar jugador..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="bg-transparent border-none outline-none text-xs w-full placeholder-slate-400 text-slate-700 font-semibold"
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+              <select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
+              >
+                <option value="">Todos los Equipos</option>
+                {teams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+
+              {activeTab === 'deliveries' ? (
+                <select
+                  value={deliveryFilter}
+                  onChange={(e) => setDeliveryFilter(e.target.value)}
+                  className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
+                >
+                  <option value="">Estado entrega: Todos</option>
+                  <option value="all_delivered">📦 Con todo entregado</option>
+                  <option value="pending_any">⚠️ Con alguna prenda pendiente</option>
+                  <option value="missing_all_sizes">❌ Sin tallas registradas</option>
+                  <option disabled>─────────────────────────</option>
+                  {APPAREL_ITEMS.map(item => {
+                    const cleanLabel = item.label.split(' ').slice(1).join(' ') || item.key;
+                    return (
+                      <option key={item.key} value={`missing_${item.key}`}>
+                        ❌ Falta: {cleanLabel}
+                      </option>
+                    )
+                  })}
+                </select>
+              ) : (
+                <select
+                  value={reportFilter}
+                  onChange={(e) => setReportFilter(e.target.value as any)}
+                  className="w-full sm:w-52 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-semibold shadow-sm"
+                >
+                  <option value="all">Filtro: Todas las tallas</option>
+                  <option value="to_order">🔴 Solo "A Pedir"</option>
+                  <option value="in_stock">🟢 Solo "En Stock"</option>
+                </select>
+              )}
+
+              <button
+                onClick={exportToExcel}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all shadow-sm shrink-0"
+              >
+                📥 Descargar Excel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* SECCIÓN PRINCIPAL (Desplazable únicamente en PC) */}
       <div className="lg:flex-1 lg:overflow-hidden lg:flex lg:flex-col lg:min-h-0">
-        {loading ? (
+        {activeTab === 'matches' ? (
+          <div className="lg:flex-1 lg:overflow-y-auto min-h-0 pb-12 pr-1">
+            <UtilleroMatchKitPlanner />
+          </div>
+        ) : loading ? (
           <div className="min-h-[40vh] lg:flex-1 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
           </div>

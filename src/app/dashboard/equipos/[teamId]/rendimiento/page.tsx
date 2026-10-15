@@ -10,7 +10,7 @@ import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/acti
 import { getAuthorizedTeamWellnessSummary } from "@/app/actions/feedback-actions";
 import { useSeason } from "@/components/providers/SeasonProvider";
 import { isFormativeCategory } from "@/lib/utils";
-import { generateInformationalAlerts, InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
+import { generateInformationalAlerts, InformationalAlert, HooperRatings, DiscomfortDetails, getSpainDateString } from "@/lib/performance/wellness-service";
 
 export interface TeamWellnessSummary {
   date: string;
@@ -364,7 +364,7 @@ export default function RendimientoGlobalPage() {
       setMatchStats(mResults.sort((a, b) => b.matchMinutes - a.matchMinutes));
 
       // --- WELLNESS & ASISTENCIA SUMMARY (Cálculo y Presentación del Centro de Rendimiento) ---
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getSpainDateString(new Date());
       const todayEvent = allEvents?.find(e => e.date === todayStr);
 
       // Comprobar rol de usuario actual para visibilidad de molestias (personal técnico autorizado)

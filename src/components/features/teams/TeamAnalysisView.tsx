@@ -36,7 +36,31 @@ import {
   Tooltip,
   ReferenceLine,
 } from "recharts";
-import { TeamAnalysisData } from "@/app/actions/team-actions";
+import { TeamAnalysisData, TeamAnalysisMatch } from "@/app/actions/team-actions";
+
+function formatDateNice(dateStr: string | null): string {
+  if (!dateStr) return "Fecha por confirmar";
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      if (!isNaN(d.getTime())) {
+        const weekday = d.toLocaleDateString('es-ES', { weekday: 'short' });
+        const capWeekday = weekday ? weekday.charAt(0).toUpperCase() + weekday.slice(1).replace('.', '') : '';
+        return `${capWeekday ? `${capWeekday} ` : ''}${day}/${month}/${year}`;
+      }
+      return `${day}/${month}/${year}`;
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
 
 interface TeamAnalysisViewProps {
   initialData: TeamAnalysisData;
@@ -46,6 +70,7 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
   const [data] = useState<TeamAnalysisData>(initialData);
   const [activeChartTab, setActiveChartTab] = useState<"posicion" | "puntos" | "goles">("posicion");
   const [matchFilter, setMatchFilter] = useState<"all" | "V" | "E" | "D" | "home" | "away">("all");
+  const [selectedTimelineMatch, setSelectedTimelineMatch] = useState<TeamAnalysisMatch | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -354,8 +379,8 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
           </div>
         </div>
 
-        <div className="overflow-x-auto pb-2">
-          <div className="flex items-center gap-1.5 min-w-max py-1">
+        <div className="pb-1">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-1">
             {matches.map((m) => {
               const bg =
                 m.resultOutcome === "V"
@@ -366,21 +391,26 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
                   ? "bg-rose-500 text-white border-rose-600"
                   : "bg-slate-100 text-slate-400 border-dashed border-slate-300";
 
+              const isSelected = selectedTimelineMatch?.id === m.id;
+
               return (
                 <div
                   key={m.id}
+                  onClick={() => setSelectedTimelineMatch(isSelected ? null : m)}
                   className="group relative flex flex-col items-center cursor-pointer"
                 >
                   <div
-                    className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex flex-col items-center justify-center font-bold text-[10px] sm:text-xs transition-transform group-hover:scale-110 shadow-2xs ${bg}`}
+                    className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex flex-col items-center justify-center font-bold text-[10px] sm:text-xs transition-all active:scale-95 group-hover:scale-110 shadow-2xs ${bg} ${
+                      isSelected ? "ring-2 ring-indigo-600 ring-offset-2 scale-105" : ""
+                    }`}
                   >
                     <span className="text-[8px] sm:text-[9px] opacity-80 leading-none">J{m.matchday}</span>
                     <span className="leading-none mt-0.5">{m.resultOutcome === "PDTE" ? "-" : m.resultOutcome}</span>
                   </div>
 
-                  {/* Tooltip flotante al hacer hover */}
+                  {/* Tooltip flotante en Desktop al hacer hover */}
                   <div className="hidden group-hover:block absolute bottom-full mb-2 z-20 w-48 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-lg pointer-events-none">
-                    <p className="font-bold text-indigo-300">Jornada {m.matchday} {m.date ? `· ${m.date}` : ""}</p>
+                    <p className="font-bold text-indigo-300">Jornada {m.matchday} {m.date ? `· ${formatDateNice(m.date)}` : ""}</p>
                     <p className="text-slate-200 mt-0.5">
                       {m.isHome ? "Casa" : "Fuera"} vs {m.rivalName}
                     </p>
@@ -392,6 +422,55 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
               );
             })}
           </div>
+
+          {/* Tarjeta de detalle al pulsar una jornada (óptimo para móvil) */}
+          {selectedTimelineMatch && (
+            <div className="mt-3 p-3.5 bg-slate-900 text-white rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-in fade-in duration-200 shadow-md">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-indigo-300 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-700/60 uppercase text-[10px]">
+                    Jornada {selectedTimelineMatch.matchday}
+                  </span>
+                  {selectedTimelineMatch.date && (
+                    <span className="text-slate-300 text-[11px] font-medium">
+                      {formatDateNice(selectedTimelineMatch.date)}
+                    </span>
+                  )}
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    selectedTimelineMatch.isHome ? "bg-emerald-900/60 text-emerald-300" : "bg-amber-900/60 text-amber-300"
+                  }`}>
+                    {selectedTimelineMatch.isHome ? "Local (Casa)" : "Visitante (Fuera)"}
+                  </span>
+                </div>
+                <p className="text-slate-200 font-semibold pt-1 text-xs">
+                  {selectedTimelineMatch.isHome ? (
+                    <>
+                      <span className="text-indigo-300 font-bold">{selectedTimelineMatch.homeTeamName}</span>
+                      <span className="text-slate-400 font-normal"> vs </span>
+                      <span>{selectedTimelineMatch.awayTeamName}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{selectedTimelineMatch.homeTeamName}</span>
+                      <span className="text-slate-400 font-normal"> vs </span>
+                      <span className="text-indigo-300 font-bold">{selectedTimelineMatch.awayTeamName}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {selectedTimelineMatch.sportingScore !== null ? "Marcador oficial:" : "Estado:"}
+                </span>
+                <span className="font-black text-sm px-3 py-1 bg-white/10 rounded-lg text-white">
+                  {selectedTimelineMatch.sportingScore !== null
+                    ? `${selectedTimelineMatch.homeScore} - ${selectedTimelineMatch.awayScore}`
+                    : (selectedTimelineMatch.status || "Pendiente")}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -647,7 +726,72 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* ── Vista Móvil Clasificación (sm:hidden): SIN SCROLL, 100% adaptable ── */}
+        <div className="sm:hidden space-y-2">
+          {standings.map((row) => {
+            const isSaladar = row.isSportingSaladar;
+            const isPositiveGD = row.goalDifference > 0;
+            const isNeutralGD = row.goalDifference === 0;
+
+            return (
+              <div
+                key={row.position}
+                className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-2.5 ${
+                  isSaladar
+                    ? "bg-indigo-50/90 border-indigo-300 text-indigo-950 shadow-2xs"
+                    : "bg-slate-50/60 border-slate-200/80 hover:bg-slate-50 text-slate-700"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <span
+                    className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black shrink-0 ${
+                      row.position <= 3
+                        ? "bg-amber-100 text-amber-800"
+                        : isSaladar
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {row.position}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-xs font-bold leading-tight break-words ${isSaladar ? "font-black text-indigo-950" : "text-slate-900"}`}>
+                        {row.teamName}
+                      </span>
+                      {isSaladar && (
+                        <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-indigo-600 text-white uppercase tracking-wider shrink-0">
+                          Nuestro Club
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>{row.played} PJ</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-emerald-700 font-semibold">{row.won}V</span>
+                      <span className="text-slate-600">{row.drawn}E</span>
+                      <span className="text-rose-600">{row.lost}D</span>
+                      <span className="text-slate-300">·</span>
+                      <span className={isPositiveGD ? "text-emerald-600 font-bold" : isNeutralGD ? "text-slate-500 font-semibold" : "text-rose-600 font-bold"}>
+                        DG {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <div className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 shadow-2xs text-center min-w-[42px]">
+                    <span className="block text-xs font-black text-indigo-700 leading-none">{row.points}</span>
+                    <span className="block text-[8px] uppercase font-bold text-slate-400 leading-none mt-0.5">pts</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Vista Desktop Clasificación (hidden sm:block): Tabla completa ── */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-slate-400 text-[10px] sm:text-[11px] font-bold uppercase">
@@ -803,62 +947,146 @@ export function TeamAnalysisView({ initialData }: TeamAnalysisViewProps) {
             const isD = m.resultOutcome === "D";
 
             return (
-              <div
-                key={m.id}
-                className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0 flex items-center gap-3">
-                  <span
-                    className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
-                      isV
-                        ? "bg-emerald-500 text-white"
-                        : isE
-                        ? "bg-slate-400 text-white"
-                        : isD
-                        ? "bg-rose-500 text-white"
-                        : "bg-slate-200 text-slate-500"
-                    }`}
-                  >
-                    {m.resultOutcome === "PDTE" ? "-" : m.resultOutcome}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-700 uppercase">
-                        J{m.matchday}
+              <React.Fragment key={m.id}>
+                {/* ── Vista Móvil (< sm): Tarjeta centrada con Jornada destacada, nombres completos y marcador ── */}
+                <div className="sm:hidden p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 space-y-2.5 transition-all shadow-2xs">
+                  {/* Cabecera de la Jornada centrada */}
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wide">
+                        Jornada {m.matchday}
                       </span>
-                      <span className="text-[11px] text-slate-400 truncate">
-                        {m.date || "Fecha a confirmar"}
-                      </span>
-                    </div>
-                    <p className="text-xs font-bold text-slate-900 truncate mt-1">
-                      {m.isHome ? (
-                        <span>
-                          <span className="font-black text-indigo-700">{m.homeTeamName}</span> vs {m.awayTeamName}
-                        </span>
-                      ) : (
-                        <span>
-                          {m.homeTeamName} vs <span className="font-black text-indigo-700">{m.awayTeamName}</span>
+                      {m.date && (
+                        <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-slate-400" />
+                          {formatDateNice(m.date)}{m.time ? ` · ${m.time.slice(0, 5)}` : ""}
                         </span>
                       )}
-                    </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className={`w-6 h-6 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
+                          isV
+                            ? "bg-emerald-500 text-white"
+                            : isE
+                            ? "bg-slate-400 text-white"
+                            : isD
+                            ? "bg-rose-500 text-white"
+                            : "bg-slate-200 text-slate-600 font-bold"
+                        }`}
+                        title={isV ? "Victoria" : isE ? "Empate" : isD ? "Derrota" : "Pendiente"}
+                      >
+                        {m.resultOutcome === "PDTE" ? "-" : m.resultOutcome}
+                      </span>
+                      {m.codActa && (
+                        <Link
+                          href={`/dashboard/equipos/${team.id}/partidos?view=actas&codacta=${m.codActa}&matchId=${m.codActa}`}
+                          className="p-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                          title="Ver Acta Oficial FFCV"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Enfrentamiento: Equipo Local vs Visitante con nombres COMPLETOS */}
+                  <div className="space-y-1.5 py-1 text-center">
+                    {/* Equipo Local */}
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className={`text-sm font-extrabold leading-snug break-words ${m.isHome ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                        {m.homeTeamName}
+                      </span>
+                      {m.isHome && (
+                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 uppercase tracking-wider shrink-0">
+                          Casa
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Divisor central con Marcador o VS */}
+                    <div className="flex items-center justify-center gap-2 py-0.5">
+                      <div className="h-px bg-slate-200 w-10" />
+                      {m.sportingScore !== null ? (
+                        <span className="text-sm font-black px-3 py-0.5 bg-slate-900 text-white rounded-lg shadow-2xs tracking-wide">
+                          {m.homeScore} - {m.awayScore}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
+                          VS
+                        </span>
+                      )}
+                      <div className="h-px bg-slate-200 w-10" />
+                    </div>
+
+                    {/* Equipo Visitante */}
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className={`text-sm font-extrabold leading-snug break-words ${!m.isHome ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                        {m.awayTeamName}
+                      </span>
+                      {!m.isHome && (
+                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 uppercase tracking-wider shrink-0">
+                          Fuera
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="text-right shrink-0 flex items-center gap-2">
-                  <div className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-black text-xs sm:text-sm text-slate-900 shadow-2xs">
-                    {m.sportingScore !== null ? `${m.homeScore} - ${m.awayScore}` : (m.status || "Pendiente")}
-                  </div>
-                  {m.codActa && (
-                    <Link
-                      href={`/dashboard/equipos/${team.id}/partidos?view=actas&codacta=${m.codActa}&matchId=${m.codActa}`}
-                      className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                      title="Ver Acta Oficial FFCV"
+                {/* ── Vista Desktop (hidden sm:flex): Fila horizontal ── */}
+                <div className="hidden sm:flex p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 transition-all items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-3 flex-1">
+                    <span
+                      className={`w-8 h-8 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
+                        isV
+                          ? "bg-emerald-500 text-white"
+                          : isE
+                          ? "bg-slate-400 text-white"
+                          : isD
+                          ? "bg-rose-500 text-white"
+                          : "bg-slate-200 text-slate-500"
+                      }`}
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  )}
+                      {m.resultOutcome === "PDTE" ? "-" : m.resultOutcome}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase">
+                          Jornada {m.matchday}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {formatDateNice(m.date)}{m.time ? ` · ${m.time.slice(0, 5)}` : ""}
+                        </span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className={m.isHome ? "font-black text-indigo-700" : "text-slate-800"}>
+                          {m.homeTeamName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold shrink-0">vs</span>
+                        <span className={!m.isHome ? "font-black text-indigo-700" : "text-slate-800"}>
+                          {m.awayTeamName}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    <div className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-black text-xs sm:text-sm text-slate-900 shadow-2xs">
+                      {m.sportingScore !== null ? `${m.homeScore} - ${m.awayScore}` : (m.status || "Pendiente")}
+                    </div>
+                    {m.codActa && (
+                      <Link
+                        href={`/dashboard/equipos/${team.id}/partidos?view=actas&codacta=${m.codActa}&matchId=${m.codActa}`}
+                        className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                        title="Ver Acta Oficial FFCV"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </React.Fragment>
             );
           })}
         </div>

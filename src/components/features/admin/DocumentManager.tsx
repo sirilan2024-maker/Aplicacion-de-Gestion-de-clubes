@@ -357,6 +357,7 @@ export function DocumentManager({ playerId, playerName }: DocumentManagerProps) 
   const [payerInfo, setPayerInfo] = useState<{ type: string; name: string | null; dni: string | null } | null>(null);
   const [sepaForm, setSepaForm] = useState({ iban: '', sepaMandateId: '', sepaMandateDate: '' });
   const [savingSepa, setSavingSepa] = useState(false);
+  const [isEditingSepa, setIsEditingSepa] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadDocType, setUploadDocType] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(false);

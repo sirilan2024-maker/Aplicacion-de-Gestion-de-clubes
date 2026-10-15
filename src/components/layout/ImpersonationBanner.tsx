@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { getImpersonationStatusAction, stopImpersonationAction } from "@/app/actions/impersonation-actions";
 import { ShieldAlert, LogOut, Eye, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function ImpersonationBanner() {
+  const pathname = usePathname();
   const [status, setStatus] = useState<{
     isImpersonating: boolean;
     impersonatedName?: string;
@@ -14,6 +16,8 @@ export function ImpersonationBanner() {
   const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
+    if (pathname?.startsWith("/wellness/demo")) return;
+
     async function checkStatus() {
       try {
         const response = await fetch('/api/auth/impersonation-status', { cache: 'no-store' });

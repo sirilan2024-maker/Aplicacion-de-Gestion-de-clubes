@@ -20,6 +20,20 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
   if (!match) return null;
 
   const defaultTeamId = match.equipo_id || teamId;
+  const matchDate = match.fecha_hora ? new Date(match.fecha_hora) : new Date();
+  const defaultDate = !isNaN(matchDate.getTime()) ? matchDate.toISOString().split('T')[0] : '';
+  const defaultTime = !isNaN(matchDate.getTime()) ? matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:00';
+
+  let defaultCitacionTime = '';
+  if (match.hora_citacion) {
+    const cDate = new Date(match.hora_citacion);
+    if (!isNaN(cDate.getTime())) {
+      defaultCitacionTime = cDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+  } else if (!isNaN(matchDate.getTime())) {
+    const cDate = new Date(matchDate.getTime() - 60 * 60 * 1000);
+    defaultCitacionTime = cDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
@@ -32,6 +46,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           const rivalStr = formData.get("rival") as string;
           const dateStr = formData.get("date") as string;
           const timeStr = formData.get("time") as string;
+          const citacionTimeStr = formData.get("hora_citacion") as string;
           const placeStr = formData.get("place") as string;
           const equipoIdStr = formData.get("equipo_id") as string || defaultTeamId;
           const tipoPartidoStr = (formData.get("tipo_partido") as string) || match.tipo_partido || 'liga';
@@ -57,9 +72,16 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           
           if (dateStr && timeStr) {
             const combinedISO = new Date(`${dateStr}T${timeStr}`).toISOString();
+            let finalCitacionISO = null;
+            if (dateStr && citacionTimeStr) {
+              finalCitacionISO = new Date(`${dateStr}T${citacionTimeStr}`).toISOString();
+            } else {
+              finalCitacionISO = new Date(new Date(`${dateStr}T${timeStr}`).getTime() - 60 * 60 * 1000).toISOString();
+            }
             
-            let updatedData = {
+            let updatedData: any = {
               fecha_hora: combinedISO,
+              hora_citacion: finalCitacionISO,
               lugar: placeStr,
               rival_nombre: rivalStr,
               equipo_id: equipoIdStr,
@@ -122,6 +144,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
             <Input name="rival" defaultValue={match.rival_nombre} className="font-semibold text-slate-800 bg-white border-slate-200" required />
           </div>
           
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nuestro Equipo</label>
@@ -143,15 +166,27 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               )}
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fecha y Hora</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">⏱️ Fecha e Inicio del Partido</label>
               <div className="flex flex-row gap-2">
-                <Input type="date" name="date" defaultValue={new Date(match.fecha_hora).toISOString().split('T')[0]} required className="font-semibold text-slate-800 bg-white border-slate-200 w-[60%]" />
-                <Input type="time" name="time" defaultValue={new Date(match.fecha_hora).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} required className="font-semibold text-slate-800 bg-white border-slate-200 px-2 w-[40%]" />
+                <Input type="date" name="date" defaultValue={defaultDate} required className="font-semibold text-slate-800 bg-white border-slate-200 w-[60%]" />
+                <Input type="time" name="time" defaultValue={defaultTime} required className="font-semibold text-slate-800 bg-white border-slate-200 px-2 w-[40%]" />
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase">📍 Citación en el Campo</label>
+                <span className="text-[10px] text-slate-400 font-medium">(1h antes por defecto)</span>
+              </div>
+              <Input 
+                type="time" 
+                name="hora_citacion" 
+                defaultValue={defaultCitacionTime} 
+                className="font-semibold text-slate-800 bg-white border-slate-200" 
+              />
+            </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lugar del Partido</label>
               <select name="place" defaultValue={match.lugar === 'Local' ? 'Local' : 'Visitante'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
@@ -159,13 +194,14 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
                 <option value="Visitante">Visitante</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo de Partido</label>
-              <select name="tipo_partido" defaultValue={match.tipo_partido || 'liga'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
-                <option value="liga">Oficial de Liga</option>
-                <option value="amistoso">Amistoso (no computa en liga)</option>
-              </select>
-            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo de Partido</label>
+            <select name="tipo_partido" defaultValue={match.tipo_partido || 'liga'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
+              <option value="liga">Oficial de Liga</option>
+              <option value="amistoso">Amistoso (no computa en liga)</option>
+            </select>
           </div>
 
           <div className="p-4 bg-slate-100/80 rounded-xl border border-slate-200">

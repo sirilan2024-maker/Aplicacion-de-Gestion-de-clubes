@@ -719,12 +719,23 @@ export interface GetTeamWellnessSummaryResult {
  */
 export async function getAuthorizedTeamWellnessSummary(
   teamId: string,
-  date: string
+  date: string,
+  seasonId: string
 ): Promise<GetTeamWellnessSummaryResult> {
   try {
     const { context } = await getAuthenticatedContext();
     if (!context || !context.user) {
       return { success: false, canViewDiscomfort: false, entries: [], error: "No autenticado." };
+    }
+
+    // Validación obligatoria de seasonId
+    if (!seasonId || typeof seasonId !== 'string' || seasonId.trim() === '') {
+      return {
+        success: false,
+        canViewDiscomfort: false,
+        entries: [],
+        error: "Identificador de temporada no válido o no proporcionado."
+      };
     }
 
     const adminClient = createAdminClient();
@@ -744,7 +755,7 @@ export async function getAuthorizedTeamWellnessSummary(
       return { success: false, canViewDiscomfort: false, entries: [], error: "Acceso denegado a este club." };
     }
 
-    // 2. Determinar autorización para ver molestias
+    // 2. Determinar autorización para consultar este equipo y ver molestias
     const role = context.profile.role || '';
     const isStaffOrMedic = ['admin', 'superadmin', 'coordinador', 'metodologo', 'preparador_fisico', 'fisio'].includes(role);
     
@@ -768,21 +779,94 @@ export async function getAuthorizedTeamWellnessSummary(
       isAssignedCoach = Boolean(tc || t);
     }
 
+    // Si el usuario es entrenador pero no está asignado a este equipo, y no es staff global, denegar acceso
+    if (!isStaffOrMedic && !isAssignedCoach) {
+      return {
+        success: false,
+        canViewDiscomfort: false,
+        entries: [],
+        error: "No tienes permiso para consultar el rendimiento de este equipo."
+      };
+    }
+
     const canViewDiscomfort = isStaffOrMedic || isAssignedCoach;
 
-    // 3. Consultar player_daily_wellness
+    // 3. Obtener exclusivamente los identificadores de jugadores pertenecientes a este equipo en la temporada solicitada
+    const { data: historyPlayers, error: historyErr } = await adminClient
+      .from('player_season_history')
+      .select('player_id, status')
+      .eq('team_id', teamId)
+      .eq('season_id', seasonId);
+
+    if (historyErr) {
+      return {
+        success: false,
+        canViewDiscomfort,
+        entries: [],
+        error: historyErr.message
+      };
+    }
+
+    // Filtrar únicamente los historiales vigentes (descartando estados inactivos o de baja)
+    const teamPlayerIds = Array.from(new Set(
+      (historyPlayers || [])
+        .filter((h: any) => {
+          const st = (h.status || '').toLowerCase().trim();
+          return st !== 'inactive' && st !== 'inactivo' && st !== 'baja' && st !== 'pending_renewal';
+        })
+        .map((h: any) => h.player_id)
+    )).filter(Boolean) as string[];
+
+    // 4. Si el equipo no cuenta con jugadores vigentes, devolver resultado vacío seguro sin consultar tablas
+    if (teamPlayerIds.length === 0) {
+      return {
+        success: true,
+        canViewDiscomfort,
+        entries: []
+      };
+    }
+
+    // 5. Consultar player_daily_wellness acotado estrictamente a los jugadores de este equipo
     const { data: rows, error: rowsErr } = await adminClient
       .from('player_daily_wellness')
       .select('*')
       .eq('club_id', teamData.club_id)
-      .eq('date', date);
+      .eq('date', date)
+      .in('player_id', teamPlayerIds);
 
     if (rowsErr) {
       return { success: false, canViewDiscomfort, entries: [], error: rowsErr.message };
     }
 
-    // 4. Sanitizar en servidor: Omitir campos sensibles de molestias si no está autorizado
+    // 6. Consultar incidencias de molestias complementarias (ej. dobles sesiones) acotadas a los mismos jugadores
+    const latestIncidentByPlayer = new Map<string, any>();
+    try {
+      const { data: incidents, error: incErr } = await adminClient
+        .from('player_session_discomfort_incidents')
+        .select('player_id, timing, zone, intensity, notes, created_at')
+        .eq('club_id', teamData.club_id)
+        .in('player_id', teamPlayerIds)
+        .order('created_at', { ascending: false });
+
+      if (!incErr && incidents) {
+        for (const inc of incidents) {
+          if (!latestIncidentByPlayer.has(inc.player_id)) {
+            latestIncidentByPlayer.set(inc.player_id, inc);
+          }
+        }
+      }
+    } catch {
+      // Degrada de forma segura si la tabla complementaria de incidencias aún no está migrada
+    }
+
+    // 7. Sanitizar en servidor: Omitir campos sensibles de molestias si no está autorizado
     const entries: SanitizedPlayerWellnessEntry[] = (rows || []).map((row: any) => {
+      const latestInc = latestIncidentByPlayer.get(row.player_id);
+      const hasReportedDiscomfort = Boolean(row.has_discomfort || latestInc);
+      const resolvedZone = latestInc ? latestInc.zone : row.discomfort_zone;
+      const resolvedIntensity = latestInc ? latestInc.intensity : row.discomfort_intensity;
+      const resolvedNotes = latestInc ? (latestInc.notes || row.notes) : row.notes;
+
       const base: SanitizedPlayerWellnessEntry = {
         playerId: row.player_id,
         date: row.date,
@@ -793,13 +877,13 @@ export async function getAuthorizedTeamWellnessSummary(
         mood: row.mood,
         wellnessScore: row.wellness_score,
         submittedAt: row.submitted_at,
-        hasDiscomfort: Boolean(row.has_discomfort),
+        hasDiscomfort: hasReportedDiscomfort,
       };
 
       if (canViewDiscomfort) {
-        base.discomfortZone = row.discomfort_zone;
-        base.discomfortIntensity = row.discomfort_intensity;
-        base.notes = row.notes;
+        base.discomfortZone = resolvedZone;
+        base.discomfortIntensity = resolvedIntensity;
+        base.notes = resolvedNotes;
         base.isDiscomfortRedacted = false;
       } else {
         base.discomfortZone = null;

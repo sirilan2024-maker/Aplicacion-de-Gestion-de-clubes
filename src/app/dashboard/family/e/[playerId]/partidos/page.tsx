@@ -110,6 +110,7 @@ export default function FamilyMatchesPage() {
   const [ffcvMatches, setFfcvMatches] = useState<any[]>([]);
   const [ffcvStandings, setFfcvStandings] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<'Finalizado' | 'Todos'>('Finalizado');
+  const [playerConvs, setPlayerConvs] = useState<Map<string, string>>(new Map());
   const [viewingFfcvActa, setViewingFfcvActa] = useState<{
     codacta: string;
     matchId?: string;
@@ -140,10 +141,18 @@ export default function FamilyMatchesPage() {
         // Fetch convocatorias for this specific player to identify any cross-team call-ups (e.g. Senior)
         const { data: cData } = await supabase
           .from('convocatorias')
-          .select('partido_id')
+          .select('partido_id, status')
           .eq('player_id', playerId);
 
-        const convMatchIds = (cData || []).map(c => c.partido_id).filter(Boolean);
+        const convMap = new Map<string, string>();
+        (cData || []).forEach((c: any) => {
+          if (c.partido_id && c.status) {
+            convMap.set(c.partido_id, c.status);
+          }
+        });
+        setPlayerConvs(convMap);
+
+        const convMatchIds = (cData || []).filter((c: any) => c.status !== 'no_convocado').map((c: any) => c.partido_id).filter(Boolean);
 
         // Fetch matches: base team matches OR any match where player was convened
         let query = supabase
@@ -210,7 +219,13 @@ export default function FamilyMatchesPage() {
   }, [matches, statusFilter]);
 
   const handleOpenReport = (match: any, ffcvMatch: any) => {
-    // 1. Extraer codacta si existe
+    // Para partidos programados o en directo, la vista principal es la del partido del club (convocatoria, citación y asistencia)
+    if (match.estado === 'Programado' || match.estado === 'En Curso' || match.estado === 'Descanso') {
+      router.push(`/dashboard/family/e/${playerId}/partidos/${match.id}`);
+      return;
+    }
+
+    // 1. Extraer codacta si existe para partidos finalizados
     let codacta = ffcvMatch?.codacta || null;
     if (!codacta && match.acta_oficial_url) {
       const matchExtract = match.acta_oficial_url.match(/CodPartido=(\d+)/);
@@ -397,14 +412,60 @@ export default function FamilyMatchesPage() {
                           {currentMatchTeamName}
                         </div>
                       )}
+
+                      {match.estado === 'Programado' && (() => {
+                        const callStatus = playerConvs.get(match.id);
+                        if (!callStatus) return null;
+                        if (['convocado', 'titular', 'suplente'].includes(callStatus)) {
+                          return (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                              Convocado
+                            </span>
+                          );
+                        }
+                        if (callStatus === 'no_convocado') {
+                          return (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider bg-slate-100 text-slate-600 border border-slate-300">
+                              No convocado
+                            </span>
+                          );
+                        }
+                        if (callStatus === 'duda') {
+                          return (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                              Duda
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     
-                    <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5 shrink-0">
-                      <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                      <span className="capitalize">{new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                      <span className="text-slate-300">•</span>
-                      <span>{new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} h</span>
-                    </div>
+                    {(() => {
+                      const mDate = match.fecha_hora ? new Date(match.fecha_hora) : new Date();
+                      const cDate = match.hora_citacion 
+                        ? new Date(match.hora_citacion) 
+                        : (match.fecha_hora ? new Date(new Date(match.fecha_hora).getTime() - 60 * 60 * 1000) : null);
+                      const cTime = cDate && !isNaN(cDate.getTime()) 
+                        ? cDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) 
+                        : null;
+                      const mTime = !isNaN(mDate.getTime()) 
+                        ? mDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) 
+                        : '--:--';
+                      return (
+                        <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span className="capitalize">{mDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                          <span className="text-slate-300">•</span>
+                          <span>⏱️ {mTime} h</span>
+                          {match.estado === 'Programado' && cTime && (
+                            <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 ml-0.5 shadow-2xs" title="Hora de citación en el campo">
+                              📍 {cTime} h
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   
                   {/* Marcador Central con Escudos */}
@@ -469,14 +530,23 @@ export default function FamilyMatchesPage() {
                       </div>
                     </div>
 
-                    {/* Barra de acción: Ver Estadísticas abre el Acta FFCV */}
+                    {/* Barra de acción: Ver Convocatoria / Estadísticas y Acta FFCV */}
                     <div className="flex items-center justify-between pt-1">
                       {codacta ? (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenReport(match, ffcvMatch);
+                            const isLocal = match.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match.lugar || '');
+                            const homeTeam = isLocal ? (match.equipo?.name || 'Mi Equipo') : (match.rival_nombre || 'Rival');
+                            const awayTeam = isLocal ? (match.rival_nombre || 'Rival') : (match.equipo?.name || 'Mi Equipo');
+                            setViewingFfcvActa({
+                              codacta,
+                              matchId: ffcvMatch?.ffcv_match_id || match.id,
+                              teamId: match.equipo_id,
+                              homeTeamName: ffcvMatch?.home_team_name || homeTeam,
+                              awayTeamName: ffcvMatch?.away_team_name || awayTeam
+                            });
                           }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors border border-blue-200"
                         >
@@ -496,7 +566,7 @@ export default function FamilyMatchesPage() {
                         className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group-hover:translate-x-1 transition-transform ml-auto"
                       >
                         <BarChart3 className="w-3.5 h-3.5" />
-                        <span>Ver Estadísticas</span>
+                        <span>{match.estado === 'Programado' ? 'Ver Convocatoria' : 'Ver Estadísticas'}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     </div>

@@ -319,34 +319,34 @@ export function TeamMatchesView({
         /* VISTA "PARTIDOS" (Doble Sección: Partidos del Club vs Calendario FFCV) */
         <div className="space-y-6 pt-2">
           {ffcvGroupId && (
-            <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2.5">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => handleSubTabChange('club')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  className={`flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                     matchesSubTab === 'club'
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  <Calendar className="w-3.5 h-3.5" />
-                  Partidos del Club
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span>Partidos del Club</span>
                 </button>
 
                 <button
                   onClick={() => handleSubTabChange('ffcv')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  className={`flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                     matchesSubTab === 'ffcv'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'
                   }`}
                 >
-                  <Trophy className="w-3.5 h-3.5" />
-                  {isLigaBrave ? 'Calendario Oficial Liga Brave' : 'Calendario Oficial FFCV'}
+                  <Trophy className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{isLigaBrave ? 'Calendario Oficial Liga Brave' : 'Calendario Oficial FFCV'}</span>
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 {syncMessage && (
                   <span className={`text-xs font-bold ${syncMessage.startsWith('Error') ? 'text-rose-600' : 'text-emerald-600'} animate-in fade-in`}>
                     {syncMessage}
@@ -355,10 +355,10 @@ export function TeamMatchesView({
                 <button
                   onClick={handleSyncFFCV}
                   disabled={isSyncing}
-                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs hover:shadow-xs transition-all flex items-center gap-2 disabled:opacity-50"
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs hover:shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   title={isLigaBrave ? "Sincronizar horarios y resultados con la Liga Brave" : "Sincronizar horarios y resultados oficiales con la FFCV"}
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
                   <span>{isSyncing ? 'Sincronizando...' : (isLigaBrave ? 'Sincronizar Liga Brave' : 'Sincronizar FFCV')}</span>
                 </button>
               </div>

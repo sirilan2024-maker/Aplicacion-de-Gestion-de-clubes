@@ -445,7 +445,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   // 2. Fetch matches from 'partidos' for this active season
   const { data: clubPartidos, error: cpErr } = await supabase
     .from('partidos')
-    .select('id, rival_nombre, fecha_hora, lugar, estado, resultado_propio, resultado_rival, acta_oficial_url, equipo_id, teams(name, ffcv_team_id, ffcv_group_id)')
+    .select('id, rival_nombre, fecha_hora, hora_citacion, lugar, estado, resultado_propio, resultado_rival, acta_oficial_url, equipo_id, teams(name, ffcv_team_id, ffcv_group_id)')
     .eq('season_id', activeSeason.id);
 
   if (cpErr || !clubPartidos || clubPartidos.length === 0) {
@@ -559,7 +559,18 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
         const ffcvMs = new Date(ffcvIso).getTime();
         if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
           updates.fecha_hora = ffcvIso;
+          // Recalcular hora de citación automáticamente (60 minutos antes del inicio oficial)
+          updates.hora_citacion = new Date(ffcvMs - 60 * 60 * 1000).toISOString();
         }
+      }
+    }
+
+    // Si falta la hora de citación y tenemos fecha_hora, asignarla por defecto a 1h antes
+    if (!pm.hora_citacion && (updates.fecha_hora || pm.fecha_hora) && !updates.hora_citacion) {
+      const baseIso = updates.fecha_hora || pm.fecha_hora;
+      const baseMs = new Date(baseIso).getTime();
+      if (!isNaN(baseMs)) {
+        updates.hora_citacion = new Date(baseMs - 60 * 60 * 1000).toISOString();
       }
     }
 

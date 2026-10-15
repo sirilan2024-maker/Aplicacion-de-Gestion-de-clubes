@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 
 export interface Season {
   id: string;
@@ -39,12 +40,19 @@ const SeasonContext = createContext<SeasonContextType>({
 const STORAGE_KEY = "sporting_selected_season_id";
 
 export function SeasonProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [activeSeason, setActiveSeason] = useState<Season | null>(null);
   const [selectedSeasonId, setSelectedSeasonIdState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSeasons = async () => {
+    // Protección estricta: en rutas demo nunca consultar Supabase
+    if (pathname?.startsWith("/wellness/demo")) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();

@@ -122,7 +122,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
           {/* TAB: CONVOCATORIA */}
           {activeTab === "convocatoria" && (
             <div className="space-y-4">
-              <ConvocatoriaList players={activePlayers} matchId={matchId} convocatorias={convocatorias} />
+              <ConvocatoriaList players={activePlayers} matchId={matchId} convocatorias={convocatorias} match={match} />
             </div>
           )}
 

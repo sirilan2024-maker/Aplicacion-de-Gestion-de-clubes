@@ -197,6 +197,7 @@ async function run() {
 
     const uPlayer1 = 'cccccccc-1111-0000-0000-000000000001'; // Menor en Team 1
     const uPlayer2 = 'cccccccc-2222-0000-0000-000000000002'; // Jugador con cuenta en Team 2
+    const uPlayer3 = 'cccccccc-3333-0000-0000-000000000003'; // Segundo menor en Team 1 tutelado por uTutor1 (para pruebas RLS de fecha)
 
     const uEvent1 = 'dddddddd-1111-0000-0000-000000000001'; // Entrenamiento Team 1
 
@@ -232,7 +233,8 @@ async function run() {
       -- Insertar Jugadores
       INSERT INTO public.players (id, club_id, team_id, first_name, last_name, birth_date, tutor_id, user_auth_id) VALUES
         ('${uPlayer1}', '${uClubA}', '${uTeam1}', 'Lucas', 'Perez', '2012-05-10', '${uTutor1}', NULL),
-        ('${uPlayer2}', '${uClubA}', '${uTeam2}', 'Mateo', 'Gomez', '2008-03-15', NULL, '${uPlayerUser}');
+        ('${uPlayer2}', '${uClubA}', '${uTeam2}', 'Mateo', 'Gomez', '2008-03-15', NULL, '${uPlayerUser}'),
+        ('${uPlayer3}', '${uClubA}', '${uTeam1}', 'Marcos', 'Perez', '2014-07-20', '${uTutor1}', NULL);
 
       -- Vincular Segundo Tutor en player_tutors
       INSERT INTO public.player_tutors (player_id, tutor_id, is_primary) VALUES
@@ -381,7 +383,7 @@ async function run() {
       await rlsClient.query(`
         INSERT INTO public.player_daily_wellness 
           (club_id, player_id, date, sleep_quality, fatigue, soreness, stress, mood)
-        VALUES ('${uClubA}', '${uPlayer1}', ((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid') - INTERVAL '2 days')::DATE, 3, 3, 3, 3, 3);
+        VALUES ('${uClubA}', '${uPlayer3}', ((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid') - INTERVAL '2 days')::DATE, 3, 3, 3, 3, 3);
       `);
     } catch (e: any) {
       pastDateBlocked = e.code === '42501';
@@ -394,7 +396,7 @@ async function run() {
       await rlsClient.query(`
         INSERT INTO public.player_daily_wellness 
           (club_id, player_id, date, sleep_quality, fatigue, soreness, stress, mood)
-        VALUES ('${uClubA}', '${uPlayer1}', ((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid') + INTERVAL '1 day')::DATE, 3, 3, 3, 3, 3);
+        VALUES ('${uClubA}', '${uPlayer3}', ((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid') + INTERVAL '1 day')::DATE, 3, 3, 3, 3, 3);
       `);
     } catch (e: any) {
       futureDateBlocked = e.code === '42501';
@@ -407,7 +409,7 @@ async function run() {
       await rlsClient.query(`
         INSERT INTO public.player_daily_wellness 
           (club_id, player_id, date, sleep_quality, fatigue, soreness, stress, mood)
-        VALUES ('${uClubA}', '${uPlayer1}', (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE, 2, 2, 2, 2, 2);
+        VALUES ('${uClubA}', '${uPlayer3}', (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE, 2, 2, 2, 2, 2);
       `);
       todayInsertSucceeded = true;
     } catch (e: any) {
@@ -421,7 +423,7 @@ async function run() {
       await rlsClient.query(`
         UPDATE public.player_daily_wellness 
         SET date = ((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid') - INTERVAL '5 days')::DATE
-        WHERE player_id = '${uPlayer1}' AND date = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE;
+        WHERE player_id = '${uPlayer3}' AND date = (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Madrid')::DATE;
       `);
     } catch (e: any) {
       updateToPastBlocked = e.code === '42501';

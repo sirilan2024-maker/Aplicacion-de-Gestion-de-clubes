@@ -9,9 +9,10 @@ interface QuickConvocatoriaModalProps {
   players: any[];
   convocatorias: any[];
   onClose: () => void;
+  match?: any;
 }
 
-export function QuickConvocatoriaModal({ matchId, matchSubtitle, players, convocatorias, onClose }: QuickConvocatoriaModalProps) {
+export function QuickConvocatoriaModal({ matchId, matchSubtitle, players, convocatorias, onClose, match }: QuickConvocatoriaModalProps) {
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
       <div 
@@ -39,7 +40,7 @@ export function QuickConvocatoriaModal({ matchId, matchSubtitle, players, convoc
           </button>
         </div>
         <div className="overflow-hidden flex flex-col p-4 sm:p-6 bg-slate-50/50 flex-1 min-h-0">
-          <ConvocatoriaList players={players} matchId={matchId} convocatorias={convocatorias} onCloseModal={onClose} />
+          <ConvocatoriaList players={players} matchId={matchId} convocatorias={convocatorias} onCloseModal={onClose} match={match} />
         </div>
       </div>
     </div>

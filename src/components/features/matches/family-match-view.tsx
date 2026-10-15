@@ -95,7 +95,19 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   const awayName = isLocal ? rivalName : teamName;
   
   const matchDate = match?.fecha_hora ? new Date(match.fecha_hora) : new Date();
-  
+  const citacionDate = match?.hora_citacion 
+    ? new Date(match.hora_citacion) 
+    : (match?.fecha_hora ? new Date(new Date(match.fecha_hora).getTime() - 60 * 60 * 1000) : null);
+  const citacionTimeStr = citacionDate && !isNaN(citacionDate.getTime()) 
+    ? citacionDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) 
+    : null;
+  const matchTimeStr = !isNaN(matchDate.getTime()) 
+    ? matchDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) 
+    : '--:--';
+  const matchDateFormatted = !isNaN(matchDate.getTime())
+    ? matchDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+    : '';
+
   // Player specific
   const playerConv = convocatorias.find(c => c.player_id === playerId);
   const playerEvents = matchEvents.filter(e => e.player_id === playerId);
@@ -203,56 +215,108 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
           </div>
         </div>
 
-        {/* ─── ASISTENCIA CONVOCATORIA ─── */}
-        {playerConv && playerConv.status === 'convocado' && playerConv.asistencia_confirmada_familia === null && (
+        {/* ─── ASISTENCIA CONVOCATORIA (Convocado) ─── */}
+        {playerConv && ['convocado', 'titular', 'suplente'].includes(playerConv.status) && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="text-blue-900 font-bold text-lg">Has sido convocado</h3>
-              <p className="text-blue-700 text-sm mt-1">
-                El entrenador ha convocado al jugador para este partido. Por favor, confirma si podrá asistir.
+            <div className="space-y-1.5 text-center md:text-left">
+              <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
+                <h3 className="text-blue-900 font-bold text-lg">Has sido convocado</h3>
+                {citacionTimeStr && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                    📍 Citación: {citacionTimeStr} h
+                  </span>
+                )}
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-900 border border-blue-200 flex items-center gap-1">
+                  ⏱️ Inicio: {matchTimeStr} h
+                </span>
+              </div>
+              <p className="text-blue-700 text-sm">
+                El entrenador ha convocado al jugador para este partido.
+                {citacionTimeStr && (
+                  <> Hora de llegada al campo: <strong>{citacionTimeStr} h</strong> (1 hora antes del inicio oficial a las {matchTimeStr} h).</>
+                )}
+                {playerConv.estado_asistencia === 'Confirmado'
+                  ? " Has confirmado que ASISTIRÁ al encuentro."
+                  : (playerConv.estado_asistencia === 'Ausente'
+                      ? " Has comunicado que NO PODRÁ asistir."
+                      : " Por favor, confirma si podrá asistir.")}
               </p>
             </div>
             
-              <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
-                <button 
-                  onClick={async () => {
-                    if (playerConv.asistencia_confirmada_familia === true) return;
-                    const res = await fetch(`/api/matches/${matchId}/attendance`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ playerId, status: true })
-                    });
-                    if (res.ok) router.refresh();
-                  }}
-                  className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
-                    ${playerConv.asistencia_confirmada_familia === true 
-                      ? 'bg-emerald-600 text-white cursor-default' 
-                      : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
-                    }`}
-                >
-                  {playerConv.asistencia_confirmada_familia === true && <CheckCircle2 className="w-5 h-5" />}
-                  Sí, asistiré
-                </button>
-                <button 
-                  onClick={async () => {
-                    if (playerConv.asistencia_confirmada_familia === false) return;
-                    const res = await fetch(`/api/matches/${matchId}/attendance`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ playerId, status: false })
-                    });
-                    if (res.ok) router.refresh();
-                  }}
-                  className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
-                    ${playerConv.asistencia_confirmada_familia === false
-                      ? 'bg-rose-600 text-white cursor-default'
-                      : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
-                    }`}
-                >
-                  {playerConv.asistencia_confirmada_familia === false && <span className="text-lg leading-none">❌</span>}
-                  No podré
-                </button>
-              </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
+              <button 
+                onClick={async () => {
+                  if (playerConv.estado_asistencia === 'Confirmado') return;
+                  const res = await fetch(`/api/matches/${matchId}/attendance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId, status: true })
+                  });
+                  if (res.ok) router.refresh();
+                }}
+                className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                  ${playerConv.estado_asistencia === 'Confirmado' 
+                    ? 'bg-emerald-600 text-white cursor-default' 
+                    : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+              >
+                {playerConv.estado_asistencia === 'Confirmado' && <CheckCircle2 className="w-5 h-5" />}
+                {playerConv.estado_asistencia === 'Confirmado' ? 'Asistencia confirmada' : 'Sí, asistiré'}
+              </button>
+              <button 
+                onClick={async () => {
+                  if (playerConv.estado_asistencia === 'Ausente') return;
+                  const res = await fetch(`/api/matches/${matchId}/attendance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId, status: false })
+                  });
+                  if (res.ok) router.refresh();
+                }}
+                className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                  ${playerConv.estado_asistencia === 'Ausente'
+                    ? 'bg-rose-600 text-white cursor-default'
+                    : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+                  }`}
+              >
+                {playerConv.estado_asistencia === 'Ausente' && <span className="text-lg leading-none">❌</span>}
+                {playerConv.estado_asistencia === 'Ausente' ? 'No asistirá' : 'No podré'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── DESCONVOCADO (No convocado) ─── */}
+        {playerConv && playerConv.status === 'no_convocado' && (
+          <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs mb-6 flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center shrink-0 font-bold text-lg">
+              ℹ️
+            </div>
+            <div>
+              <h3 className="text-slate-800 font-bold text-base">Convocatoria actualizada</h3>
+              <p className="text-slate-600 text-sm mt-0.5">
+                El jugador <strong>no está convocado</strong> para este partido por decisión técnica o rotación. ¡Mucho ánimo para el próximo encuentro!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ─── CONVOCATORIA PENDIENTE / DUDA ─── */}
+        {(!playerConv || playerConv.status === 'duda') && match?.estado === 'Programado' && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs mb-6 flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-slate-800 font-bold text-base">
+                {playerConv?.status === 'duda' ? 'Convocatoria en duda' : 'Convocatoria pendiente'}
+              </h3>
+              <p className="text-slate-600 text-sm mt-0.5">
+                {playerConv?.status === 'duda' 
+                  ? 'El cuerpo técnico ha marcado la convocatoria como pendiente de evolución (molestias / rotación).'
+                  : 'El cuerpo técnico aún no ha publicado la convocatoria oficial para este encuentro.'}
+              </p>
+            </div>
           </div>
         )}
 
@@ -262,7 +326,17 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
           <div className="bg-indigo-600 text-white px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 text-xs font-bold tracking-wide">
             <span className="uppercase">{match.competicion_nombre || 'Liga'}</span>
             <div className="flex flex-wrap items-center gap-3 md:gap-4 opacity-95 text-[11px]">
-              <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4" /> 
+                <span className="capitalize">{matchDateFormatted}</span>
+                <span className="text-indigo-200">•</span>
+                <span>⏱️ {matchTimeStr} h</span>
+                {citacionTimeStr && (
+                  <span className="bg-amber-400 text-indigo-950 font-black px-2 py-0.5 rounded ml-1 shadow-2xs">
+                    📍 Citación: {citacionTimeStr} h
+                  </span>
+                )}
+              </span>
               <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {match?.lugar || 'Por definir'}</span>
               
               <button
@@ -287,6 +361,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
               </button>
             </div>
           </div>
+
 
           {/* Body */}
           <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-white">

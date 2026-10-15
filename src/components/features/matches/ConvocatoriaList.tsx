@@ -1,8 +1,13 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from 'react';
-import { updateConvocatoria, sendConvocatoriaAlerts, getAvailableJuvenilePlayersAction } from '@/app/actions/match-actions';
-import { Loader2, UserPlus, X, ShieldCheck } from 'lucide-react';
+import { 
+  updateConvocatoria, 
+  sendConvocatoriaAlerts, 
+  getAvailableLowerCategoryPlayersAction 
+} from '@/app/actions/match-actions';
+import { detectLowerCategoryTarget } from '@/lib/matches/category-promotion';
+import { Loader2, UserPlus, X, Clock } from 'lucide-react';
 
 export type AttendanceStatus = 'Convocado' | 'No convocado' | 'Duda' | 'Lesión' | null;
 
@@ -13,11 +18,24 @@ export interface Player {
   status: AttendanceStatus;
   teamName?: string;
   isJuvenile?: boolean;
+  isLowerCategory?: boolean;
   avatarUrl?: string | null;
   dorsal?: number | null;
 }
 
-export function ConvocatoriaList({ players = [], matchId, convocatorias = [], onCloseModal }: { players?: any[], matchId?: string, convocatorias?: any[], onCloseModal?: () => void }) {
+export function ConvocatoriaList({ 
+  players = [], 
+  matchId, 
+  convocatorias = [], 
+  onCloseModal,
+  match
+}: { 
+  players?: any[], 
+  matchId?: string, 
+  convocatorias?: any[], 
+  onCloseModal?: () => void,
+  match?: any
+}) {
   const validPlayers = players.filter(p => {
     const pos = (p.posicion || '').toLowerCase();
     return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
@@ -58,31 +76,101 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
   const [playerList, setPlayerList] = useState<Player[]>(mappedPlayers);
   const [isPending, startTransition] = useTransition();
 
-  // Modal para añadir juveniles
-  const [showJuvenileModal, setShowJuvenileModal] = useState(false);
-  const [juvenileCandidates, setJuvenileCandidates] = useState<any[]>([]);
-  const [loadingJuveniles, setLoadingJuveniles] = useState(false);
+  // Gestión de la hora de citación
+  const [matchData, setMatchData] = useState<any>(match || null);
+  const [horaCitacion, setHoraCitacion] = useState<string>(() => {
+    if (match?.hora_citacion) {
+      const c = new Date(match.hora_citacion);
+      if (!isNaN(c.getTime())) return c.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    if (match?.fecha_hora) {
+      const m = new Date(match.fecha_hora);
+      if (!isNaN(m.getTime())) {
+        const c = new Date(m.getTime() - 60 * 60 * 1000);
+        return c.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    return '';
+  });
+
+  // Detección de categoría inferior permitida (+ Juvenil en Senior, + Cadete en Juvenil, + Infantil en Cadete, ninguna en Infantil)
+  const [targetCategory, setTargetCategory] = useState<'Juvenil' | 'Cadete' | 'Infantil' | null>(null);
+
+  // Modal para añadir jugadores de categoría inferior
+  const [showLowerCategoryModal, setShowLowerCategoryModal] = useState(false);
+  const [candidatePlayers, setCandidatePlayers] = useState<any[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const openJuvenileModal = async () => {
-    setShowJuvenileModal(true);
-    if (matchId) {
-      setLoadingJuveniles(true);
+  // Efecto para obtener datos de partido/equipo si no vinieron en props
+  useEffect(() => {
+    if (!matchId) return;
+
+    let isMounted = true;
+    async function loadMatchAndCategory() {
       try {
-        const res = await getAvailableJuvenilePlayersAction(matchId);
-        if (res.success && res.players) {
-          setJuvenileCandidates(res.players);
+        let currentMatch = match;
+        if (!currentMatch?.fecha_hora || !currentMatch?.equipo) {
+          const supabase = (await import('@/lib/supabase/client')).createClient();
+          const { data } = await supabase
+            .from('partidos')
+            .select('fecha_hora, hora_citacion, equipo_id, equipo:teams(id, name, category)')
+            .eq('id', matchId)
+            .single();
+          if (data && isMounted) {
+            currentMatch = data;
+            setMatchData(data);
+          }
+        }
+
+        if (currentMatch && isMounted) {
+          // Inicializar hora de citación si estaba vacía
+          if (!horaCitacion) {
+            if (currentMatch.hora_citacion) {
+              const c = new Date(currentMatch.hora_citacion);
+              if (!isNaN(c.getTime())) setHoraCitacion(c.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            } else if (currentMatch.fecha_hora) {
+              const m = new Date(currentMatch.fecha_hora);
+              if (!isNaN(m.getTime())) {
+                const c = new Date(m.getTime() - 60 * 60 * 1000);
+                setHoraCitacion(c.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+              }
+            }
+          }
+
+          // Detectar qué categoría inferior corresponde
+          const team = (Array.isArray(currentMatch.equipo) ? currentMatch.equipo[0] : currentMatch.equipo) as any;
+          const detected = detectLowerCategoryTarget(team?.name, team?.category);
+          setTargetCategory(detected ? detected.target : null);
         }
       } catch (err) {
-        console.error("Error fetching juvenile players:", err);
+        console.error("Error cargando detalles del partido en ConvocatoriaList:", err);
+      }
+    }
+
+    loadMatchAndCategory();
+    return () => { isMounted = false; };
+  }, [matchId, match]);
+
+  const openLowerCategoryModal = async () => {
+    setShowLowerCategoryModal(true);
+    if (matchId) {
+      setLoadingCandidates(true);
+      try {
+        const res = await getAvailableLowerCategoryPlayersAction(matchId);
+        if (res.success && res.players) {
+          setCandidatePlayers(res.players);
+          if (res.targetCategory) setTargetCategory(res.targetCategory);
+        }
+      } catch (err) {
+        console.error("Error fetching lower category players:", err);
       } finally {
-        setLoadingJuveniles(false);
+        setLoadingCandidates(false);
       }
     }
   };
 
-  const handleAddJuvenile = (p: any) => {
-    // Si ya está en la lista, no duplicar, simplemente convocar
+  const handleAddCandidate = (p: any) => {
     const exists = playerList.find(item => item.id === p.id);
     if (exists) {
       handleStatusChange(p.id, 'Convocado');
@@ -92,12 +180,14 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
         name: `${p.first_name} ${p.last_name}`.toUpperCase(),
         position: (p.posicion || 'Jugador').toLowerCase(),
         status: 'Convocado',
-        teamName: p.teams?.name || 'Juvenil',
-        isJuvenile: true
+        teamName: p.teams?.name || (targetCategory ? targetCategory.toUpperCase() : 'Refuerzo'),
+        isLowerCategory: true,
+        avatarUrl: p.avatar_url,
+        dorsal: p.dorsal
       };
       setPlayerList(prev => [newPlayer, ...prev]);
     }
-    setShowJuvenileModal(false);
+    setShowLowerCategoryModal(false);
   };
 
   const handleStatusChange = (playerId: string, newStatus: AttendanceStatus) => {
@@ -136,9 +226,17 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
         
         return { playerId: p.id, status: dbStatus };
       });
+
+      // Calcular fecha ISO para hora_citacion
+      let finalCitacionISO: string | null = null;
+      if (horaCitacion) {
+        const baseDate = matchData?.fecha_hora ? new Date(matchData.fecha_hora) : (match?.fecha_hora ? new Date(match.fecha_hora) : new Date());
+        const datePart = !isNaN(baseDate.getTime()) ? baseDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        finalCitacionISO = new Date(`${datePart}T${horaCitacion}:00`).toISOString();
+      }
       
       const { updateConvocatoriaBatch } = await import('@/app/actions/match-actions');
-      const result = await updateConvocatoriaBatch(matchId, updates);
+      const result = await updateConvocatoriaBatch(matchId, updates, { horaCitacion: finalCitacionISO });
       
       if (result && !result.success) {
         const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || "Error desconocido";
@@ -183,25 +281,44 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl">
       <div className="flex flex-col gap-3 mb-4 shrink-0 px-1">
-        <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
-          <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">Resumen</span>
-          <div className="text-xs font-bold flex flex-wrap gap-1.5 justify-end">
-            <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">Conv: {counts.convocados}</span>
-            <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100">Dudas: {counts.dudas}</span>
-            <span className="text-rose-600 bg-rose-50 px-2 py-1 rounded-md border border-rose-100">Les: {counts.lesionados}</span>
+        {/* Barra superior de Resumen y Hora de Citación */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100 gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">Resumen</span>
+            <div className="text-xs font-bold flex flex-wrap gap-1.5">
+              <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Conv: {counts.convocados}</span>
+              <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">Dudas: {counts.dudas}</span>
+              <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">Les: {counts.lesionados}</span>
+            </div>
+          </div>
+
+          {/* Campo editable de Hora de Citación */}
+          <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs self-start sm:self-auto">
+            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">📍 Citación:</span>
+            <input
+              type="time"
+              value={horaCitacion}
+              onChange={(e) => setHoraCitacion(e.target.value)}
+              className="text-xs font-black text-slate-900 bg-transparent outline-none cursor-pointer w-16"
+              title="Hora en la que los jugadores deben estar en el campo (por defecto 1h antes del partido)"
+            />
           </div>
         </div>
 
         {/* Botones de acción superiores: adaptativos a móvil con grid de 2 columnas o 1 fila en desktop */}
         <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2">
-          <button
-            onClick={openJuvenileModal}
-            type="button"
-            className="col-span-1 py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span className="truncate">+ Juvenil</span>
-          </button>
+          {targetCategory && (
+            <button
+              onClick={openLowerCategoryModal}
+              type="button"
+              className="col-span-1 py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+              title={`Convocar jugadores de categoría ${targetCategory}`}
+            >
+              <UserPlus className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span className="truncate">+ {targetCategory}</span>
+            </button>
+          )}
           <button
             onClick={handleConvocarTodos}
             className="col-span-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-xs truncate"
@@ -259,9 +376,9 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                           #{player.dorsal}
                         </span>
                       )}
-                      {player.isJuvenile && (
+                      {(player.isLowerCategory || player.isJuvenile) && player.teamName && (
                         <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded border border-indigo-200 shrink-0">
-                          {player.teamName || 'JUVENIL'}
+                          {player.teamName}
                         </span>
                       )}
                     </div>
@@ -322,8 +439,8 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
         </div>
       </div>
 
-      {/* Modal para añadir juveniles */}
-      {showJuvenileModal && (
+      {/* Modal para convocar jugadores de categoría inferior */}
+      {showLowerCategoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -332,12 +449,12 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-sm">Convocar Jugador Juvenil</h3>
-                  <p className="text-[11px] text-slate-500">Sube a un jugador de categoría Juvenil para este partido</p>
+                  <h3 className="font-bold text-slate-800 text-sm">Convocar Jugador {targetCategory || 'Inferior'}</h3>
+                  <p className="text-[11px] text-slate-500">Sube a un jugador de categoría {targetCategory || 'inferior'} para este partido</p>
                 </div>
               </div>
               <button
-                onClick={() => setShowJuvenileModal(false)}
+                onClick={() => setShowLowerCategoryModal(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -349,23 +466,23 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre o equipo juvenil..."
+                placeholder={`Buscar por nombre o equipo ${targetCategory ? targetCategory.toLowerCase() : ''}...`}
                 className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
 
             <div className="p-3 overflow-y-auto flex-1 divide-y divide-slate-100 custom-scrollbar">
-              {loadingJuveniles ? (
+              {loadingCandidates ? (
                 <div className="py-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
-                  Buscando juveniles disponibles...
+                  Buscando jugadores {targetCategory ? targetCategory.toLowerCase() + 's' : ''} disponibles...
                 </div>
-              ) : juvenileCandidates.length === 0 ? (
+              ) : candidatePlayers.length === 0 ? (
                 <div className="py-8 text-center text-slate-400 text-xs">
-                  No se encontraron jugadores en equipos Juveniles del club.
+                  No se encontraron jugadores en equipos {targetCategory || 'inferiores'} del club.
                 </div>
               ) : (
-                juvenileCandidates
+                candidatePlayers
                   .filter(p => {
                     const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
                     const team = (p.teams?.name || '').toLowerCase();
@@ -381,13 +498,13 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[10px] text-slate-500 font-medium">{p.posicion || 'Jugador'}</span>
                             <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-100">
-                              {p.teams?.name || 'Juvenil'}
+                              {p.teams?.name || targetCategory || 'Refuerzo'}
                             </span>
                             {p.dorsal && <span className="text-[10px] text-slate-400 font-semibold">#{p.dorsal}</span>}
                           </div>
                         </div>
                         <button
-                          onClick={() => handleAddJuvenile(p)}
+                          onClick={() => handleAddCandidate(p)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             isAlreadyAdded 
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 pointer-events-none' 
@@ -404,7 +521,7 @@ export function ConvocatoriaList({ players = [], matchId, convocatorias = [], on
 
             <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button
-                onClick={() => setShowJuvenileModal(false)}
+                onClick={() => setShowLowerCategoryModal(false)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors"
               >
                 Cerrar

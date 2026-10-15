@@ -4,8 +4,9 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessMatch, canUserAccessPlayer } from "@/lib/auth-helpers"
 import { NotificationService } from "@/lib/notifications/notification-service"
-import { getConvocationEmailHtml } from "@/lib/email-service"
+import { getConvocationEmailHtml, getUnconvocationEmailHtml } from "@/lib/email-service"
 import { isSeasonEditable, assertSeasonEditable } from "@/lib/season-utils"
+import { detectLowerCategoryTarget } from "@/lib/matches/category-promotion"
 
 export async function updateConvocatoria(matchId: string, playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | null) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -63,7 +64,11 @@ export async function updateConvocatoria(matchId: string, playerId: string, stat
   return { success: true }
 }
 
-export async function updateConvocatoriaBatch(matchId: string, updates: { playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | "titular" | "suplente" | null }[]) {
+export async function updateConvocatoriaBatch(
+  matchId: string, 
+  updates: { playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | "titular" | "suplente" | null }[],
+  options?: { horaCitacion?: string | null }
+) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
     return { success: false, error: authError || "No autenticado" };
@@ -83,56 +88,178 @@ export async function updateConvocatoriaBatch(matchId: string, updates: { player
     }
   }
 
+  // 1. Si se proporciona hora de citación, actualizarla en la tabla partidos
+  if (options && options.horaCitacion !== undefined) {
+    await supabase
+      .from('partidos')
+      .update({ hora_citacion: options.horaCitacion })
+      .eq('id', matchId);
+  }
+
+  // 2. Consultar convocatorias previas para detectar jugadores que pasan a ser DESCONVOCADOS
+  const { data: existingConvs } = await supabase
+    .from('convocatorias')
+    .select('player_id, status, asistencia_confirmada_familia')
+    .eq('partido_id', matchId);
+
+  const existingMap = new Map<string, { status: string | null, asistencia_confirmada_familia: boolean | null }>();
+  existingConvs?.forEach(c => existingMap.set(c.player_id, { status: c.status, asistencia_confirmada_familia: c.asistencia_confirmada_familia }));
+
+  const unconvokedPlayerIds: string[] = [];
+
   let hasError = false;
   let lastError = null;
 
   for (const update of updates) {
+    const prev = existingMap.get(update.playerId);
+    const wasConvoked = prev && (prev.status === 'convocado' || prev.status === 'titular' || prev.status === 'suplente');
+    const isNowUnconvoked = update.status === 'no_convocado' || update.status === null;
+
+    if (wasConvoked && isNowUnconvoked) {
+      unconvokedPlayerIds.push(update.playerId);
+    }
+
     if (update.status === null) {
       const { error } = await supabase
         .from("convocatorias")
         .delete()
         .eq("partido_id", matchId)
-        .eq("player_id", update.playerId)
+        .eq("player_id", update.playerId);
       if (error) { console.error("Error deleting:", error); hasError = true; lastError = error; }
     } else {
-      const { data: existing, error: selectError } = await supabase
+      const { data: existing } = await supabase
         .from("convocatorias")
         .select("id")
         .eq("partido_id", matchId)
         .eq("player_id", update.playerId)
-        .single()
+        .single();
+
+      const payload: Record<string, any> = { status: update.status };
+      // Al desconvocar, resetear confirmación previa para que empiece de cero si se vuelve a convocar
+      if (isNowUnconvoked) {
+        payload.asistencia_confirmada_familia = false;
+        payload.estado_asistencia = 'Pendiente';
+      }
 
       if (existing) {
         const { error } = await supabase
           .from("convocatorias")
-          .update({ status: update.status })
-          .eq("id", existing.id)
+          .update(payload)
+          .eq("id", existing.id);
         if (error) { console.error("Error updating:", error); hasError = true; lastError = error; }
       } else {
         const { error } = await supabase
           .from("convocatorias")
-          .insert({ partido_id: matchId, player_id: update.playerId, status: update.status })
+          .insert({ partido_id: matchId, player_id: update.playerId, ...payload });
         if (error) { console.error("Error inserting:", error); hasError = true; lastError = error; }
       }
     }
   }
 
-  if (hasError) {
-    return { success: false, error: lastError }
+  // 3. Notificar automáticamente a las familias de los jugadores desconvocados
+  if (unconvokedPlayerIds.length > 0) {
+    try {
+      const match = matchAccess.match;
+      const { data: matchTeam } = await supabase
+        .from('teams')
+        .select('name')
+        .eq('id', match.equipo_id)
+        .maybeSingle();
+
+      const teamName = matchTeam?.name || 'Equipo';
+      const rivalName = match.rival_nombre || 'Rival';
+      const matchDate = match.fecha_hora ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Próximamente';
+      const matchTime = match.fecha_hora ? new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+
+      const { data: players } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, tutor_id, user_auth_id, email, tutor_email, parent1_email, tutor:profiles!players_tutor_id_fkey(email)')
+        .in('id', unconvokedPlayerIds);
+
+      // Also query player_tutors to include linked guardians (crucial for players linked via player_tutors!)
+      const { data: linkedTutors } = await supabase
+        .from('player_tutors')
+        .select('player_id, tutor_id, tutor:profiles(email)')
+        .in('player_id', unconvokedPlayerIds);
+
+      const linkedTutorsByPlayer = new Map<string, Array<{ tutorId: string, email?: string }>>();
+      linkedTutors?.forEach((lt: any) => {
+        if (lt.player_id && lt.tutor_id) {
+          const arr = linkedTutorsByPlayer.get(lt.player_id) || [];
+          arr.push({ tutorId: lt.tutor_id, email: lt.tutor?.email });
+          linkedTutorsByPlayer.set(lt.player_id, arr);
+        }
+      });
+
+      const unconvokeDispatches: any[] = [];
+      for (const p of (players || [])) {
+        const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+        const primaryTutorId = p.tutor_id || p.user_auth_id;
+        const primaryEmail = (p.tutor as any)?.email || p.tutor_email || p.parent1_email || p.email;
+
+        const emailHtml = getUnconvocationEmailHtml({
+          playerName: fullName,
+          teamName,
+          rivalName,
+          date: matchDate,
+          time: matchTime ? `${matchTime} h` : undefined,
+          viewUrl: `https://app.clubsportingsaladar.com/dashboard/family/e/${p.id}/partidos`,
+        });
+
+        const targets: Array<{ userId: string; email?: string }> = [];
+        if (primaryTutorId) {
+          targets.push({ userId: primaryTutorId, email: primaryEmail });
+        }
+
+        const extraTutors = linkedTutorsByPlayer.get(p.id) || [];
+        for (const et of extraTutors) {
+          if (et.tutorId && !targets.some(t => t.userId === et.tutorId)) {
+            targets.push({ userId: et.tutorId, email: et.email });
+          }
+        }
+
+        for (const target of targets) {
+          unconvokeDispatches.push({
+            userId: target.userId,
+            userEmail: target.email,
+            clubId: match.club_id,
+            type: 'GENERAL_ALERT' as const,
+            title: `⚽ Actualización de Convocatoria: ${teamName} vs ${rivalName}`,
+            content: `${p.first_name} no está convocado/a finalmente para el partido vs ${rivalName}. No es necesario que acuda al encuentro.`,
+            link: `/dashboard/family/e/${p.id}/partidos`,
+            channels: ['IN_APP' as const, 'EMAIL' as const],
+            idempotencyKey: `unconvoke:${matchId}:${p.id}:${target.userId}:${Date.now()}`,
+            emailSubject: `Actualización Convocatoria: ${teamName} vs ${rivalName}`,
+            emailHtml,
+            metadata: { matchId, playerId: p.id, unconvoked: true },
+          });
+        }
+      }
+
+      if (unconvokeDispatches.length > 0) {
+        await NotificationService.dispatchBatch({ notifications: unconvokeDispatches });
+      }
+    } catch (unconvErr) {
+      console.error('[updateConvocatoriaBatch] Error notifying unconvoked players:', unconvErr);
+    }
   }
 
-  revalidatePath('/dashboard', 'layout')
-  return { success: true }
+  if (hasError) {
+    return { success: false, error: lastError };
+  }
+
+  revalidatePath('/dashboard', 'layout');
+  return { success: true };
 }
 
 
 export async function sendConvocatoriaAlerts(matchId: string, teamId: string, playerIds: string[]) {
   const adminSupabase = await createAdminClient()
 
-  // 1. Get match details
+  // 1. Obtener detalles del partido con su hora_citacion
   const { data: match } = await adminSupabase
     .from('partidos')
-    .select('id, rival_nombre, fecha_hora, lugar, notas, club_id, equipo:teams(name)')
+    .select('id, rival_nombre, fecha_hora, hora_citacion, lugar, notas, club_id, equipo:teams(name)')
     .eq('id', matchId)
     .single()
 
@@ -142,7 +269,16 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
   const matchDate = match?.fecha_hora ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Próximamente'
   const matchTime = match?.fecha_hora ? new Date(match.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : 'Por confirmar'
 
-  // 2. Get players with tutor_id and contact emails
+  // Calcular hora de citación: hora_citacion explícita o defecto 60 min antes
+  const citacionMs = match?.hora_citacion
+    ? new Date(match.hora_citacion).getTime()
+    : (match?.fecha_hora ? new Date(match.fecha_hora).getTime() - 60 * 60 * 1000 : null)
+  const citacionTime = citacionMs
+    ? new Date(citacionMs).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    : null
+  const citacionText = citacionTime ? `${citacionTime} h` : '60 min antes del partido'
+
+  // 2. Obtener jugadores con tutor_id y correos de contacto
   const { data: players } = await adminSupabase
     .from('players')
     .select('id, first_name, last_name, tutor_id, user_auth_id, email, tutor_email, parent1_email, parent2_email, tutor:profiles!players_tutor_id_fkey(email)')
@@ -167,7 +303,7 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
     }
   })
 
-  // 3. Build notification dispatch list
+  // 3. Construir lista de notificaciones con ambas horas claramente destacadas
   const dispatchItems: any[] = []
 
   for (const p of players) {
@@ -180,11 +316,14 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
       teamName,
       rivalName: match?.rival_nombre || 'Rival',
       date: matchDate,
-      time: matchTime,
+      time: matchTime ? `${matchTime} h` : undefined,
+      meetingTime: citacionText,
       location: match?.lugar || 'Campo Oficial',
       notes: match?.notas || undefined,
-      viewUrl: `https://app-gestiondeclubes.vercel.app/dashboard/family/e/${p.id}/partidos`,
+      viewUrl: `https://app.clubsportingsaladar.com/dashboard/family/e/${p.id}/partidos`,
     })
+
+    const notificationContent = `${p.first_name} ha sido convocado/a para el partido vs ${match?.rival_nombre || 'Rival'}.\n📍 Citación en el campo: ${citacionText} | ⏱️ Inicio: ${matchTime} h.`
 
     if (targetUserId) {
       dispatchItems.push({
@@ -193,13 +332,13 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
         clubId: match?.club_id,
         type: 'NEW_CONVOCATION' as const,
         title: `⚽ Convocatoria: ${matchTitle}`,
-        content: `${p.first_name} ha sido convocado/a para el partido vs ${match?.rival_nombre || 'Rival'} el ${matchDate} a las ${matchTime}.`,
+        content: notificationContent,
         link: `/dashboard/family/e/${p.id}/partidos`,
         channels: ['IN_APP' as const, 'EMAIL' as const],
         idempotencyKey: `convocation:${matchId}:${p.id}:${targetUserId}:published`,
         emailSubject: `⚽ Convocatoria Oficial: ${teamName} vs ${match?.rival_nombre}`,
         emailHtml,
-        metadata: { matchId, playerId: p.id },
+        metadata: { matchId, playerId: p.id, horaCitacion: citacionText },
       })
     }
 
@@ -213,13 +352,13 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
           clubId: match?.club_id,
           type: 'NEW_CONVOCATION' as const,
           title: `⚽ Convocatoria: ${matchTitle}`,
-          content: `${p.first_name} ha sido convocado/a para el partido vs ${match?.rival_nombre || 'Rival'}.`,
+          content: notificationContent,
           link: `/dashboard/family/e/${p.id}/partidos`,
           channels: ['IN_APP' as const, 'EMAIL' as const],
           idempotencyKey: `convocation:${matchId}:${p.id}:${et.tutorId}:published`,
           emailSubject: `⚽ Convocatoria Oficial: ${teamName} vs ${match?.rival_nombre}`,
           emailHtml,
-          metadata: { matchId, playerId: p.id },
+          metadata: { matchId, playerId: p.id, horaCitacion: citacionText },
         })
       }
     }
@@ -233,29 +372,37 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
   return { success: true, message: `Alertas enviadas a ${dispatchItems.length} destinatarios.` }
 }
 
-export async function getAvailableJuvenilePlayersAction(matchId: string) {
+export async function getAvailableLowerCategoryPlayersAction(matchId: string) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
-    return { success: false, error: authError || "No autenticado", players: [] };
+    return { success: false, error: authError || "No autenticado", players: [], targetCategory: null };
   }
 
   const supabase = await createAdminClient();
   const matchAccess = await canUserAccessMatch(supabase, context, matchId);
   if (!matchAccess.allowed || !matchAccess.match) {
-    return { success: false, error: matchAccess.reason || "No tienes acceso a este partido", players: [] };
+    return { success: false, error: matchAccess.reason || "No tienes acceso a este partido", players: [], targetCategory: null };
   }
 
   const clubId = context.profile.club_id;
 
-  // 1. Obtener la temporada del partido o en su defecto la temporada activa del club
+  // 1. Obtener la temporada y el equipo del partido
   const { data: matchData } = await supabase
     .from('partidos')
-    .select('season_id, equipo:teams(season_id)')
+    .select('season_id, equipo_id, equipo:teams(id, name, category, season_id)')
     .eq('id', matchId)
     .single();
 
-  let targetSeasonId = matchData?.season_id || (matchData?.equipo as any)?.season_id;
+  const team = (Array.isArray(matchData?.equipo) ? matchData?.equipo[0] : matchData?.equipo) as { name?: string, category?: string, season_id?: string } | undefined;
+  const teamName = team?.name || '';
+  const teamCategory = team?.category || '';
 
+  const config = detectLowerCategoryTarget(teamName, teamCategory);
+  if (!config) {
+    return { success: true, players: [], targetCategory: null };
+  }
+
+  let targetSeasonId = matchData?.season_id || team?.season_id;
   if (!targetSeasonId) {
     const { data: activeSeason } = await supabase
       .from('seasons')
@@ -266,26 +413,35 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
     targetSeasonId = activeSeason?.id;
   }
 
-  // 2. Obtener los equipos juveniles del club para esa temporada
+  // 2. Obtener los equipos de la categoría inferior del club para esa temporada
+  // Aislamiento estricto de temporadas: excluir temporada cerrada 25/26
   let teamsQuery = supabase
     .from('teams')
     .select('id, name, category, season_id')
     .eq('club_id', clubId)
-    .ilike('category', '%juvenil%');
+    .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
   if (targetSeasonId) {
     teamsQuery = teamsQuery.eq('season_id', targetSeasonId);
   }
 
-  const { data: juvenileTeams, error: teamsErr } = await teamsQuery;
-
-  if (teamsErr || !juvenileTeams || juvenileTeams.length === 0) {
-    return { success: true, players: [] };
+  if (config.target === 'Juvenil') {
+    teamsQuery = teamsQuery.or('name.ilike.%juvenil%,category.ilike.%juvenil%');
+  } else if (config.target === 'Cadete') {
+    teamsQuery = teamsQuery.or('name.ilike.%cadete%,category.ilike.%cadet%');
+  } else if (config.target === 'Infantil') {
+    teamsQuery = teamsQuery.or('name.ilike.%infantil%,category.ilike.%infantil%');
   }
 
-  const juvenileTeamIds = juvenileTeams.map(t => t.id);
+  const { data: targetTeams, error: teamsErr } = await teamsQuery;
 
-  // 3. Obtener jugadores activos de la plantilla juvenil mediante player_season_history
+  if (teamsErr || !targetTeams || targetTeams.length === 0) {
+    return { success: true, players: [], targetCategory: config.target };
+  }
+
+  const targetTeamIds = targetTeams.map(t => t.id);
+
+  // 3. Obtener jugadores activos de la plantilla inferior mediante player_season_history
   let playersList: any[] = [];
 
   const { data: historyData, error: hErr } = await supabase
@@ -295,7 +451,7 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
       team_id,
       players!inner (id, first_name, last_name, dorsal, status, medical_notes, posicion, posicion_principal, teams(name, category))
     `)
-    .in('team_id', juvenileTeamIds)
+    .in('team_id', targetTeamIds)
     .neq('status', 'inactive');
 
   if (!hErr && historyData && historyData.length > 0) {
@@ -305,11 +461,11 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
       posicion: h.players?.posicion_principal || h.players?.posicion
     }));
   } else {
-    // Fallback: solo dentro de los equipos juveniles de la temporada seleccionada
+    // Fallback: consulta directa a players
     const { data: directPlayers } = await supabase
       .from('players')
       .select('id, first_name, last_name, dorsal, status, medical_notes, posicion, posicion_principal, team_id, teams(name, category)')
-      .in('team_id', juvenileTeamIds)
+      .in('team_id', targetTeamIds)
       .neq('status', 'inactive')
       .order('first_name');
 
@@ -323,7 +479,7 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
     return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
   });
 
-  // Deduplicar estrictamente por id Y por nombre normalizado (para evitar duplicados por registros repetidos)
+  // Deduplicar estrictamente por id Y por nombre normalizado
   const uniquePlayersMap = new Map<string, any>();
   const seenNormalizedNames = new Set<string>();
 
@@ -339,10 +495,28 @@ export async function getAvailableJuvenilePlayersAction(matchId: string) {
     (a.first_name || '').localeCompare(b.first_name || '')
   );
 
-  return { success: true, players: sortedPlayers };
+  return { success: true, players: sortedPlayers, targetCategory: config.target };
 }
 
-export async function updateMatchDetails(matchId: string, teamId: string, updates: { fecha_hora?: string, lugar?: string, rival_nombre?: string, resultado_propio?: number | null, resultado_rival?: number | null, estado?: string, rsvp_reminder_time?: string | null, tipo_partido?: string }) {
+export async function getAvailableJuvenilePlayersAction(matchId: string) {
+  return getAvailableLowerCategoryPlayersAction(matchId);
+}
+
+export async function updateMatchDetails(
+  matchId: string, 
+  teamId: string, 
+  updates: { 
+    fecha_hora?: string, 
+    hora_citacion?: string | null,
+    lugar?: string, 
+    rival_nombre?: string, 
+    resultado_propio?: number | null, 
+    resultado_rival?: number | null, 
+    estado?: string, 
+    rsvp_reminder_time?: string | null, 
+    tipo_partido?: string 
+  }
+) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
     return { success: false, error: authError || "No autenticado" };
@@ -576,7 +750,7 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
 }
 
 
-export async function createPartidoAction(teamId: string, data: { fecha_hora: string, lugar?: string, rival_nombre?: string, season_id?: string, tipo_partido?: string, estado?: string, resultado_propio?: number | null, resultado_rival?: number | null, rsvp_reminder_time?: string | null }) {
+export async function createPartidoAction(teamId: string, data: { fecha_hora: string, hora_citacion?: string | null, lugar?: string, rival_nombre?: string, season_id?: string, tipo_partido?: string, estado?: string, resultado_propio?: number | null, resultado_rival?: number | null, rsvp_reminder_time?: string | null }) {
   const supabase = await createClient()
 
   // Obtener el club_id del usuario autenticado
@@ -610,6 +784,14 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
     if (!activeSeason) throw new Error("No hay una temporada activa para guardar el partido");
     finalSeasonId = activeSeason.id;
   }
+
+  let finalHoraCitacion = data.hora_citacion;
+  if (!finalHoraCitacion && data.fecha_hora) {
+    const ms = new Date(data.fecha_hora).getTime();
+    if (!isNaN(ms)) {
+      finalHoraCitacion = new Date(ms - 60 * 60 * 1000).toISOString();
+    }
+  }
   
   const { data: newMatch, error } = await supabase
     .from("partidos")
@@ -617,6 +799,7 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
       club_id: profile.club_id,
       equipo_id: teamId,
       fecha_hora: data.fecha_hora,
+      hora_citacion: finalHoraCitacion,
       lugar: data.lugar,
       rival_nombre: data.rival_nombre,
       estado: data.estado || 'Programado',

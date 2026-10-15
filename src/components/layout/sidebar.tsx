@@ -189,7 +189,8 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                 .neq('status', 'inactive')
                 .maybeSingle()
 
-              if (playerRec && playerRec.teams?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' && !isCancelled) {
+              const playerTeam = (Array.isArray(playerRec?.teams) ? playerRec?.teams[0] : playerRec?.teams) as any
+              if (playerRec && playerTeam?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' && !isCancelled) {
                 setLinkedPlayers([{
                   player_id: playerRec.id,
                   players: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Target, Crosshair, BarChart2, X, BrainCircuit, Sparkles, Flame, Compass, HeartHandshake, CheckCircle2, ChevronRight, Smile, AlertTriangle, Moon, Battery, ThumbsUp, ShieldAlert, AlertCircle } from "lucide-react";
@@ -8,6 +8,7 @@ import { differenceInDays, parseISO } from "date-fns";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
 import { getAuthorizedTeamWellnessSummary } from "@/app/actions/feedback-actions";
+import { useSeason } from "@/components/providers/SeasonProvider";
 import { isFormativeCategory } from "@/lib/utils";
 import { generateInformationalAlerts, InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
 
@@ -84,6 +85,8 @@ export default function RendimientoGlobalPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = typeof params.teamId === 'string' ? params.teamId : '';
+  const { selectedSeasonId } = useSeason();
+  const requestIdRef = useRef(0);
 
   const [trainingStats, setTrainingStats] = useState<TrainingStats[]>([]);
   const [matchStats, setMatchStats] = useState<MatchStats[]>([]);
@@ -97,56 +100,97 @@ export default function RendimientoGlobalPage() {
   const [drawerTab, setDrawerTab] = useState<'entrenamientos' | 'partidos' | 'formativo'>('entrenamientos');
 
   useEffect(() => {
+    let isCancelled = false;
+    const currentRequestId = ++requestIdRef.current;
+
     if (teamId) {
-      fetchGlobalData();
+      // Limpiar inmediatamente datos de la temporada previa y activar estado de carga
+      setLoading(true);
+      setWellnessSummary(null);
+      setTrainingStats([]);
+      setMatchStats([]);
+      setFormativeStats([]);
+
+      fetchGlobalData(currentRequestId, () => isCancelled);
     }
-  }, [teamId]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [teamId, selectedSeasonId]);
 
   const isFormative = (): boolean => {
     return isFormativeCategory(teamCategory, teamName);
   };
 
-  const fetchGlobalData = async () => {
-    setLoading(true);
+  const fetchGlobalData = async (reqId: number, checkCancelled: () => boolean) => {
     const supabase = createClient();
 
     try {
       // 0. Fetch Formative Team Overview
       const formSummary = await getTeamFormativeOverview(teamId);
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
       setFormativeStats(formSummary);
 
       // 1. Fetch team and metrics
       const { data: teamData } = await supabase.from('teams').select('club_id, category, name').eq('id', teamId).single();
-      if (!teamData) return;
-      if (teamData) {
-        setTeamCategory(teamData.category || '');
-        setTeamName(teamData.name || '');
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
+      if (!teamData) {
+        setLoading(false);
+        return;
       }
+      setTeamCategory(teamData.category || '');
+      setTeamName(teamData.name || '');
       
       const { data: metrics } = await supabase.from('club_metrics').select('id, name').eq('club_id', teamData.club_id);
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
 
       // 2. Fetch Active Season & Players
       const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', teamData.club_id).eq('is_active', true).single();
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
+      const currentSeasonId = selectedSeasonId || activeSeason?.id;
       
       let allPlayers: any[] = [];
-      if (activeSeason?.id) {
+      if (currentSeasonId) {
         const { data: historyData } = await supabase
           .from('player_season_history')
           .select('player_id, players(id, first_name, last_name, dorsal, avatar_url, accumulated_minutes, technical_rating, posicion)')
           .eq('team_id', teamId)
           .neq('status', 'inactive')
-          .or(`season_id.eq.${activeSeason.id},season_id.is.null`);
+          .or(`season_id.eq.${currentSeasonId},season_id.is.null`);
           
+        if (checkCancelled() || reqId !== requestIdRef.current) return;
+
         if (historyData) {
           allPlayers = historyData.map((h: any) => h.players);
         }
       }
-      if (!allPlayers.length) return;
+
+      // Si la temporada seleccionada no tiene jugadores, restablecer datos y mostrar estado vacío
+      if (!allPlayers.length) {
+        if (checkCancelled() || reqId !== requestIdRef.current) return;
+        setTrainingStats([]);
+        setMatchStats([]);
+        setWellnessSummary(null);
+        setFormativeStats([]);
+        setLoading(false);
+        return;
+      }
 
       const players = allPlayers.filter(p => {
         const pos = p.posicion?.toLowerCase() || '';
         return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('técnico');
       });
+
+      if (!players.length) {
+        if (checkCancelled() || reqId !== requestIdRef.current) return;
+        setTrainingStats([]);
+        setMatchStats([]);
+        setWellnessSummary(null);
+        setFormativeStats([]);
+        setLoading(false);
+        return;
+      }
 
       // 3. Fetch all events and separate them
       // 3. Fetch all events and official matches
@@ -160,10 +204,10 @@ export default function RendimientoGlobalPage() {
         .select('id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival')
         .eq('equipo_id', teamId);
 
-      if (activeSeason?.id) {
-        matchQuery = matchQuery.eq('season_id', activeSeason.id);
+      if (currentSeasonId) {
+        matchQuery = matchQuery.eq('season_id', currentSeasonId);
       } else {
-        // Fallback defensivo: excluir temporada cerrada si no se resolviera activeSeason
+        // Fallback defensivo: excluir temporada cerrada si no se resolviera la temporada
         matchQuery = matchQuery.neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
       }
 
@@ -315,6 +359,7 @@ export default function RendimientoGlobalPage() {
         });
       }
 
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
       setTrainingStats(tResults.sort((a, b) => b.acwr - a.acwr));
       setMatchStats(mResults.sort((a, b) => b.matchMinutes - a.matchMinutes));
 
@@ -350,10 +395,12 @@ export default function RendimientoGlobalPage() {
       // 6. Consultar bienestar diario del equipo mediante Server Action autorizada (protege molestias en origen)
       let dailyWellnessRows: any[] = [];
       try {
-        const wellnessServerRes = await getAuthorizedTeamWellnessSummary(teamId, todayStr);
-        if (wellnessServerRes.success) {
-          canViewDiscomfort = wellnessServerRes.canViewDiscomfort;
-          dailyWellnessRows = wellnessServerRes.entries;
+        if (currentSeasonId) {
+          const wellnessServerRes = await getAuthorizedTeamWellnessSummary(teamId, todayStr, currentSeasonId);
+          if (wellnessServerRes.success) {
+            canViewDiscomfort = wellnessServerRes.canViewDiscomfort;
+            dailyWellnessRows = wellnessServerRes.entries;
+          }
         }
       } catch (err) {
         // Fallback silencioso defensivo
@@ -452,6 +499,7 @@ export default function RendimientoGlobalPage() {
         }
       }
 
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
       setWellnessSummary({
         date: todayStr,
         totalSquad: players.length,
@@ -472,7 +520,9 @@ export default function RendimientoGlobalPage() {
     } catch (err) {
       console.error("Error fetching global stats:", err);
     } finally {
-      setLoading(false);
+      if (!checkCancelled() && reqId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -564,7 +614,8 @@ export default function RendimientoGlobalPage() {
       </div>
 
       {/* BLOQUE BIENESTAR DIARIO & PREVENCIÓN */}
-      {viewMode === 'bienestar' && wellnessSummary && (
+      {viewMode === 'bienestar' && (
+        wellnessSummary ? (
         <section className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
           {/* Banner de estado de persistencia */}
           <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 shadow-sm">
@@ -837,7 +888,15 @@ export default function RendimientoGlobalPage() {
             </div>
           </div>
         </section>
-      )}
+      ) : (
+        <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-3xl border border-gray-200 text-center space-y-3 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100">
+            <HeartHandshake size={24} />
+          </div>
+          <h4 className="text-base font-bold text-gray-800">Sin datos de bienestar en esta temporada</h4>
+          <p className="text-sm text-gray-500 max-w-md">No hay jugadores matriculados ni cuestionarios de bienestar diario registrados para este equipo en la temporada seleccionada.</p>
+        </div>
+      ))}
 
       {/* BLOQUE FORMATIVO & APRENDIZAJE COLECTIVO */}
       {viewMode === 'formativo' && isFormative() && (
@@ -1020,66 +1079,76 @@ export default function RendimientoGlobalPage() {
         {/* Global Team Performance Banner */}
         <TeamPerformanceBanner trainingStats={trainingStats} />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {trainingStats.map(player => {
-            const acwrStatus = getACWRStatus(player.acwr);
-            return (
-              <button
-                key={`tr-${player.id}`}
-                onClick={() => { setDrawerPlayerId(player.id); setDrawerTab('entrenamientos'); }}
-                className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-emerald-300 hover:shadow-md transition-all text-left flex flex-col h-full group cursor-pointer"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  {player.avatar_url ? (
-                    <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover object-[center_25%] border border-gray-200" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg border border-slate-200">
-                      {player.first_name.charAt(0)}{player.last_name.charAt(0)}
-                    </div>
-                  )}
-                  <div className="overflow-hidden">
-                    <h3 className="font-bold text-gray-900 truncate group-hover:text-emerald-600 transition-colors">
-                      {player.first_name} {player.last_name}
-                    </h3>
-                    <div className="text-xs text-gray-500 flex items-center gap-1">
-                      <UserIcon size={12} /> Dorsal {player.dorsal || '-'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-3">
-                  <div className={`flex items-center justify-between p-3 rounded-xl border ${acwrStatus.color}`}>
-                    <div className="flex items-center gap-2">
-                      <Activity size={16} />
-                      <span className="text-xs font-bold uppercase">ACWR</span>
-                    </div>
-                    <div className="font-black">
-                      {player.acwr > 0 ? player.acwr.toFixed(2) : '-'}
+        {trainingStats.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {trainingStats.map(player => {
+              const acwrStatus = getACWRStatus(player.acwr);
+              return (
+                <button
+                  key={`tr-${player.id}`}
+                  onClick={() => { setDrawerPlayerId(player.id); setDrawerTab('entrenamientos'); }}
+                  className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-emerald-300 hover:shadow-md transition-all text-left flex flex-col h-full group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    {player.avatar_url ? (
+                      <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover object-[center_25%] border border-gray-200" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg border border-slate-200">
+                        {player.first_name.charAt(0)}{player.last_name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="overflow-hidden">
+                      <h3 className="font-bold text-gray-900 truncate group-hover:text-emerald-600 transition-colors">
+                        {player.first_name} {player.last_name}
+                      </h3>
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <UserIcon size={12} /> Dorsal {player.dorsal || '-'}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Calendar size={14} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Asist.</span>
+                  <div className="flex-1 space-y-3">
+                    <div className={`flex items-center justify-between p-3 rounded-xl border ${acwrStatus.color}`}>
+                      <div className="flex items-center gap-2">
+                        <Activity size={16} />
+                        <span className="text-xs font-bold uppercase">ACWR</span>
                       </div>
-                      <span className="font-black text-slate-900">{player.trainingAttendancePct}%</span>
+                      <div className="font-black">
+                        {player.acwr > 0 ? player.acwr.toFixed(2) : '-'}
+                      </div>
                     </div>
-                    
-                    <div className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Clock size={14} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Mins.</span>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Calendar size={14} className="text-slate-400" />
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Asist.</span>
+                        </div>
+                        <span className="font-black text-slate-900">{player.trainingAttendancePct}%</span>
                       </div>
-                      <span className="font-black text-slate-900">{player.trainingMinutes}</span>
+                      
+                      <div className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Clock size={14} className="text-slate-400" />
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Mins.</span>
+                        </div>
+                        <span className="font-black text-slate-900">{player.trainingMinutes}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-3xl border border-gray-200 text-center space-y-3 shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100">
+              <TrendingUp size={24} />
+            </div>
+            <h4 className="text-base font-bold text-gray-800">Sin sesiones de entrenamiento</h4>
+            <p className="text-sm text-gray-500 max-w-md">No hay entrenamientos ni métricas de carga registradas para esta plantilla en la temporada seleccionada.</p>
+          </div>
+        )}
       </section>
       )}
 
@@ -1096,89 +1165,99 @@ export default function RendimientoGlobalPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {matchStats.map(player => {
-            return (
-              <button
-                key={`mt-${player.id}`}
-                onClick={() => { setDrawerPlayerId(player.id); setDrawerTab('partidos'); }}
-                className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all text-left flex flex-col h-full group cursor-pointer"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  {player.avatar_url ? (
-                    <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover object-[center_25%] border border-gray-200" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg border border-slate-200">
-                      {player.first_name.charAt(0)}{player.last_name.charAt(0)}
-                    </div>
-                  )}
-                  <div className="overflow-hidden">
-                    <h3 className="font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
-                      {player.first_name} {player.last_name}
-                    </h3>
-                    <div className="text-xs text-gray-500 flex items-center gap-1">
-                      <UserIcon size={12} /> Dorsal {player.dorsal || '-'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col p-3 rounded-xl bg-indigo-50/50 border border-indigo-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Clock size={14} className="text-indigo-500" />
-                        <span className="text-[10px] font-bold text-indigo-700 uppercase">Minutos</span>
-                      </div>
-                      <span className="font-black text-indigo-900">{player.matchMinutes}</span>
-                    </div>
-                    
-                    <div className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Calendar size={14} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Convocat.</span>
-                      </div>
-                      <span className="font-black text-slate-900">{player.matchAttendancePct}%</span>
-                    </div>
-                  </div>
-
-                  {/* Bloque Estadísticas Oficiales (Actas FFCV) */}
-                  <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-1.5">
-                        <Target size={12} className="text-amber-500" />
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Goles</span>
-                      </div>
-                      <span className="font-bold text-sm text-gray-900">{player.goals ?? 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-1.5">
-                        <Crosshair size={12} className="text-blue-500" />
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Asist.</span>
-                      </div>
-                      <span className="font-bold text-sm text-gray-900">{player.assists ?? 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm inline-block shadow-xs"></div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Tarjetas</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs font-bold">
-                        <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">{player.yellowCards} 🟨</span>
-                        <span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">{player.redCards} 🟥</span>
-                      </div>
-                    </div>
-                    {player.starts > 0 && (
-                      <div className="flex justify-between items-center pt-1 border-t border-gray-200/60">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Titular</span>
-                        <span className="text-xs font-black text-slate-700">{player.starts} partidos</span>
+        {matchStats.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {matchStats.map(player => {
+              return (
+                <button
+                  key={`mt-${player.id}`}
+                  onClick={() => { setDrawerPlayerId(player.id); setDrawerTab('partidos'); }}
+                  className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-indigo-300 hover:shadow-md transition-all text-left flex flex-col h-full group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    {player.avatar_url ? (
+                      <img src={player.avatar_url} alt={player.first_name} className="w-12 h-12 rounded-full object-cover object-[center_25%] border border-gray-200" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center font-bold text-lg border border-slate-200">
+                        {player.first_name.charAt(0)}{player.last_name.charAt(0)}
                       </div>
                     )}
+                    <div className="overflow-hidden">
+                      <h3 className="font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+                        {player.first_name} {player.last_name}
+                      </h3>
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <UserIcon size={12} /> Dorsal {player.dorsal || '-'}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+
+                  <div className="flex-1 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col p-3 rounded-xl bg-indigo-50/50 border border-indigo-100">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Clock size={14} className="text-indigo-500" />
+                          <span className="text-[10px] font-bold text-indigo-700 uppercase">Minutos</span>
+                        </div>
+                        <span className="font-black text-indigo-900">{player.matchMinutes}</span>
+                      </div>
+                      
+                      <div className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Calendar size={14} className="text-slate-400" />
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Convocat.</span>
+                        </div>
+                        <span className="font-black text-slate-900">{player.matchAttendancePct}%</span>
+                      </div>
+                    </div>
+
+                    {/* Bloque Estadísticas Oficiales (Actas FFCV) */}
+                    <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Target size={12} className="text-amber-500" />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Goles</span>
+                        </div>
+                        <span className="font-bold text-sm text-gray-900">{player.goals ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Crosshair size={12} className="text-blue-500" />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Asist.</span>
+                        </div>
+                        <span className="font-bold text-sm text-gray-900">{player.assists ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-3.5 bg-amber-400 rounded-sm inline-block shadow-xs"></div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Tarjetas</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-bold">
+                          <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">{player.yellowCards} 🟨</span>
+                          <span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">{player.redCards} 🟥</span>
+                        </div>
+                      </div>
+                      {player.starts > 0 && (
+                        <div className="flex justify-between items-center pt-1 border-t border-gray-200/60">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Titular</span>
+                          <span className="text-xs font-black text-slate-700">{player.starts} partidos</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-white rounded-3xl border border-gray-200 text-center space-y-3 shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100">
+              <Target size={24} />
+            </div>
+            <h4 className="text-base font-bold text-gray-800">Sin partidos oficiales</h4>
+            <p className="text-sm text-gray-500 max-w-md">No hay convocatorias ni minutos de juego registrados para este equipo en la temporada seleccionada.</p>
+          </div>
+        )}
       </section>
       )}
 

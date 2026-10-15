@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ExternalLink,
   Calendar,
+  MapPin,
 } from "lucide-react";
 import {
   CoordinatorUpcomingMatch,
@@ -306,7 +307,7 @@ export function ClubAgendaCommsSection({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="divide-y divide-slate-100">
+              <div className="space-y-2.5 sm:space-y-0 sm:divide-y sm:divide-slate-100">
                 {displayedMatches.map((m) => {
                   const matchDate = new Date(m.fechaHora);
                   const dateStr = formatDateDMY(m.fechaHora);
@@ -314,69 +315,42 @@ export function ClubAgendaCommsSection({
                     hour: "2-digit",
                     minute: "2-digit",
                   });
+                  const dayName = matchDate.toLocaleDateString("es-ES", { weekday: "short" });
+                  const dayCapitalized = dayName ? dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "") : "";
 
                   const isLive = m.estado === "En curso" || m.estado === "live";
                   const isFinished = m.estado === "Finalizado";
 
                   return (
-                    <div
-                      key={m.id}
-                      className="py-3 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/70 rounded-xl px-2 -mx-2 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-16 text-center shrink-0">
-                          <div className="text-[10px] font-bold text-slate-500 uppercase">{dateStr}</div>
-                          <div className="text-xs font-black text-slate-800 flex items-center justify-center gap-0.5">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            {timeStr}
-                          </div>
-                        </div>
-
-                        <div className="space-y-0.5 min-w-0">
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="text-xs font-bold text-slate-900 truncate">
-                              {m.esLocal ? m.teamName : m.rivalNombre}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold shrink-0">vs</span>
-                            <span className="text-xs font-bold text-slate-900 truncate">
-                              {m.esLocal ? m.rivalNombre : m.teamName}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-500 truncate">
-                            <span
-                              className="inline-block w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: m.teamColor || "#4F46E5" }}
-                            />
-                            <span className="font-medium truncate">{m.teamName}</span>
-                            {m.teamCategory && (
-                              <span className="text-slate-400 shrink-0">· {m.teamCategory}</span>
-                            )}
-                            {m.lugar && !['local', 'visitante'].includes(m.lugar.toLowerCase()) && (
-                              <span className="hidden md:inline text-slate-400 truncate">
-                                · {m.lugar}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {isLive ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                    <React.Fragment key={m.id}>
+                      {/* ── Vista Móvil (< sm): Centrado, legible y con nombres completos ── */}
+                      <div className="sm:hidden p-3.5 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2.5 text-center transition-all shadow-2xs">
+                        {/* Fila superior centrada: Fecha/Hora y Badges */}
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
+                          <span className="inline-flex items-center gap-1.5 font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span className="uppercase text-[11px] font-black">{dayCapitalized ? `${dayCapitalized}, ` : ""}{dateStr}</span>
+                            <span className="text-slate-300">·</span>
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="font-black text-slate-900 text-xs">{timeStr}</span>
                           </span>
-                        ) : isFinished ? (
-                          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg">
-                            {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            {(m as any).tipoPartido === 'amistoso' && (
-                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
-                                Amistoso
-                              </span>
-                            )}
+
+                          {(m as any).tipoPartido === 'amistoso' && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
+                              Amistoso
+                            </span>
+                          )}
+
+                          {isLive ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                            </span>
+                          ) : isFinished ? (
+                            <span className="text-[11px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-lg">
+                              Finalizado {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                            </span>
+                          ) : (
                             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
                               m.esLocal
                                 ? "text-emerald-700 bg-emerald-50 border-emerald-200"
@@ -384,10 +358,143 @@ export function ClubAgendaCommsSection({
                             }`}>
                               {m.esLocal ? "Local" : "Visitante"}
                             </span>
+                          )}
+                        </div>
+
+                        {/* Enfrentamiento centrado con nombres completos sin recortar */}
+                        <div className="py-1 px-1 space-y-1.5">
+                          {/* Equipo Local */}
+                          <div className="flex items-center justify-center gap-1.5">
+                            {m.esLocal && (
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: m.teamColor || "#4F46E5" }}
+                                title={m.teamName}
+                              />
+                            )}
+                            <span className={`text-sm font-extrabold leading-snug break-words ${m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                              {m.esLocal ? m.teamName : m.rivalNombre}
+                            </span>
+                          </div>
+
+                          {/* Divisor central con VS o Marcador */}
+                          <div className="flex items-center justify-center gap-2 py-0.5">
+                            <div className="h-px bg-slate-200 w-10" />
+                            {isLive || isFinished ? (
+                              <span className="text-sm font-black px-3 py-0.5 bg-slate-900 text-white rounded-lg shadow-2xs tracking-wide">
+                                {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
+                                VS
+                              </span>
+                            )}
+                            <div className="h-px bg-slate-200 w-10" />
+                          </div>
+
+                          {/* Equipo Visitante */}
+                          <div className="flex items-center justify-center gap-1.5">
+                            {!m.esLocal && (
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: m.teamColor || "#4F46E5" }}
+                                title={m.teamName}
+                              />
+                            )}
+                            <span className={`text-sm font-extrabold leading-snug break-words ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                              {m.esLocal ? m.rivalNombre : m.teamName}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Pie de detalles centrados: Categoría y Campo/Lugar */}
+                        {(m.teamCategory || (m.lugar && !['local', 'visitante'].includes(m.lugar.toLowerCase()))) && (
+                          <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-slate-500 font-medium">
+                            {m.teamCategory && (
+                              <span className="text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md font-semibold text-[10px]">
+                                {m.teamCategory}
+                              </span>
+                            )}
+                            {m.lugar && !['local', 'visitante'].includes(m.lugar.toLowerCase()) && (
+                              <span className="inline-flex items-center gap-1 text-slate-500 text-[10px]">
+                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="break-words">{m.lugar}</span>
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
-                    </div>
+
+                      {/* ── Vista Desktop (sm: en adelante): Formato fila horizontal ── */}
+                      <div className="hidden sm:flex py-3 first:pt-1 last:pb-1 sm:items-center justify-between gap-3 hover:bg-slate-50/70 rounded-xl px-2.5 -mx-2 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-24 min-w-[90px] text-center shrink-0">
+                            <div className="text-[11px] font-bold text-slate-500 uppercase whitespace-nowrap">
+                              {dayCapitalized ? `${dayCapitalized} ` : ""}{dateStr}
+                            </div>
+                            <div className="text-xs font-black text-slate-800 flex items-center justify-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {timeStr}
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-extrabold ${m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                                {m.esLocal ? m.teamName : m.rivalNombre}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold shrink-0">vs</span>
+                              <span className={`text-xs font-extrabold ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
+                                {m.esLocal ? m.rivalNombre : m.teamName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                              <span
+                                className="inline-block w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: m.teamColor || "#4F46E5" }}
+                              />
+                              <span className="font-semibold text-slate-700">{m.teamName}</span>
+                              {m.teamCategory && (
+                                <span className="text-slate-400 shrink-0">· {m.teamCategory}</span>
+                              )}
+                              {m.lugar && !['local', 'visitante'].includes(m.lugar.toLowerCase()) && (
+                                <span className="inline-flex items-center gap-0.5 text-slate-400">
+                                  · <MapPin className="w-2.5 h-2.5 text-slate-400 inline shrink-0" /> {m.lugar}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isLive ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                            </span>
+                          ) : isFinished ? (
+                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                              {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              {(m as any).tipoPartido === 'amistoso' && (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
+                                  Amistoso
+                                </span>
+                              )}
+                              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
+                                m.esLocal
+                                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                  : "text-amber-700 bg-amber-50 border-amber-200"
+                              }`}>
+                                {m.esLocal ? "Local" : "Visitante"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </React.Fragment>
                   );
                 })}
               </div>
@@ -428,28 +535,53 @@ export function ClubAgendaCommsSection({
         ) : (
           displayedTrainings.length > 0 ? (
             <div className="space-y-3">
-              <div className="divide-y divide-slate-100">
+              <div className="space-y-2.5 sm:space-y-0 sm:divide-y sm:divide-slate-100">
                 {displayedTrainings.map((t) => (
-                  <div
-                    key={t.id}
-                    className="py-3 first:pt-1 last:pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/70 rounded-xl px-2 -mx-2 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-16 text-center shrink-0">
-                        <div className="text-[10px] font-bold text-indigo-600 uppercase">{formatDateDMY(t.date)}</div>
-                        <div className="text-xs font-black text-slate-800">{(t.startTime || "18:00").slice(0, 5)}</div>
+                  <React.Fragment key={t.id}>
+                    {/* Vista Móvil Entrenamientos */}
+                    <div className="sm:hidden p-3.5 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-center transition-all shadow-2xs">
+                      <div className="flex items-center justify-center gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1.5 font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                          <span className="text-[11px] uppercase font-bold">{formatDateDMY(t.date)}</span>
+                          <span className="text-indigo-300">·</span>
+                          <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                          <span className="text-xs font-black">{(t.startTime || "18:00").slice(0, 5)}</span>
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                          {t.eventType}
+                        </span>
                       </div>
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{t.title}</p>
-                        <p className="text-[11px] text-slate-500 truncate">
+                      <div className="py-0.5">
+                        <p className="text-sm font-extrabold text-slate-900 leading-snug">{t.title}</p>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
                           {t.teamName} · {t.location || "Campo de fútbol"}
                         </p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg self-end sm:self-center shrink-0">
-                      {t.eventType}
-                    </span>
-                  </div>
+
+                    {/* Vista Desktop Entrenamientos */}
+                    <div className="hidden sm:flex py-3 first:pt-1 last:pb-1 sm:items-center justify-between gap-3 hover:bg-slate-50/70 rounded-xl px-2.5 -mx-2 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-24 min-w-[90px] text-center shrink-0">
+                          <div className="text-[11px] font-bold text-indigo-600 uppercase whitespace-nowrap">{formatDateDMY(t.date)}</div>
+                          <div className="text-xs font-black text-slate-800 flex items-center justify-center gap-1">
+                            <Clock className="w-3 h-3 text-indigo-400" />
+                            {(t.startTime || "18:00").slice(0, 5)}
+                          </div>
+                        </div>
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="text-xs font-bold text-slate-900">{t.title}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {t.teamName} · {t.location || "Campo de fútbol"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg shrink-0">
+                        {t.eventType}
+                      </span>
+                    </div>
+                  </React.Fragment>
                 ))}
               </div>
 

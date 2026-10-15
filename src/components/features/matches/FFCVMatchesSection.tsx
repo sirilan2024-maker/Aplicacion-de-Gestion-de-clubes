@@ -357,7 +357,7 @@ export function FFCVMatchesSection({
                       rel="noopener noreferrer"
                       className="w-full sm:w-auto px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0"
                     >
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                       <span>Ficha en Apúntamelo</span>
                     </a>
                   ) : m.codacta ? (
@@ -370,7 +370,7 @@ export function FFCVMatchesSection({
                       })}
                       className="w-full sm:w-auto px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0"
                     >
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                       <span>Ver acta oficial FFCV</span>
                     </button>
                   ) : null}

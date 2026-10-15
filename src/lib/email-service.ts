@@ -611,6 +611,105 @@ export function getConvocationEmailHtml(params: {
 }
 
 /**
+ * Plantilla HTML: Desconvocatoria / Actualización de Convocatoria de Partido
+ */
+export function getUnconvocationEmailHtml(params: {
+  playerName: string;
+  teamName: string;
+  rivalName: string;
+  date: string;
+  time?: string;
+  viewUrl?: string;
+}): string {
+  const {
+    playerName,
+    teamName,
+    rivalName,
+    date,
+    time = 'Por confirmar',
+    viewUrl = 'https://app-gestiondeclubes.vercel.app/dashboard/matches'
+  } = params;
+
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Actualización de Convocatoria - Sporting Saladar</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
+      .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+      .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #ffffff; padding: 32px 30px; text-align: center; }
+      .header h1 { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
+      .badge { display: inline-block; background: rgba(244, 63, 94, 0.2); color: #fda4af; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px; border: 1px solid rgba(253, 164, 175, 0.3); }
+      .content { padding: 32px 30px; }
+      .salutation { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+      .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; margin: 20px 0; }
+      .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+      .row:last-child { border-bottom: none; }
+      .label { color: #64748b; font-weight: 600; }
+      .value { color: #0f172a; font-weight: 800; text-align: right; }
+      .button-container { text-align: center; margin: 26px 0 10px; }
+      .button { display: inline-block; background: #475569; color: #ffffff !important; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 12px; }
+      .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <span class="badge">Aviso de Convocatoria Actualizada</span>
+        <h1>${teamName} vs ${rivalName}</h1>
+      </div>
+      <div class="content">
+        <div class="salutation">Hola 👋</div>
+        <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+          Te informamos de que se ha actualizado la convocatoria oficial y <strong>${playerName}</strong> no está convocado/a finalmente para el próximo encuentro.
+        </p>
+
+        <div class="card">
+          <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 10px;">
+            Datos del Partido:
+          </div>
+          <div class="row">
+            <span class="label">Jugador/a:</span>
+            <span class="value">${playerName}</span>
+          </div>
+          <div class="row">
+            <span class="label">Equipo:</span>
+            <span class="value">${teamName}</span>
+          </div>
+          <div class="row">
+            <span class="label">Rival:</span>
+            <span class="value">${rivalName}</span>
+          </div>
+          <div class="row">
+            <span class="label">Fecha y Hora:</span>
+            <span class="value">${date} a las ${time}</span>
+          </div>
+          <div class="row">
+            <span class="label">Estado Convocatoria:</span>
+            <span class="value" style="color: #e11d48;">No convocado/a</span>
+          </div>
+        </div>
+
+        <p style="font-size: 13.5px; line-height: 1.6; color: #64748b;">
+          Por tanto, <strong>no es necesario acudir a la citación del partido</strong>. Si tienes cualquier duda sobre la rotación o convocatoria, consulta directamente con el cuerpo técnico.
+        </p>
+
+        <div class="button-container">
+          <a href="${viewUrl}" class="button" target="_blank">Ver Ficha del Partido en la App</a>
+        </div>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Sporting Saladar Club de Fútbol.
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+}
+
+/**
  * Plantilla HTML: Recordatorio 24h de Evento / Entrenamiento
  */
 export function getEventReminderEmailHtml(params: {

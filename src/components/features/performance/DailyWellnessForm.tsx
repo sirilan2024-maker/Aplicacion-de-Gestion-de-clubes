@@ -14,7 +14,8 @@ import {
   ShieldAlert, 
   Info,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO } from "date-fns";
@@ -36,6 +37,7 @@ export interface DailyWellnessFormProps {
   token?: string;
   tokenExp?: number;
   teamName: string;
+  isDemo?: boolean;
 }
 
 export function DailyWellnessForm({
@@ -47,6 +49,7 @@ export function DailyWellnessForm({
   token,
   tokenExp,
   teamName,
+  isDemo = false,
 }: DailyWellnessFormProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState(initialPlayerId);
 
@@ -115,6 +118,19 @@ export function DailyWellnessForm({
 
     if (!validateForm()) {
       toast.error("Por favor, completa todas las preguntas obligatorias antes de enviar.");
+      return;
+    }
+
+    if (isDemo) {
+      setSubmitting(true);
+      setTimeout(() => {
+        setSubmitting(false);
+        setSubmitResult({
+          status: 'success',
+          message: "Modo Demostración: Cuestionario validado con éxito. El guardado en base de datos está desactivado en este modo para garantizar el aislamiento total.",
+        });
+        toast.success("Demostración: Validación completada");
+      }, 300);
       return;
     }
 
@@ -214,6 +230,35 @@ export function DailyWellnessForm({
         <p className="text-[11px] text-gray-400 italic">
           * Tu información está disponible para el preparador físico y cuerpo técnico para adaptar las cargas del entrenamiento.
         </p>
+
+        {isDemo && (
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3 text-left text-xs text-amber-800">
+              <span className="font-bold block">Aviso de modo demo:</span>
+              <span>Esta fue una simulación en memoria. No se realizó ninguna llamada a Supabase ni se guardaron datos.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSubmitResult({ status: 'idle' });
+                setSleepQuality(0);
+                setFatigue(0);
+                setSoreness(0);
+                setStress(0);
+                setMood(0);
+                setHasDiscomfort(false);
+                setZone("");
+                setIntensity(5);
+                setNotes("");
+                setValidationErrors({});
+              }}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 mx-auto transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Probar de nuevo el formulario</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -460,37 +505,52 @@ export function DailyWellnessForm({
 
         {/* 3. REPORTE DE MOLESTIAS (CONDICIONAL) */}
         <div className="space-y-3 pt-2 border-t border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-sm font-bold text-gray-800 block">
-                3. ¿Tienes alguna molestia o dolor previo?
-              </label>
-              <p className="text-[11px] text-gray-500">Informa al preparador antes de saltar al campo</p>
-            </div>
+          <div>
+            <label className="text-sm font-bold text-gray-800 block">
+              3. ¿Tienes alguna molestia o dolor previo?
+            </label>
+            <p className="text-[11px] text-gray-500">Informa al preparador antes de saltar al campo</p>
+          </div>
+
+          {/* Dos opciones explícitas: "No, todo bien" y "Sí, tengo molestia" */}
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => {
-                const nextState = !hasDiscomfort;
-                setHasDiscomfort(nextState);
-                if (!nextState) {
-                  setZone("");
-                  setIntensity(5);
-                  setNotes("");
-                  setValidationErrors((prev) => {
-                    const next = { ...prev };
-                    delete next.zone;
-                    delete next.intensity;
-                    return next;
-                  });
-                }
+                setHasDiscomfort(false);
+                setZone("");
+                setIntensity(5);
+                setNotes("");
+                setValidationErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.zone;
+                  delete next.intensity;
+                  return next;
+                });
               }}
-              className={`text-xs font-bold px-3.5 py-1.5 rounded-full transition-all ${
-                hasDiscomfort
-                  ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-300'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              className={`py-3 px-3 rounded-2xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all border ${
+                !hasDiscomfort
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm ring-2 ring-emerald-200/60'
+                  : 'bg-white hover:bg-slate-50 border-gray-200 text-gray-600'
               }`}
             >
-              {hasDiscomfort ? 'Sí, tengo molestia' : 'No, todo bien'}
+              <CheckCircle2 className={`w-4 h-4 shrink-0 ${!hasDiscomfort ? 'text-emerald-600' : 'text-gray-400'}`} />
+              <span>No, todo bien</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setHasDiscomfort(true);
+              }}
+              className={`py-3 px-3 rounded-2xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all border ${
+                hasDiscomfort
+                  ? 'bg-amber-500 border-amber-500 text-white shadow-sm ring-2 ring-amber-300'
+                  : 'bg-white hover:bg-slate-50 border-gray-200 text-gray-600'
+              }`}
+            >
+              <AlertTriangle className={`w-4 h-4 shrink-0 ${hasDiscomfort ? 'text-white' : 'text-amber-500'}`} />
+              <span>Sí, tengo molestia</span>
             </button>
           </div>
 
@@ -598,12 +658,12 @@ export function DailyWellnessForm({
           {submitting ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Registrando respuestas...</span>
+              <span>{isDemo ? "Validando en modo demo..." : "Registrando respuestas..."}</span>
             </>
           ) : (
             <>
               <CheckCircle2 className="w-5 h-5" />
-              <span>Enviar Cuestionario de Bienestar</span>
+              <span>{isDemo ? "Validar Cuestionario (Modo Demostración)" : "Enviar Cuestionario de Bienestar"}</span>
             </>
           )}
         </button>

@@ -173,72 +173,72 @@ export function UtilleroMatchKitPlanner() {
   }
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-5 animate-in fade-in duration-300">
       {/* ── 1. BARRA DE MÉTRICAS Y RESUMEN DE LA JORNADA ── */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0">
-              <Calendar className="w-5 h-5 text-indigo-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
             </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Partidos Jornada</span>
-              <span className="text-xl font-black text-slate-900">{summary.totalMatches}</span>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate">Partidos Jornada</span>
+              <span className="text-lg sm:text-xl font-black text-slate-900">{summary.totalMatches}</span>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-              <Shirt className="w-5 h-5" />
+          <div className="bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+              <Shirt className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">1ª Azul Oficial</span>
-              <span className="text-xl font-black text-blue-700">{summary.primeraCount}</span>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate">1ª Azul Oficial</span>
+              <span className="text-lg sm:text-xl font-black text-blue-700">{summary.primeraCount}</span>
             </div>
           </div>
 
           <div
-            className={`p-4 rounded-2xl border shadow-2xs flex items-center gap-3 ${
+            className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border shadow-2xs flex items-center gap-2.5 sm:gap-3 ${
               summary.segundaCount > 0
                 ? "bg-rose-50/70 border-rose-200 text-rose-950"
                 : "bg-white border-slate-200"
             }`}
           >
             <div
-              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl border flex items-center justify-center shrink-0 ${
                 summary.segundaCount > 0
                   ? "bg-white border-rose-300 text-rose-600"
                   : "bg-slate-50 border-slate-200 text-slate-400"
               }`}
             >
-              <Shirt className="w-5 h-5" />
+              <Shirt className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">2ª Roja (Conflicto)</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider block truncate">2ª Roja (Conflicto)</span>
                 {summary.conflictCount > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-ping" />
                 )}
               </div>
-              <span className="text-xl font-black text-rose-700">{summary.segundaCount}</span>
+              <span className="text-lg sm:text-xl font-black text-rose-700">{summary.segundaCount}</span>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
+          <div className="bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-2.5 sm:gap-3">
             <div
-              className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl border flex items-center justify-center shrink-0 ${
                 summary.pendingCount === 0
                   ? "bg-emerald-50 border-emerald-200 text-emerald-600"
                   : "bg-amber-50 border-amber-200 text-amber-600"
               }`}
             >
-              {summary.pendingCount === 0 ? <CheckCheck className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+              {summary.pendingCount === 0 ? <CheckCheck className="w-4 h-4 sm:w-5 sm:h-5" /> : <Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
             </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estado Preparación</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-emerald-700">{summary.preparedCount}</span>
-                <span className="text-xs font-semibold text-slate-400">/ {summary.totalMatches} listas</span>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate">Preparación</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg sm:text-xl font-black text-emerald-700">{summary.preparedCount}</span>
+                <span className="text-xs font-semibold text-slate-400">/{summary.totalMatches}</span>
               </div>
             </div>
           </div>
@@ -247,17 +247,17 @@ export function UtilleroMatchKitPlanner() {
 
       {/* ── 2. ALERTA DESTACADA DE CONFLICTOS DE COLOR (SI EXISTEN) ── */}
       {summary && summary.segundaCount > 0 && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-start gap-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 border border-amber-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-start gap-2.5 sm:gap-3">
             <div className="p-2 rounded-xl bg-white border border-amber-200 text-amber-600 shrink-0 mt-0.5">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-sm font-extrabold text-slate-900">
-                Atención Utillería: {summary.segundaCount} partido{summary.segundaCount > 1 ? "s" : ""} requiere{summary.segundaCount > 1 ? "n" : ""} 2ª Equipación Roja
+              <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug">
+                Atención Utillería: {summary.segundaCount} partido{summary.segundaCount > 1 ? "s" : ""} con 2ª Equipación Roja obligatoria
               </h4>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Los rivales visten con camiseta azul en sus actas oficiales FFCV. El equipo visitante debe vestir obligatoriamente de rojo para evitar sanción arbitral.
+              <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5 leading-relaxed">
+                El rival viste de azul en la FFCV. Equipación visitante roja obligatoria para evitar incidencias arbitrales.
               </p>
             </div>
           </div>
@@ -265,7 +265,7 @@ export function UtilleroMatchKitPlanner() {
           <button
             onClick={handleSendWeeklyAlert}
             disabled={sendingAlert}
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 disabled:opacity-50 cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 disabled:opacity-50 cursor-pointer"
           >
             <Bell className={`w-3.5 h-3.5 ${sendingAlert ? "animate-spin" : ""}`} />
             {sendingAlert ? "Enviando aviso..." : "Enviar aviso a Utilleros"}
@@ -274,11 +274,11 @@ export function UtilleroMatchKitPlanner() {
       )}
 
       {/* ── 3. CONTROLES Y FILTROS ── */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold overflow-x-auto max-w-full scrollbar-none gap-1">
           <button
             onClick={() => setFilter("all")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               filter === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -286,7 +286,7 @@ export function UtilleroMatchKitPlanner() {
           </button>
           <button
             onClick={() => setFilter("pending")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               filter === "pending" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -294,7 +294,7 @@ export function UtilleroMatchKitPlanner() {
           </button>
           <button
             onClick={() => setFilter("conflicts")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               filter === "conflicts" ? "bg-white text-rose-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -302,7 +302,7 @@ export function UtilleroMatchKitPlanner() {
           </button>
           <button
             onClick={() => setFilter("prepared")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
               filter === "prepared" ? "bg-white text-emerald-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -310,16 +310,14 @@ export function UtilleroMatchKitPlanner() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadSchedule}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer ml-auto"
-            title="Refrescar y comprobar colores FFCV"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Actualizar FFCV</span>
-          </button>
-        </div>
+        <button
+          onClick={loadSchedule}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+          title="Refrescar y comprobar colores FFCV"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Actualizar FFCV</span>
+        </button>
       </div>
 
       {/* ── 4. LISTADO DE PARTIDOS PARA PREPARACIÓN DE EQUIPACIONES ── */}
@@ -330,7 +328,7 @@ export function UtilleroMatchKitPlanner() {
           <p className="text-xs text-slate-400">Todos los partidos seleccionados están al día en preparación.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {filteredMatches.map((match) => {
             const { dateStr, timeStr, dayName } = formatMadridMatchDate(match.fechaHora);
             const isSegunda = match.equipacionAsignada === "segunda";
@@ -339,128 +337,223 @@ export function UtilleroMatchKitPlanner() {
             return (
               <div
                 key={match.id}
-                className={`p-4 rounded-2xl border transition-all shadow-2xs flex flex-col justify-between gap-3.5 ${
+                className={`rounded-2xl border transition-all shadow-xs flex flex-col justify-between overflow-hidden ${
                   match.equipacionPreparada
-                    ? "bg-emerald-50/30 border-emerald-200/80"
+                    ? "bg-white border-emerald-300/80 ring-1 ring-emerald-200/50"
                     : isSegunda
-                    ? "bg-rose-50/40 border-rose-200 hover:border-rose-300"
+                    ? "bg-white border-rose-300 ring-1 ring-rose-200/60"
                     : "bg-white border-slate-200 hover:border-indigo-300"
                 }`}
               >
-                {/* Cabecera de la tarjeta: Equipo, Categoría y Fecha */}
-                <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: match.teamColor || "#4F46E5" }}
-                      />
-                      <h3 className="font-black text-sm text-slate-900 truncate">{match.teamName}</h3>
-                      {match.teamCategory && (
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                {/* 1. Cabecera de la ficha: Fecha/Hora y Badges superiores */}
+                <div className="p-3 sm:p-3.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                  {/* Fecha y Hora en España */}
+                  <div className="inline-flex items-center gap-1.5 font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-xs">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span className="uppercase text-[11px] font-black">{dayName}, {dateStr}</span>
+                    <span className="text-slate-300">·</span>
+                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-black text-slate-900 text-xs">{timeStr}</span>
+                  </div>
+
+                  {/* Estado de Local/Visitante y Ropa */}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg border ${
+                      match.esLocal
+                        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                        : "text-amber-700 bg-amber-50 border-amber-200"
+                    }`}>
+                      {match.esLocal ? "Local" : "Visitante"}
+                    </span>
+
+                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-lg border flex items-center gap-1 ${
+                      match.equipacionPreparada
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                        : "bg-amber-100/70 text-amber-900 border-amber-300"
+                    }`}>
+                      {match.equipacionPreparada ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span>Lista</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>Pendiente</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Cuerpo de la ficha: Enfrentamiento deportivo */}
+                <div className="p-3.5 sm:p-4 space-y-3">
+                  {/* Bloque de Equipos (Local vs Visitante) */}
+                  <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                    {/* Equipo Local */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {match.esLocal ? (
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
+                            style={{ backgroundColor: match.teamColor || "#4F46E5" }}
+                          />
+                        ) : (
+                          <span className="w-3 h-3 rounded-full shrink-0 bg-slate-300" />
+                        )}
+                        <span className={`text-xs sm:text-sm leading-snug break-words ${
+                          match.esLocal ? "font-black text-indigo-950" : "font-extrabold text-slate-800"
+                        }`}>
+                          {match.esLocal ? match.teamName : match.rivalNombre}
+                        </span>
+                      </div>
+                      {match.esLocal && match.teamCategory && (
+                        <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
                           {match.teamCategory}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-1">
-                      <span className="font-bold text-slate-700">
-                        {match.esLocal ? "Local vs" : "Visitante @"} {match.rivalNombre}
-                      </span>
+
+                    {/* Divisor VS */}
+                    <div className="flex items-center gap-2">
+                      <div className="h-px bg-slate-200 flex-1" />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">VS</span>
+                      <div className="h-px bg-slate-200 flex-1" />
+                    </div>
+
+                    {/* Equipo Visitante */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {!match.esLocal ? (
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
+                            style={{ backgroundColor: match.teamColor || "#4F46E5" }}
+                          />
+                        ) : (
+                          <span className="w-3 h-3 rounded-full shrink-0 bg-slate-300" />
+                        )}
+                        <span className={`text-xs sm:text-sm leading-snug break-words ${
+                          !match.esLocal ? "font-black text-indigo-950" : "font-extrabold text-slate-800"
+                        }`}>
+                          {!match.esLocal ? match.teamName : match.rivalNombre}
+                        </span>
+                      </div>
+                      {!match.esLocal && match.teamCategory && (
+                        <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                          {match.teamCategory}
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Fecha y Hora en España */}
-                  <div className="text-right shrink-0">
-                    <span className="text-[11px] font-black uppercase text-slate-700 block">
-                      {dayName} {dateStr}
-                    </span>
-                    <span className="text-xs font-bold text-indigo-600 block">{timeStr}</span>
-                  </div>
-                </div>
-
-                {/* Badge Visual de Equipación */}
-                <div className="space-y-1.5">
-                  <MatchKitBadge
-                    equipacionAsignada={match.equipacionAsignada}
-                    equipacionPreparada={match.equipacionPreparada}
-                    conflictoEquipacion={match.conflictoEquipacion}
-                    rivalCamisetaColor={match.rivalCamisetaColor}
-                    esLocal={match.esLocal}
-                    size="sm"
-                    showPreparedStatus={false}
-                    showConflictDetails={true}
-                  />
-
-                  {/* Información adicional del rival si viste de azul */}
-                  {match.rivalCamisetaColor && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                      <Info className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>
-                        Equipación rival registrada: <strong className="text-slate-800">{match.rivalCamisetaColor}</strong>
-                      </span>
-                    </div>
-                  )}
-
+                  {/* Lugar / Campo de juego */}
                   {match.lugar && !["local", "visitante"].includes(match.lugar.toLowerCase()) && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{match.lugar}</span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate font-medium">{match.lugar}</span>
                     </div>
                   )}
+
+                  {/* 3. SECCIÓN DESTACADA: Equipación a Preparar (Grande y Clara) */}
+                  <div className={`p-3 rounded-xl border flex flex-col gap-1.5 transition-all ${
+                    isSegunda
+                      ? "bg-rose-50 border-rose-300 text-rose-950 shadow-2xs"
+                      : "bg-blue-50/80 border-blue-200 text-blue-950 shadow-2xs"
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                        isSegunda
+                          ? "bg-white border-rose-300 text-rose-600 shadow-2xs"
+                          : "bg-white border-blue-300 text-blue-600 shadow-2xs"
+                      }`}>
+                        <Shirt className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black tracking-tight uppercase">
+                            {isSegunda ? "2ª Equipación (Roja)" : "1ª Equipación (Azul)"}
+                          </span>
+                          {match.conflictoEquipacion && (
+                            <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-200 text-rose-900 border border-rose-300 shrink-0">
+                              Conflicto Color
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] opacity-80 font-medium mt-0.5">
+                          {isSegunda
+                            ? "Camiseta roja, pantalón y medias rojas oficiales."
+                            : "Camiseta azul, pantalón y medias azules oficiales."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Advertencia de coincidencia si el rival viste de azul */}
+                    {match.conflictoEquipacion && (
+                      <div className="mt-1 pt-2 border-t border-rose-200/80 flex items-start gap-1.5 text-[11px] text-rose-900 font-bold leading-snug">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span>
+                          Rival viste de azul{match.rivalCamisetaColor ? ` (${match.rivalCamisetaColor})` : ""}: Obligatorio vestir de rojo para evitar sanción arbitral.
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Footer de Acciones: Selector manual de equipación y Botón checklist */}
-                <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  {/* Selector rápido para utillero */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOverrideKit(match.id, "primera")}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all ${
-                        match.equipacionAsignada === "primera"
-                          ? "bg-blue-600 text-white shadow-2xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                      title="Forzar 1ª Equipación (Azul)"
-                    >
-                      1ª Azul
-                    </button>
-                    <button
-                      onClick={() => handleOverrideKit(match.id, "segunda")}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all ${
-                        match.equipacionAsignada === "segunda"
-                          ? "bg-rose-600 text-white shadow-2xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                      title="Forzar 2ª Equipación (Roja)"
-                    >
-                      2ª Roja
-                    </button>
-                  </div>
-
-                  {/* Botón de Checklist interactivo */}
+                {/* 4. Pie de la ficha: Botón táctil grande y selector manual */}
+                <div className="p-3 sm:p-3.5 bg-slate-50/80 border-t border-slate-100 space-y-2.5">
+                  {/* Botón táctil grande de preparación (Full width, excelente en móviles) */}
                   <button
                     onClick={() => handleTogglePrepared(match.id, match.equipacionPreparada)}
                     disabled={isToggling}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs ${
+                    className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-60 ${
                       match.equipacionPreparada
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "bg-white hover:bg-slate-50 text-slate-800 border border-slate-300"
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+                        : "bg-white hover:bg-amber-50 text-slate-800 border-2 border-dashed border-amber-300 hover:border-amber-400"
                     }`}
                   >
                     {isToggling ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin" />
                     ) : match.equipacionPreparada ? (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                        <span>Ropa lista en bolsa ✅</span>
+                        <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+                        <span>✅ ROPA LISTA EN BOLSA (Preparada)</span>
                       </>
                     ) : (
                       <>
-                        <Clock className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Marcar como preparada ⏳</span>
+                        <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>⏳ ROPA PENDIENTE · Tocar para marcar lista</span>
                       </>
                     )}
                   </button>
+
+                  {/* Selector rápido manual para excepciones */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5 text-[11px] text-slate-500 font-medium">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Asignar manual:</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOverrideKit(match.id, "primera")}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all ${
+                          match.equipacionAsignada === "primera"
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                        }`}
+                        title="Forzar 1ª Equipación (Azul)"
+                      >
+                        👕 1ª Azul
+                      </button>
+                      <button
+                        onClick={() => handleOverrideKit(match.id, "segunda")}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all ${
+                          match.equipacionAsignada === "segunda"
+                            ? "bg-rose-600 text-white shadow-2xs"
+                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                        }`}
+                        title="Forzar 2ª Equipación (Roja)"
+                      >
+                        👕 2ª Roja
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             );

@@ -447,11 +447,11 @@ export default function UtilleriaDashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in duration-300 lg:max-w-none lg:w-full lg:px-6 lg:py-4 lg:space-y-4 lg:flex lg:flex-col lg:h-[calc(100vh-1rem)] lg:overflow-hidden">
+    <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 animate-in fade-in duration-300 lg:max-w-none lg:w-full lg:px-6 lg:py-4 lg:space-y-4 lg:flex lg:flex-col lg:h-[calc(100vh-1rem)] lg:overflow-hidden">
       {/* CABECERA (Estática en PC) */}
       <div className="lg:flex-none flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0">
             <Shirt size={22} />
           </div>
           <div>
@@ -460,37 +460,37 @@ export default function UtilleriaDashboardPage() {
           </div>
         </div>
 
-        {/* CONTROLES TABS */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+        {/* CONTROLES TABS (Scroll horizontal en móvil para evitar desbordamientos) */}
+        <div className="flex items-center overflow-x-auto max-w-full bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0 scrollbar-none gap-1">
           <button
             onClick={() => setActiveTab('matches')}
-            className={`flex items-center gap-2 px-3.5 py-2 font-bold text-xs rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'matches'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Shirt size={14} /> Partidos (Equipaciones)
+            <Shirt size={14} className="shrink-0" /> Partidos (Equipaciones)
           </button>
           <button
             onClick={() => setActiveTab('deliveries')}
-            className={`flex items-center gap-2 px-3.5 py-2 font-bold text-xs rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'deliveries'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <ClipboardList size={14} /> Entrega de Ropa
+            <ClipboardList size={14} className="shrink-0" /> Entrega de Ropa
           </button>
           <button
             onClick={() => setActiveTab('report')}
-            className={`flex items-center gap-2 px-3.5 py-2 font-bold text-xs rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'report'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <BarChart3 size={14} /> Informe de Pedidos
+            <BarChart3 size={14} className="shrink-0" /> Informe de Pedidos
           </button>
         </div>
       </div>

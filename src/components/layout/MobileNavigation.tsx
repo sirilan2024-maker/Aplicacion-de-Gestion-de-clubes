@@ -153,23 +153,35 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             if (eqData && !isCancelled) setEquipos(eqData)
 
             // Fetch dynamic navigation
+            const allUserRoles = Array.from(new Set([profile.role, ...(profile.roles || [])].filter(Boolean)));
+            const isAdminUser = allUserRoles.some((r: string) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+            const isCoachUser = allUserRoles.some((r: string) => ['coach', 'entrenador', 'delegado', 'preparador_fisico'].includes(r));
+
             const { data: navData } = await supabaseClient
               .from('role_navigation')
               .select(`nav_id, app_navigation(label, path, icon_name, sort_order)`)
-              .eq('role', profile.role)
+              .in('role', allUserRoles);
+
+            const userHasGlobalPerm = isAdminUser || (navData && navData.some((n: any) => n.nav_id === 'global_club' || n.app_navigation?.path === '/dashboard/global-club'));
             
             if (navData && !isCancelled) {
                const parsedNavs = navData
-                 .filter((n: any) => n.app_navigation)
+                 .filter((n: any) => {
+                   if (!n.app_navigation) return false;
+                   if (isCoachUser && !userHasGlobalPerm && (n.nav_id === 'global_club' || n.app_navigation.path === '/dashboard/global-club')) {
+                     return false;
+                   }
+                   return true;
+                 })
                  .map((n: any) => ({
                    name: n.app_navigation.label,
                    href: n.app_navigation.path,
                    icon: IconMap[n.app_navigation.icon_name] || LayoutDashboard,
                    sortOrder: n.app_navigation.sort_order
                  }))
-                 .sort((a, b) => a.sortOrder - b.sortOrder)
+                 .sort((a, b) => a.sortOrder - b.sortOrder);
                
-               setGlobalNavItems(parsedNavs)
+               setGlobalNavItems(parsedNavs);
             }
           }
         }
@@ -241,19 +253,24 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     } else {
       // Coach / Entrenador
       bottomLinks = [
-        { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },
-        { name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield },
+        { name: "Mis Equipos", href: "/dashboard/mis-equipos", icon: Shield },
         { name: "Partidos", href: "/dashboard/matches", icon: Trophy },
+        { name: "Eventos", href: getHref("Eventos", "/dashboard/events"), icon: CalendarDays },
         { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
       ]
     }
   }
 
   // 2. DYNAMIC HAMBURGER MENU (Secundarios)
+  const isCoach = ['coach', 'entrenador', 'delegado', 'preparador_fisico'].includes(userRole || '');
   let secondaryLinks: NavItem[] = []
   if (activeTeamId) {
     secondaryLinks = [
-      { name: "Volver a Inicio", href: "/dashboard", icon: LayoutDashboard },
+      { 
+        name: isCoach ? "Volver a Mis Equipos" : "Volver a Inicio", 
+        href: isCoach ? "/dashboard/mis-equipos" : "/dashboard", 
+        icon: LayoutDashboard 
+      },
       { name: "En directo", href: "/live", icon: Radio },
       { name: "Entrenamientos", href: `/dashboard/equipos/${activeTeamId}/entrenamientos`, icon: Target },
       { name: "Banco de Tareas", href: `/dashboard/equipos/${activeTeamId}/banco-tareas`, icon: Target },
@@ -442,7 +459,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
                             targetUrl = '/admin/metodologia';
                           } else if (newRole === 'utillero') {
                             targetUrl = '/dashboard/utilleria';
-                          } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
+                          } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado' || newRole === 'preparador_fisico') {
                             targetUrl = '/dashboard/mis-equipos';
                           } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {
                             targetUrl = '/dashboard/family';

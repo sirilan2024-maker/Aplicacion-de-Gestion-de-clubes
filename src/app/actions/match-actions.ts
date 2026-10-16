@@ -237,6 +237,19 @@ export async function updateConvocatoriaBatch(
       }
 
       if (unconvokeDispatches.length > 0) {
+        try {
+          const targetUserIds = unconvokeDispatches.map(d => d.userId).filter(Boolean);
+          if (targetUserIds.length > 0) {
+            await supabase
+              .from('notifications')
+              .update({ is_read: true })
+              .in('user_id', targetUserIds)
+              .ilike('content', `%${rivalName}%`)
+              .ilike('content', '%ha sido convocado%');
+          }
+        } catch (markErr) {
+          console.warn('[updateConvocatoriaBatch] Error marking previous convocation notifications read:', markErr);
+        }
         await NotificationService.dispatchBatch({ notifications: unconvokeDispatches });
       }
     } catch (unconvErr) {
@@ -335,7 +348,7 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
         content: notificationContent,
         link: `/dashboard/family/e/${p.id}/partidos`,
         channels: ['IN_APP' as const, 'EMAIL' as const],
-        idempotencyKey: `convocation:${matchId}:${p.id}:${targetUserId}:published`,
+        idempotencyKey: `convocation:${matchId}:${p.id}:${targetUserId}:${Date.now()}`,
         emailSubject: `⚽ Convocatoria Oficial: ${teamName} vs ${match?.rival_nombre}`,
         emailHtml,
         metadata: { matchId, playerId: p.id, horaCitacion: citacionText },
@@ -355,7 +368,7 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
           content: notificationContent,
           link: `/dashboard/family/e/${p.id}/partidos`,
           channels: ['IN_APP' as const, 'EMAIL' as const],
-          idempotencyKey: `convocation:${matchId}:${p.id}:${et.tutorId}:published`,
+          idempotencyKey: `convocation:${matchId}:${p.id}:${et.tutorId}:${Date.now()}`,
           emailSubject: `⚽ Convocatoria Oficial: ${teamName} vs ${match?.rival_nombre}`,
           emailHtml,
           metadata: { matchId, playerId: p.id, horaCitacion: citacionText },
@@ -365,7 +378,21 @@ export async function sendConvocatoriaAlerts(matchId: string, teamId: string, pl
   }
 
   if (dispatchItems.length > 0) {
-    await NotificationService.dispatchBatch({ notifications: dispatchItems })
+    try {
+      const allTargetUserIds = dispatchItems.map(d => d.userId).filter(Boolean);
+      if (allTargetUserIds.length > 0) {
+        await adminSupabase
+          .from('notifications')
+          .update({ is_read: true })
+          .in('user_id', allTargetUserIds)
+          .ilike('content', `%${match?.rival_nombre || ''}%`)
+          .ilike('content', '%no está convocado%');
+      }
+    } catch (cleanErr) {
+      console.warn('[sendConvocatoriaAlerts] Error cleaning unconvoke notifications:', cleanErr);
+    }
+
+    await NotificationService.dispatchBatch({ notifications: dispatchItems });
   }
 
   console.log(`[ALERTA CONVOCATORIA ENVIADA] Partido ${matchId}: ${dispatchItems.length} alertas despachadas.`)

@@ -34,7 +34,7 @@ export async function markNotificationAsReadAction(notificationId: string) {
     const adminClient = await createAdminClient()
     const { error } = await adminClient
       .from('notifications')
-      .update({ is_read: true, read: true })
+      .update({ is_read: true })
       .eq('id', notificationId)
       .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
 
@@ -56,9 +56,9 @@ export async function markAllNotificationsAsReadAction() {
     const adminClient = await createAdminClient()
     const { error } = await adminClient
       .from('notifications')
-      .update({ is_read: true, read: true })
+      .update({ is_read: true })
       .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
-      .or('is_read.eq.false,read.eq.false')
+      .eq('is_read', false)
 
     if (error) throw error
 

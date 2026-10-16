@@ -726,12 +726,12 @@ export async function canUserAccessModule(
   ctx: AuthenticatedContext,
   moduleId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const effectiveRole = ctx.realAdminRole || ctx.profile.role;
+  const effectiveRole = ctx.isImpersonating ? ctx.profile.role : (ctx.realAdminRole || ctx.profile.role);
   const userRoles = ctx.profile.roles || [];
   const allRoles = Array.from(new Set([effectiveRole, ...userRoles].filter(Boolean)));
 
-  // Superadmins y Admins generales del club tienen acceso total
-  if (allRoles.includes('admin') || allRoles.includes('superadmin') || allRoles.includes('administrador') || allRoles.includes('admin_club')) {
+  // Superadmins y Admins generales del club tienen acceso total (a menos que estén simulando otro usuario)
+  if (!ctx.isImpersonating && (allRoles.includes('admin') || allRoles.includes('superadmin') || allRoles.includes('administrador') || allRoles.includes('admin_club'))) {
     return { allowed: true };
   }
 

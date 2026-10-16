@@ -20,7 +20,8 @@ export const SYSTEM_MODULES: AppNavModule[] = [
 
   // ── 1. General & Club ──
   { id: 'centro_control', label: 'Centro de Control', path: '/admin/inicio', icon_name: 'Home', sort_order: 1, category: 'General / Club' },
-  { id: 'club', label: 'Directorio de Miembros', path: '/dashboard/club/miembros', icon_name: 'Users', sort_order: 2, category: 'General / Club' },
+  { id: 'global_club', label: 'Global Club', path: '/dashboard/global-club', icon_name: 'Globe', sort_order: 2, category: 'General / Club' },
+  { id: 'club', label: 'Directorio de Miembros', path: '/dashboard/club/miembros', icon_name: 'Users', sort_order: 3, category: 'General / Club' },
   { id: 'equipos', label: 'Equipos', path: '/dashboard/equipos', icon_name: 'Shield', sort_order: 3, category: 'General / Club' },
   { id: 'partidos', label: 'Partidos', path: '/dashboard/matches', icon_name: 'Swords', sort_order: 4, category: 'General / Club' },
   { id: 'eventos', label: 'Eventos y Calendario', path: '/dashboard/events', icon_name: 'Calendar', sort_order: 5, category: 'General / Club' },

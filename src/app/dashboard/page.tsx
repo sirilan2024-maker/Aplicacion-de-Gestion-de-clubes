@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { COACH_ROLES } from "@/lib/auth-helpers";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -23,7 +24,7 @@ export default async function DashboardPage() {
     redirect('/admin/inicio');
   } else if (role === 'coordinador' || role === 'coordinador_general') {
     redirect('/admin/coordinador');
-  } else if (role === 'coach' || role === 'entrenador') {
+  } else if (COACH_ROLES.includes(role || '')) {
     redirect('/dashboard/mis-equipos');
   } else if (role === 'metodologo' || role === 'metodologia') {
     redirect('/admin/metodologia');
@@ -54,14 +55,12 @@ export default async function DashboardPage() {
     redirect('/dashboard/family');
   } else if (role === 'tutor' || role === 'familia' || role === 'family') {
     redirect('/dashboard/family');
-  } else if (role === 'utillero') {
-    redirect('/dashboard/utilleria');
   }
 
   // 2. Si no hay rol activo o no coincide, evaluar roles secundarios en profile.roles por jerarquía
   if (userRoles.includes('admin') || userRoles.includes('superadmin')) redirect('/admin/inicio');
   else if (userRoles.includes('coordinador') || userRoles.includes('coordinador_general')) redirect('/admin/coordinador');
-  else if (userRoles.includes('coach') || userRoles.includes('entrenador')) redirect('/dashboard/mis-equipos');
+  else if (userRoles.some(r => COACH_ROLES.includes(r))) redirect('/dashboard/mis-equipos');
   else if (userRoles.includes('metodologo') || userRoles.includes('metodologia')) redirect('/admin/metodologia');
   else if (userRoles.includes('utillero')) redirect('/dashboard/utilleria');
   else if (userRoles.includes('jugador')) {
@@ -73,7 +72,13 @@ export default async function DashboardPage() {
       .maybeSingle();
     if (playerRec) redirect(`/dashboard/family/e/${playerRec.id}/perfil`);
   }
-  else if (userRoles.includes('tutor') || userRoles.includes('family')) redirect('/dashboard/family');
+  else if (userRoles.includes('tutor') || userRoles.includes('family') || userRoles.includes('familia')) redirect('/dashboard/family');
+
+  // Fallback seguro: si el usuario tiene rol de entrenador de cualquier forma, nunca enviar a global-club
+  const allRoles = Array.from(new Set([role, ...userRoles].filter(Boolean)));
+  if (allRoles.some(r => COACH_ROLES.includes(r as string))) {
+    redirect('/dashboard/mis-equipos');
+  }
 
   redirect("/dashboard/global-club");
 }

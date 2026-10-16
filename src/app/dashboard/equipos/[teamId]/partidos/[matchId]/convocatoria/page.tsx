@@ -9,6 +9,7 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
   const { teamId, matchId } = use(params);
   const [players, setPlayers] = useState<any[]>([])
   const [convocados, setConvocados] = useState<Set<string>>(new Set())
+  const [convDetails, setConvDetails] = useState<Map<string, { estado_asistencia?: string; asistencia_confirmada_familia?: boolean }>>(new Map())
   const [matchDetails, setMatchDetails] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -25,14 +26,17 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
       if (matchData) setMatchDetails(matchData)
 
 
-      // 2. Fetch current convocados first
+      // 2. Fetch current convocados first with attendance details
       const { data: convData } = await supabase
         .from("convocatorias")
-        .select("player_id")
+        .select("player_id, estado_asistencia, asistencia_confirmada_familia")
         .eq("partido_id", matchId)
 
       const convPlayerIds = (convData || []).map(c => c.player_id)
       if (convData) {
+        const map = new Map<string, { estado_asistencia?: string; asistencia_confirmada_familia?: boolean }>()
+        convData.forEach(c => map.set(c.player_id, c))
+        setConvDetails(map)
         setConvocados(new Set(convPlayerIds))
       }
 
@@ -118,6 +122,9 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
             const isLesionado = p.status === 'Lesionado'
             const isSancionado = p.status === 'Sancionado'
             const isAvailable = !isLesionado && !isSancionado
+            const convItem = convDetails.get(p.id)
+            const isConfirmed = convItem?.estado_asistencia === 'Confirmado' || convItem?.asistencia_confirmada_familia === true
+            const isAbsent = convItem?.estado_asistencia === 'Ausente'
 
             return (
               <div 
@@ -164,6 +171,23 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                     )}
                     {isAvailable && (
                       <p className="text-slate-400 text-xs font-medium mt-0.5">Disponible</p>
+                    )}
+                    {isConvocado && (
+                      <div className="mt-1">
+                        {isConfirmed ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                            <CheckCircle2 size={12} className="text-emerald-600" /> Confirmado por familia
+                          </span>
+                        ) : isAbsent ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                            ❌ No asiste (Baja)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            ⏳ Pendiente confirmación
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

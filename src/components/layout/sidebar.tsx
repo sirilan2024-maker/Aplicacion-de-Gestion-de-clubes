@@ -112,9 +112,11 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
   const [showEditClub, setShowEditClub] = useState(false)
   const [showImpersonateModal, setShowImpersonateModal] = useState(false)
   const [globalNavItems, setGlobalNavItems] = useState<NavItem[]>([])
+  const [hasGlobalClubAccess, setHasGlobalClubAccess] = useState(false)
 
   // SÓLO los administradores ven el fondo oscuro y el menú especial
   const isAdmin = userRole === "admin" || userRole === "superadmin";
+  const isCoach = userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado' || userRole === 'preparador_fisico';
 
   // Detect active team context from URL (/dashboard/e/[teamId] or /dashboard/equipos/[teamId])
   const match = pathname.match(/^\/dashboard\/(?:e|equipos)\/([a-zA-Z0-9-]+)/)
@@ -156,7 +158,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
             if (club && !isCancelled) setClubInfo({ id: club.id, name: club.name, logo_url: club.logo_url })
 
             // Fetch equipos strictly for the active/selected season (never past 25/26 unless in archive)
-            if (profile.role === 'admin' || profile.role === 'coordinador' || profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
+            if (profile.role === 'admin' || profile.role === 'coordinador' || profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado' || profile.role === 'preparador_fisico') {
               let query = supabaseClient.from('teams').select("id, name, category, season_id").eq("club_id", profile.club_id)
               const effectiveSeasonId = selectedSeason?.id || activeSeason?.id
               if (effectiveSeasonId && effectiveSeasonId !== "584f508a-fc1a-4339-b5b2-4296ffde2f4c") {
@@ -166,7 +168,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
               }
               query = query.order("name")
 
-              if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
+              if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado' || profile.role === 'preparador_fisico') {
                 const { data: coachTeams } = await supabaseClient.from('team_coaches').select('team_id').eq('profile_id', user.id);
                 const teamIds = coachTeams?.map(ct => ct.team_id) || [];
                 if (teamIds.length > 0) {
@@ -224,14 +226,27 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
             }
 
             // Fetch dynamic navigation
+            const allUserRoles = Array.from(new Set([profile.role, ...(profile.roles || [])].filter(Boolean)));
+            const isAdminUser = allUserRoles.some((r: string) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+            const isCoachUser = allUserRoles.some((r: string) => ['coach', 'entrenador', 'delegado', 'preparador_fisico'].includes(r));
+
             const { data: navData } = await supabaseClient
               .from('role_navigation')
               .select(`nav_id, app_navigation(id, label, path, icon_name, sort_order)`)
-              .eq('role', profile.role)
+              .in('role', allUserRoles);
             
+            const userHasGlobalPerm = isAdminUser || (navData && navData.some((n: any) => n.nav_id === 'global_club' || n.app_navigation?.id === 'global_club' || n.app_navigation?.path === '/dashboard/global-club'));
+            if (!isCancelled) setHasGlobalClubAccess(!!userHasGlobalPerm);
+
             if (navData && !isCancelled) {
                const parsedNavs = navData
-                 .filter((n: any) => n.app_navigation)
+                 .filter((n: any) => {
+                   if (!n.app_navigation) return false;
+                   if (isCoachUser && !userHasGlobalPerm && (n.nav_id === 'global_club' || n.app_navigation.id === 'global_club' || n.app_navigation.path === '/dashboard/global-club')) {
+                     return false;
+                   }
+                   return true;
+                 })
                  .map((n: any) => {
                    const sysMod = SYSTEM_MODULES.find(m => m.id === n.nav_id || m.id === n.app_navigation.id || m.path === n.app_navigation.path);
                    return {
@@ -242,9 +257,9 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                      category: sysMod?.category || "General / Club"
                    };
                  })
-                 .sort((a, b) => a.sortOrder - b.sortOrder)
+                 .sort((a, b) => a.sortOrder - b.sortOrder);
                
-               setGlobalNavItems(parsedNavs)
+               setGlobalNavItems(parsedNavs);
             }
           } else {
             if (!isCancelled) setClubInfo({ id: "", name: "Sin Club", logo_url: null })
@@ -378,8 +393,8 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
         label: "Volver",
         items: [
           { 
-            name: (userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') ? "Mis Equipos" : "Global Club",  
-            href: (userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado') ? `/dashboard/mis-equipos` : `/dashboard`, 
+            name: isCoach ? "Mis Equipos" : "Global Club",  
+            href: isCoach ? `/dashboard/mis-equipos` : `/dashboard`, 
             icon: LayoutDashboard 
           },
           { name: "En directo", href: "/live", icon: Trophy },
@@ -425,7 +440,6 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
     // GLOBAL CONTEXT
     
     // Add "Mis Equipos" for coaches if not present
-    const isCoach = userRole === 'coach' || userRole === 'entrenador' || userRole === 'delegado';
     const hasMisEquipos = globalNavItems.some(n => 
       n.name.toLowerCase() === "mis equipos" || 
       n.href === "/dashboard/equipos" || 
@@ -463,7 +477,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
 
     if (isCoach && !hasMisEquipos) {
       if (!itemsByCategory["General / Club"]) itemsByCategory["General / Club"] = [];
-      itemsByCategory["General / Club"].push({ name: "Mis Equipos", href: "/dashboard/equipos", icon: Shield });
+      itemsByCategory["General / Club"].push({ name: "Mis Equipos", href: "/dashboard/mis-equipos", icon: Shield });
     }
 
     navGroups = [];
@@ -612,7 +626,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                       targetUrl = '/admin/metodologia';
                     } else if (newRole === 'utillero') {
                       targetUrl = '/dashboard/utilleria';
-                    } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado') {
+                    } else if (newRole === 'coach' || newRole === 'entrenador' || newRole === 'delegado' || newRole === 'preparador_fisico') {
                       targetUrl = '/dashboard/mis-equipos';
                     } else if (newRole === 'tutor' || newRole === 'family' || newRole === 'familia') {
                       if (linkedPlayers && linkedPlayers.length > 0) {
@@ -680,7 +694,7 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                   `${activeFamilyPlayer.players?.teams?.name || 'Equipo'} (${activeFamilyPlayer.players?.first_name})`
                   : (userRole === 'familia' || userRole === 'jugador' || userRole === 'tutor' || userRole === 'family' ? 
                       (activeFamilyPlayer ? `${activeFamilyPlayer.players?.teams?.name || 'Equipo'} (${activeFamilyPlayer.players?.first_name})` : "Área Personal") 
-                      : (activeTeam ? activeTeam.name : "Global Club")
+                      : (activeTeam ? activeTeam.name : (isCoach && !hasGlobalClubAccess ? "Mis Equipos" : (pathname.includes('/mis-equipos') ? "Mis Equipos" : "Global Club")))
                     )
                 }
               </span>
@@ -713,17 +727,33 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
                 </>
               ) : (
                 <>
-                  <button
-                    onClick={() => { setShowTeamDropdown(false); router.push("/dashboard"); }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 text-sm font-medium transition-colors",
-                      isAdmin 
-                        ? (!activeTeamId ? "text-blue-400 bg-slate-700/50" : "text-slate-300 hover:bg-slate-700")
-                        : (!activeTeamId ? "text-blue-700 bg-blue-50/50" : "text-gray-700 hover:bg-blue-50")
-                    )}
-                  >
-                    🌍 Global Club
-                  </button>
+                  {(!isCoach || hasGlobalClubAccess) && (
+                    <button
+                      onClick={() => { setShowTeamDropdown(false); router.push("/dashboard/global-club"); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-sm font-medium transition-colors",
+                        isAdmin 
+                          ? (!activeTeamId && pathname.includes('/global-club') ? "text-blue-400 bg-slate-700/50 font-bold" : "text-slate-300 hover:bg-slate-700")
+                          : (!activeTeamId && pathname.includes('/global-club') ? "text-blue-700 bg-blue-50/50 font-bold" : "text-gray-700 hover:bg-blue-50")
+                      )}
+                    >
+                      🌍 Global Club
+                    </button>
+                  )}
+                  {isCoach && (
+                    <button
+                      onClick={() => { setShowTeamDropdown(false); router.push("/dashboard/mis-equipos"); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5",
+                        !activeTeamId && (pathname.includes('/mis-equipos') || (!pathname.includes('/global-club') && !hasGlobalClubAccess))
+                          ? "text-blue-700 font-bold bg-blue-50/50" 
+                          : "text-gray-700 hover:bg-blue-50"
+                      )}
+                    >
+                      <span>🛡️</span>
+                      <span>Mis Equipos</span>
+                    </button>
+                  )}
                   {equipos.map(eq => (
                     <button
                       key={eq.id}

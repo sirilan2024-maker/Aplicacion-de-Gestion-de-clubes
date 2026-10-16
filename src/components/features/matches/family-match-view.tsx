@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Clock, MapPin, Activity, CheckCircle2, Trophy } from "lucide-react";
+import { ChevronLeft, Clock, MapPin, Activity, CheckCircle2, Trophy, Loader2 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
 import { findRivalShield } from "@/lib/ffcv/rival-shields";
@@ -24,11 +25,17 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   const router = useRouter();
   const [match, setMatch] = useState<any>(initialMatch);
   const [matchEvents, setMatchEvents] = useState<any[]>(initialMatchEvents);
+  const [convocatoriasList, setConvocatoriasList] = useState<any[]>(convocatorias || []);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [rivalShield, setRivalShield] = useState<string | null>(initialMatch?.rival_escudo || null);
   const [positions, setPositions] = useState<{
     homePosition: number | null;
     awayPosition: number | null;
   }>({ homePosition: null, awayPosition: null });
+
+  useEffect(() => {
+    setConvocatoriasList(convocatorias || []);
+  }, [convocatorias]);
 
   const supabase = createClient();
   const matchId = match?.id;
@@ -108,6 +115,21 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidos', filter: `id=eq.${matchId}` }, (payload) => {
         setMatch((prev: any) => ({ ...prev, ...payload.new }));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'convocatorias', filter: `partido_id=eq.${matchId}` }, (payload: any) => {
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+          setConvocatoriasList((prev) => {
+            const idx = prev.findIndex((c) => c.player_id === payload.new.player_id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = { ...copy[idx], ...payload.new };
+              return copy;
+            }
+            return [...prev, payload.new];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setConvocatoriasList((prev) => prev.filter((c) => c.id !== payload.old.id));
+        }
+      })
       .subscribe();
       
     return () => {
@@ -139,7 +161,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
     : '';
 
   // Player specific
-  const playerConv = convocatorias.find(c => c.player_id === playerId);
+  const playerConv = convocatoriasList.find(c => c.player_id === playerId);
   const playerEvents = matchEvents.filter(e => e.player_id === playerId);
 
   // Goals calculations
@@ -276,41 +298,73 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto shrink-0">
               <button 
                 onClick={async () => {
+                  if (isSubmittingAttendance || !matchId || !playerId) return;
                   if (playerConv.estado_asistencia === 'Confirmado') return;
-                  const res = await fetch(`/api/matches/${matchId}/attendance`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ playerId, status: true })
-                  });
-                  if (res.ok) router.refresh();
+                  setIsSubmittingAttendance(true);
+                  const previousList = convocatoriasList;
+                  setConvocatoriasList(prev => prev.map(c => c.player_id === playerId ? { ...c, estado_asistencia: 'Confirmado', asistencia_confirmada_familia: true } : c));
+                  try {
+                    const res = await fetch(`/api/matches/${matchId}/attendance`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ playerId, status: true })
+                    });
+                    if (!res.ok) throw new Error('Error al confirmar asistencia');
+                    toast.success('¡Asistencia confirmada! El entrenador ha sido notificado.');
+                    router.refresh();
+                  } catch (err: any) {
+                    setConvocatoriasList(previousList);
+                    toast.error(err.message || 'Error al confirmar');
+                  } finally {
+                    setIsSubmittingAttendance(false);
+                  }
                 }}
-                className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                disabled={isSubmittingAttendance}
+                className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-all text-sm flex items-center justify-center gap-2 active:scale-95
                   ${playerConv.estado_asistencia === 'Confirmado' 
-                    ? 'bg-emerald-600 text-white cursor-default' 
+                    ? 'bg-emerald-600 text-white shadow-emerald-600/25 ring-2 ring-emerald-500/20' 
                     : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
-                  }`}
+                  } disabled:opacity-60`}
               >
-                {playerConv.estado_asistencia === 'Confirmado' && <CheckCircle2 className="w-5 h-5" />}
-                {playerConv.estado_asistencia === 'Confirmado' ? 'Asistencia confirmada' : 'Sí, asistiré'}
+                {isSubmittingAttendance ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className={`w-5 h-5 ${playerConv.estado_asistencia === 'Confirmado' ? 'text-white' : 'text-emerald-500'}`} />
+                )}
+                <span>{playerConv.estado_asistencia === 'Confirmado' ? 'Asistencia confirmada' : 'Sí, asistiré'}</span>
               </button>
               <button 
                 onClick={async () => {
+                  if (isSubmittingAttendance || !matchId || !playerId) return;
                   if (playerConv.estado_asistencia === 'Ausente') return;
-                  const res = await fetch(`/api/matches/${matchId}/attendance`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ playerId, status: false })
-                  });
-                  if (res.ok) router.refresh();
+                  setIsSubmittingAttendance(true);
+                  const previousList = convocatoriasList;
+                  setConvocatoriasList(prev => prev.map(c => c.player_id === playerId ? { ...c, estado_asistencia: 'Ausente', asistencia_confirmada_familia: false } : c));
+                  try {
+                    const res = await fetch(`/api/matches/${matchId}/attendance`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ playerId, status: false })
+                    });
+                    if (!res.ok) throw new Error('Error al registrar respuesta');
+                    toast.success('Has comunicado que no podrás asistir.');
+                    router.refresh();
+                  } catch (err: any) {
+                    setConvocatoriasList(previousList);
+                    toast.error(err.message || 'Error al comunicar respuesta');
+                  } finally {
+                    setIsSubmittingAttendance(false);
+                  }
                 }}
-                className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center gap-2
+                disabled={isSubmittingAttendance}
+                className={`flex-1 sm:flex-none font-bold py-2.5 px-6 rounded-lg shadow-sm transition-all text-sm flex items-center justify-center gap-2 active:scale-95
                   ${playerConv.estado_asistencia === 'Ausente'
-                    ? 'bg-rose-600 text-white cursor-default'
+                    ? 'bg-rose-600 text-white shadow-rose-600/25 ring-2 ring-rose-500/20'
                     : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
-                  }`}
+                  } disabled:opacity-60`}
               >
-                {playerConv.estado_asistencia === 'Ausente' && <span className="text-lg leading-none">❌</span>}
-                {playerConv.estado_asistencia === 'Ausente' ? 'No asistirá' : 'No podré'}
+                <span className="text-base leading-none">❌</span>
+                <span>{playerConv.estado_asistencia === 'Ausente' ? 'No asistirá' : 'No podré'}</span>
               </button>
             </div>
           </div>

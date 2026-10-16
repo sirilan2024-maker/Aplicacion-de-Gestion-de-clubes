@@ -7,7 +7,7 @@ import {
   getAvailableLowerCategoryPlayersAction 
 } from '@/app/actions/match-actions';
 import { detectLowerCategoryTarget } from '@/lib/matches/category-promotion';
-import { Loader2, UserPlus, X, Clock } from 'lucide-react';
+import { Loader2, UserPlus, X, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 export type AttendanceStatus = 'Convocado' | 'No convocado' | 'Duda' | 'Lesión' | null;
 
@@ -21,6 +21,8 @@ export interface Player {
   isLowerCategory?: boolean;
   avatarUrl?: string | null;
   dorsal?: number | null;
+  estadoAsistencia?: 'Confirmado' | 'Ausente' | 'Pendiente' | null;
+  asistenciaConfirmadaFamilia?: boolean | null;
 }
 
 export function ConvocatoriaList({ 
@@ -61,6 +63,10 @@ export function ConvocatoriaList({
       else if (conv.status === 'lesionado') status = 'Lesión';
     }
     const isJuv = p.teams?.category?.toLowerCase().includes('juvenil') || p.team_category?.toLowerCase().includes('juvenil');
+
+    const estadoAsistencia = conv?.estado_asistencia 
+      || (conv?.asistencia_confirmada_familia === true ? 'Confirmado' : (conv?.asistencia_confirmada_familia === false ? 'Ausente' : (status === 'Convocado' ? 'Pendiente' : null)));
+
     mappedPlayers.push({
       id: p.id,
       name: `${p.first_name} ${p.last_name}`.toUpperCase(),
@@ -69,7 +75,9 @@ export function ConvocatoriaList({
       teamName: p.teams?.name || (isJuv ? 'Juvenil' : undefined),
       isJuvenile: isJuv,
       avatarUrl: p.avatar_url,
-      dorsal: p.dorsal
+      dorsal: p.dorsal,
+      estadoAsistencia: estadoAsistencia as any,
+      asistenciaConfirmadaFamilia: conv?.asistencia_confirmada_familia ?? null
     });
   });
 
@@ -192,9 +200,16 @@ export function ConvocatoriaList({
 
   const handleStatusChange = (playerId: string, newStatus: AttendanceStatus) => {
     setPlayerList((prev) =>
-      prev.map((player) =>
-        player.id === playerId ? { ...player, status: newStatus } : player
-      )
+      prev.map((player) => {
+        if (player.id !== playerId) return player;
+        let estadoAsistencia = player.estadoAsistencia;
+        if (newStatus === 'Convocado' && !estadoAsistencia) {
+          estadoAsistencia = 'Pendiente';
+        } else if (newStatus !== 'Convocado') {
+          estadoAsistencia = null;
+        }
+        return { ...player, status: newStatus, estadoAsistencia };
+      })
     );
   };
 
@@ -278,6 +293,18 @@ export function ConvocatoriaList({
     { convocados: 0, dudas: 0, lesionados: 0 }
   );
 
+  const attendanceCounts = playerList.reduce(
+    (acc, player) => {
+      if (player.status === 'Convocado') {
+        if (player.estadoAsistencia === 'Confirmado') acc.confirmados++;
+        else if (player.estadoAsistencia === 'Ausente') acc.ausentes++;
+        else acc.pendientes++;
+      }
+      return acc;
+    },
+    { confirmados: 0, ausentes: 0, pendientes: 0 }
+  );
+
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl">
       <div className="flex flex-col gap-3 mb-4 shrink-0 px-1">
@@ -285,10 +312,28 @@ export function ConvocatoriaList({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100 gap-2.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">Resumen</span>
-            <div className="text-xs font-bold flex flex-wrap gap-1.5">
+            <div className="text-xs font-bold flex flex-wrap gap-1.5 items-center">
               <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Conv: {counts.convocados}</span>
               <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">Dudas: {counts.dudas}</span>
               <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">Les: {counts.lesionados}</span>
+              {counts.convocados > 0 && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1 shadow-2xs font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {attendanceCounts.confirmados} Confirmados
+                  </span>
+                  {attendanceCounts.ausentes > 0 && (
+                    <span className="text-rose-700 bg-rose-100/90 px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1 shadow-2xs font-bold">
+                      <XCircle className="w-3.5 h-3.5 text-rose-600" /> {attendanceCounts.ausentes} Bajas
+                    </span>
+                  )}
+                  {attendanceCounts.pendientes > 0 && (
+                    <span className="text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1 font-semibold">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" /> {attendanceCounts.pendientes} Pendientes
+                    </span>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -382,7 +427,24 @@ export function ConvocatoriaList({
                         </span>
                       )}
                     </div>
-                    <span className={`text-[11px] font-bold block truncate mt-0.5 ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
+                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                      <span className={`text-[11px] font-bold block truncate ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
+                      {player.status === 'Convocado' && (
+                        player.estadoAsistencia === 'Confirmado' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Confirmado por familia
+                          </span>
+                        ) : player.estadoAsistencia === 'Ausente' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                            <XCircle className="w-3 h-3 text-rose-600" /> No asiste (Baja)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-500" /> Pendiente confirmación
+                          </span>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
                 

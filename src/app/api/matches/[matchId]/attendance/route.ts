@@ -91,7 +91,7 @@ export async function POST(
             type: 'MATCH_RSVP_COACH_UPDATE' as const,
             title: 'Respuesta de Convocatoria',
             content: `${playerName} ${actionText} partido ${matchName}.`,
-            link: `/dashboard/equipos/${matchData.equipo_id}/partidos/${matchId}`,
+            link: `/dashboard/equipos/${matchData.equipo_id}/partidos/${matchId}?tab=convocatoria`,
             channels: ['IN_APP', 'EMAIL', 'PUSH'] as ('IN_APP' | 'EMAIL' | 'PUSH')[],
             idempotencyKey: `match_rsvp:${matchId}:${playerId}:${status}:${c.profile_id}`,
           }))

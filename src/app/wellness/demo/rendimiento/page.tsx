@@ -1,434 +1,468 @@
 "use client";
 
-import React, { useState, useEffect, useId } from "react";
+import React, { useState } from "react";
 import {
   Activity,
-  Smile,
   AlertTriangle,
-  AlertCircle,
-  TrendingUp,
-  Moon,
-  Battery,
-  ShieldCheck,
-  ShieldAlert,
-  Sparkles,
-  User as UserIcon,
-  X,
-  Clock,
+  BarChart3,
+  Brain,
   Calendar,
   CheckCircle2,
   ChevronRight,
-  Flame,
-  ThumbsUp,
-  RefreshCw,
+  Clock,
   Eye,
   EyeOff,
-  Filter,
-  Users
+  FileText,
+  Heart,
+  Home,
+  Info,
+  Lock,
+  Moon,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  User,
+  UserCheck,
+  Users,
+  X,
+  Zap,
 } from "lucide-react";
 
 import {
-  generateInformationalAlerts,
-  InformationalAlert,
   HooperRatings,
   DiscomfortDetails,
-  getSpainDateString
+  getSpainDateString,
 } from "@/lib/performance/wellness-service";
 
 // ============================================================================
-// TIPOS Y MODELOS DE DEMOSTRACIÓN (100% EN MEMORIA)
+// MODELOS Y DATOS FICTICIOS EN MEMORIA (100% AISLADOS DE PRODUCCIÓN)
 // ============================================================================
 
 export interface MockPlayer {
   id: string;
+  name: string;
   firstName: string;
   lastName: string;
   dorsal: number | null;
   position: string;
-  avatarUrl: string | null;
+  posCode: string;
+  posClass: string;
+  avatarInitials: string;
+  hooper: number;
+  sleep: number;
+  fatigue: number;
+  soreness: number;
+  stress: number;
+  mood: number;
+  status: "completed" | "pending";
+  hasDiscomfort: boolean;
+  discomfortZone?: string;
+  discomfortIntensity?: number;
+  discomfortDuration?: string;
+  discomfortType?: string;
+  discomfortNote?: string;
+  sessions: {
+    date: string;
+    rpe: number;
+    min: number;
+    note: string;
+  }[];
 }
 
-export interface MockWellnessEntry {
-  playerId: string;
-  attendanceStatus: 'confirmed' | 'pending' | 'absent';
-  wellnessStatus: 'completed' | 'pending' | 'not_required';
-  ratings?: HooperRatings;
-  discomfort?: DiscomfortDetails;
-  submittedAt?: string;
-  notes?: string;
-}
-
-export interface MockSessionRecord {
-  id: string;
-  date: string;
-  title: string;
-  minutes: number | null;
-  rpe: number | null;
-  attendanceStatus: string;
-}
-
-// ============================================================================
-// DATOS FICTICIOS EN MEMORIA (SIN CONEXIÓN A BASE DE DATOS)
-// ============================================================================
-
-const MOCK_TEAMS = [
-  { id: "demo-team-cadete-a", name: "Cadete A — Sporting Saladar", category: "Cadete" },
-  { id: "demo-team-infantil-b", name: "Infantil B — Sporting Saladar", category: "Infantil" },
-  { id: "demo-team-empty", name: "Prebenjamín C (Equipo Vacío)", category: "Prebenjamín" },
+const CADETE_A_PLAYERS: MockPlayer[] = [
+  {
+    id: "p1",
+    name: "Javier Martín",
+    firstName: "Javier",
+    lastName: "Martín",
+    dorsal: 10,
+    position: "Delantero",
+    posCode: "DEL",
+    posClass: "bg-blue-100 text-blue-700",
+    avatarInitials: "JM",
+    hooper: 19.8,
+    sleep: 7.8,
+    fatigue: 5.2,
+    soreness: 1.3,
+    stress: 3.1,
+    mood: 8.0,
+    status: "pending",
+    hasDiscomfort: true,
+    discomfortZone: "Isquiotibial derecho",
+    discomfortIntensity: 8,
+    discomfortDuration: "2 días",
+    discomfortType: "Contractura",
+    discomfortNote: "Requiere seguimiento médico y control de carga.",
+    sessions: [
+      { date: "Hoy", rpe: 7.5, min: 82, note: "-" },
+      { date: "11 may", rpe: 6.0, min: 76, note: "Buenas sensaciones" },
+      { date: "09 may", rpe: 8.5, min: 90, note: "Molestia isquiotibial" },
+      { date: "06 may", rpe: 5.0, min: 70, note: "-" },
+      { date: "04 may", rpe: 7.0, min: 80, note: "-" },
+    ],
+  },
+  {
+    id: "p2",
+    name: "Carlos Ruiz",
+    firstName: "Carlos",
+    lastName: "Ruiz",
+    dorsal: 7,
+    position: "Mediocentro",
+    posCode: "MED",
+    posClass: "bg-teal-100 text-teal-800",
+    avatarInitials: "CR",
+    hooper: 18.5,
+    sleep: 7.1,
+    fatigue: 5.9,
+    soreness: 2.8,
+    stress: 3.7,
+    mood: 7.5,
+    status: "completed",
+    hasDiscomfort: false,
+    sessions: [
+      { date: "Hoy", rpe: 6.5, min: 85, note: "-" },
+      { date: "11 may", rpe: 6.0, min: 75, note: "Ritmo adecuado" },
+      { date: "09 may", rpe: 7.0, min: 90, note: "-" },
+    ],
+  },
+  {
+    id: "p3",
+    name: "Diego López",
+    firstName: "Diego",
+    lastName: "López",
+    dorsal: 11,
+    position: "Extremo",
+    posCode: "EXT",
+    posClass: "bg-purple-100 text-purple-800",
+    avatarInitials: "DL",
+    hooper: 17.9,
+    sleep: 6.8,
+    fatigue: 6.1,
+    soreness: 2.5,
+    stress: 3.9,
+    mood: 7.2,
+    status: "pending",
+    hasDiscomfort: true,
+    discomfortZone: "Cuádriceps",
+    discomfortIntensity: 6,
+    discomfortDuration: "1 día",
+    discomfortType: "Sobrecarga",
+    discomfortNote: "Sobrecarga en golpeos de media distancia.",
+    sessions: [
+      { date: "Hoy", rpe: 7.0, min: 80, note: "-" },
+      { date: "11 may", rpe: 6.5, min: 75, note: "-" },
+    ],
+  },
+  {
+    id: "p4",
+    name: "Álvaro Sánchez",
+    firstName: "Álvaro",
+    lastName: "Sánchez",
+    dorsal: 6,
+    position: "Defensa",
+    posCode: "DEF",
+    posClass: "bg-rose-100 text-rose-800",
+    avatarInitials: "AS",
+    hooper: 20.2,
+    sleep: 8.1,
+    fatigue: 4.7,
+    soreness: 1.2,
+    stress: 2.8,
+    mood: 8.5,
+    status: "completed",
+    hasDiscomfort: false,
+    sessions: [
+      { date: "Hoy", rpe: 5.5, min: 90, note: "Óptima recuperación" },
+    ],
+  },
+  {
+    id: "p5",
+    name: "Hugo Torres",
+    firstName: "Hugo",
+    lastName: "Torres",
+    dorsal: 3,
+    position: "Defensa",
+    posCode: "DEF",
+    posClass: "bg-rose-100 text-rose-800",
+    avatarInitials: "HT",
+    hooper: 16.7,
+    sleep: 6.4,
+    fatigue: 6.8,
+    soreness: 3.1,
+    stress: 4.2,
+    mood: 6.5,
+    status: "completed",
+    hasDiscomfort: false,
+    sessions: [
+      { date: "Hoy", rpe: 8.0, min: 85, note: "Exigencia máxima" },
+    ],
+  },
+  {
+    id: "p6",
+    name: "Mateo Fernández",
+    firstName: "Mateo",
+    lastName: "Fernández",
+    dorsal: 8,
+    position: "Mediocentro",
+    posCode: "MED",
+    posClass: "bg-teal-100 text-teal-800",
+    avatarInitials: "MF",
+    hooper: 18.1,
+    sleep: 7.5,
+    fatigue: 5.6,
+    soreness: 2.0,
+    stress: 3.4,
+    mood: 7.8,
+    status: "pending",
+    hasDiscomfort: false,
+    sessions: [
+      { date: "Hoy", rpe: 6.0, min: 80, note: "-" },
+    ],
+  },
 ];
 
-const MOCK_SEASONS = [
-  { id: "demo-season-26-27", name: "Temporada 26/27 (Activa)", isActive: true },
-  { id: "demo-season-25-26", name: "Temporada 25/26 (Cerrada / Histórica)", isActive: false },
+const INFANTIL_B_PLAYERS: MockPlayer[] = [
+  { id: "ib1", name: "Lucas Molina", firstName: "Lucas", lastName: "Molina", dorsal: 9, position: "Delantero", posCode: "DEL", posClass: "bg-blue-100 text-blue-700", avatarInitials: "LM", hooper: 19.2, sleep: 8.0, fatigue: 4.5, soreness: 1.5, stress: 2.9, mood: 8.1, status: "completed", hasDiscomfort: false, sessions: [] },
+  { id: "ib2", name: "Sergio Ramos", firstName: "Sergio", lastName: "Ramos", dorsal: 4, position: "Defensa", posCode: "DEF", posClass: "bg-rose-100 text-rose-800", avatarInitials: "SR", hooper: 17.5, sleep: 7.0, fatigue: 5.8, soreness: 2.2, stress: 3.5, mood: 7.0, status: "completed", hasDiscomfort: false, sessions: [] },
+  { id: "ib3", name: "David Gil", firstName: "David", lastName: "Gil", dorsal: 1, position: "Portero", posCode: "POR", posClass: "bg-amber-100 text-amber-800", avatarInitials: "DG", hooper: 20.0, sleep: 8.5, fatigue: 3.8, soreness: 1.0, stress: 2.0, mood: 9.0, status: "completed", hasDiscomfort: false, sessions: [] },
+  { id: "ib4", name: "Pablo Soto", firstName: "Pablo", lastName: "Soto", dorsal: 10, position: "Mediapunta", posCode: "MED", posClass: "bg-teal-100 text-teal-800", avatarInitials: "PS", hooper: 16.9, sleep: 6.5, fatigue: 6.2, soreness: 2.8, stress: 4.0, mood: 6.8, status: "pending", hasDiscomfort: false, sessions: [] },
 ];
-
-const MOCK_CADETE_PLAYERS: MockPlayer[] = [
-  { id: "p1", firstName: "Hugo", lastName: "Navarro", dorsal: 10, position: "Centrocampista", avatarUrl: null },
-  { id: "p2", firstName: "Marc", lastName: "García", dorsal: 7, position: "Extremo Derecho", avatarUrl: null },
-  { id: "p3", firstName: "Álvaro", lastName: "Martínez", dorsal: 4, position: "Defensa Central", avatarUrl: null },
-  { id: "p4", firstName: "Mateo", lastName: "Sánchez", dorsal: 1, position: "Portero", avatarUrl: null },
-  { id: "p5", firstName: "Lucas", lastName: "Fernández", dorsal: 9, position: "Delantero Centro", avatarUrl: null },
-  { id: "p6", firstName: "David", lastName: "López", dorsal: 11, position: "Lateral Izquierdo", avatarUrl: null },
-];
-
-const MOCK_INFANTIL_PLAYERS: MockPlayer[] = [
-  { id: "p7", firstName: "Adrián", lastName: "Soler", dorsal: 8, position: "Centrocampista", avatarUrl: null },
-  { id: "p8", firstName: "Pablo", lastName: "Cano", dorsal: 5, position: "Defensa", avatarUrl: null },
-  { id: "p9", firstName: "Iker", lastName: "Molina", dorsal: 1, position: "Portero", avatarUrl: null },
-  { id: "p10", firstName: "Leo", lastName: "Torres", dorsal: 9, position: "Delantero", avatarUrl: null },
-];
-
-const MOCK_ENTRIES_ACTIVE_CADETE: Record<string, MockWellnessEntry> = {
-  p1: {
-    playerId: "p1",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "completed",
-    ratings: { sleepQuality: 2, fatigue: 4, soreness: 5, stress: 3, mood: 2 },
-    discomfort: { hasDiscomfort: true, zone: "Isquiotibial derecho", intensity: 8, notes: "Pinchazo al sprintar en el entreno anterior" },
-    submittedAt: "16:45",
-  },
-  p2: {
-    playerId: "p2",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "completed",
-    ratings: { sleepQuality: 4, fatigue: 2, soreness: 2, stress: 1, mood: 4 },
-    discomfort: { hasDiscomfort: false, zone: null, intensity: null, notes: null },
-    submittedAt: "17:10",
-  },
-  p3: {
-    playerId: "p3",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "completed",
-    ratings: { sleepQuality: 3, fatigue: 3, soreness: 3, stress: 2, mood: 3 },
-    discomfort: { hasDiscomfort: true, zone: "Cuádriceps", intensity: 5, notes: "Sobrecarga leve" },
-    submittedAt: "17:02",
-  },
-  p4: {
-    playerId: "p4",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "pending",
-  },
-  p5: {
-    playerId: "p5",
-    attendanceStatus: "absent",
-    wellnessStatus: "not_required",
-    notes: "Ausencia justificada comunicada por tutor (Gripe)",
-  },
-  p6: {
-    playerId: "p6",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "completed",
-    ratings: { sleepQuality: 5, fatigue: 1, soreness: 1, stress: 1, mood: 5 },
-    discomfort: { hasDiscomfort: false, zone: null, intensity: null, notes: null },
-    submittedAt: "16:30",
-  },
-};
-
-const MOCK_ENTRIES_ACTIVE_INFANTIL: Record<string, MockWellnessEntry> = {
-  p7: {
-    playerId: "p7",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "completed",
-    ratings: { sleepQuality: 4, fatigue: 2, soreness: 1, stress: 1, mood: 4 },
-    discomfort: { hasDiscomfort: false, zone: null, intensity: null, notes: null },
-    submittedAt: "17:15",
-  },
-  p8: {
-    playerId: "p8",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "completed",
-    ratings: { sleepQuality: 2, fatigue: 4, soreness: 4, stress: 3, mood: 2 },
-    discomfort: { hasDiscomfort: true, zone: "Aductor", intensity: 7, notes: "Molestia al golpear balón" },
-    submittedAt: "17:20",
-  },
-  p9: {
-    playerId: "p9",
-    attendanceStatus: "confirmed",
-    wellnessStatus: "pending",
-  },
-  p10: {
-    playerId: "p10",
-    attendanceStatus: "pending",
-    wellnessStatus: "pending",
-  },
-};
-
-const MOCK_PLAYER_SESSIONS: Record<string, MockSessionRecord[]> = {
-  p1: [
-    { id: "s1", date: "2026-10-15", title: "Entrenamiento Táctico Previo", minutes: 80, rpe: 8, attendanceStatus: "Presente" },
-    { id: "s2", date: "2026-10-13", title: "Sesión de Fuerza y Resistencia", minutes: 75, rpe: 7, attendanceStatus: "Presente" },
-    { id: "s3", date: "2026-10-11", title: "Competición Jornada 4", minutes: 90, rpe: 9, attendanceStatus: "Titular (90 min)" },
-    { id: "s4", date: "2026-10-09", title: "Recuperación Activa", minutes: 0, rpe: 3, attendanceStatus: "Preservado (0 min)" },
-  ],
-  p2: [
-    { id: "s5", date: "2026-10-15", title: "Entrenamiento Táctico Previo", minutes: 80, rpe: 6, attendanceStatus: "Presente" },
-    { id: "s6", date: "2026-10-13", title: "Sesión de Fuerza y Resistencia", minutes: 75, rpe: 5, attendanceStatus: "Presente" },
-  ],
-};
 
 // ============================================================================
-// COMPONENTE: DRAWER DE JUGADOR EN MEMORIA (SIN SUPABASE NI CONSULTAS)
+// COMPONENTE EXCLUSIVO DEMO: DRAWER DE RENDIMIENTO DE JUGADOR
+// (SIN CONSULTAS A SUPABASE NI DEPENDENCIAS EXTERNAS)
 // ============================================================================
-
-function getAlertTitle(type: string): string {
-  switch (type) {
-    case 'fatigue_warning': return 'Fatiga Elevada';
-    case 'soreness_warning': return 'Dolor Muscular';
-    case 'discomfort_reported': return 'Molestia Física';
-    case 'high_exertion': return 'Esfuerzo Extremo';
-    default: return 'Aviso Físico';
-  }
-}
 
 interface DemoPlayerPerformanceDrawerProps {
   player: MockPlayer;
-  entry?: MockWellnessEntry;
-  alerts: InformationalAlert[];
-  canViewDiscomfort: boolean;
+  currentRole: "tech" | "med" | "fam";
   onClose: () => void;
 }
 
 function DemoPlayerPerformanceDrawer({
   player,
-  entry,
-  alerts,
-  canViewDiscomfort,
+  currentRole,
   onClose,
 }: DemoPlayerPerformanceDrawerProps) {
-  const sessions = MOCK_PLAYER_SESSIONS[player.id] || [
-    { id: "s-def", date: "2026-10-15", title: "Entrenamiento Táctico", minutes: 75, rpe: 6, attendanceStatus: "Presente" }
-  ];
+  const [activeTab, setActiveTab] = useState<"resumen" | "hooper" | "molestias" | "historial">("resumen");
 
-  const totalMinutes = sessions.reduce((acc, s) => acc + (s.minutes || 0), 0);
-  const evaluatedLoads = sessions.filter(s => s.minutes !== null && s.rpe !== null);
-  const totalLoad = evaluatedLoads.reduce((acc, s) => acc + (s.minutes! * s.rpe!), 0);
+  const isTechnicalOrMedical = currentRole === "tech" || currentRole === "med";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-200">
-      <div className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden">
-        {/* Header Drawer */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-xs flex justify-end"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden animate-in slide-in-from-right duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Cabecera del Drawer */}
+        <div className="p-5 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-sm">
-              {player.dorsal ?? "#"}
+            <div className="w-11 h-11 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-black text-sm">
+              {player.avatarInitials}
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 leading-tight">
-                {player.firstName} {player.lastName}
+              <h3 className="text-base font-black text-slate-900 leading-tight">
+                {player.name}
               </h3>
-              <p className="text-xs font-semibold text-slate-500">
-                {player.position} • Dorsal {player.dorsal ?? "S/D"}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs font-semibold text-slate-500">
+                  #{player.dorsal} • {player.position}
+                </span>
+                {player.hasDiscomfort && (
+                  <span className="bg-rose-100 text-rose-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    ● Molestia activa
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors font-bold text-sm"
             title="Cerrar ficha"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Contenido scrolleable */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Banner de Estado Hoy */}
-          <div className="p-4 rounded-2xl border bg-slate-50 border-slate-200">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Calendar size={13} /> Sesión de Hoy
-              </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
-                entry?.wellnessStatus === 'completed'
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                  : entry?.wellnessStatus === 'not_required'
-                  ? 'bg-slate-200 text-slate-700'
-                  : 'bg-amber-100 text-amber-800 border border-amber-200'
-              }`}>
-                {entry?.wellnessStatus === 'completed' ? 'Cuestionario Completado' : entry?.wellnessStatus === 'not_required' ? 'No Requerido' : 'Pendiente de Responder'}
-              </span>
+        {/* Pestañas de Navegación del Drawer */}
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-bold">
+          {(["resumen", "hooper", "molestias", "historial"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded-full capitalize transition-all ${
+                activeTab === tab
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Cuerpo del Drawer */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Tarjeta 1: Valoración Hooper */}
+          <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 mb-3">
+              <Activity size={15} className="text-blue-600" />
+              <span>Valoración Hooper</span>
             </div>
 
-            {/* Alertas del jugador */}
-            {alerts.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {alerts.map((al, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
-                      al.level === 'attention'
-                        ? 'bg-rose-50 border-rose-200 text-rose-900'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
-                    }`}
-                  >
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-bold">{getAlertTitle(al.type)}</div>
-                      <div className="text-[11px] mt-0.5 opacity-90">{al.message}</div>
+            <div className="flex items-center gap-5">
+              <div className="flex flex-col items-center justify-center w-22 h-22 rounded-full border-4 border-emerald-500 shrink-0">
+                <div className="text-lg font-black text-slate-900 leading-none">
+                  {player.hooper}
+                </div>
+                <div className="text-[10px] font-bold text-slate-400">/ 25</div>
+                <span className="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full mt-1">
+                  Buena
+                </span>
+              </div>
+
+              <div className="flex-1 space-y-1.5 text-xs text-slate-600">
+                <div className="flex justify-between">
+                  <span>🌙 Sueño</span>
+                  <strong className="text-slate-900">{player.sleep} / 10</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>⚡ Fatiga</span>
+                  <strong className="text-slate-900">{player.fatigue} / 10</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>🩹 Dolor Muscular</span>
+                  <strong className="text-slate-900">{player.soreness} / 10</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>🧠 Estrés</span>
+                  <strong className="text-slate-900">{player.stress} / 10</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>⚠️ Molestias</span>
+                  <strong className={player.hasDiscomfort ? "text-rose-600" : "text-slate-900"}>
+                    {player.hasDiscomfort ? `${player.discomfortIntensity}.0 / 10` : "0.0 / 10"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tarjeta 2: Molestias Actuales y Protección de Confidencialidad */}
+          {player.hasDiscomfort ? (
+            !isTechnicalOrMedical ? (
+              // Vista Redactada para Familiar / Jugador
+              <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 text-xs flex items-center gap-3">
+                <Lock className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <strong className="block text-amber-950 font-bold mb-0.5">
+                    Información de Salud Confidencial
+                  </strong>
+                  <span>
+                    Los detalles anatómicos y el diagnóstico clínico están reservados al cuerpo técnico y médico para proteger la privacidad del deportista.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              // Vista Completa para Cuerpo Técnico o Médico
+              <div className="p-4 rounded-2xl border border-rose-200 bg-rose-50/70">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-rose-900">
+                    <AlertTriangle size={15} className="text-rose-600" />
+                    <span>Molestias actuales</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-rose-800 bg-rose-200/80 px-2 py-0.5 rounded-full">
+                    {currentRole === "med" ? "Diagnóstico Clínico" : "Informe Técnico"}
+                  </span>
+                </div>
+
+                <div className="flex gap-4 items-center mt-3">
+                  {/* Silueta Anatómica Humana SVG con isquiotibial resaltado */}
+                  <div className="w-24 h-32 bg-white rounded-xl border border-rose-200 flex items-center justify-center shrink-0">
+                    <svg viewBox="0 0 100 150" className="w-20 h-28">
+                      <circle cx="50" cy="15" r="9" fill="#cbd5e1" />
+                      <path d="M38,25 L62,25 L60,65 L40,65 Z" fill="#cbd5e1" />
+                      <path d="M38,65 L62,65 L60,80 L40,80 Z" fill="#cbd5e1" />
+                      <path d="M40,80 L49,80 L47,135 L42,135 Z" fill="#cbd5e1" />
+                      <path d="M51,80 L60,80 L58,135 L53,135 Z" fill="#cbd5e1" />
+                      {/* Zona resaltada en rojo según la lesión */}
+                      <ellipse cx="55.5" cy="98" rx="4.5" ry="12" fill="#ef4444" opacity="0.9" />
+                    </svg>
+                  </div>
+
+                  <div className="flex-1 space-y-1 text-xs">
+                    <div className="font-extrabold text-rose-900 text-sm">
+                      {player.discomfortZone}
+                    </div>
+                    <div className="font-extrabold text-rose-700 text-xs">
+                      Intensidad: {player.discomfortIntensity}/10
+                    </div>
+                    <div className="text-slate-600">
+                      <strong>Duración:</strong> {player.discomfortDuration}
+                    </div>
+                    <div className="text-slate-600">
+                      <strong>Tipo:</strong> {player.discomfortType}
+                    </div>
+                    <div className="text-[11px] text-slate-700 bg-white p-2 rounded-lg border border-rose-200 mt-2">
+                      • {player.discomfortNote}
                     </div>
                   </div>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>Sin molestias físicas reportadas en la sesión de hoy.</span>
+            </div>
+          )}
+
+          {/* Tarjeta 3: Historial de Sesiones sRPE */}
+          <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 mb-2">
+              <BarChart3 size={15} className="text-blue-600" />
+              <span>Historial de sesiones (sRPE)</span>
+            </div>
+
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase font-black">
+                  <th className="py-1.5 px-2">Fecha</th>
+                  <th className="py-1.5 px-2">sRPE</th>
+                  <th className="py-1.5 px-2">Minutos</th>
+                  <th className="py-1.5 px-2">Notas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {player.sessions.map((s, idx) => (
+                  <tr key={idx}>
+                    <td className="py-2 px-2 font-bold text-slate-800">{s.date}</td>
+                    <td className="py-2 px-2">
+                      <span
+                        className={`font-black ${
+                          s.rpe >= 8 ? "text-rose-600" : "text-emerald-700"
+                        }`}
+                      >
+                        {s.rpe}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 text-slate-600">{s.min}</td>
+                    <td className="py-2 px-2 text-slate-500 text-[11px]">{s.note}</td>
+                  </tr>
                 ))}
-              </div>
-            )}
-
-            {/* Desglose de 5 métricas Hooper */}
-            {entry?.ratings ? (
-              <div className="grid grid-cols-5 gap-1.5 pt-2">
-                <div className="p-2 rounded-xl bg-white border border-slate-200 text-center">
-                  <Moon className="w-4 h-4 mx-auto text-indigo-500 mb-1" />
-                  <div className="text-[10px] text-slate-500 font-semibold">Sueño</div>
-                  <div className="text-sm font-black text-slate-900">{entry.ratings.sleepQuality}/5</div>
-                </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200 text-center">
-                  <Battery className="w-4 h-4 mx-auto text-amber-500 mb-1" />
-                  <div className="text-[10px] text-slate-500 font-semibold">Fatiga</div>
-                  <div className="text-sm font-black text-slate-900">{entry.ratings.fatigue}/5</div>
-                </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200 text-center">
-                  <Activity className="w-4 h-4 mx-auto text-rose-500 mb-1" />
-                  <div className="text-[10px] text-slate-500 font-semibold">Dolor</div>
-                  <div className="text-sm font-black text-slate-900">{entry.ratings.soreness}/5</div>
-                </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200 text-center">
-                  <Flame className="w-4 h-4 mx-auto text-orange-500 mb-1" />
-                  <div className="text-[10px] text-slate-500 font-semibold">Estrés</div>
-                  <div className="text-sm font-black text-slate-900">{entry.ratings.stress}/5</div>
-                </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200 text-center">
-                  <Smile className="w-4 h-4 mx-auto text-emerald-500 mb-1" />
-                  <div className="text-[10px] text-slate-500 font-semibold">Ánimo</div>
-                  <div className="text-sm font-black text-slate-900">{entry.ratings.mood}/5</div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-xs text-slate-400 italic py-2 text-center">
-                {entry?.wellnessStatus === 'not_required'
-                  ? entry.notes || 'El jugador está ausente de la sesión.'
-                  : 'A la espera de que el futbolista o familia cumplimente el formulario previo.'}
-              </div>
-            )}
+              </tbody>
+            </table>
           </div>
 
-          {/* Bloque de Molestia y Confidencialidad */}
-          <div className="p-4 rounded-2xl border border-slate-200 bg-white">
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-2 flex items-center justify-between">
-              <span>Informe de Molestias Físicas</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                canViewDiscomfort ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {canViewDiscomfort ? <Eye size={11} /> : <EyeOff size={11} />}
-                {canViewDiscomfort ? 'Vista Médica / Técnica' : 'Vista Restringida (Familiar)'}
-              </span>
-            </h4>
-
-            {entry?.discomfort?.hasDiscomfort ? (
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-xs text-rose-900">
-                      Molestia Activa Reportada
-                    </span>
-                    {canViewDiscomfort ? (
-                      <span className="text-[11px] font-black px-2 py-0.5 rounded bg-rose-200 text-rose-900">
-                        Intensidad: {entry.discomfort.intensity}/10
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-rose-700">Registrada</span>
-                    )}
-                  </div>
-
-                  {canViewDiscomfort ? (
-                    <>
-                      <div className="text-xs text-rose-800">
-                        <strong>Zona anatómica:</strong> {entry.discomfort.zone}
-                      </div>
-                      {entry.discomfort.notes && (
-                        <div className="text-xs text-rose-700 mt-1 italic">
-                          "{entry.discomfort.notes}"
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-xs text-slate-600 mt-1.5 p-2 bg-white/80 rounded-lg border border-rose-200/50 flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span>
-                        Detalles clínicos redactados para roles familiares. Notificado al cuerpo médico y preparador físico.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Sin molestias físicas reportadas para el día de hoy.</span>
-              </div>
-            )}
+          {/* Tarjeta 4: Aviso de Confidencialidad Médica */}
+          <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-[11px] leading-relaxed">
+            <strong className="block font-bold mb-0.5">ℹ️ Información clínica</strong>
+            Los datos de molestias son confidenciales y solo visibles para el cuerpo técnico y personal médico autorizado.
           </div>
-
-          {/* Historial de Cargas y Sesiones */}
-          <div className="p-4 rounded-2xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
-                Historial de Sesiones (Carga sRPE)
-              </h4>
-              <div className="text-xs text-slate-500 font-semibold">
-                Total: <strong className="text-slate-900">{totalMinutes} min</strong> • Carga: <strong className="text-slate-900">{totalLoad} UA</strong>
-              </div>
-            </div>
-
-            <div className="divide-y divide-slate-100 text-xs">
-              {sessions.map(s => {
-                const sRpe = s.minutes !== null && s.rpe !== null ? s.minutes * s.rpe : null;
-                return (
-                  <div key={s.id} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-slate-900">{s.title}</div>
-                      <div className="text-[11px] text-slate-400">{s.date} • {s.attendanceStatus}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono font-bold text-slate-900">
-                        {s.minutes !== null ? `${s.minutes} min` : '—'} • RPE {s.rpe ?? '—'}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        Carga: {sRpe !== null ? `${sRpe} UA` : 'Pendiente'}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Drawer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 text-right">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-colors"
-          >
-            Cerrar Ficha
-          </button>
         </div>
       </div>
     </div>
@@ -436,540 +470,706 @@ function DemoPlayerPerformanceDrawer({
 }
 
 // ============================================================================
-// COMPONENTE PRINCIPAL: RUTA DEMO DEL PANEL DE RENDIMIENTO
+// COMPONENTE PRINCIPAL DE LA RUTA DEMO: CENTRO DE RENDIMIENTO
 // ============================================================================
 
 export default function PerformanceDemoPage() {
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("demo-team-cadete-a");
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string>("demo-season-26-27");
-  const [isTechnicalRole, setIsTechnicalRole] = useState<boolean>(true);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending' | 'discomfort'>('all');
+  const [selectedTeam, setSelectedTeam] = useState<"cadete_a" | "infantil_b" | "prebenjamin_c">("cadete_a");
+  const [selectedSeason, setSelectedSeason] = useState<"26_27" | "25_26">("26_27");
+  const [currentRole, setCurrentRole] = useState<"tech" | "med" | "fam">("tech");
+  const [currentFilter, setCurrentFilter] = useState<"todos" | "completados" | "pendientes" | "molestias">("todos");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedPlayerForDrawer, setSelectedPlayerForDrawer] = useState<MockPlayer | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const todaySpainStr = getSpainDateString(new Date());
+  const todaySpainStr = "13 may 2025, 16:42";
 
-  // Simulación del cambio de equipo o temporada con vaciado inmediato de datos
-  const handleTeamChange = (newTeamId: string) => {
-    setIsLoading(true);
-    setSelectedTeamId(newTeamId);
-    setSelectedPlayerForDrawer(null);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 250);
+  // Control de cambio de equipo con cierre garantizado del drawer
+  const handleTeamChange = (val: "cadete_a" | "infantil_b" | "prebenjamin_c") => {
+    setSelectedPlayerForDrawer(null); // Corrige cierre inmediato
+    setSelectedTeam(val);
   };
 
-  const handleSeasonChange = (newSeasonId: string) => {
-    setIsLoading(true);
-    setSelectedSeasonId(newSeasonId);
-    setSelectedPlayerForDrawer(null);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 250);
+  // Control de cambio de temporada con cierre garantizado del drawer
+  const handleSeasonChange = (val: "26_27" | "25_26") => {
+    setSelectedPlayerForDrawer(null); // Corrige cierre inmediato
+    setSelectedSeason(val);
   };
 
-  // Resolución de datos según equipo y temporada seleccionados
-  const currentTeam = MOCK_TEAMS.find(t => t.id === selectedTeamId)!;
-  const isHistoricalSeason = selectedSeasonId === "demo-season-25-26";
-  const isEmptyTeam = selectedTeamId === "demo-team-empty";
+  // Apertura de drawer por ID
+  const handleOpenDrawerById = (playerId: string) => {
+    const list = selectedTeam === "cadete_a" ? CADETE_A_PLAYERS : INFANTIL_B_PLAYERS;
+    const found = list.find((p) => p.id === playerId) || CADETE_A_PLAYERS[0];
+    setSelectedPlayerForDrawer(found);
+  };
 
-  let players: MockPlayer[] = [];
-  let entriesMap: Record<string, MockWellnessEntry> = {};
+  // Selección de futbolistas según equipo activo
+  const activePlayers =
+    selectedSeason === "25_26" || selectedTeam === "prebenjamin_c"
+      ? []
+      : selectedTeam === "cadete_a"
+      ? CADETE_A_PLAYERS
+      : INFANTIL_B_PLAYERS;
 
-  if (!isEmptyTeam && !isHistoricalSeason) {
-    if (selectedTeamId === "demo-team-cadete-a") {
-      players = MOCK_CADETE_PLAYERS;
-      entriesMap = MOCK_ENTRIES_ACTIVE_CADETE;
-    } else if (selectedTeamId === "demo-team-infantil-b") {
-      players = MOCK_INFANTIL_PLAYERS;
-      entriesMap = MOCK_ENTRIES_ACTIVE_INFANTIL;
-    }
-  }
-
-  // Agregados Hooper
-  const completedEntries = players
-    .map(p => entriesMap[p.id])
-    .filter((e): e is MockWellnessEntry => e?.wellnessStatus === 'completed');
-
-  const completedCount = completedEntries.length;
-  const pendingCount = players.filter(p => !entriesMap[p.id] || entriesMap[p.id].wellnessStatus === 'pending').length;
-  const discomfortCount = completedEntries.filter(e => e.discomfort?.hasDiscomfort).length;
-
-  let avgSleep = 0, avgFatigue = 0, avgSoreness = 0, avgStress = 0, avgMood = 0;
-  if (completedCount > 0) {
-    avgSleep = completedEntries.reduce((s, e) => s + (e.ratings?.sleepQuality || 0), 0) / completedCount;
-    avgFatigue = completedEntries.reduce((s, e) => s + (e.ratings?.fatigue || 0), 0) / completedCount;
-    avgSoreness = completedEntries.reduce((s, e) => s + (e.ratings?.soreness || 0), 0) / completedCount;
-    avgStress = completedEntries.reduce((s, e) => s + (e.ratings?.stress || 0), 0) / completedCount;
-    avgMood = completedEntries.reduce((s, e) => s + (e.ratings?.mood || 0), 0) / completedCount;
-  }
-
-  const avgHooperGlobal = completedCount > 0 ? (avgSleep + avgFatigue + avgSoreness + avgStress + avgMood).toFixed(1) : null;
-
-  // Alertas calculadas con sanitización de rol
-  const allAlerts: { player: MockPlayer; alert: InformationalAlert }[] = [];
-  for (const p of players) {
-    const entry = entriesMap[p.id];
-    if (entry?.wellnessStatus === 'completed' && entry.ratings) {
-      let discomfortForAlert: DiscomfortDetails | undefined = undefined;
-      if (entry.discomfort?.hasDiscomfort) {
-        discomfortForAlert = {
-          hasDiscomfort: true,
-          zone: isTechnicalRole ? entry.discomfort.zone : null,
-          intensity: isTechnicalRole ? entry.discomfort.intensity : null,
-          notes: isTechnicalRole ? entry.discomfort.notes : null,
-        };
-      }
-      const playerAlerts = generateInformationalAlerts(entry.ratings, discomfortForAlert);
-      for (const al of playerAlerts) {
-        allAlerts.push({ player: p, alert: al });
-      }
-    }
-  }
-
-  // Filtrado de plantilla
-  const filteredPlayers = players.filter(p => {
-    const entry = entriesMap[p.id];
-    if (statusFilter === 'completed') return entry?.wellnessStatus === 'completed';
-    if (statusFilter === 'pending') return !entry || entry.wellnessStatus === 'pending';
-    if (statusFilter === 'discomfort') return entry?.discomfort?.hasDiscomfort;
+  // Filtrado de futbolistas
+  const filteredPlayers = activePlayers.filter((p) => {
+    if (currentFilter === "completados" && p.status !== "completed") return false;
+    if (currentFilter === "pendientes" && p.status !== "pending") return false;
+    if (currentFilter === "molestias" && !p.hasDiscomfort) return false;
+    if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
+  const total = activePlayers.length;
+  const pendingCount = activePlayers.filter((p) => p.status === "pending").length;
+  const discomfortCount = activePlayers.filter((p) => p.hasDiscomfort).length;
+  const avgHooper = total > 0 ? (activePlayers.reduce((s, p) => s + p.hooper, 0) / total).toFixed(1) : "—";
+  const avgSleep = total > 0 ? (activePlayers.reduce((s, p) => s + p.sleep, 0) / total).toFixed(1) : "—";
+  const avgFatigue = total > 0 ? (activePlayers.reduce((s, p) => s + p.fatigue, 0) / total).toFixed(1) : "—";
+  const avgSoreness = total > 0 ? (activePlayers.reduce((s, p) => s + p.soreness, 0) / total).toFixed(1) : "—";
+  const avgStress = total > 0 ? (activePlayers.reduce((s, p) => s + p.stress, 0) / total).toFixed(1) : "—";
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex overflow-x-hidden font-sans">
       {/* ====================================================================== */}
-      {/* BANNER PERSISTENTE DEMO AQUELLA RUTA NUNCA CONECTA A SUPABASE */}
+      {/* 1. BARRA LATERAL IZQUIERDA (DARK NAVY) IDENTICA A LA IMAGEN */}
       {/* ====================================================================== */}
-      <header className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 sticky top-0 z-40 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-amber-950">
-          <div className="flex items-center gap-2 font-black">
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            <span className="uppercase tracking-wider">Modo Demostración Aislado — Centro de Rendimiento</span>
-            <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-              <ShieldCheck size={11} /> 100% En Memoria
-            </span>
+      <aside className="w-60 bg-[#0b1329] text-white shrink-0 min-h-screen sticky top-0 h-screen hidden md:flex flex-col border-r border-[#172554] z-30">
+        {/* Cabecera Sidebar */}
+        <div className="p-5 border-b border-[#172554] flex items-center gap-3">
+          <div className="w-9 h-9 bg-linear-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-md shadow-blue-500/30">
+            <BarChart3 size={20} />
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Selector de Simulación de Rol */}
-            <div className="flex items-center gap-1.5 bg-white/90 p-1 rounded-xl border border-amber-300/60 shadow-xs">
-              <span className="font-bold text-[11px] text-slate-600 px-1.5 flex items-center gap-1">
-                {isTechnicalRole ? <Eye size={12} className="text-blue-600" /> : <EyeOff size={12} className="text-amber-600" />}
-                Rol visual:
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsTechnicalRole(true)}
-                className={`px-2 py-0.5 rounded-lg font-bold text-[11px] transition-all ${
-                  isTechnicalRole ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Cuerpo Técnico
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsTechnicalRole(false)}
-                className={`px-2 py-0.5 rounded-lg font-bold text-[11px] transition-all ${
-                  !isTechnicalRole ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Familiar / Jugador
-              </button>
-            </div>
-
-            <div className="text-[11px] text-amber-900/80 font-mono">
-              Fecha Peninsular: <strong>{todaySpainStr}</strong>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ====================================================================== */}
-      {/* CUERPO DEL PANEL DE RENDIMIENTO */}
-      {/* ====================================================================== */}
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Cabecera del Panel con Selectores de Equipo y Temporada */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-200">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 flex items-center gap-2.5">
-              <Activity className="text-blue-600 w-7 h-7 shrink-0" />
-              <span>Centro de Rendimiento Global</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Monitoreo diario de bienestar (Hooper), alertas biomecánicas y control de fatiga.
-            </p>
-          </div>
-
-          {/* Selectores de Equipo y Temporada */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Selector de Equipo */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">Equipo</label>
-              <select
-                value={selectedTeamId}
-                onChange={(e) => handleTeamChange(e.target.value)}
-                className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-              >
-                {MOCK_TEAMS.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+            <div className="font-extrabold text-sm tracking-tight text-white leading-none">
+              ANTIGRAVITY
             </div>
-
-            {/* Selector de Temporada */}
-            <div className="flex flex-col">
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">Temporada</label>
-              <select
-                value={selectedSeasonId}
-                onChange={(e) => handleSeasonChange(e.target.value)}
-                className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-              >
-                {MOCK_SEASONS.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+            <div className="text-[11px] font-semibold text-blue-300 mt-1">
+              Demo - Rendimiento
             </div>
           </div>
         </div>
 
-        {/* ================================================================== */}
-        {/* ESTADOS DE CARGA O VACÍO */}
-        {/* ================================================================== */}
-        {isLoading ? (
-          <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 shadow-xs">
-            <RefreshCw className="w-8 h-8 mx-auto text-blue-600 animate-spin mb-3" />
-            <p className="font-bold text-sm text-slate-800">Cargando métricas del equipo...</p>
-            <p className="text-xs text-slate-400 mt-1">Vaciando datos previos y resolviendo estado de la plantilla.</p>
+        {/* Navegación Sidebar */}
+        <nav className="p-3 flex-1 flex flex-col gap-1 text-xs font-semibold text-slate-400">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <Home size={17} />
+            <span>Inicio</span>
           </div>
-        ) : isHistoricalSeason ? (
-          <div className="p-10 rounded-3xl bg-slate-100 border border-slate-200 text-center">
-            <Calendar className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h3 className="font-bold text-base text-slate-800">Temporada Cerrada (25/26)</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-              Esta temporada está archivada en modo histórico. El cuestionario Hooper y las alertas en vivo solo operan sobre la temporada activa 26/27.
+
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30 cursor-pointer">
+            <BarChart3 size={17} />
+            <span>Rendimiento</span>
+          </div>
+
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <Heart size={17} />
+            <span>Bienestar</span>
+          </div>
+
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <Users size={17} />
+            <span>Equipos</span>
+          </div>
+
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <Calendar size={17} />
+            <span>Calendario</span>
+          </div>
+
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <UserCheck size={17} />
+            <span>Jugadores</span>
+          </div>
+
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <FileText size={17} />
+            <span>Informes</span>
+          </div>
+        </nav>
+
+        {/* Footer Sidebar con Estado en Memoria */}
+        <div className="p-3.5 border-t border-[#172554] space-y-3">
+          <div className="bg-[#111e40] border border-[#1d3368] rounded-xl p-3">
+            <div className="flex items-center gap-2 text-[11px] font-black text-emerald-400 uppercase tracking-wider mb-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>DEMO EN MEMORIA</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              Todos los datos son ficticios y se gestionan en el navegador.
             </p>
           </div>
-        ) : isEmptyTeam || players.length === 0 ? (
-          <div className="p-10 rounded-3xl bg-white border border-slate-200 text-center">
-            <Users className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-            <h3 className="font-bold text-base text-slate-800">Plantilla Sin Jugadores</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-              No hay futbolistas inscritos en este equipo para la temporada seleccionada.
-            </p>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+            <Clock size={13} />
+            <span>Fecha actual (ES): <strong className="text-slate-300">{todaySpainStr}</strong></span>
           </div>
-        ) : (
-          <>
-            {/* ================================================================ */}
-            {/* TARJETAS RESUMEN DE BIENESTAR DE HOY */}
-            {/* ================================================================ */}
-            <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {/* Hooper Global */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Puntuación Hooper</span>
-                  <Activity size={15} className="text-blue-500" />
-                </div>
-                <div className="text-2xl font-black text-slate-900 mt-1">
-                  {avgHooperGlobal ?? '—'}
-                  <span className="text-xs text-slate-400 font-semibold ml-1">/ 25</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {completedCount} de {players.length} evaluados
-                </p>
+        </div>
+      </aside>
+
+      {/* ====================================================================== */}
+      {/* 2. AREA PRINCIPAL                                                      */}
+      {/* ====================================================================== */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Banner Superior de Demostración */}
+        <header className="bg-sky-50 border-b border-sky-100 px-6 py-2.5 flex items-center justify-between text-xs text-sky-900 sticky top-0 z-20">
+          <div className="inline-flex items-center gap-2 bg-sky-200/70 text-sky-800 font-extrabold px-3 py-0.5 rounded-full">
+            <ShieldCheck size={13} />
+            <span>Modo demostración • 100% En memoria</span>
+          </div>
+          <div className="text-slate-500 font-medium hidden sm:block">
+            Datos ficticios • Sin conexión • 13 may 2025 (ES)
+          </div>
+        </header>
+
+        <main className="p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
+          {/* Header de la Página con los 3 Selectores */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Centro de Rendimiento
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Bienestar, carga y rendimiento de tu equipo
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Selector de Equipo */}
+              <div className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 flex flex-col shadow-xs">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Equipo
+                </label>
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => handleTeamChange(e.target.value as any)}
+                  className="bg-transparent text-xs font-bold text-slate-900 outline-hidden cursor-pointer"
+                >
+                  <option value="cadete_a">⚽ Cadete A (6 jugadores)</option>
+                  <option value="infantil_b">⚽ Infantil B (4 jugadores)</option>
+                  <option value="prebenjamin_c">⚽ Prebenjamín C (0 jugadores)</option>
+                </select>
               </div>
 
-              {/* Calidad de Sueño */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Sueño</span>
-                  <Moon size={15} className="text-indigo-500" />
-                </div>
-                <div className="text-2xl font-black text-slate-900 mt-1">
-                  {completedCount > 0 ? avgSleep.toFixed(1) : '—'}
-                  <span className="text-xs text-slate-400 font-semibold ml-1">/ 5</span>
-                </div>
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">5 = Óptimo descanso</p>
+              {/* Selector de Temporada */}
+              <div className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 flex flex-col shadow-xs">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Temporada
+                </label>
+                <select
+                  value={selectedSeason}
+                  onChange={(e) => handleSeasonChange(e.target.value as any)}
+                  className="bg-transparent text-xs font-bold text-slate-900 outline-hidden cursor-pointer"
+                >
+                  <option value="26_27">📅 Temporada 26/27 (Activa)</option>
+                  <option value="25_26">🔒 Temporada 25/26 (Cerrada)</option>
+                </select>
               </div>
 
-              {/* Fatiga */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Fatiga</span>
-                  <Battery size={15} className="text-amber-500" />
-                </div>
-                <div className="text-2xl font-black text-slate-900 mt-1">
-                  {completedCount > 0 ? avgFatigue.toFixed(1) : '—'}
-                  <span className="text-xs text-slate-400 font-semibold ml-1">/ 5</span>
-                </div>
-                <p className={`text-[10px] font-bold mt-1 ${avgFatigue >= 4 ? 'text-rose-600' : 'text-slate-500'}`}>
-                  {avgFatigue >= 4 ? 'Atención: Fatiga Alta' : '1 = Menor fatiga'}
-                </p>
+              {/* Selector de Rol Visual */}
+              <div className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 flex flex-col shadow-xs">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Rol visual
+                </label>
+                <select
+                  value={currentRole}
+                  onChange={(e) => setCurrentRole(e.target.value as any)}
+                  className="bg-transparent text-xs font-bold text-slate-900 outline-hidden cursor-pointer"
+                >
+                  <option value="tech">👤 Cuerpo Técnico</option>
+                  <option value="med">🩺 Personal Médico</option>
+                  <option value="fam">👨‍👩‍👦 Familiar / Jugador</option>
+                </select>
               </div>
+            </div>
+          </div>
 
-              {/* Dolor Muscular */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Dolor / Agujetas</span>
-                  <Flame size={15} className="text-rose-500" />
-                </div>
-                <div className="text-2xl font-black text-slate-900 mt-1">
-                  {completedCount > 0 ? avgSoreness.toFixed(1) : '—'}
-                  <span className="text-xs text-slate-400 font-semibold ml-1">/ 5</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">1 = Sin dolor</p>
+          {/* Banner de Advertencia de Temporada Cerrada (Regla 1) */}
+          {selectedSeason === "25_26" && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center gap-3">
+              <Lock className="w-5 h-5 text-rose-600 shrink-0" />
+              <div>
+                <strong>Temporada 25/26 archivada (Modo Solo Lectura Histórico):</strong>
+                <span className="block mt-0.5">
+                  En cumplimiento de la Regla 1 de AGENTS.md, la temporada 25/26 está cerrada y no se cruzan datos con la temporada activa 26/27.
+                </span>
               </div>
+            </div>
+          )}
 
-              {/* Estrés */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Estrés</span>
-                  <Smile size={15} className="text-orange-500" />
-                </div>
-                <div className="text-2xl font-black text-slate-900 mt-1">
-                  {completedCount > 0 ? avgStress.toFixed(1) : '—'}
-                  <span className="text-xs text-slate-400 font-semibold ml-1">/ 5</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">1 = Muy relajado</p>
-              </div>
+          {/* Estado de Plantilla Vacía */}
+          {selectedSeason !== "25_26" && selectedTeam === "prebenjamin_c" && (
+            <div className="p-12 text-center rounded-2xl bg-white border border-slate-200">
+              <Users className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+              <h3 className="font-extrabold text-base text-slate-800">
+                Plantilla vacía (Prebenjamín C)
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                No hay futbolistas inscritos en este grupo para la temporada activa.
+              </p>
+            </div>
+          )}
 
-              {/* Molestias Físicas Activas */}
-              <div className={`p-4 rounded-2xl border shadow-xs ${
-                discomfortCount > 0 ? 'bg-rose-50/80 border-rose-200' : 'bg-white border-slate-200'
-              }`}>
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">Molestias</span>
-                  <AlertTriangle size={15} className={discomfortCount > 0 ? 'text-rose-600' : 'text-slate-400'} />
-                </div>
-                <div className={`text-2xl font-black mt-1 ${discomfortCount > 0 ? 'text-rose-900' : 'text-slate-900'}`}>
-                  {discomfortCount}
-                  <span className="text-xs text-slate-400 font-semibold ml-1">jugadores</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {discomfortCount > 0 ? 'Requieren valoración' : 'Sin incidencias'}
-                </p>
-              </div>
-            </section>
-
-            {/* ================================================================ */}
-            {/* ALERTAS ACTIVAS DEL EQUIPO */}
-            {/* ================================================================ */}
-            {allAlerts.length > 0 && (
-              <section className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <AlertTriangle className="text-amber-500 w-4 h-4" />
-                    <span>Alertas Informadas Hoy ({allAlerts.length})</span>
-                  </h3>
-                  <span className="text-[11px] text-slate-400">
-                    Calculadas determinísticamente por umbrales Hooper
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {allAlerts.map((item, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => setSelectedPlayerForDrawer(item.player)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-sm ${
-                        item.alert.level === 'attention'
-                          ? 'bg-rose-50/70 border-rose-200 hover:border-rose-300'
-                          : 'bg-amber-50/70 border-amber-200 hover:border-amber-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-xs text-slate-900">
-                          {item.player.firstName} {item.player.lastName} (#{item.player.dorsal})
-                        </span>
-                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                          item.alert.level === 'attention' ? 'bg-rose-200 text-rose-900' : 'bg-amber-200 text-amber-900'
-                        }`}>
-                          {item.alert.level === 'attention' ? 'Atención' : 'Info'}
-                        </span>
+          {/* Panel Operativo con Datos Activos */}
+          {selectedSeason === "26_27" && selectedTeam !== "prebenjamin_c" && (
+            <>
+              {/* ============================================================== */}
+              {/* 3. FILA DE 6 METRICAS KPI CON GAUGE Y SPARKLINES               */}
+              {/* ============================================================== */}
+              <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* Hooper Global */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
+                    <ShieldCheck size={15} className="text-blue-600" />
+                    <span>Hooper Global</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
+                      <svg className="w-14 h-14 -rotate-90" viewBox="0 0 60 60">
+                        <circle cx="30" cy="30" r="25" fill="none" stroke="#f1f5f9" strokeWidth="6" />
+                        <circle cx="30" cy="30" r="25" fill="none" stroke="#0d9488" strokeWidth="6" strokeDasharray="157" strokeDashoffset="40" strokeLinecap="round" />
+                      </svg>
+                      <div className="absolute text-center leading-none">
+                        <span className="font-black text-xs text-slate-900">{avgHooper}</span>
+                        <span className="block text-[8px] font-bold text-slate-400">/ 25</span>
                       </div>
-                      <div className="text-xs font-semibold text-slate-800">{getAlertTitle(item.alert.type)}</div>
-                      <div className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{item.alert.message}</div>
                     </div>
-                  ))}
+                    <div>
+                      <svg className="w-16 h-8" viewBox="0 0 70 32">
+                        <path d="M0,24 Q15,20 30,16 T50,10 T70,8" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                      <div className="text-[10px] font-extrabold text-emerald-600 mt-0.5">
+                        ↑ +0.8 <span className="text-slate-400 font-medium">vs. sem. ant.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sueño */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
+                    <Moon size={15} className="text-blue-600" />
+                    <span>Sueño</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div>
+                      <div className="text-2xl font-black text-slate-900">
+                        {avgSleep} <span className="text-xs font-bold text-slate-400">/ 10</span>
+                      </div>
+                      <div className="text-[11px] font-extrabold text-emerald-600 mt-0.5">
+                        ↑ +0.2
+                      </div>
+                    </div>
+                    <svg className="w-16 h-8" viewBox="0 0 70 32">
+                      <path d="M0,20 Q20,15 35,22 T70,12" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Fatiga */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
+                    <Zap size={15} className="text-amber-500" />
+                    <span>Fatiga</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div>
+                      <div className="text-2xl font-black text-slate-900">
+                        {avgFatigue} <span className="text-xs font-bold text-slate-400">/ 10</span>
+                      </div>
+                      <div className="text-[11px] font-extrabold text-emerald-600 mt-0.5">
+                        ↓ -0.6
+                      </div>
+                    </div>
+                    <svg className="w-16 h-8" viewBox="0 0 70 32">
+                      <path d="M0,10 Q25,18 45,14 T70,22" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Dolor Muscular */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
+                    <Activity size={15} className="text-rose-600" />
+                    <span>Dolor Muscular</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div>
+                      <div className="text-2xl font-black text-slate-900">
+                        {avgSoreness} <span className="text-xs font-bold text-slate-400">/ 10</span>
+                      </div>
+                      <div className="text-[11px] font-extrabold text-emerald-600 mt-0.5">
+                        ↓ -0.3
+                      </div>
+                    </div>
+                    <svg className="w-16 h-8" viewBox="0 0 70 32">
+                      <path d="M0,14 Q20,22 40,16 T70,24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Estrés */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
+                    <Brain size={15} className="text-purple-600" />
+                    <span>Estrés</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div>
+                      <div className="text-2xl font-black text-slate-900">
+                        {avgStress} <span className="text-xs font-bold text-slate-400">/ 10</span>
+                      </div>
+                      <div className="text-[11px] font-extrabold text-emerald-600 mt-0.5">
+                        ↓ -0.5
+                      </div>
+                    </div>
+                    <svg className="w-16 h-8" viewBox="0 0 70 32">
+                      <path d="M0,18 Q30,12 50,20 T70,14" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Molestias Activas */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500">
+                    <AlertTriangle size={15} className="text-rose-600" />
+                    <span>Molestias Activas</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div>
+                      <div className="text-2xl font-black text-rose-700">
+                        {discomfortCount}
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-400 mt-0.5">
+                        de {total} jugadores
+                      </div>
+                    </div>
+                    <svg className="w-16 h-8" viewBox="0 0 70 32">
+                      <path d="M0,24 Q25,10 45,26 T70,12" fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </div>
                 </div>
               </section>
-            )}
 
-            {/* ================================================================ */}
-            {/* TABLA DE PLANTILLA Y DETALLE INDIVIDUAL */}
-            {/* ================================================================ */}
-            <section className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-black text-slate-900 text-base">Estado de la Plantilla</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {currentTeam.name} • Sesión de Hoy ({todaySpainStr})
-                  </p>
-                </div>
-
-                {/* Filtro de Estado */}
-                <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs font-bold">
+              {/* ============================================================== */}
+              {/* 4. SECCIÓN DE ALERTAS DEL EQUIPO (3 TARJETAS PASTEL)           */}
+              {/* ============================================================== */}
+              <section className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-rose-600" />
+                    <h3 className="font-black text-sm text-slate-900">Alertas del equipo</h3>
+                    <span className="bg-rose-100 text-rose-800 text-[11px] font-black px-2 py-0.5 rounded-full">
+                      3
+                    </span>
+                  </div>
                   <button
-                    onClick={() => setStatusFilter('all')}
-                    className={`px-3 py-1 rounded-lg transition-all ${statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                    onClick={() => setCurrentFilter("molestias")}
+                    className="text-xs font-bold text-blue-600 hover:underline"
                   >
-                    Todos ({players.length})
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('completed')}
-                    className={`px-3 py-1 rounded-lg transition-all ${statusFilter === 'completed' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    Completados ({completedCount})
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('pending')}
-                    className={`px-3 py-1 rounded-lg transition-all ${statusFilter === 'pending' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    Pendientes ({pendingCount})
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('discomfort')}
-                    className={`px-3 py-1 rounded-lg transition-all ${statusFilter === 'discomfort' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    Molestias ({discomfortCount})
+                    Ver todas →
                   </button>
                 </div>
-              </div>
 
-              {/* Listado */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Jugador</th>
-                      <th className="py-3 px-4">Asistencia Hoy</th>
-                      <th className="py-3 px-4">Bienestar (Hooper)</th>
-                      <th className="py-3 px-4 text-center">Sueño</th>
-                      <th className="py-3 px-4 text-center">Fatiga</th>
-                      <th className="py-3 px-4 text-center">Dolor</th>
-                      <th className="py-3 px-4 text-center">Estrés</th>
-                      <th className="py-3 px-4 text-center">Ánimo</th>
-                      <th className="py-3 px-4">Molestias</th>
-                      <th className="py-3 px-4 text-right">Ficha</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredPlayers.map(p => {
-                      const entry = entriesMap[p.id];
-                      const isCompleted = entry?.wellnessStatus === 'completed';
-                      const isPending = !entry || entry.wellnessStatus === 'pending';
-                      const isNotRequired = entry?.wellnessStatus === 'not_required';
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Alerta 1: Javier Martín */}
+                  <div
+                    onClick={() => handleOpenDrawerById("p1")}
+                    className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 hover:shadow-xs cursor-pointer transition-transform hover:-translate-y-0.5 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="bg-rose-200 text-rose-900 font-black px-2 py-0.5 rounded-md text-[10px]">
+                        ⚠️ ATENCIÓN
+                      </span>
+                      <span className="text-slate-400 font-semibold">Hoy</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center font-black text-xs shrink-0">
+                        JM
+                      </div>
+                      <div className="flex-1 min-w-0 text-xs">
+                        <div className="font-extrabold text-slate-900 truncate">Javier Martín</div>
+                        <div className="text-[11px] text-slate-600 truncate">
+                          {currentRole === "fam" ? (
+                            <em>Molestia física reportada (confidencial)</em>
+                          ) : (
+                            <>Molestia: <strong className="text-rose-700">Isquiotibial derecho</strong></>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {currentRole === "fam" ? "Estado: En seguimiento" : "Intensidad: 8/10"}
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-400" />
+                    </div>
+                  </div>
 
-                      return (
-                        <tr
-                          key={p.id}
-                          onClick={() => setSelectedPlayerForDrawer(p)}
-                          className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                        >
-                          {/* Jugador */}
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-black text-xs flex items-center justify-center border border-slate-200">
-                                {p.dorsal ?? '—'}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                                  {p.firstName} {p.lastName}
-                                </div>
-                                <div className="text-[10px] text-slate-400">{p.position}</div>
-                              </div>
-                            </div>
-                          </td>
+                  {/* Alerta 2: Diego López */}
+                  <div
+                    onClick={() => handleOpenDrawerById("p3")}
+                    className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 hover:shadow-xs cursor-pointer transition-transform hover:-translate-y-0.5 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="bg-amber-200 text-amber-900 font-black px-2 py-0.5 rounded-md text-[10px]">
+                        ⚠️ ATENCIÓN
+                      </span>
+                      <span className="text-slate-400 font-semibold">Hoy</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center font-black text-xs shrink-0">
+                        DL
+                      </div>
+                      <div className="flex-1 min-w-0 text-xs">
+                        <div className="font-extrabold text-slate-900 truncate">Diego López</div>
+                        <div className="text-[11px] text-slate-600 truncate">
+                          {currentRole === "fam" ? (
+                            <em>Molestia muscular leve</em>
+                          ) : (
+                            <>Molestia: <strong className="text-amber-800">Cuádriceps</strong></>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {currentRole === "fam" ? "Estado: Cuestionario recibido" : "Intensidad: 6/10"}
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-400" />
+                    </div>
+                  </div>
 
-                          {/* Asistencia */}
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              entry?.attendanceStatus === 'confirmed'
-                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                : entry?.attendanceStatus === 'absent'
-                                ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {entry?.attendanceStatus === 'confirmed' ? 'Confirmado' : entry?.attendanceStatus === 'absent' ? 'Ausente' : 'Pendiente'}
-                            </span>
-                          </td>
+                  {/* Alerta 3: Mateo Fernández */}
+                  <div
+                    onClick={() => handleOpenDrawerById("p6")}
+                    className="p-3.5 rounded-xl bg-sky-50/80 border border-sky-200 hover:shadow-xs cursor-pointer transition-transform hover:-translate-y-0.5 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="bg-sky-200 text-sky-900 font-black px-2 py-0.5 rounded-md text-[10px]">
+                        ℹ️ INFO
+                      </span>
+                      <span className="text-slate-400 font-semibold">Hoy</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center font-black text-xs shrink-0">
+                        MF
+                      </div>
+                      <div className="flex-1 min-w-0 text-xs">
+                        <div className="font-extrabold text-slate-900 truncate">Mateo Fernández</div>
+                        <div className="text-[11px] text-slate-600 truncate">Cuestionario pendiente de envío</div>
+                        <div className="text-[11px] text-slate-400">Sin molestias reportadas</div>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-400" />
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-                          {/* Estado Wellness */}
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                              isCompleted
-                                ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                                : isNotRequired
-                                ? 'bg-slate-100 text-slate-500'
-                                : 'bg-amber-50 text-amber-800 border border-amber-200'
-                            }`}>
-                              {isCompleted ? 'Completado' : isNotRequired ? 'No Requerido' : 'Pendiente'}
-                            </span>
-                          </td>
+              {/* ============================================================== */}
+              {/* 5. TABLA DE PLANTILLA Y FILTROS                                */}
+              {/* ============================================================== */}
+              <section className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setCurrentFilter("todos")}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        currentFilter === "todos"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setCurrentFilter("completados")}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        currentFilter === "completados"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Completados
+                    </button>
+                    <button
+                      onClick={() => setCurrentFilter("pendientes")}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 transition-all ${
+                        currentFilter === "pendientes"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>Pendientes</span>
+                      <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 rounded-full font-black">
+                        {pendingCount}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setCurrentFilter("molestias")}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 transition-all ${
+                        currentFilter === "molestias"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>Con Molestias</span>
+                      <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 rounded-full font-black">
+                        {discomfortCount}
+                      </span>
+                    </button>
+                  </div>
 
-                          {/* 5 Escalas */}
-                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-800">
-                            {entry?.ratings ? `${entry.ratings.sleepQuality}` : '—'}
-                          </td>
-                          <td className={`py-3 px-4 text-center font-mono font-bold ${
-                            entry?.ratings && entry.ratings.fatigue >= 4 ? 'text-rose-600' : 'text-slate-800'
-                          }`}>
-                            {entry?.ratings ? `${entry.ratings.fatigue}` : '—'}
-                          </td>
-                          <td className={`py-3 px-4 text-center font-mono font-bold ${
-                            entry?.ratings && entry.ratings.soreness >= 4 ? 'text-rose-600' : 'text-slate-800'
-                          }`}>
-                            {entry?.ratings ? `${entry.ratings.soreness}` : '—'}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-800">
-                            {entry?.ratings ? `${entry.ratings.stress}` : '—'}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-800">
-                            {entry?.ratings ? `${entry.ratings.mood}` : '—'}
-                          </td>
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Buscar jugador..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 w-48 sm:w-60"
+                    />
+                  </div>
+                </div>
 
-                          {/* Molestias */}
-                          <td className="py-3 px-4">
-                            {entry?.discomfort?.hasDiscomfort ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                                <span className="font-bold text-rose-800 text-[11px]">
-                                  {isTechnicalRole ? entry.discomfort.zone : 'Molestia registrada'}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-[11px]">—</span>
-                            )}
-                          </td>
-
-                          {/* Botón Ficha */}
-                          <td className="py-3 px-4 text-right">
-                            <span className="text-blue-600 font-bold text-[11px] group-hover:underline flex items-center justify-end gap-1">
-                              Ficha <ChevronRight size={13} />
-                            </span>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-4">Jugador</th>
+                        <th className="py-3 px-3">Posición</th>
+                        <th className="py-3 px-3">Hooper</th>
+                        <th className="py-3 px-3">Sueño</th>
+                        <th className="py-3 px-3">Fatiga</th>
+                        <th className="py-3 px-3">Dolor</th>
+                        <th className="py-3 px-3">Estrés</th>
+                        <th className="py-3 px-3">Molestias</th>
+                        <th className="py-3 px-3">Estado</th>
+                        <th className="py-3 px-4"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPlayers.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} className="py-8 text-center text-slate-400">
+                            No se encontraron jugadores con los filtros aplicados.
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </>
-        )}
-      </main>
+                      ) : (
+                        filteredPlayers.map((player) => (
+                          <tr
+                            key={player.id}
+                            onClick={() => setSelectedPlayerForDrawer(player)}
+                            className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                          >
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                  {player.avatarInitials}
+                                </div>
+                                <div>
+                                  <div className="font-extrabold text-slate-900">{player.name}</div>
+                                  <div className="text-[11px] text-slate-400">
+                                    #{player.dorsal} • {player.position}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-3">
+                              <span className={`px-2 py-0.5 rounded-md font-extrabold text-[10px] ${player.posClass}`}>
+                                {player.posCode}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-3">
+                              <span className="bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full text-xs">
+                                {player.hooper}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-3 font-bold text-slate-700">{player.sleep}</td>
+                            <td className="py-3 px-3 font-bold text-slate-700">{player.fatigue}</td>
+                            <td className="py-3 px-3 font-bold text-slate-700">{player.soreness}</td>
+                            <td className="py-3 px-3 font-bold text-slate-700">{player.stress}</td>
+
+                            <td className="py-3 px-3">
+                              {player.hasDiscomfort ? (
+                                currentRole === "fam" ? (
+                                  <span className="bg-amber-100 text-amber-800 text-[11px] font-extrabold px-2 py-0.5 rounded-md">
+                                    ● Molestia
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                                      (player.discomfortIntensity || 0) >= 7
+                                        ? "bg-rose-100 text-rose-800"
+                                        : "bg-amber-100 text-amber-800"
+                                    }`}
+                                  >
+                                    {player.discomfortZone}
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3">
+                              <span
+                                className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                                  player.status === "completed"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {player.status === "completed" ? "Completado" : "Pendiente"}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4 text-right text-slate-400">
+                              <ChevronRight size={16} />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {/* ============================================================== */}
+              {/* 6. LISTADO INFERIOR DE OTROS EQUIPOS                           */}
+              {/* ============================================================== */}
+              <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs divide-y divide-slate-100 text-xs">
+                <div className="p-3.5 px-5 flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-extrabold text-slate-800">
+                    <span>⚽</span>
+                    <span>Infantil B (4 jugadores)</span>
+                  </div>
+                  <button
+                    onClick={() => handleTeamChange("infantil_b")}
+                    className="font-bold text-blue-600 hover:underline"
+                  >
+                    Ver equipo →
+                  </button>
+                </div>
+
+                <div className="p-3.5 px-5 flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-extrabold text-slate-800">
+                    <span>⚽</span>
+                    <span>Prebenjamín C (0 jugadores)</span>
+                  </div>
+                  <span className="text-slate-400 font-semibold">Plantilla vacía</span>
+                </div>
+              </section>
+            </>
+          )}
+        </main>
+      </div>
 
       {/* ====================================================================== */}
-      {/* DRAWER DE JUGADOR (SI HAY UNO SELECCIONADO) */}
+      {/* 7. FICHA LATERAL (DEMO PLAYER PERFORMANCE DRAWER)                      */}
       {/* ====================================================================== */}
       {selectedPlayerForDrawer && (
         <DemoPlayerPerformanceDrawer
           player={selectedPlayerForDrawer}
-          entry={entriesMap[selectedPlayerForDrawer.id]}
-          alerts={allAlerts
-            .filter(a => a.player.id === selectedPlayerForDrawer.id)
-            .map(a => a.alert)}
-          canViewDiscomfort={isTechnicalRole}
+          currentRole={currentRole}
           onClose={() => setSelectedPlayerForDrawer(null)}
         />
       )}

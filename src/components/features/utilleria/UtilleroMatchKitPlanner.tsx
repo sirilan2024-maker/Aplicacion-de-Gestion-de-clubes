@@ -13,7 +13,8 @@ import {
   Filter,
   CheckCheck,
   ChevronDown,
-  Info
+  Info,
+  Trophy
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -388,71 +389,65 @@ export function UtilleroMatchKitPlanner() {
 
                 {/* 2. Cuerpo de la ficha: Enfrentamiento deportivo */}
                 <div className="p-3.5 sm:p-4 space-y-3">
-                  {/* Bloque de Equipos (Local vs Visitante) */}
-                  <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                  {/* Bloque de Equipos (Local vs Visitante) - Nombres al 100% de ancho sin taparse */}
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200 space-y-2.5">
                     {/* Equipo Local */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {match.esLocal ? (
-                          <span
-                            className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
-                            style={{ backgroundColor: match.teamColor || "#4F46E5" }}
-                          />
-                        ) : (
-                          <span className="w-3 h-3 rounded-full shrink-0 bg-slate-300" />
-                        )}
-                        <span className={`text-xs sm:text-sm leading-snug break-words ${
-                          match.esLocal ? "font-black text-indigo-950" : "font-extrabold text-slate-800"
-                        }`}>
-                          {match.esLocal ? match.teamName : match.rivalNombre}
-                        </span>
-                      </div>
-                      {match.esLocal && match.teamCategory && (
-                        <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-                          {match.teamCategory}
-                        </span>
+                    <div className="flex items-center gap-2.5">
+                      {match.esLocal ? (
+                        <span
+                          className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs"
+                          style={{ backgroundColor: match.teamColor || "#4F46E5" }}
+                        />
+                      ) : (
+                        <span className="w-3.5 h-3.5 rounded-full shrink-0 bg-slate-300" />
                       )}
+                      <span className={`text-sm sm:text-base leading-snug break-words ${
+                        match.esLocal ? "font-black text-indigo-950" : "font-extrabold text-slate-800"
+                      }`}>
+                        {match.esLocal ? match.teamName : match.rivalNombre}
+                      </span>
                     </div>
 
                     {/* Divisor VS */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 py-0.5">
                       <div className="h-px bg-slate-200 flex-1" />
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">VS</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">VS</span>
                       <div className="h-px bg-slate-200 flex-1" />
                     </div>
 
                     {/* Equipo Visitante */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {!match.esLocal ? (
-                          <span
-                            className="w-3 h-3 rounded-full shrink-0 shadow-2xs"
-                            style={{ backgroundColor: match.teamColor || "#4F46E5" }}
-                          />
-                        ) : (
-                          <span className="w-3 h-3 rounded-full shrink-0 bg-slate-300" />
-                        )}
-                        <span className={`text-xs sm:text-sm leading-snug break-words ${
-                          !match.esLocal ? "font-black text-indigo-950" : "font-extrabold text-slate-800"
-                        }`}>
-                          {!match.esLocal ? match.teamName : match.rivalNombre}
-                        </span>
-                      </div>
-                      {!match.esLocal && match.teamCategory && (
-                        <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-                          {match.teamCategory}
-                        </span>
+                    <div className="flex items-center gap-2.5">
+                      {!match.esLocal ? (
+                        <span
+                          className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs"
+                          style={{ backgroundColor: match.teamColor || "#4F46E5" }}
+                        />
+                      ) : (
+                        <span className="w-3.5 h-3.5 rounded-full shrink-0 bg-slate-300" />
                       )}
+                      <span className={`text-sm sm:text-base leading-snug break-words ${
+                        !match.esLocal ? "font-black text-indigo-950" : "font-extrabold text-slate-800"
+                      }`}>
+                        {!match.esLocal ? match.teamName : match.rivalNombre}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Lugar / Campo de juego */}
-                  {match.lugar && !["local", "visitante"].includes(match.lugar.toLowerCase()) && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate font-medium">{match.lugar}</span>
-                    </div>
-                  )}
+                  {/* Fila separada: Competición / Grupo y Campo (Nunca tapa a los equipos) */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {match.teamCategory && (
+                      <span className="inline-flex items-center gap-1.5 font-bold text-indigo-950 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200/80 text-[11px] shadow-2xs">
+                        <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>{match.teamCategory}</span>
+                      </span>
+                    )}
+                    {match.lugar && !["local", "visitante"].includes(match.lugar.toLowerCase()) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/80">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[220px]">{match.lugar}</span>
+                      </span>
+                    )}
+                  </div>
 
                   {/* 3. SECCIÓN DESTACADA: Equipación a Preparar (Grande y Clara) */}
                   <div className={`p-3 rounded-xl border flex flex-col gap-1.5 transition-all ${

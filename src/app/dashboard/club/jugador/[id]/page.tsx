@@ -20,6 +20,7 @@ import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { ManagePlayerPinModal } from "@/components/features/players/ManagePlayerPinModal";
 import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
+import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
 import {
   isConfirmedAttendanceStatus,
   isTrainingSessionEligible,
@@ -883,6 +884,9 @@ export default function GlobalPlayerProfilePage() {
                       🔴 BAJA POR LESIÓN
                     </button>
                   )}
+                </div>
+                <div className="mt-2">
+                  <PlayerHeaderBadges playerId={player.id} />
                 </div>
               </div>
             </div>

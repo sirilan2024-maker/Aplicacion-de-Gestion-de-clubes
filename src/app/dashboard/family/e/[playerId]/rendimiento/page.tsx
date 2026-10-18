@@ -10,6 +10,8 @@ import {
 import { getPersonalPerformanceAction, PersonalPerformanceData } from "@/app/actions/performance-portal-actions";
 import { isFormativeCategory } from "@/lib/utils";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
+import { PlayerAchievementsShowcase } from "@/components/features/performance/PlayerAchievementsShowcase";
+import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
 
 export default function FamilyPerformancePage() {
   const params = useParams();
@@ -118,6 +120,9 @@ export default function FamilyPerformancePage() {
             <p className="text-xs text-slate-500 font-medium">
               {player.dorsal ? `Dorsal #${player.dorsal}` : 'Sin dorsal'} {player.posicion ? `• ${player.posicion}` : ''}
             </p>
+            <div className="mt-1.5">
+              <PlayerHeaderBadges playerId={playerId} />
+            </div>
           </div>
         </div>
 
@@ -212,6 +217,9 @@ export default function FamilyPerformancePage() {
               <span className="text-[11px] text-slate-500 block mt-0.5">{summary.totalMatchMinutes} mins en actas</span>
             </div>
           </div>
+
+          {/* Vitrina de Logros e Insignias Deportivas */}
+          <PlayerAchievementsShowcase playerId={playerId} />
 
           {/* Panel Informativo de Seguimiento */}
           <div className="bg-blue-50/70 border border-blue-200 rounded-3xl p-5 sm:p-6 text-blue-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

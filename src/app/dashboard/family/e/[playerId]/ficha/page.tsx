@@ -17,6 +17,7 @@ import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import Subscriptions from "@/components/features/treasury/Subscriptions";
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
+import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
 
 interface PlayerData {
   id: string;
@@ -653,6 +654,9 @@ export default function PlayerProfilePage() {
                   }`}>
                     {player.status || 'Activo'}
                   </span>
+                </div>
+                <div className="mt-2">
+                  <PlayerHeaderBadges playerId={playerId} />
                 </div>
               </div>
             </div>

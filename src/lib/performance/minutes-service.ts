@@ -863,3 +863,119 @@ export function resolveOfficialMatchMinutes(params: {
   return num;
 }
 
+export interface TrainingFeedbackResponseLike {
+  success: boolean;
+  persistenceStatus: 'confirmed' | 'partial' | 'uncertain' | 'failed';
+  savedTargets?: {
+    trainingMetrics: boolean;
+    sessionFeedback: boolean;
+    discomfortIncident: boolean;
+  };
+  warning?: string;
+  error?: string;
+}
+
+export interface TrainingFeedbackUIState {
+  viewState: 'form' | 'confirmed' | 'partial';
+  isSubmitted: boolean;
+  isPartial: boolean;
+  isError: boolean;
+  title: string;
+  message: string;
+  warningText: string | null;
+  errorToast: string | null;
+  targetSummary: {
+    trainingMetricsSaved: boolean;
+    sessionFeedbackSaved: boolean;
+    discomfortIncidentSaved: boolean;
+  } | null;
+}
+
+/**
+ * 14. Determina si el formulario de feedback post-entrenamiento puede enviarse.
+ * - Exige jugador seleccionado (`selectedPlayerId` no vacío), no estar enviando (`!submitting`)
+ *   y un RPE numérico explícito entre 0 y 10 (`rpe !== null`, admitiendo `rpe === 0`).
+ */
+export function canSubmitTrainingFeedbackForm(params: {
+  submitting: boolean;
+  selectedPlayerId?: string | null;
+  rpe: number | null | undefined;
+}): boolean {
+  if (params.submitting) return false;
+  if (!params.selectedPlayerId || params.selectedPlayerId.trim() === '') return false;
+  if (params.rpe === null || params.rpe === undefined || typeof params.rpe !== 'number' || isNaN(params.rpe)) {
+    return false;
+  }
+  return params.rpe >= 0 && params.rpe <= 10;
+}
+
+/**
+ * 15. Resuelve de forma determinista el estado visual y los mensajes al jugador tras `submitTrainingFeedback`:
+ * - `success: true` + `persistenceStatus: 'confirmed'`: confirmación habitual de guardado completo.
+ * - `success: true` + `persistenceStatus: 'partial'`: aviso veraz de guardado parcial (nunca afirma guardado total),
+ *   mostrando `result.warning` o un mensaje explicativo de respaldo no vacío si `warning` está ausente.
+ * - `success: false`: conserva el formulario y expone el mensaje de error para mostrar al usuario.
+ */
+export function resolveTrainingFeedbackUIState(
+  result: TrainingFeedbackResponseLike
+): TrainingFeedbackUIState {
+  if (!result || !result.success) {
+    const errorMsg =
+      result?.error && result.error.trim().length > 0
+        ? result.error.trim()
+        : 'No se pudo registrar la evaluación.';
+    return {
+      viewState: 'form',
+      isSubmitted: false,
+      isPartial: false,
+      isError: true,
+      title: '',
+      message: '',
+      warningText: null,
+      errorToast: errorMsg,
+      targetSummary: null,
+    };
+  }
+
+  const targetSummary = result.savedTargets
+    ? {
+        trainingMetricsSaved: Boolean(result.savedTargets.trainingMetrics),
+        sessionFeedbackSaved: Boolean(result.savedTargets.sessionFeedback),
+        discomfortIncidentSaved: Boolean(result.savedTargets.discomfortIncident),
+      }
+    : null;
+
+  if (result.persistenceStatus === 'partial') {
+    const cleanWarning =
+      typeof result.warning === 'string' && result.warning.trim().length > 0
+        ? result.warning.trim()
+        : 'La métrica principal de esfuerzo se ha guardado, pero el registro complementario de la sesión quedó pendiente de sincronización.';
+
+    return {
+      viewState: 'partial',
+      isSubmitted: true,
+      isPartial: true,
+      isError: false,
+      title: 'Guardado Parcial',
+      message:
+        'Tu esfuerzo principal ha quedado registrado, pero algunos datos complementarios de la sesión no pudieron guardarse por completo.',
+      warningText: cleanWarning,
+      errorToast: null,
+      targetSummary,
+    };
+  }
+
+  return {
+    viewState: 'confirmed',
+    isSubmitted: true,
+    isPartial: false,
+    isError: false,
+    title: '¡Datos Enviados!',
+    message: 'Gracias por rellenar tu evaluación. Tus datos han sido guardados correctamente en el sistema.',
+    warningText: null,
+    errorToast: null,
+    targetSummary,
+  };
+}
+
+

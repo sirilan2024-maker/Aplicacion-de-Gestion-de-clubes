@@ -4,9 +4,14 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTrainingFeedback } from "@/app/actions/feedback-actions";
-import { calculatePlannedTrainingDuration } from "@/lib/performance/minutes-service";
+import {
+  calculatePlannedTrainingDuration,
+  canSubmitTrainingFeedbackForm,
+  resolveTrainingFeedbackUIState,
+  TrainingFeedbackUIState,
+} from "@/lib/performance/minutes-service";
 import { DailyWellnessForm } from "@/components/features/performance/DailyWellnessForm";
-import { Activity, Clock, CheckCircle2, Loader2, Target } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Clock, Info, Loader2, Target } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -46,6 +51,7 @@ export default function PlayerFeedbackPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submissionUI, setSubmissionUI] = useState<TrainingFeedbackUIState | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -119,10 +125,12 @@ export default function PlayerFeedbackPage() {
     );
     setSubmitting(false);
 
-    if (result.success) {
+    const uiState = resolveTrainingFeedbackUIState(result);
+    if (uiState.isSubmitted) {
+      setSubmissionUI(uiState);
       setSubmitted(true);
     } else {
-      toast.error(result.error || "No se pudo registrar la evaluación.");
+      toast.error(uiState.errorToast || "No se pudo registrar la evaluación.");
     }
   };
 
@@ -147,15 +155,58 @@ export default function PlayerFeedbackPage() {
     );
   }
 
-  if (submitted) {
+  if (submitted && submissionUI) {
+    const isPartial = submissionUI.isPartial;
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border-t-4 border-emerald-500 animate-in zoom-in duration-500">
-          <CheckCircle2 className="w-20 h-20 text-emerald-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Datos Enviados!</h2>
-          <p className="text-gray-500">
-            Gracias por rellenar tu evaluación. Tus datos han sido guardados correctamente en el sistema.
-          </p>
+        <div
+          className={`bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border-t-4 animate-in zoom-in duration-500 ${
+            isPartial ? "border-amber-500" : "border-emerald-500"
+          }`}
+        >
+          {isPartial ? (
+            <AlertTriangle className="w-20 h-20 text-amber-500 mx-auto mb-4" />
+          ) : (
+            <CheckCircle2 className="w-20 h-20 text-emerald-500 mx-auto mb-4" />
+          )}
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{submissionUI.title}</h2>
+          <p className="text-gray-600">{submissionUI.message}</p>
+
+          {isPartial && submissionUI.warningText && (
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-left text-xs text-amber-900 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Aviso de persistencia parcial:</p>
+                <p className="mt-0.5">{submissionUI.warningText}</p>
+              </div>
+            </div>
+          )}
+
+          {isPartial && submissionUI.targetSummary && (
+            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-left text-xs text-slate-700 space-y-1">
+              <p className="font-bold text-slate-900">Detalle del guardado:</p>
+              <p>
+                • Métrica principal (RPE / minutos):{" "}
+                <span className="font-semibold">
+                  {submissionUI.targetSummary.trainingMetricsSaved ? "Guardada" : "No guardada"}
+                </span>
+              </p>
+              <p>
+                • Ficha complementaria de sesión:{" "}
+                <span className="font-semibold">
+                  {submissionUI.targetSummary.sessionFeedbackSaved ? "Guardada" : "No guardada"}
+                </span>
+              </p>
+              {hasDiscomfort && (
+                <p>
+                  • Aviso de molestia:{" "}
+                  <span className="font-semibold">
+                    {submissionUI.targetSummary.discomfortIncidentSaved ? "Guardado" : "No guardado"}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -359,7 +410,7 @@ export default function PlayerFeedbackPage() {
 
             <button
               type="submit"
-              disabled={submitting || !selectedPlayerId || rpe === null}
+              disabled={!canSubmitTrainingFeedbackForm({ submitting, selectedPlayerId, rpe })}
               className="w-full bg-gray-900 hover:bg-black text-white font-bold text-lg py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-gray-200"
             >
               {submitting ? <Loader2 size={24} className="animate-spin" /> : <Activity size={24} />}

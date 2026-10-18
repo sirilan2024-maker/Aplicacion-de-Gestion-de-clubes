@@ -341,13 +341,29 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
         const groupIds = Array.from(new Set(teams.map(t => t.ffcv_group_id).filter(Boolean)));
         if (groupIds.length === 0) return;
         const supabase = createClient();
-        const [mRes, standingsMap] = await Promise.all([
-          supabase.from('ffcv_matches').select('*').in('ffcv_group_id', groupIds).neq('ffcv_season_id', '21'),
+        
+        // Fetch matches per group to avoid Supabase PostgREST 1000-row limit truncation
+        const [groupMatchResponses, standingsMap] = await Promise.all([
+          Promise.all(groupIds.map(gid =>
+            supabase
+              .from('ffcv_matches')
+              .select('*')
+              .eq('ffcv_group_id', gid)
+              .neq('ffcv_season_id', '21')
+              .eq('ffcv_season_id', '22')
+              .limit(1000)
+          )),
           fetchLatestStandingsForGroups(supabase, groupIds)
         ]);
-        if (!mRes.error && mRes.data) {
-          setFfcvMatches(mRes.data);
-        }
+
+        const allFfcvMatches: any[] = [];
+        groupMatchResponses.forEach(res => {
+          if (!res.error && res.data) {
+            allFfcvMatches.push(...res.data);
+          }
+        });
+        setFfcvMatches(allFfcvMatches);
+
         if (standingsMap) {
           setLatestStandingsMap(standingsMap);
           const allStandingsRows: any[] = [];
@@ -1069,25 +1085,37 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                       {/* Botonera de acciones (iconos encuadrados y proporcionales) */}
                       <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end shrink-0">
                         {/* Botón Ver Acta Oficial FFCV */}
-                        {ffcvMatch?.codacta && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewingFfcvActa({
-                                codacta: ffcvMatch.codacta,
-                                matchId: ffcvMatch.ffcv_match_id || match.id,
-                                teamId: match.equipo_id,
-                                homeTeamName: ffcvMatch.home_team_name,
-                                awayTeamName: ffcvMatch.away_team_name
-                              });
-                            }}
-                            className="flex-1 sm:flex-initial h-8 px-2 sm:px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
-                            title="Ver Acta Oficial FFCV"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                            <span className="hidden sm:inline">Acta FFCV</span>
-                          </button>
-                        )}
+                        {(() => {
+                          let cardCodacta = ffcvMatch?.codacta || null;
+                          if (!cardCodacta && match.ffcv_match_id) {
+                            cardCodacta = String(match.ffcv_match_id);
+                          }
+                          if (!cardCodacta && match.acta_oficial_url) {
+                            const matchExtract = match.acta_oficial_url.match(/CodPartido=(\d+)/i);
+                            if (matchExtract) cardCodacta = matchExtract[1];
+                          }
+                          if (!cardCodacta) return null;
+
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingFfcvActa({
+                                  codacta: cardCodacta,
+                                  matchId: ffcvMatch?.ffcv_match_id || match.ffcv_match_id || match.id,
+                                  teamId: match.equipo_id,
+                                  homeTeamName: ffcvMatch?.home_team_name || (isLocal ? homeTeamName : awayTeamName),
+                                  awayTeamName: ffcvMatch?.away_team_name || (isLocal ? awayTeamName : homeTeamName)
+                                });
+                              }}
+                              className="flex-1 sm:flex-initial h-8 px-2 sm:px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
+                              title="Ver Acta Oficial FFCV"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span className="hidden sm:inline">Acta FFCV</span>
+                            </button>
+                          );
+                        })()}
 
                         {/* Botón Ver Ficha en Apúntamelo (Liga Brave) */}
                         {match.acta_oficial_url && match.acta_oficial_url.includes('apuntamelo.com') && (

@@ -522,6 +522,81 @@ export async function syncFFCVActaToConvocatorias(
       }
     }
 
+    // 4. Synchronize match_events (goals and cards for both local and visitante teams)
+    try {
+      const newEvents: any[] = [];
+
+      // Helper to find player ID for Saladar players
+      const findSaladarPlayerId = (playerName: string) => {
+        const matched = matchPlayer(playerName, undefined, allPlayers || [], teamPlayers, isSeniorMatch);
+        return matched?.id || null;
+      };
+
+      // Goals: Local
+      (details.goles_equipo_local || []).forEach((g: any) => {
+        const pId = isSaladarHome ? findSaladarPlayerId(g.nombre_jugador) : null;
+        const tipo = String(g.tipo_gol) === '102' ? 'Gol en propia puerta' : (String(g.tipo_gol) === '101' ? 'Penalti' : 'Gol');
+        newEvents.push({
+          partido_id: partido.id,
+          player_id: pId,
+          tipo_evento: tipo,
+          minuto: Number(g.minuto) || 0,
+          notas: `[LOCAL] ${g.nombre_jugador || 'Gol'}`
+        });
+      });
+
+      // Goals: Visitante
+      (details.goles_equipo_visitante || []).forEach((g: any) => {
+        const pId = !isSaladarHome ? findSaladarPlayerId(g.nombre_jugador) : null;
+        const tipo = String(g.tipo_gol) === '102' ? 'Gol en propia puerta' : (String(g.tipo_gol) === '101' ? 'Penalti' : 'Gol');
+        newEvents.push({
+          partido_id: partido.id,
+          player_id: pId,
+          tipo_evento: tipo,
+          minuto: Number(g.minuto) || 0,
+          notas: `[VISITANTE] ${g.nombre_jugador || 'Gol'}`
+        });
+      });
+
+      // Cards: Local
+      (details.tarjetas_equipo_local || []).forEach((c: any) => {
+        const pId = isSaladarHome ? findSaladarPlayerId(c.nombre_jugador) : null;
+        const isRed = c.segunda_amarilla === '1' || c.segunda_amarilla === 1 || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja';
+        newEvents.push({
+          partido_id: partido.id,
+          player_id: pId,
+          tipo_evento: isRed ? 'Tarjeta Roja' : 'Tarjeta Amarilla',
+          minuto: Number(c.minuto) || 0,
+          notas: `[LOCAL] ${c.nombre_jugador || 'Tarjeta'}`
+        });
+      });
+
+      // Cards: Visitante
+      (details.tarjetas_equipo_visitante || []).forEach((c: any) => {
+        const pId = !isSaladarHome ? findSaladarPlayerId(c.nombre_jugador) : null;
+        const isRed = c.segunda_amarilla === '1' || c.segunda_amarilla === 1 || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja';
+        newEvents.push({
+          partido_id: partido.id,
+          player_id: pId,
+          tipo_evento: isRed ? 'Tarjeta Roja' : 'Tarjeta Amarilla',
+          minuto: Number(c.minuto) || 0,
+          notas: `[VISITANTE] ${c.nombre_jugador || 'Tarjeta'}`
+        });
+      });
+
+      if (newEvents.length > 0) {
+        await supabase
+          .from('match_events')
+          .delete()
+          .eq('partido_id', partido.id)
+          .or('notas.ilike.[LOCAL]%,notas.ilike.[VISITANTE]%');
+
+        await supabase.from('match_events').insert(newEvents);
+      }
+    } catch (eventsErr) {
+      console.warn('[syncFFCVActaToConvocatorias] Warning: error syncing match_events:', eventsErr);
+    }
+
     // Also ensure partido status and score are up to date
     const isClosed = String(details.acta_cerrada) === '1';
     const hasScores = details.goles_local !== undefined && details.goles_local !== null && details.goles_local !== '' &&

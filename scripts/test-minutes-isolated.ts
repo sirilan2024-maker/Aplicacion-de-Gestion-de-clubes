@@ -19,6 +19,8 @@ import {
   calculateRollingWorkloadMetrics,
   aggregatePlayerMultiTeamWorkload,
   resolveOfficialMatchMinutes,
+  canSubmitTrainingFeedbackForm,
+  resolveTrainingFeedbackUIState,
 } from '../src/lib/performance/minutes-service';
 import { verifyFeedbackToken } from '../src/app/actions/feedback-actions';
 
@@ -680,6 +682,146 @@ console.log("=== INICIANDO PRUEBAS UNITARIAS AISLADAS (MODELO DE MINUTOS Y TOKEN
       isConfirmedAttendanceStatus("presente") === true &&
       isConfirmedAttendanceStatus("retraso") === true,
       "Caso 20: Estado 'unmarked' jamás cuenta como asistencia confirmada"
+    );
+  }
+
+  console.log("\n=== FASE 1B.2: PRUEBAS DE PERSISTENCIA PARCIAL Y COMUNICACIÓN VERAZ EN FEEDBACK ===");
+
+  // 11.1 Persistencia completa (confirmed): se muestra la confirmación habitual
+  {
+    const uiConfirmed = resolveTrainingFeedbackUIState({
+      success: true,
+      persistenceStatus: "confirmed",
+      savedTargets: {
+        trainingMetrics: true,
+        sessionFeedback: true,
+        discomfortIncident: false,
+      },
+    });
+    assert(
+      uiConfirmed.viewState === "confirmed" &&
+      uiConfirmed.isSubmitted === true &&
+      uiConfirmed.isPartial === false &&
+      uiConfirmed.isError === false &&
+      uiConfirmed.title === "¡Datos Enviados!" &&
+      uiConfirmed.message.includes("guardados correctamente") &&
+      uiConfirmed.warningText === null,
+      "Fase 1B.2 (1): Persistencia completa ('confirmed') muestra la confirmación habitual de guardado completo"
+    );
+  }
+
+  // 11.2 Persistencia parcial (success: true, persistenceStatus: 'partial'): aviso de guardado parcial y NO confirmación total
+  {
+    const uiPartial = resolveTrainingFeedbackUIState({
+      success: true,
+      persistenceStatus: "partial",
+      savedTargets: {
+        trainingMetrics: true,
+        sessionFeedback: false,
+        discomfortIncident: false,
+      },
+      warning: "El esfuerzo se guardó, pero la ficha de sesión no pudo insertarse.",
+    });
+    assert(
+      uiPartial.viewState === "partial" &&
+      uiPartial.isSubmitted === true &&
+      uiPartial.isPartial === true &&
+      uiPartial.isError === false &&
+      uiPartial.title === "Guardado Parcial" &&
+      !uiPartial.message.includes("guardados correctamente en el sistema") &&
+      uiPartial.warningText === "El esfuerzo se guardó, pero la ficha de sesión no pudo insertarse." &&
+      uiPartial.targetSummary?.trainingMetricsSaved === true &&
+      uiPartial.targetSummary?.sessionFeedbackSaved === false,
+      "Fase 1B.2 (2): Persistencia parcial ('partial') muestra aviso de guardado parcial con el warning real y nunca afirma guardado total"
+    );
+  }
+
+  // 11.3 Persistencia parcial con warning ausente o vacío: no falla ni muestra texto vacío
+  {
+    const uiPartialNoWarning = resolveTrainingFeedbackUIState({
+      success: true,
+      persistenceStatus: "partial",
+      savedTargets: {
+        trainingMetrics: true,
+        sessionFeedback: false,
+        discomfortIncident: false,
+      },
+    });
+    const uiPartialBlankWarning = resolveTrainingFeedbackUIState({
+      success: true,
+      persistenceStatus: "partial",
+      warning: "   ",
+    });
+    assert(
+      uiPartialNoWarning.viewState === "partial" &&
+      uiPartialNoWarning.isPartial === true &&
+      typeof uiPartialNoWarning.warningText === "string" &&
+      uiPartialNoWarning.warningText.trim().length > 0 &&
+      typeof uiPartialBlankWarning.warningText === "string" &&
+      uiPartialBlankWarning.warningText.trim().length > 0,
+      "Fase 1B.2 (3): Persistencia parcial sin warning (undefined o vacío) no falla ni genera texto vacío"
+    );
+  }
+
+  // 11.4 y 11.5 Selección y envío de RPE = 0 permitido vs RPE = null bloqueado
+  {
+    const allowedRpeZero = canSubmitTrainingFeedbackForm({
+      submitting: false,
+      selectedPlayerId: "22222222-2222-2222-2222-222222222222",
+      rpe: 0,
+    });
+    const allowedRpeTen = canSubmitTrainingFeedbackForm({
+      submitting: false,
+      selectedPlayerId: "22222222-2222-2222-2222-222222222222",
+      rpe: 10,
+    });
+    const blockedRpeNull = canSubmitTrainingFeedbackForm({
+      submitting: false,
+      selectedPlayerId: "22222222-2222-2222-2222-222222222222",
+      rpe: null,
+    });
+    const blockedWhileSubmitting = canSubmitTrainingFeedbackForm({
+      submitting: true,
+      selectedPlayerId: "22222222-2222-2222-2222-222222222222",
+      rpe: 0,
+    });
+    const blockedWithoutPlayer = canSubmitTrainingFeedbackForm({
+      submitting: false,
+      selectedPlayerId: "",
+      rpe: 5,
+    });
+    assert(
+      allowedRpeZero === true &&
+      allowedRpeTen === true &&
+      blockedRpeNull === false &&
+      blockedWhileSubmitting === false &&
+      blockedWithoutPlayer === false,
+      "Fase 1B.2 (4 y 5): RPE = 0 y RPE = 10 están permitidos para envío, mientras que RPE === null, submitting = true o jugador vacío bloquean el envío"
+    );
+  }
+
+  // 11.6 Error completo de envío (success: false): mantiene el comportamiento de error existente
+  {
+    const uiFailed = resolveTrainingFeedbackUIState({
+      success: false,
+      persistenceStatus: "failed",
+      error: "No se pudo registrar la métrica de esfuerzo.",
+    });
+    const uiUncertain = resolveTrainingFeedbackUIState({
+      success: false,
+      persistenceStatus: "uncertain",
+      error: "La operación no se completó íntegramente. Por seguridad, verifica con tu cuerpo técnico antes de reenviar.",
+    });
+    assert(
+      uiFailed.viewState === "form" &&
+      uiFailed.isSubmitted === false &&
+      uiFailed.isError === true &&
+      uiFailed.errorToast === "No se pudo registrar la métrica de esfuerzo." &&
+      uiUncertain.viewState === "form" &&
+      uiUncertain.isSubmitted === false &&
+      uiUncertain.isError === true &&
+      uiUncertain.errorToast?.includes("verifica con tu cuerpo técnico") === true,
+      "Fase 1B.2 (6): Error completo o incierto de envío conserva el formulario activo y expone el mensaje de error"
     );
   }
 

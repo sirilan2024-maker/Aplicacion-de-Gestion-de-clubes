@@ -9,6 +9,7 @@ import { PlayerStatsGrid } from "@/components/features/estadisticas/PlayerStatsG
 import { MatchTrendsModal } from "@/components/features/matches/match-details/MatchTrendsModal"
 import { getGlobalStatsAction, GlobalStatsKPIs, TeamStatDTO } from "@/app/actions/stats-actions"
 import { useSeason } from "@/components/providers/SeasonProvider"
+import { TacticalAnalyticsCard } from "@/components/features/performance/TacticalAnalyticsCard"
 
 interface RawData {
   players: any[];
@@ -980,6 +981,13 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             </div>
           </div>
         </div>
+
+        {/* ANÁLISIS TÁCTICO Y GOLES (FFCV / LIGA BRAVE) */}
+        {(fixedTeamId || selectedTeamId !== 'todos') && (
+          <div className="mt-6">
+            <TacticalAnalyticsCard teamId={fixedTeamId || selectedTeamId} />
+          </div>
+        )}
       </div>
 
       {/* SECCIÓN 3: FÍSICO Y CARGAS */}

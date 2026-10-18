@@ -9,7 +9,6 @@ import {
   Save, AlertCircle, Camera, UploadCloud, Loader2, X, TrendingUp, AlertTriangle, FolderOpen, Shield, Trash2, ChevronRight, BrainCircuit, ShieldCheck, KeyRound
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import { differenceInDays, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DocumentManager } from "@/components/features/admin/DocumentManager";
@@ -21,6 +20,13 @@ import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { ManagePlayerPinModal } from "@/components/features/players/ManagePlayerPinModal";
 import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
+import {
+  isConfirmedAttendanceStatus,
+  isTrainingSessionEligible,
+  aggregatePlayerMultiTeamWorkload,
+  resolveOfficialMatchMinutes,
+  MultiTeamSessionInput,
+} from "@/lib/performance/minutes-service";
 
 interface PlayerData {
   id: string;
@@ -255,14 +261,17 @@ export default function GlobalPlayerProfilePage() {
       // 1. Obtener métricas de entrenamiento (RPE y Minutos) del jugador
       const { data: pMetrics } = await supabase
         .from('player_training_metrics')
-        .select('event_id, value_number, metric:club_metrics(name)')
+        .select('event_id, value_number, metric:club_metrics(name), event:team_events(*)')
         .eq('player_id', playerId);
 
-      const metricsMap = new Map<string, { rpe?: number; minutes?: number }>();
+      const metricsMap = new Map<string, { rpe?: number; minutes?: number; event?: any }>();
       (pMetrics || []).forEach((m: any) => {
         const evId = m.event_id;
         if (!metricsMap.has(evId)) metricsMap.set(evId, {});
         const entry = metricsMap.get(evId)!;
+        if (m.event && !entry.event) {
+          entry.event = m.event;
+        }
         const metricName = (m.metric?.name || '').toLowerCase();
         if (metricName.includes('rpe')) {
           entry.rpe = m.value_number;
@@ -311,10 +320,18 @@ export default function GlobalPlayerProfilePage() {
             const yCount = !isPlayed ? 0 : ((rawY !== null && rawY !== undefined) ? Number(rawY) : mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length);
             const rawR = c.red_cards ?? c.tarjetas_rojas;
             const rCount = !isPlayed ? 0 : ((rawR !== null && rawR !== undefined) ? Number(rawR) : mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length);
-            const rawM = c.minutes_played ?? c.minutos_jugados;
-            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 90 : 0);
 
-            totalMatchMinutes += mins;
+            const mins = resolveOfficialMatchMinutes({
+              matchEstado: c.partidos.estado,
+              minutosJugados: c.minutos_jugados,
+              minutesPlayed: c.minutes_played,
+              titular: c.titular,
+              convocatoriaStatus: c.status,
+            });
+
+            if (mins !== null) {
+              totalMatchMinutes += mins;
+            }
             totalGoalsCount += gCount;
             totalYellowsCount += yCount;
             totalRedsCount += rCount;
@@ -347,10 +364,9 @@ export default function GlobalPlayerProfilePage() {
             const gCount = mEvs.filter((e: any) => e.tipo_evento === 'Gol').length;
             const yCount = mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length;
             const rCount = mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length;
-            // Sin convocatoria/acta no hay minutos oficiales: no se inventan
-            const mins = 0;
+            // Sin convocatoria/acta no hay minutos oficiales: permanecen pendientes (null)
+            const mins: number | null = null;
 
-            totalMatchMinutes += mins;
             totalGoalsCount += gCount;
             totalYellowsCount += yCount;
             totalRedsCount += rCount;
@@ -373,12 +389,13 @@ export default function GlobalPlayerProfilePage() {
             });
             processedMatches.add(m.id);
           } else {
+            const isPlayed = m.estado === 'Finalizado';
             mHistory.push({
               id: m.id,
               date: m.fecha_hora,
               title: `vs ${m.rival_nombre} (${m.lugar})`,
               attendance: 'No convocado',
-              minutes: 0,
+              minutes: isPlayed ? 0 : null,
               goles: 0,
               goals: 0,
               asistencias: 0,
@@ -396,7 +413,7 @@ export default function GlobalPlayerProfilePage() {
       // Orden del más cercano en fecha al más lejano
       mHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      // 3. Entrenamientos, Asistencia y ACWR
+      // 3. Entrenamientos, Asistencia y ACWR (unificado con Europe/Madrid y ventanas de 7/28 días)
       const { data: attData } = await supabase
         .from('attendance')
         .select('*, events:event_id(*)')
@@ -409,83 +426,97 @@ export default function GlobalPlayerProfilePage() {
       }
 
       const tHistory: any[] = [];
-      const processedEvents = new Set();
-      let acuteWorkload = 0;
-      let chronicWorkload = 0;
-
+      const multiTeamSessions: MultiTeamSessionInput[] = [];
+      const processedEvents = new Set<string>();
       const now = new Date();
-      const d7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const d28 = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+
+      const formatAttendanceLabel = (rawStatus: string | null | undefined): string => {
+        if (!rawStatus) return 'Pendiente';
+        const s = rawStatus.trim().toLowerCase();
+        if (isConfirmedAttendanceStatus(s)) return 'Presente';
+        if (['ausente', 'absent', 'no_asiste'].includes(s)) return 'Ausente';
+        if (['justificado', 'justified', 'excused', 'lesionado', 'injured', 'enfermo', 'sick'].includes(s)) return 'Justificado';
+        return 'Pendiente';
+      };
+
+      const registerTrainingEvent = (ev: any, rawAttStatus: string | null | undefined) => {
+        const evId = ev?.id;
+        if (!evId || processedEvents.has(evId) || ev.event_type !== 'Entrenamiento') return;
+
+        const met = metricsMap.get(evId);
+        const rpe = met?.rpe ?? null;
+        const mins = met?.minutes ?? null;
+        const hasRealMetrics = (rpe !== null && rpe !== undefined) || (mins !== null && mins !== undefined);
+
+        const isEligible = isTrainingSessionEligible({
+          eventDate: ev.date || ev.start_time,
+          eventStartTime: ev.start_time,
+          attendanceStatus: rawAttStatus ?? null,
+          hasRealMetrics,
+          event: ev,
+          now,
+        });
+
+        processedEvents.add(evId);
+        if (!isEligible) return;
+
+        multiTeamSessions.push({
+          eventId: evId,
+          teamId: ev.team_id || teamId || null,
+          date: ev.date || ev.start_time,
+          startTime: ev.start_time,
+          rpe,
+          minutes: mins,
+          attendanceStatus: rawAttStatus ?? null,
+          event: ev,
+        });
+
+        tHistory.push({
+          ...ev,
+          id: evId,
+          date: ev.date || ev.start_time,
+          title: ev.title || 'Entrenamiento',
+          attendance: formatAttendanceLabel(rawAttStatus),
+          rpe,
+          minutes: mins,
+        });
+      };
 
       if (attData) {
         attData.forEach((a) => {
           if (a.events && a.events.event_type === 'Entrenamiento') {
-            const evId = a.event_id || a.events.id;
-            if (evId && !processedEvents.has(evId)) {
-              const met = metricsMap.get(evId);
-              const rpe = met?.rpe ?? null;
-              const mins = met?.minutes ?? null;
-              const wl = rpe !== null && mins !== null ? mins * rpe : null;
-
-              if (wl !== null) {
-                const evDate = new Date(a.events.date || a.events.start_time);
-                if (evDate >= d7) acuteWorkload += wl;
-                if (evDate >= d28) chronicWorkload += wl;
-              }
-
-              const attStatus = (a.status || '').toLowerCase() === 'presente' ? 'Presente' : ((a.status || '').toLowerCase() === 'ausente' ? 'Ausente' : 'Justificado');
-
-              tHistory.push({
-                ...a.events,
-                id: evId,
-                date: a.events.date || a.events.start_time,
-                title: a.events.title || 'Entrenamiento',
-                attendance: attStatus,
-                rpe: rpe,
-                minutes: mins
-              });
-              processedEvents.add(evId);
-            }
+            registerTrainingEvent(
+              { ...a.events, id: a.event_id || a.events.id },
+              a.status
+            );
           }
         });
       }
 
-      teamEvents.forEach(e => {
-        if (e.id && !processedEvents.has(e.id)) {
-          const met = metricsMap.get(e.id);
-          const rpe = met?.rpe ?? null;
-          const mins = met?.minutes ?? null;
-          const wl = rpe !== null && mins !== null ? mins * rpe : null;
+      teamEvents.forEach((e) => {
+        registerTrainingEvent(e, null);
+      });
 
-          if (wl !== null) {
-            const evDate = new Date(e.date || e.start_time);
-            if (evDate >= d7) acuteWorkload += wl;
-            if (evDate >= d28) chronicWorkload += wl;
-          }
-
-          tHistory.push({
-            ...e,
-            id: e.id,
-            date: e.date || e.start_time,
-            title: e.title || 'Entrenamiento',
-            attendance: 'Pendiente',
-            rpe: rpe,
-            minutes: mins
-          });
-          processedEvents.add(e.id);
+      metricsMap.forEach((entry, evId) => {
+        if (entry.event && !processedEvents.has(evId)) {
+          registerTrainingEvent({ ...entry.event, id: evId }, null);
         }
       });
+
       tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      // Calcular ratio ACWR solo cuando existen datos reales suficientes (Rango óptimo: 0.85 a 1.25)
-      const avgAcute = acuteWorkload / 7;
-      const avgChronic = chronicWorkload / 28;
+      // Calcular ratio ACWR biológico unificado (7 días / 7 y 28 días / 28 en Europe/Madrid)
+      const workloadSummary = aggregatePlayerMultiTeamWorkload({
+        sessions: multiTeamSessions,
+        contextTeamId: teamId || null,
+        now,
+      });
 
-      if (avgChronic > 0) {
+      if (workloadSummary.acwr !== null) {
         setAcwrData({
-          acute: Math.round(avgAcute),
-          chronic: Math.round(avgChronic),
-          acwr: Number((avgAcute / avgChronic).toFixed(2))
+          acute: Math.round(workloadSummary.acuteLoad),
+          chronic: Math.round(workloadSummary.chronicLoad),
+          acwr: workloadSummary.acwr
         });
       } else {
         setAcwrData(null);
@@ -1850,7 +1881,7 @@ export default function GlobalPlayerProfilePage() {
                                   </td>
                                   <td className="px-6 py-4 text-center font-bold text-blue-600">{m.coach_rating || '0'}</td>
                                   <td className="px-6 py-4 text-center font-bold text-purple-600">{m.actitud || '0'}</td>
-                                  <td className="px-6 py-4 text-center font-bold text-indigo-600">{m.minutes > 0 ? `${m.minutes}'` : '0'}</td>
+                                  <td className="px-6 py-4 text-center font-bold text-indigo-600">{typeof m.minutes === 'number' ? `${m.minutes}'` : '-'}</td>
                                   <td className="px-6 py-4 text-center font-bold text-slate-700">{m.goles || '0'}</td>
                                   <td className="px-6 py-4 text-center font-bold text-slate-700">{m.asistencias || '0'}</td>
                                   <td className="px-6 py-4 text-center font-bold text-amber-500">{m.amarillas || '0'}</td>
@@ -1880,7 +1911,7 @@ export default function GlobalPlayerProfilePage() {
                               <div className="grid grid-cols-4 gap-2 mt-3">
                                 <div className="bg-slate-50 p-2 rounded flex flex-col items-center justify-center border border-slate-100">
                                   <div className="text-[10px] font-bold text-slate-400 uppercase">Min</div>
-                                  <div className="font-bold text-indigo-600">{m.minutes > 0 ? `${m.minutes}'` : '0'}</div>
+                                  <div className="font-bold text-indigo-600">{typeof m.minutes === 'number' ? `${m.minutes}'` : '-'}</div>
                                 </div>
                                 <div className="bg-slate-50 p-2 rounded flex flex-col items-center justify-center border border-slate-100">
                                   <div className="text-[10px] font-bold text-slate-400 uppercase">Nota</div>

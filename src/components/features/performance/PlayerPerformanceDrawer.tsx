@@ -7,6 +7,11 @@ import { Loader2, User as UserIcon, X, Calendar, Activity, Clock, Flame, CheckCi
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
 import { isFormativeCategory } from "@/lib/utils";
 import { InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
+import {
+  isTrainingSessionEligible,
+  calculateTrainingLoad,
+  resolveOfficialMatchMinutes,
+} from "@/lib/performance/minutes-service";
 
 export interface PlayerPerformanceDrawerProps {
   playerId: string;
@@ -80,7 +85,7 @@ export function PlayerPerformanceDrawer({
           // 2. Eventos del equipo (entrenamientos)
           const { data: allEvents } = await supabase
             .from('team_events')
-            .select('id, date, event_type, title')
+            .select('id, date, start_time, end_time, event_type, title')
             .eq('team_id', teamId)
             .order('date', { ascending: false });
           if (allEvents) setEvents(allEvents);
@@ -363,7 +368,7 @@ export function PlayerPerformanceDrawer({
               <div className="grid grid-cols-3 gap-2.5">
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">
                   <div className="text-xl sm:text-2xl font-black text-slate-900">
-                    {globalTrainingStats?.acwr > 0 ? globalTrainingStats.acwr.toFixed(2) : '-'}
+                    {typeof globalTrainingStats?.acwr === 'number' ? globalTrainingStats.acwr.toFixed(2) : '-'}
                   </div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">ACWR</div>
                 </div>
@@ -397,23 +402,40 @@ export function PlayerPerformanceDrawer({
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {events.filter(e => e.event_type === 'Entrenamiento').length === 0 ? (
-                      <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        No hay sesiones de entrenamiento programadas para este equipo.
-                      </div>
-                    ) : (
-                      events.filter(e => e.event_type === 'Entrenamiento').map(ev => {
+                    {(() => {
+                      const eligibleTrainings = events.filter(ev => {
+                        if (ev.event_type !== 'Entrenamiento') return false;
+                        const att = attendanceMap[ev.id];
+                        const hasMetricsForEv = metrics.some(
+                          mx => mx.event_id === ev.id && mx.value_number !== null && mx.value_number !== undefined
+                        );
+                        return isTrainingSessionEligible({
+                          eventDate: ev.date,
+                          eventStartTime: ev.start_time,
+                          attendanceStatus: att?.status ?? null,
+                          hasRealMetrics: hasMetricsForEv,
+                          event: ev,
+                        });
+                      });
+
+                      if (eligibleTrainings.length === 0) {
+                        return (
+                          <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            No hay sesiones de entrenamiento registradas para este equipo.
+                          </div>
+                        );
+                      }
+
+                      return eligibleTrainings.map(ev => {
                         const m = metrics.filter(mx => mx.event_id === ev.id);
-                        const rpeVal = m.find(x => x.club_metrics?.name?.toLowerCase().includes('rpe'))?.value_number;
-                        const minVal = m.find(x => x.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number;
+                        const rpeVal = m.find(x => x.club_metrics?.name?.toLowerCase().includes('rpe'))?.value_number ?? null;
+                        const minVal = m.find(x => x.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number ?? null;
                         const att = attendanceMap[ev.id];
 
-                        // Si no hay datos registrados de ningún tipo en esta sesión
-                        const hasMetrics = (rpeVal !== undefined && rpeVal !== null) || (minVal !== undefined && minVal !== null);
                         const hasAttendanceInfo = att !== undefined;
 
-                        // Carga sRPE = RPE * Minutos confirmados (solo si ambos existen)
-                        const load = (typeof rpeVal === 'number' && typeof minVal === 'number') ? (rpeVal * minVal) : null;
+                        // Carga sRPE = RPE * Minutos confirmados (solo si ambos existen y son válidos)
+                        const load = calculateTrainingLoad(rpeVal, minVal);
 
                         return (
                           <div 
@@ -470,8 +492,8 @@ export function PlayerPerformanceDrawer({
                             </div>
                           </div>
                         );
-                      })
-                    )}
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -550,7 +572,13 @@ export function PlayerPerformanceDrawer({
                       officialMatches.map((conv) => {
                         const partido = conv.partidos;
                         const matchDate = partido?.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES') : '-';
-                        const mins = conv.minutos_jugados || conv.minutes_played || 0;
+                        const mins = resolveOfficialMatchMinutes({
+                          matchEstado: partido?.estado,
+                          minutosJugados: conv.minutos_jugados,
+                          minutesPlayed: conv.minutes_played,
+                          titular: conv.titular,
+                          convocatoriaStatus: conv.status,
+                        });
                         const gols = conv.goles ?? conv.goals ?? 0;
                         const asts = conv.asistencias ?? conv.assists ?? 0;
                         const yellows = conv.tarjetas_amarillas ?? conv.yellow_cards ?? 0;
@@ -575,7 +603,7 @@ export function PlayerPerformanceDrawer({
                             <div className="flex gap-2.5 text-center items-center shrink-0">
                               <div className="bg-indigo-50/70 border border-indigo-100 px-2 py-1 rounded-xl">
                                 <span className="block text-[9px] font-bold text-indigo-700 uppercase">Min</span>
-                                <span className="text-xs font-black text-indigo-950">{mins}'</span>
+                                <span className="text-xs font-black text-indigo-950">{mins !== null ? `${mins}'` : '-'}</span>
                               </div>
 
                               {gols > 0 && (

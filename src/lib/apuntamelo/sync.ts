@@ -7,6 +7,7 @@ import {
   FFCVMatchRecord,
   FFCVSyncResult
 } from '../ffcv/types';
+import { matchPlayer } from '../ffcv/acta-sync';
 
 // Agent configured to bypass intermediate SSL certificate issue on apuntamelo.com
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
@@ -231,8 +232,8 @@ export async function syncApuntameloTeam(
           away_team_ffcv_id: String(m.FK_EquipoLiga_B),
           home_team_name: m.Nombre_A || 'Local',
           away_team_name: m.Nombre_B || 'Visitante',
-          home_shield_url: null,
-          away_shield_url: null,
+          home_shield_url: m.Escudo_A || null,
+          away_shield_url: m.Escudo_B || null,
           home_score: hasScore ? Number(m.Goles_A) : null,
           away_score: hasScore ? Number(m.Goles_B) : null,
           status: hasScore ? 'played' : 'scheduled',
@@ -324,6 +325,8 @@ export async function syncApuntameloTeam(
         return false;
       });
 
+      let resolvedMatchId = matchExact ? matchExact.id : null;
+
       if (matchExact) {
         // Actualizar datos del partido
         await supabase
@@ -340,19 +343,108 @@ export async function syncApuntameloTeam(
           .eq('id', matchExact.id);
       } else {
         // Insertar nuevo partido
-        await supabase.from('partidos').insert({
-          club_id: team.club_id || '7ff5dbeb-2942-4576-8e74-b45a17646fb7',
-          equipo_id: teamId,
-          season_id: activeAppSeasonId,
-          rival_nombre: rivalName,
-          fecha_hora: isoDateTime,
-          lugar,
-          resultado_propio: scorePropio,
-          resultado_rival: scoreRival,
-          estado,
-          acta_oficial_url: matchUrl,
-          highlight_jornada: false
-        });
+        const { data: insertedMatch } = await supabase
+          .from('partidos')
+          .insert({
+            club_id: team.club_id || '7ff5dbeb-2942-4576-8e74-b45a17646fb7',
+            equipo_id: teamId,
+            season_id: activeAppSeasonId,
+            rival_nombre: rivalName,
+            fecha_hora: isoDateTime,
+            lugar,
+            resultado_propio: scorePropio,
+            resultado_rival: scoreRival,
+            estado,
+            acta_oficial_url: matchUrl,
+            highlight_jornada: false
+          })
+          .select('id')
+          .single();
+
+        if (insertedMatch) {
+          resolvedMatchId = insertedMatch.id;
+        }
+      }
+
+      // Si el partido está disputado, sincronizar goles y tarjetas a la tabla convocatorias
+      if (hasScore && resolvedMatchId) {
+        try {
+          const matchInfoArr = await fetchApuntameloJson<any[]>(
+            `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`
+          );
+
+          if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
+            const mInfo = matchInfoArr[0];
+            const { data: teamPlayers } = await supabase
+              .from('players')
+              .select('id, first_name, last_name, dorsal, team_id')
+              .eq('team_id', teamId);
+
+            if (teamPlayers && teamPlayers.length > 0) {
+              const puntuaciones = JSON.parse(mInfo.Json_puntuaciones || '[]');
+              const noticias = JSON.parse(mInfo.Json_noticias || '[]');
+
+              const teamPuntuaciones = puntuaciones.filter(
+                (p: any) =>
+                  Number(p.FK_EquipoLiga) === config.teamApuntameloId ||
+                  Number(p.EquipoLiga) === config.teamApuntameloId
+              );
+
+              const convocatoriasToUpsert: any[] = [];
+              for (const pStats of teamPuntuaciones) {
+                const matched = matchPlayer(pStats.Nombre || '', pStats.Dorsal, teamPlayers, teamPlayers);
+                if (!matched) continue;
+
+                let playerGoals = Number(pStats.Goles) || 0;
+                let playerYellows = Number(pStats.Amarillas) || 0;
+                let playerReds = Number(pStats.Rojas) || 0;
+
+                // Verificar también en la crónica en vivo (Json_noticias)
+                const cardNoticias = noticias.filter(
+                  (n: any) =>
+                    Number(n.FK_EquipoLiga) === config.teamApuntameloId &&
+                    (String(n.FK_JugadorLiga) === String(pStats.FK_JugadorLiga) ||
+                      (n.Nombre_Jugador &&
+                        matched.first_name &&
+                        matched.last_name &&
+                        n.Nombre_Jugador.toLowerCase().includes(matched.last_name.toLowerCase().trim())))
+                );
+
+                for (const cn of cardNoticias) {
+                  if (cn.Icono === 5 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.amarilla')) {
+                    playerYellows = Math.max(playerYellows, 1);
+                  }
+                  if (cn.Icono === 6 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.roja')) {
+                    playerReds = Math.max(playerReds, 1);
+                  }
+                }
+
+                convocatoriasToUpsert.push({
+                  partido_id: resolvedMatchId,
+                  player_id: matched.id,
+                  status: 'convocado',
+                  titular: !Boolean(pStats.Suplente),
+                  yellow_cards: playerYellows,
+                  tarjetas_amarillas: playerYellows,
+                  red_cards: playerReds,
+                  tarjetas_rojas: playerReds,
+                  goals: playerGoals,
+                  goles: playerGoals,
+                  minutes_played: pStats.Suplente ? 35 : 70,
+                  minutos_jugados: pStats.Suplente ? 35 : 70
+                });
+              }
+
+              if (convocatoriasToUpsert.length > 0) {
+                await supabase
+                  .from('convocatorias')
+                  .upsert(convocatoriasToUpsert, { onConflict: 'partido_id,player_id' });
+              }
+            }
+          }
+        } catch (detailErr: any) {
+          console.warn(`[syncApuntameloTeam] Error extrayendo estadísticas del partido ${sm.Id}:`, detailErr.message);
+        }
       }
 
       // Propagar también a agenda / team_events (Regla 5)

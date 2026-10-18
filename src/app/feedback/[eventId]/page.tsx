@@ -359,7 +359,7 @@ export default function PlayerFeedbackPage() {
 
             <button
               type="submit"
-              disabled={submitting || !selectedPlayerId || rpe === 0}
+              disabled={submitting || !selectedPlayerId || rpe === null}
               className="w-full bg-gray-900 hover:bg-black text-white font-bold text-lg py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-gray-200"
             >
               {submitting ? <Loader2 size={24} className="animate-spin" /> : <Activity size={24} />}

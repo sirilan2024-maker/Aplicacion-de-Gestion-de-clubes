@@ -4,13 +4,19 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Target, Crosshair, BarChart2, X, BrainCircuit, Sparkles, Flame, Compass, HeartHandshake, CheckCircle2, ChevronRight, Smile, AlertTriangle, Moon, Battery, ThumbsUp, ShieldAlert, AlertCircle } from "lucide-react";
-import { differenceInDays, parseISO } from "date-fns";
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
 import { getAuthorizedTeamWellnessSummary } from "@/app/actions/feedback-actions";
 import { useSeason } from "@/components/providers/SeasonProvider";
 import { isFormativeCategory } from "@/lib/utils";
 import { generateInformationalAlerts, InformationalAlert, HooperRatings, DiscomfortDetails, getSpainDateString } from "@/lib/performance/wellness-service";
+import {
+  isConfirmedAttendanceStatus,
+  isTrainingSessionEligible,
+  aggregatePlayerMultiTeamWorkload,
+  resolveOfficialMatchMinutes,
+  MultiTeamSessionInput,
+} from "@/lib/performance/minutes-service";
 
 export interface TeamWellnessSummary {
   date: string;
@@ -56,7 +62,7 @@ interface TrainingStats {
   avatar_url: string | null;
   acuteLoad: number;
   chronicLoad: number;
-  acwr: number;
+  acwr: number | null;
   trainingMinutes: number;
   totalTrainings: number;
   trainingsAttended: number;
@@ -192,9 +198,11 @@ export default function RendimientoGlobalPage() {
         return;
       }
 
-      // 3. Fetch all events and separate them
       // 3. Fetch all events and official matches
-      const { data: allEvents } = await supabase.from('team_events').select('id, date, event_type').eq('team_id', teamId);
+      const { data: allEvents } = await supabase
+        .from('team_events')
+        .select('id, team_id, date, start_time, end_time, event_type, title')
+        .eq('team_id', teamId);
       const trainings = allEvents?.filter(e => e.event_type === 'Entrenamiento') || [];
       const eventIds = allEvents?.map(e => e.id) || [];
 
@@ -247,45 +255,54 @@ export default function RendimientoGlobalPage() {
       }
 
       const today = new Date();
+      const matchById = new Map((teamOfficialMatches || []).map(m => [m.id, m]));
       const tResults: TrainingStats[] = [];
       const mResults: MatchStats[] = [];
 
       for (const p of players) {
         // --- TRAINING STATS ---
         const playerAtt = attendanceData.filter(a => a.player_id === p.id);
-        const tAtt = playerAtt.filter(a => trainings.find(t => t.id === a.event_id));
-        const tPresents = tAtt.filter(a => ['presente', 'present', 'retraso', 'late'].includes(a.status.toLowerCase())).length;
-        const totalTrainings = trainings.length;
+        const eligibleTrainings = trainings.filter(ev => {
+          const att = playerAtt.find(a => a.event_id === ev.id);
+          const hasMetricsForEv = ptData.some(
+            m => m.event_id === ev.id && m.player_id === p.id && m.value_number !== null && m.value_number !== undefined
+          );
+          return isTrainingSessionEligible({
+            eventDate: ev.date,
+            eventStartTime: (ev as any).start_time,
+            attendanceStatus: att?.status ?? null,
+            hasRealMetrics: hasMetricsForEv,
+            event: ev,
+            now: today,
+          });
+        });
+
+        const tAtt = playerAtt.filter(a => eligibleTrainings.some(t => t.id === a.event_id));
+        const tPresents = tAtt.filter(a => isConfirmedAttendanceStatus(a.status)).length;
+        const totalTrainings = eligibleTrainings.length;
         const tPct = totalTrainings > 0 ? Math.round((tPresents / totalTrainings) * 100) : 0;
 
-        let totalTMin = 0;
-        const dailyLoads: Record<string, number> = {};
-        
-        trainings.forEach(ev => {
-          const rpe = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase().includes('rpe'))?.value_number;
-          const min = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number;
-          if (min) totalTMin += min;
-          if (rpe !== undefined && min !== undefined && rpe !== null && min !== null) {
-            dailyLoads[ev.date] = (dailyLoads[ev.date] || 0) + (rpe * min);
-          }
+        const multiTeamSessions: MultiTeamSessionInput[] = eligibleTrainings.map(ev => {
+          const rpe = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase().includes('rpe'))?.value_number ?? null;
+          const min = ptData.find(m => m.event_id === ev.id && m.player_id === p.id && m.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number ?? null;
+          const att = playerAtt.find(a => a.event_id === ev.id);
+          return {
+            eventId: ev.id,
+            teamId: (ev as any).team_id || teamId,
+            date: ev.date,
+            startTime: (ev as any).start_time,
+            rpe,
+            minutes: min,
+            attendanceStatus: att?.status ?? null,
+            event: ev,
+          };
         });
 
-        // Determine the reference date for ACWR (latest training date)
-        const dates = Object.keys(dailyLoads).map(d => parseISO(d).getTime());
-        const referenceDate = dates.length > 0 ? new Date(Math.max(...dates)) : new Date();
-
-        let acuteSum = 0; let acuteDays = 0;
-        let chronicSum = 0; let chronicDays = 0;
-
-        Object.entries(dailyLoads).forEach(([dateStr, load]) => {
-          const diff = Math.abs(differenceInDays(referenceDate, parseISO(dateStr)));
-          if (diff <= 7) { acuteSum += load; acuteDays++; }
-          if (diff <= 28) { chronicSum += load; chronicDays++; }
+        const workloadSummary = aggregatePlayerMultiTeamWorkload({
+          sessions: multiTeamSessions,
+          contextTeamId: teamId,
+          now: today,
         });
-
-        const acuteLoad = acuteDays > 0 ? acuteSum / 7 : 0;
-        const chronicLoad = chronicDays > 0 ? chronicSum / 28 : 0;
-        const acwr = chronicLoad > 0 ? acuteLoad / chronicLoad : 0;
 
         tResults.push({
           id: p.id,
@@ -293,10 +310,10 @@ export default function RendimientoGlobalPage() {
           last_name: p.last_name,
           dorsal: p.dorsal,
           avatar_url: p.avatar_url,
-          acuteLoad,
-          chronicLoad,
-          acwr,
-          trainingMinutes: totalTMin,
+          acuteLoad: workloadSummary.acuteLoad,
+          chronicLoad: workloadSummary.chronicLoad,
+          acwr: workloadSummary.acwr,
+          trainingMinutes: workloadSummary.contextTeamTrainingMinutes,
           totalTrainings,
           trainingsAttended: tPresents,
           trainingAttendancePct: tPct
@@ -315,8 +332,17 @@ export default function RendimientoGlobalPage() {
         let startsCount = 0;
 
         playerConvs.forEach(c => {
-          const mins = Number(c.minutos_jugados || c.minutes_played || 0);
-          totalOfficialMinutes += mins;
+          const matchObj = matchById.get(c.partido_id);
+          const resolvedMins = resolveOfficialMatchMinutes({
+            matchEstado: matchObj?.estado,
+            minutosJugados: c.minutos_jugados,
+            minutesPlayed: c.minutes_played,
+            titular: c.titular,
+            convocatoriaStatus: c.status,
+          });
+          if (resolvedMins !== null) {
+            totalOfficialMinutes += resolvedMins;
+          }
 
           const g = Number(c.goles ?? c.goals ?? 0);
           totalOfficialGoals += g;
@@ -360,7 +386,7 @@ export default function RendimientoGlobalPage() {
       }
 
       if (checkCancelled() || reqId !== requestIdRef.current) return;
-      setTrainingStats(tResults.sort((a, b) => b.acwr - a.acwr));
+      setTrainingStats(tResults.sort((a, b) => (b.acwr ?? -1) - (a.acwr ?? -1)));
       setMatchStats(mResults.sort((a, b) => b.matchMinutes - a.matchMinutes));
 
       // --- WELLNESS & ASISTENCIA SUMMARY (Cálculo y Presentación del Centro de Rendimiento) ---
@@ -382,9 +408,9 @@ export default function RendimientoGlobalPage() {
         const { data: todayAtt } = await supabase.from('attendance').select('player_id, status').eq('event_id', todayEvent.id);
         (todayAtt || []).forEach((att: any) => {
           const s = (att.status || '').toLowerCase();
-          if (['presente', 'present', 'confirmado', 'confirmed', 'retraso', 'late'].includes(s)) {
+          if (isConfirmedAttendanceStatus(s)) {
             todayAttendanceMap[att.player_id] = 'confirmed';
-          } else if (['ausente', 'absent', 'no_asiste'].includes(s)) {
+          } else if (['ausente', 'absent', 'no_asiste', 'lesionado', 'injured', 'enfermo', 'sick', 'sancionado'].includes(s)) {
             todayAttendanceMap[att.player_id] = 'absent';
           } else {
             todayAttendanceMap[att.player_id] = 'pending';
@@ -526,8 +552,8 @@ export default function RendimientoGlobalPage() {
     }
   };
 
-  const getACWRStatus = (acwr: number) => {
-    if (acwr === 0) return { text: "Sin Datos", color: "bg-slate-100 text-slate-700 border-slate-200" };
+  const getACWRStatus = (acwr: number | null) => {
+    if (acwr === null) return { text: "Sin Datos", color: "bg-slate-100 text-slate-700 border-slate-200" };
     if (acwr >= 0.8 && acwr <= 1.3) return { text: "Óptimo", color: "bg-green-100 text-green-700 border-green-200" };
     if (acwr > 1.3 && acwr <= 1.5) return { text: "Precaución", color: "bg-yellow-100 text-yellow-700 border-yellow-200" };
     if (acwr > 1.5) return { text: "Peligro", color: "bg-red-100 text-red-700 border-red-200" };
@@ -1114,7 +1140,7 @@ export default function RendimientoGlobalPage() {
                         <span className="text-xs font-bold uppercase">ACWR</span>
                       </div>
                       <div className="font-black">
-                        {player.acwr > 0 ? player.acwr.toFixed(2) : '-'}
+                        {player.acwr !== null ? player.acwr.toFixed(2) : '-'}
                       </div>
                     </div>
 
@@ -1281,7 +1307,7 @@ export default function RendimientoGlobalPage() {
 
 
 function TeamPerformanceBanner({ trainingStats }: { trainingStats: TrainingStats[] }) {
-  const validAcwrPlayers = trainingStats.filter(p => p.acwr > 0);
+  const validAcwrPlayers = trainingStats.filter((p): p is TrainingStats & { acwr: number } => p.acwr !== null);
   
   if (validAcwrPlayers.length === 0) return null;
 

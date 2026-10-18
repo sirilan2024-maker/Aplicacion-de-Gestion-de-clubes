@@ -11,7 +11,7 @@ const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
  * - Collapses repeated letters ("YOUSSEF" -> "yousef")
  */
 const NAME_PARTICLES = new Set(['el', 'al', 'de', 'la', 'del', 'ben', 'ait', 'van', 'da', 'do']);
-function normalizeNameWords(str: string): string[] {
+export function normalizeNameWords(str: string): string[] {
   const raw = (str || '')
     .toLowerCase()
     .normalize('NFD')
@@ -81,7 +81,7 @@ const NICKNAMES_MAP: Record<string, string[]> = {
 };
 
 /** Two name words are equivalent if identical, aliases/nicknames, or (len>=4) 1 edit apart / substring */
-function wordsEquivalent(a: string, b: string): boolean {
+export function wordsEquivalent(a: string, b: string): boolean {
   if (a === b) return true;
   if (NICKNAMES_MAP[a]?.includes(b) || NICKNAMES_MAP[b]?.includes(a)) return true;
   if (a.length >= 4 && b.length >= 4) {
@@ -91,7 +91,7 @@ function wordsEquivalent(a: string, b: string): boolean {
   return false;
 }
 
-function countCommonWords(a: string[], b: string[]): number {
+export function countCommonWords(a: string[], b: string[]): number {
   const used = new Set<number>();
   let common = 0;
   for (const w of a) {
@@ -105,9 +105,9 @@ function countCommonWords(a: string[], b: string[]): number {
 }
 
 /**
- * Matches an FFCV player to our internal database player
+ * Matches an FFCV or external league player to our internal database player
  */
-function matchPlayer(
+export function matchPlayer(
   ffcvName: string,
   dorsal: string | number | undefined,
   allPlayers: any[],

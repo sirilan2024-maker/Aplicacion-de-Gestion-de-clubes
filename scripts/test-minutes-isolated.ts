@@ -10,7 +10,15 @@ import {
   validateTrainingFeedbackInputs,
   calculateTrainingLoad,
   reconcileMatchMinutes,
-  computeMinutesFromLiveEvents
+  computeMinutesFromLiveEvents,
+  getSpainReferenceDate,
+  calculateCalendarDaysDiff,
+  isConfirmedAttendanceStatus,
+  isCancelledTrainingSession,
+  isTrainingSessionEligible,
+  calculateRollingWorkloadMetrics,
+  aggregatePlayerMultiTeamWorkload,
+  resolveOfficialMatchMinutes,
 } from '../src/lib/performance/minutes-service';
 import { verifyFeedbackToken } from '../src/app/actions/feedback-actions';
 
@@ -249,6 +257,431 @@ console.log("=== INICIANDO PRUEBAS UNITARIAS AISLADAS (MODELO DE MINUTOS Y TOKEN
   assert(await verifyFeedbackToken('rpe', null as any, playerId, validExp, validRpeToken) === false, "eventId null no debe provocar excepciones");
   assert(await verifyFeedbackToken('rpe', eventId, playerId, NaN, validRpeToken) === false, "exp NaN no debe provocar excepciones");
   assert(await verifyFeedbackToken('rpe', eventId, playerId, validExp, null as any) === false, "token null no debe provocar excepciones");
+
+  console.log("\n=== FASE 1B: PRUEBAS DE VENTANAS TEMPORALES, ACWR, MULTI-EQUIPO Y MINUTOS ===");
+
+  // Referencia sintética fija: 2026-10-18 19:00:00 Europe/Madrid (17:00:00Z en horario CEST +02:00)
+  const refNow = new Date("2026-10-18T17:00:00.000Z");
+  const refDateStr = getSpainReferenceDate(refNow);
+  assert(refDateStr === "2026-10-18", "Referencia temporal en Europe/Madrid debe resolverse a 2026-10-18");
+
+  // 10.1 Ventana aguda exacta de 7 días calendario: incluye D_ref (diff=0) y D_ref - 6d (diff=6); excluye D_ref - 7d (diff=7)
+  {
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-d0", date: "2026-10-18", rpe: 7, minutes: 100, attendanceStatus: "present" }, // diff=0 -> 700 UA
+        { eventId: "ev-d6", date: "2026-10-12", rpe: 7, minutes: 100, attendanceStatus: "present" }, // diff=6 -> 700 UA
+        { eventId: "ev-d7", date: "2026-10-11", rpe: 7, minutes: 100, attendanceStatus: "present" }, // diff=7 -> fuera de aguda, dentro de crónica
+      ],
+    });
+    assert(
+      w.acuteSum === 1400 && w.acuteSessionCount === 2 && w.chronicSum === 2100,
+      "Caso 1: Ventana aguda de 7 días incluye D_ref (2026-10-18) y D_ref-6d (2026-10-12), y excluye D_ref-7d (2026-10-11)"
+    );
+  }
+
+  // 10.2 Ventana crónica exacta de 28 días calendario: incluye D_ref (diff=0) y D_ref - 27d (diff=27); excluye D_ref - 28d (diff=28)
+  {
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-c0", date: "2026-10-18", rpe: 5, minutes: 100, attendanceStatus: "present" },  // diff=0 -> 500 UA
+        { eventId: "ev-c27", date: "2026-09-21", rpe: 5, minutes: 100, attendanceStatus: "present" }, // diff=27 -> 500 UA
+        { eventId: "ev-c28", date: "2026-09-20", rpe: 5, minutes: 100, attendanceStatus: "present" }, // diff=28 -> excluida
+      ],
+    });
+    assert(
+      w.chronicSum === 1000 && w.chronicSessionCount === 2,
+      "Caso 2: Ventana crónica de 28 días incluye D_ref (2026-10-18) y D_ref-27d (2026-09-21), y excluye D_ref-28d (2026-09-20)"
+    );
+  }
+
+  // 10.3 Días de descanso incluidos en el denominador / 7 y / 28
+  {
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-rest-1", date: "2026-10-17", rpe: 7, minutes: 100, attendanceStatus: "present" }, // 700 UA en un único día
+      ],
+    });
+    assert(
+      w.acuteLoad === 100 && w.chronicLoad === 25 && w.acwr === 4.0,
+      "Caso 3: Días de descanso incluidos en el denominador (/7 = 100 UA/día, /28 = 25 UA/día)"
+    );
+  }
+
+  // 10.4 Exclusión de sesiones futuras (diffDays < 0)
+  {
+    const futureDiff = calculateCalendarDaysDiff("2026-10-18", "2026-10-19");
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-future", date: "2026-10-19", rpe: 8, minutes: 90, attendanceStatus: "present" },
+      ],
+    });
+    assert(
+      futureDiff === -1 && w.acuteSum === 0 && w.chronicSum === 0 && w.acwr === null,
+      "Caso 4: Sesiones futuras (diffDays < 0) quedan estrictamente excluidas"
+    );
+  }
+
+  // 10.5 Sesión de hoy antes de hora de inicio y sin asistencia registrada: excluida (incluso si tiene RPE y/o minutos registrados)
+  {
+    const morningNow = new Date("2026-10-18T08:00:00.000Z"); // 10:00 Europe/Madrid
+    const eligibleNoMetrics = isTrainingSessionEligible({
+      eventDate: "2026-10-18",
+      eventStartTime: "18:30:00",
+      attendanceStatus: "unmarked",
+      hasRealMetrics: false,
+      now: morningNow,
+    });
+    const eligibleWithRpeOnly = isTrainingSessionEligible({
+      eventDate: "2026-10-18",
+      eventStartTime: "18:30:00",
+      attendanceStatus: null,
+      hasRecordedMetrics: true,
+      hasRealMetrics: true,
+      now: morningNow,
+    });
+    const wFutureTodayWithMetrics = calculateRollingWorkloadMetrics({
+      now: morningNow,
+      sessions: [
+        { eventId: "ev-today-rpe-only", date: "2026-10-18", start_time: "18:30:00", rpe: 7, minutes: null, attendanceStatus: null },
+        { eventId: "ev-today-min-only", date: "2026-10-18", start_time: "18:30:00", rpe: null, minutes: 90, attendanceStatus: "unmarked" },
+        { eventId: "ev-today-both-metrics", date: "2026-10-18", start_time: "18:30:00", rpe: 7, minutes: 90, attendanceStatus: "pending" },
+        { eventId: "ev-today-no-starttime", date: "2026-10-18", start_time: null, rpe: 8, minutes: 90, attendanceStatus: null },
+      ],
+    });
+    assert(
+      eligibleNoMetrics === false &&
+      eligibleWithRpeOnly === false &&
+      wFutureTodayWithMetrics.acuteSessionCount === 0 &&
+      wFutureTodayWithMetrics.acuteSum === 0 &&
+      wFutureTodayWithMetrics.evaluatedSessions.every(s => s.status === "ineligible"),
+      "Caso 5: Sesión de hoy futura (10:00 < 18:30) o sin start_time y sin decisión de asistencia queda excluida aunque tenga RPE, minutos o ambos"
+    );
+  }
+
+  // 10.6 Sesión de hoy con asistencia registrada (incluida ausencia explícita) o alcanzada/pasada su hora de inicio en Europe/Madrid: elegible
+  {
+    const morningNow = new Date("2026-10-18T08:00:00.000Z"); // 10:00 Europe/Madrid
+    const exactStartNow = new Date("2026-10-18T16:30:00.000Z"); // 18:30 Europe/Madrid (exactamente igual a start_time)
+    const eveningNow = new Date("2026-10-18T17:00:00.000Z"); // 19:00 Europe/Madrid
+    const eligibleByAttendance = isTrainingSessionEligible({
+      eventDate: "2026-10-18",
+      eventStartTime: "18:30:00",
+      attendanceStatus: "presente",
+      hasRealMetrics: false,
+      now: morningNow,
+    });
+    const eligibleByExplicitAbsence = isTrainingSessionEligible({
+      eventDate: "2026-10-18",
+      eventStartTime: "18:30:00",
+      attendanceStatus: "ausente",
+      hasRealMetrics: false,
+      now: morningNow,
+    });
+    const eligibleByExactStartTime = isTrainingSessionEligible({
+      eventDate: "2026-10-18",
+      eventStartTime: "18:30:00",
+      attendanceStatus: null,
+      hasRealMetrics: false,
+      now: exactStartNow,
+    });
+    const eligibleByStartTime = isTrainingSessionEligible({
+      eventDate: "2026-10-18",
+      eventStartTime: "18:30:00",
+      attendanceStatus: null,
+      hasRealMetrics: false,
+      now: eveningNow,
+    });
+    assert(
+      eligibleByAttendance === true &&
+      eligibleByExplicitAbsence === true &&
+      isConfirmedAttendanceStatus("ausente") === false &&
+      eligibleByExactStartTime === true &&
+      eligibleByStartTime === true,
+      "Caso 6: Sesión de hoy con decisión explícita (presente o ausente) o hora de inicio alcanzada/superada en Europe/Madrid es elegible, pero 'ausente' no cuenta como presencia confirmada"
+    );
+  }
+
+  // 10.7 Exclusión de sesión cancelada cuando la cancelación sea verificable
+  {
+    const cancelledObj = { id: "ev-canc", status: "Cancelado" };
+    const isCancelled = isCancelledTrainingSession(cancelledObj);
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-canc", date: "2026-10-16", rpe: 8, minutes: 90, event: cancelledObj },
+      ],
+    });
+    assert(
+      isCancelled === true && w.acuteSum === 0 && w.chronicSum === 0,
+      "Caso 7: Sesión cancelada verificable queda excluida del cálculo de carga y ACWR"
+    );
+  }
+
+  // 10.8 Caso de cruce horario UTC vs Europe/Madrid (22:30Z en verano CEST = 00:30 del día siguiente; 23:30Z en invierno CET = 00:30 del día siguiente)
+  {
+    const summerLateUtc = new Date("2026-07-15T22:30:00.000Z"); // 2026-07-16 00:30 CEST (+02:00)
+    const winterLateUtc = new Date("2026-01-15T23:30:00.000Z"); // 2026-01-16 00:30 CET (+01:00)
+    assert(
+      getSpainReferenceDate(summerLateUtc) === "2026-07-16" &&
+      getSpainReferenceDate(winterLateUtc) === "2026-01-16",
+      "Caso 8: Cruce horario UTC vs Europe/Madrid resuelve la fecha local española exacta en verano (22:30Z -> día +1) e invierno (23:30Z -> día +1)"
+    );
+  }
+
+  // 10.9 RPE = 0 y minutos = 60 genera 0 UA confirmada y cuenta como carga válida 0, no como pendiente
+  {
+    const loadRes = calculateTrainingLoad(0, 60);
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-rpe0", date: "2026-10-17", rpe: 0, minutes: 60 },
+      ],
+    });
+    assert(
+      loadRes.load === 0 && loadRes.status === "confirmed" && w.acuteSessionCount === 1 && w.acuteSum === 0,
+      "Caso 9: RPE = 0 y minutos = 60 genera 0 UA confirmada y cuenta como sesión válida con carga 0"
+    );
+  }
+
+  // 10.10 RPE = 8 y minutos = 0 genera 0 UA confirmada, no pendiente
+  {
+    const loadRes = calculateTrainingLoad(8, 0);
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-min0", date: "2026-10-17", rpe: 8, minutes: 0 },
+      ],
+    });
+    assert(
+      loadRes.load === 0 && loadRes.status === "confirmed" && w.acuteSessionCount === 1 && w.acuteSum === 0,
+      "Caso 10: RPE = 8 y minutos = 0 genera 0 UA confirmada, no pendiente"
+    );
+  }
+
+  // 10.11 RPE = null y minutos = 90 queda pending_rpe y no aporta carga
+  {
+    const loadRes = calculateTrainingLoad(null, 90);
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-null-rpe", date: "2026-10-17", rpe: null, minutes: 90 },
+      ],
+    });
+    assert(
+      loadRes.load === null && loadRes.status === "pending_rpe" && w.acuteSessionCount === 0 && w.acuteSum === 0,
+      "Caso 11: RPE = null y minutos = 90 queda pending_rpe y no aporta carga"
+    );
+  }
+
+  // 10.12 RPE = 7 y minutos = null queda pending_minutes y no aporta carga
+  {
+    const loadRes = calculateTrainingLoad(7, null);
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-null-min", date: "2026-10-17", rpe: 7, minutes: null },
+      ],
+    });
+    assert(
+      loadRes.load === null && loadRes.status === "pending_minutes" && w.acuteSessionCount === 0 && w.acuteSum === 0,
+      "Caso 12: RPE = 7 y minutos = null queda pending_minutes y no aporta carga"
+    );
+  }
+
+  // 10.13 Sin cargas válidas en 28 días: acuteLoad = 0, chronicLoad = 0, acwr = null
+  {
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-old", date: "2026-08-01", rpe: 7, minutes: 90 },
+        { eventId: "ev-incomplete", date: "2026-10-17", rpe: null, minutes: 90 },
+      ],
+    });
+    assert(
+      w.acuteLoad === 0 && w.chronicLoad === 0 && w.acwr === null,
+      "Caso 13: Sin cargas válidas en 28 días devuelve acuteLoad = 0, chronicLoad = 0, acwr = null"
+    );
+  }
+
+  // 10.14 Con carga válida solo en ventana aguda: calcular acuteLoad, chronicLoad y acwr sin división por cero
+  {
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-only-acute", date: "2026-10-16", rpe: 7, minutes: 80 }, // 560 UA -> acute=80, chronic=20, acwr=4.00
+      ],
+    });
+    assert(
+      w.acuteLoad === 80 && w.chronicLoad === 20 && w.acwr === 4.0,
+      "Caso 14: Carga válida solo en ventana aguda calcula acuteLoad (80), chronicLoad (20) y acwr (4.0) sin división por cero"
+    );
+  }
+
+  // 10.15 Varias sesiones válidas el mismo día se suman antes de dividir por 7 y 28
+  {
+    const w = calculateRollingWorkloadMetrics({
+      now: refNow,
+      sessions: [
+        { eventId: "ev-same-day-1", date: "2026-10-15", rpe: 5, minutes: 60 }, // 300 UA
+        { eventId: "ev-same-day-2", date: "2026-10-15", rpe: 7, minutes: 60 }, // 420 UA -> total día = 720 UA
+      ],
+    });
+    assert(
+      w.dailyLoads["2026-10-15"] === 720 &&
+      w.acuteSum === 720 &&
+      Math.abs(w.acuteLoad - 720 / 7) < 1e-6 &&
+      Math.abs(w.chronicLoad - 720 / 28) < 1e-6 &&
+      w.acwr === 4.0,
+      "Caso 15: Varias sesiones válidas el mismo día se suman (720 UA) antes de dividir por 7 y 28"
+    );
+  }
+
+  // 10.16 Jugador multi-equipo con sesiones en dos equipos el mismo día o la misma semana: se agregan sin duplicar eventId
+  {
+    const agg = aggregatePlayerMultiTeamWorkload({
+      now: refNow,
+      contextTeamId: "team-cadete-a",
+      sessions: [
+        { eventId: "ev-cadete-1", teamId: "team-cadete-a", date: "2026-10-15", rpe: 6, minutes: 90, attendanceStatus: "presente" }, // 540 UA
+        { eventId: "ev-juvenil-1", teamId: "team-juvenil-b", date: "2026-10-15", rpe: 7, minutes: 60, attendanceStatus: "presente" }, // 420 UA
+        { eventId: "ev-juvenil-2", teamId: "team-juvenil-b", date: "2026-10-01", rpe: 8, minutes: 90, attendanceStatus: "presente" }, // 720 UA (crónica)
+      ],
+    });
+    assert(
+      agg.acuteSum === 960 &&
+      agg.chronicSum === 1680 &&
+      agg.contextTeamTrainingMinutes === 90 &&
+      agg.totalClubTrainingMinutes === 240 &&
+      agg.minutesByTeam["team-cadete-a"] === 90 &&
+      agg.minutesByTeam["team-juvenil-b"] === 150 &&
+      agg.acwr === Number(((960 / 7) / (1680 / 28)).toFixed(2)),
+      "Caso 16: Jugador multi-equipo agrega cargas de ambos equipos en su ACWR biológico y mantiene minutos separados por equipo"
+    );
+  }
+
+  // 10.17 Misma sesión recibida dos veces por eventId (idéntica o fragmentada en entradas parciales): se fusiona y deduplica sin duplicar carga
+  {
+    const aggDup = aggregatePlayerMultiTeamWorkload({
+      now: refNow,
+      contextTeamId: "team-cadete-a",
+      sessions: [
+        { eventId: "ev-dup-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: 7, minutes: 80, attendanceStatus: "presente" },
+        { eventId: "ev-dup-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: 7, minutes: 80, attendanceStatus: "presente" },
+      ],
+    });
+    const aggMerged = aggregatePlayerMultiTeamWorkload({
+      now: refNow,
+      contextTeamId: "team-cadete-a",
+      sessions: [
+        { eventId: "test-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: 7, minutes: null, attendanceStatus: null },
+        { eventId: "test-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: null, minutes: 90, attendanceStatus: "presente" },
+      ],
+    });
+    const aggZeroMerged = aggregatePlayerMultiTeamWorkload({
+      now: refNow,
+      contextTeamId: "team-cadete-a",
+      sessions: [
+        { eventId: "test-zero-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: 0, minutes: null, attendanceStatus: "presente" },
+        { eventId: "test-zero-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: null, minutes: 60, attendanceStatus: null },
+      ],
+    });
+    const aggConflict = aggregatePlayerMultiTeamWorkload({
+      now: refNow,
+      contextTeamId: "team-cadete-a",
+      sessions: [
+        { eventId: "test-conflict-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: 7, minutes: 90, attendanceStatus: "presente" },
+        { eventId: "test-conflict-1", teamId: "team-cadete-a", date: "2026-10-16", rpe: 4, minutes: 90, attendanceStatus: "presente" },
+      ],
+    });
+    assert(
+      aggDup.acuteSessionCount === 1 &&
+      aggDup.acuteSum === 560 &&
+      aggDup.contextTeamTrainingMinutes === 80 &&
+      aggMerged.evaluatedSessions.length === 1 &&
+      aggMerged.evaluatedSessions[0].rpe === 7 &&
+      aggMerged.evaluatedSessions[0].minutes === 90 &&
+      aggMerged.evaluatedSessions[0].load === 630 &&
+      aggMerged.acuteSessionCount === 1 &&
+      aggMerged.acuteSum === 630 &&
+      aggZeroMerged.evaluatedSessions.length === 1 &&
+      aggZeroMerged.evaluatedSessions[0].rpe === 0 &&
+      aggZeroMerged.evaluatedSessions[0].minutes === 60 &&
+      aggZeroMerged.evaluatedSessions[0].load === 0 &&
+      aggZeroMerged.acuteSessionCount === 1 &&
+      aggConflict.evaluatedSessions.length === 1 &&
+      aggConflict.evaluatedSessions[0].rpe === null &&
+      aggConflict.evaluatedSessions[0].status === "pending_rpe" &&
+      aggConflict.acuteSessionCount === 0 &&
+      aggConflict.acuteSum === 0,
+      "Caso 17: Registros del mismo eventId fusionan campos complementarios (RPE 7 + Min 90 = 630 UA), preservan 0 válido, no duplican carga y dejan pendientes valores contradictorios"
+    );
+  }
+
+  // 10.18 Minutos de partido y minutos de entrenamiento permanecen separados
+  {
+    const trainingAgg = aggregatePlayerMultiTeamWorkload({
+      now: refNow,
+      contextTeamId: "team-a",
+      sessions: [
+        { eventId: "ev-tr-1", teamId: "team-a", date: "2026-10-16", rpe: 6, minutes: 90, attendanceStatus: "presente" },
+      ],
+    });
+    const matchMins = resolveOfficialMatchMinutes({
+      matchEstado: "Finalizado",
+      minutosJugados: 75,
+      titular: true,
+    });
+    assert(
+      trainingAgg.contextTeamTrainingMinutes === 90 &&
+      matchMins === 75 &&
+      trainingAgg.acuteSum === 540,
+      "Caso 18: Minutos de partido (75') y minutos de entrenamiento (90') permanecen separados y el partido no inyecta carga ficticia en ACWR"
+    );
+  }
+
+  // 10.19 Jugador titular de partido sin minutos oficiales ni manuales: no recibe 90 minutos automáticos
+  {
+    const starterNoMinutes = resolveOfficialMatchMinutes({
+      matchEstado: "Finalizado",
+      minutosJugados: null,
+      minutesPlayed: null,
+      titular: true,
+      convocatoriaStatus: "convocado",
+    });
+    const unplayedStarter = resolveOfficialMatchMinutes({
+      matchEstado: "Pendiente",
+      minutosJugados: 90,
+      minutesPlayed: 90,
+      titular: true,
+    });
+    const explicitZeroSub = resolveOfficialMatchMinutes({
+      matchEstado: "Finalizado",
+      minutosJugados: 0,
+      minutesPlayed: null,
+      titular: false,
+    });
+    assert(
+      starterNoMinutes === null && unplayedStarter === null && explicitZeroSub === 0,
+      "Caso 19: Titular sin minutos registrados devuelve null (nunca 90 automáticos), partido no finalizado devuelve null y 0 explícito devuelve 0"
+    );
+  }
+
+  // 10.20 Estado unmarked no cuenta como asistencia confirmada
+  {
+    assert(
+      isConfirmedAttendanceStatus("unmarked") === false &&
+      isConfirmedAttendanceStatus("pending") === false &&
+      isConfirmedAttendanceStatus("ausente") === false &&
+      isConfirmedAttendanceStatus("presente") === true &&
+      isConfirmedAttendanceStatus("retraso") === true,
+      "Caso 20: Estado 'unmarked' jamás cuenta como asistencia confirmada"
+    );
+  }
 
   console.log("\n=== TODAS LAS PRUEBAS UNITARIAS AISLADAS FINALIZARON CON ÉXITO ===");
 })();

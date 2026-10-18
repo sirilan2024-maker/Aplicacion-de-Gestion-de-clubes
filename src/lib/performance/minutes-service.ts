@@ -410,7 +410,7 @@ export function isCancelledTrainingSession(event: {
 }
 
 export interface TrainingSessionEligibilityParams {
-  event: {
+  event?: {
     id?: string;
     date?: string | null;
     start_time?: string | null;
@@ -419,13 +419,21 @@ export interface TrainingSessionEligibilityParams {
     estado?: string | null;
     is_cancelled?: boolean | null;
     cancelled?: boolean | null;
-  };
+  } | null;
+  /** Fecha directa del evento (alternativa o complemento a event.date) */
+  eventDate?: Date | string | null;
+  /** Hora de inicio directa (alternativa o complemento a event.start_time) */
+  eventStartTime?: string | null;
   /** Instante o fecha de referencia (por defecto, ahora en Europe/Madrid) */
   now?: Date | string | number;
+  /** Estado de asistencia individual registrado para esta sesión */
+  attendanceStatus?: string | null;
   /** Estados de asistencia registrados para esta sesión (del jugador o del equipo) */
   attendanceStatuses?: Array<string | null | undefined>;
   /** Si existen datos reales de carga (RPE o minutos) ya registrados en la sesión */
   hasRecordedMetrics?: boolean;
+  /** Alias de hasRecordedMetrics */
+  hasRealMetrics?: boolean;
 }
 
 /**
@@ -441,18 +449,29 @@ export interface TrainingSessionEligibilityParams {
  *   b) Tiene start_time definido y la hora actual en Europe/Madrid ya ha alcanzado o superado start_time.
  */
 export function isTrainingSessionEligible(params: TrainingSessionEligibilityParams): boolean {
-  const { event, now = new Date(), attendanceStatuses = [], hasRecordedMetrics = false } = params;
-  if (!event || !event.date) return false;
+  const {
+    event,
+    eventDate,
+    eventStartTime,
+    now = new Date(),
+    attendanceStatus,
+    attendanceStatuses = [],
+    hasRecordedMetrics = false,
+    hasRealMetrics = false,
+  } = params;
 
-  if (event.event_type && event.event_type !== 'Entrenamiento' && event.event_type.toLowerCase() !== 'training') {
+  const targetDate = eventDate ?? event?.date;
+  if (!targetDate) return false;
+
+  if (event?.event_type && event.event_type !== 'Entrenamiento' && event.event_type.toLowerCase() !== 'training') {
     return false;
   }
 
-  if (isCancelledTrainingSession(event)) {
+  if (event && isCancelledTrainingSession(event)) {
     return false;
   }
 
-  const diffDays = calculateCalendarDaysDiff(now, event.date);
+  const diffDays = calculateCalendarDaysDiff(now, targetDate);
   if (diffDays === null || diffDays < 0) {
     // Sesión de fecha futura: excluida
     return false;
@@ -464,9 +483,11 @@ export function isTrainingSessionEligible(params: TrainingSessionEligibilityPara
   }
 
   // Sesión del día actual (diffDays === 0):
-  // Condición A: ¿Se ha pasado lista (estado distinto de unmarked/pending) o hay métricas reales registradas?
-  const hasAttendancePassed = attendanceStatuses.some(st => hasRecordedAttendanceDecision(st));
-  if (hasAttendancePassed || hasRecordedMetrics) {
+  // Condición A: ¿Se ha pasado lista (existe al menos una decisión explícita de asistencia, distinta de unmarked/pending)?
+  // La existencia de RPE o minutos por sí sola NO hace elegible una sesión futura del día actual.
+  const allStatuses = attendanceStatus !== undefined ? [attendanceStatus, ...attendanceStatuses] : attendanceStatuses;
+  const hasAttendancePassed = allStatuses.some(st => hasRecordedAttendanceDecision(st));
+  if (hasAttendancePassed) {
     return true;
   }
 
@@ -478,8 +499,9 @@ export function isTrainingSessionEligible(params: TrainingSessionEligibilityPara
     typeof now === 'number' ||
     (typeof now === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(now.trim()));
 
-  if (hasTimeComponent && event.start_time) {
-    const startMins = parseTimeStringToMinutes(event.start_time);
+  const effectiveStartTime = eventStartTime ?? event?.start_time;
+  if (hasTimeComponent && effectiveStartTime) {
+    const startMins = parseTimeStringToMinutes(effectiveStartTime);
     const currentMins = getSpainMinutesOfDay(now);
     if (startMins !== null && currentMins !== null && currentMins >= startMins) {
       return true;
@@ -496,20 +518,42 @@ export interface SessionWorkloadEntryInput {
   rpe?: number | null;
   minutes?: number | null;
   start_time?: string | null;
+  startTime?: string | null;
   event_type?: string | null;
   status?: string | null;
   estado?: string | null;
   is_cancelled?: boolean | null;
   cancelled?: boolean | null;
+  attendanceStatus?: string | null;
   attendanceStatuses?: Array<string | null | undefined>;
+  event?: {
+    id?: string;
+    date?: string | null;
+    start_time?: string | null;
+    event_type?: string | null;
+    status?: string | null;
+    estado?: string | null;
+    is_cancelled?: boolean | null;
+    cancelled?: boolean | null;
+  } | null;
 }
+
+export type MultiTeamSessionInput = SessionWorkloadEntryInput;
 
 export interface RollingWorkloadResult {
   referenceDate: string;
   /** Suma total de UA en la ventana aguda de 7 días naturales [ref - 6d, ref] */
   acuteTotalLoad: number;
+  /** Alias de acuteTotalLoad */
+  acuteSum: number;
   /** Suma total de UA en la ventana crónica de 28 días naturales [ref - 27d, ref] */
   chronicTotalLoad: number;
+  /** Alias de chronicTotalLoad */
+  chronicSum: number;
+  /** Número de sesiones con carga confirmada en la ventana aguda de 7 días */
+  acuteSessionCount: number;
+  /** Número de sesiones con carga confirmada en la ventana crónica de 28 días */
+  chronicSessionCount: number;
   /** Media diaria aguda: UA de los últimos 7 días / 7 (incluye días de descanso en el denominador) */
   acuteLoad: number;
   /** Media diaria crónica: UA de los últimos 28 días / 28 (incluye días de descanso en el denominador) */
@@ -534,7 +578,9 @@ export interface RollingWorkloadResult {
  * 11. Calcula de forma unificada las ventanas de 7 y 28 días, medias diarias y ACWR:
  * - Ventana aguda (7 días naturales): fechas con 0 <= diffDays <= 6 (exactamente 7 fechas: [D_ref - 6, D_ref]).
  * - Ventana crónica (28 días naturales): fechas con 0 <= diffDays <= 27 (exactamente 28 fechas: [D_ref - 27, D_ref]).
- * - Deduplica sesiones por `eventId` para evitar doble conteo en agregaciones multi-equipo.
+ * - Deduplica y fusiona sesiones por `eventId`: combina campos complementarios (ej. RPE en una entrada y minutos en otra)
+ *   sin duplicar sesiones ni sumar valores, y ante valores válidos contradictorios para el mismo `eventId` aplica un
+ *   criterio conservador dejando la métrica en conflicto como `null` (pendiente).
  * - Solo suma cargas cuando tanto `rpe` (0..10) como `minutes` (0..300) están presentes y validados.
  * - Un día de descanso (o sin carga confirmada) aporta 0 a la suma y permanece en el divisor (/ 7 y / 28).
  * - Si chronicLoad === 0, devuelve acwr: null (sin fallback artificial 1.05).
@@ -545,42 +591,138 @@ export function calculateRollingWorkloadMetrics(params: {
 }): RollingWorkloadResult {
   const { sessions, now = new Date() } = params;
   const referenceDate = getSpainReferenceDate(now);
-  const seenEventIds = new Set<string>();
   const dailyLoads: Record<string, number> = {};
   const evaluatedSessions: RollingWorkloadResult['evaluatedSessions'] = [];
+  let acuteSessionCount = 0;
+  let chronicSessionCount = 0;
+
+  interface MergedSessionWorkloadEntry {
+    eventId: string;
+    date: string;
+    teamId?: string | null;
+    rpe: number | null;
+    rpeConflict: boolean;
+    minutes: number | null;
+    minutesConflict: boolean;
+    start_time: string | null;
+    event_type: string | null;
+    status: string | null;
+    estado: string | null;
+    is_cancelled: boolean;
+    cancelled: boolean;
+    attendanceStatuses: Array<string | null | undefined>;
+  }
+
+  const mergedByEventId = new Map<string, MergedSessionWorkloadEntry>();
 
   for (const s of sessions) {
     if (!s || !s.eventId) continue;
-    // Evitar duplicar una misma sesión o evento compartido entre equipos
-    if (seenEventIds.has(s.eventId)) continue;
-    seenEventIds.add(s.eventId);
 
     const hasValidRpe = typeof s.rpe === 'number' && !isNaN(s.rpe) && s.rpe >= 0 && s.rpe <= 10;
     const hasValidMin = typeof s.minutes === 'number' && !isNaN(s.minutes) && s.minutes >= 0 && s.minutes <= 300;
     const cleanRpe = hasValidRpe ? s.rpe! : null;
     const cleanMin = hasValidMin ? s.minutes! : null;
 
+    const entryDate = (s.date ?? s.event?.date ?? '') || '';
+    const entryStartTime = s.start_time ?? s.startTime ?? s.event?.start_time ?? null;
+    const entryEventType = s.event_type ?? s.event?.event_type ?? null;
+    const entryStatus = s.status ?? s.event?.status ?? null;
+    const entryEstado = s.estado ?? s.event?.estado ?? null;
+    const entryIsCancelled = Boolean(s.is_cancelled === true || s.event?.is_cancelled === true);
+    const entryCancelled = Boolean(s.cancelled === true || s.event?.cancelled === true);
+    const entryStatuses: Array<string | null | undefined> = [];
+    if (s.attendanceStatus !== undefined) entryStatuses.push(s.attendanceStatus);
+    if (Array.isArray(s.attendanceStatuses)) entryStatuses.push(...s.attendanceStatuses);
+
+    const existing = mergedByEventId.get(s.eventId);
+    if (!existing) {
+      mergedByEventId.set(s.eventId, {
+        eventId: s.eventId,
+        date: entryDate,
+        teamId: s.teamId,
+        rpe: cleanRpe,
+        rpeConflict: false,
+        minutes: cleanMin,
+        minutesConflict: false,
+        start_time: entryStartTime,
+        event_type: entryEventType,
+        status: entryStatus,
+        estado: entryEstado,
+        is_cancelled: entryIsCancelled,
+        cancelled: entryCancelled,
+        attendanceStatuses: entryStatuses,
+      });
+    } else {
+      // Fusión de RPE: completar si estaba ausente; si hay conflicto entre dos valores válidos distintos, dejar null (conservador)
+      if (cleanRpe !== null) {
+        if (existing.rpe === null && !existing.rpeConflict) {
+          existing.rpe = cleanRpe;
+        } else if (existing.rpe !== null && existing.rpe !== cleanRpe) {
+          existing.rpeConflict = true;
+          existing.rpe = null;
+        }
+      }
+
+      // Fusión de minutos: completar si estaba ausente; si hay conflicto entre dos valores válidos distintos, dejar null (conservador)
+      if (cleanMin !== null) {
+        if (existing.minutes === null && !existing.minutesConflict) {
+          existing.minutes = cleanMin;
+        } else if (existing.minutes !== null && existing.minutes !== cleanMin) {
+          existing.minutesConflict = true;
+          existing.minutes = null;
+        }
+      }
+
+      if (!existing.date && entryDate) existing.date = entryDate;
+      if ((existing.teamId === undefined || existing.teamId === null) && s.teamId !== undefined && s.teamId !== null) {
+        existing.teamId = s.teamId;
+      }
+      if (!existing.start_time && entryStartTime) existing.start_time = entryStartTime;
+      if (!existing.event_type && entryEventType) existing.event_type = entryEventType;
+
+      // Conservar cualquier estado de cancelación verificable
+      if (entryIsCancelled) existing.is_cancelled = true;
+      if (entryCancelled) existing.cancelled = true;
+      if (entryStatus && (!existing.status || isCancelledTrainingSession({ status: entryStatus }))) {
+        existing.status = entryStatus;
+      }
+      if (entryEstado && (!existing.estado || isCancelledTrainingSession({ estado: entryEstado }))) {
+        existing.estado = entryEstado;
+      }
+
+      if (entryStatuses.length > 0) {
+        existing.attendanceStatuses.push(...entryStatuses);
+      }
+    }
+  }
+
+  for (const merged of mergedByEventId.values()) {
+    const cleanRpe = merged.rpe;
+    const cleanMin = merged.minutes;
+
+    const effectiveEvent = {
+      id: merged.eventId,
+      date: merged.date,
+      start_time: merged.start_time,
+      event_type: merged.event_type ?? 'Entrenamiento',
+      status: merged.status,
+      estado: merged.estado,
+      is_cancelled: merged.is_cancelled,
+      cancelled: merged.cancelled,
+    };
+
     const eligible = isTrainingSessionEligible({
-      event: {
-        id: s.eventId,
-        date: s.date,
-        start_time: s.start_time,
-        event_type: s.event_type ?? 'Entrenamiento',
-        status: s.status,
-        estado: s.estado,
-        is_cancelled: s.is_cancelled,
-        cancelled: s.cancelled
-      },
+      event: effectiveEvent,
       now,
-      attendanceStatuses: s.attendanceStatuses,
+      attendanceStatuses: merged.attendanceStatuses,
       hasRecordedMetrics: cleanRpe !== null || cleanMin !== null
     });
 
     if (!eligible) {
       evaluatedSessions.push({
-        eventId: s.eventId,
-        date: getSpainReferenceDate(s.date),
-        teamId: s.teamId,
+        eventId: merged.eventId,
+        date: getSpainReferenceDate(merged.date),
+        teamId: merged.teamId,
         rpe: cleanRpe,
         minutes: cleanMin,
         load: null,
@@ -590,12 +732,12 @@ export function calculateRollingWorkloadMetrics(params: {
     }
 
     const loadRes = calculateTrainingLoad(cleanRpe, cleanMin);
-    const dateKey = getSpainReferenceDate(s.date);
+    const dateKey = getSpainReferenceDate(merged.date);
 
     evaluatedSessions.push({
-      eventId: s.eventId,
+      eventId: merged.eventId,
       date: dateKey,
-      teamId: s.teamId,
+      teamId: merged.teamId,
       rpe: cleanRpe,
       minutes: cleanMin,
       load: loadRes.load,
@@ -604,6 +746,11 @@ export function calculateRollingWorkloadMetrics(params: {
 
     if (loadRes.status === 'confirmed' && loadRes.load !== null && dateKey) {
       dailyLoads[dateKey] = (dailyLoads[dateKey] || 0) + loadRes.load;
+      const diffDays = calculateCalendarDaysDiff(referenceDate, dateKey);
+      if (diffDays !== null && diffDays >= 0) {
+        if (diffDays <= 6) acuteSessionCount++;
+        if (diffDays <= 27) chronicSessionCount++;
+      }
     }
   }
 
@@ -629,7 +776,11 @@ export function calculateRollingWorkloadMetrics(params: {
   return {
     referenceDate,
     acuteTotalLoad,
+    acuteSum: acuteTotalLoad,
     chronicTotalLoad,
+    chronicSum: chronicTotalLoad,
+    acuteSessionCount,
+    chronicSessionCount,
     acuteLoad,
     chronicLoad,
     acwr,
@@ -650,16 +801,21 @@ export function aggregatePlayerMultiTeamWorkload(params: {
 }): RollingWorkloadResult & {
   contextTeamTrainingMinutes: number;
   totalClubTrainingMinutes: number;
+  minutesByTeam: Record<string, number>;
 } {
   const { sessions, contextTeamId, now = new Date() } = params;
   const workload = calculateRollingWorkloadMetrics({ sessions, now });
 
   let contextTeamTrainingMinutes = 0;
   let totalClubTrainingMinutes = 0;
+  const minutesByTeam: Record<string, number> = {};
 
   for (const ev of workload.evaluatedSessions) {
     if (ev.status === 'ineligible' || ev.minutes === null) continue;
     totalClubTrainingMinutes += ev.minutes;
+    if (ev.teamId) {
+      minutesByTeam[ev.teamId] = (minutesByTeam[ev.teamId] || 0) + ev.minutes;
+    }
     if (!contextTeamId || ev.teamId === contextTeamId) {
       contextTeamTrainingMinutes += ev.minutes;
     }
@@ -668,7 +824,8 @@ export function aggregatePlayerMultiTeamWorkload(params: {
   return {
     ...workload,
     contextTeamTrainingMinutes,
-    totalClubTrainingMinutes
+    totalClubTrainingMinutes,
+    minutesByTeam
   };
 }
 
@@ -680,11 +837,15 @@ export function aggregatePlayerMultiTeamWorkload(params: {
  */
 export function resolveOfficialMatchMinutes(params: {
   matchStatus?: string | null;
+  matchEstado?: string | null;
   minutosJugados?: number | string | null;
   minutesPlayed?: number | string | null;
   isStarter?: boolean | null;
+  titular?: boolean | null;
+  convocatoriaStatus?: string | null;
 }): number | null {
-  const isFinished = (params.matchStatus || '').toLowerCase().trim() === 'finalizado';
+  const statusStr = params.matchStatus ?? params.matchEstado ?? '';
+  const isFinished = statusStr.toLowerCase().trim() === 'finalizado';
   if (!isFinished) {
     return null;
   }

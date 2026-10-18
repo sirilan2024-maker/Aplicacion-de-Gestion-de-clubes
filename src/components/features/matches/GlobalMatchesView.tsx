@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Swords, Calendar, Clock, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck, ChevronRight, ClipboardCheck, FileText, CheckCircle2, Edit3, RefreshCw } from "lucide-react"
+import { Swords, Calendar, Clock, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck, ChevronRight, ClipboardCheck, FileText, CheckCircle2, Edit3, RefreshCw, ExternalLink } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
 import { deleteMatchAction } from "@/app/actions/match-actions"
@@ -827,6 +827,15 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
             const hasInternalScore = internalHomeScore !== null && internalAwayScore !== null && match.estado !== 'Programado';
             const hasFfcvScore = ffcvMatch && ffcvMatch.status === 'played' && ffcvMatch.home_score !== null && ffcvMatch.away_score !== null;
 
+            const isBraveMatch = match.acta_oficial_url?.includes('apuntamelo') ||
+              match.equipo?.ffcv_url?.includes('apuntamelo') ||
+              match.equipo?.category?.toLowerCase().includes('brave') ||
+              match.equipo?.ffcv_group_id === '4624' ||
+              match.equipo?.ffcv_group_id === '4623' ||
+              match.equipo_id === '7123c91a-69c1-4b94-9f85-0914dee8bbdc' ||
+              match.equipo_id === '5633f710-7707-40d7-b812-c51a44b90d9e';
+            const leagueLabel = isBraveMatch ? "Liga Brave" : "Oficial FFCV";
+
             let displayHomeScore = internalHomeScore;
             let displayAwayScore = internalAwayScore;
             let scoreBadge: React.ReactNode = null;
@@ -836,13 +845,13 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
               if (isMatchEqual) {
                 scoreBadge = (
                   <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 mt-1">
-                    <CheckCircle2 className="w-2.5 h-2.5" /> Oficial FFCV
+                    <CheckCircle2 className="w-2.5 h-2.5" /> {leagueLabel}
                   </span>
                 );
               } else {
                 scoreBadge = (
-                  <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1" title={`Discrepancia: Interno (${internalHomeScore}-${internalAwayScore}) vs FFCV (${ffcvMatch.home_score}-${ffcvMatch.away_score})`}>
-                    ⚠️ FFCV: {ffcvMatch.home_score}-{ffcvMatch.away_score}
+                  <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1" title={`Discrepancia: Interno (${internalHomeScore}-${internalAwayScore}) vs ${leagueLabel} (${ffcvMatch.home_score}-${ffcvMatch.away_score})`}>
+                    ⚠️ {isBraveMatch ? 'Brave' : 'FFCV'}: {ffcvMatch.home_score}-{ffcvMatch.away_score}
                   </span>
                 );
               }
@@ -851,7 +860,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
               displayAwayScore = ffcvMatch.away_score;
               scoreBadge = (
                 <span className="text-[9px] font-black uppercase text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 mt-1">
-                  Oficial FFCV
+                  {leagueLabel}
                 </span>
               );
             }
@@ -1078,6 +1087,21 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                             <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                             <span className="hidden sm:inline">Acta FFCV</span>
                           </button>
+                        )}
+
+                        {/* Botón Ver Ficha en Apúntamelo (Liga Brave) */}
+                        {match.acta_oficial_url && match.acta_oficial_url.includes('apuntamelo.com') && (
+                          <a
+                            href={match.acta_oficial_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 sm:flex-initial h-8 px-2 sm:px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
+                            title="Ver Ficha oficial en Apúntamelo (Liga Brave)"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span className="hidden sm:inline">Apúntamelo</span>
+                          </a>
                         )}
 
                         <button 

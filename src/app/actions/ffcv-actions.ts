@@ -52,6 +52,12 @@ export async function syncTeamFFCVAction(
 
     // Perform sync
     const result = await syncTeamFFCV(teamId, options);
+    revalidatePath('/dashboard/matches');
+    revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
+    revalidatePath(`/dashboard/equipos/${teamId}`);
+    revalidatePath('/dashboard/equipos');
+    revalidatePath('/admin/partidos');
+    revalidatePath('/dashboard', 'layout');
     return { success: true, data: result };
   } catch (err: any) {
     console.error('[syncTeamFFCVAction] Error:', err);
@@ -77,6 +83,8 @@ export async function syncAllFFCVAction(
     const result = await syncAllConfiguredFFCVTeams(options);
     revalidatePath('/dashboard/matches');
     revalidatePath('/admin/partidos');
+    revalidatePath('/dashboard/equipos');
+    revalidatePath('/dashboard', 'layout');
     return { success: true, data: result };
   } catch (err: any) {
     console.error('[syncAllFFCVAction] Error:', err);

@@ -34,7 +34,7 @@ export default function PlayerFeedbackPage() {
 
   const [selectedPlayerId, setSelectedPlayerId] = useState(initialPlayerId);
   const [isLockedPlayer, setIsLockedPlayer] = useState(Boolean(initialPlayerId));
-  const [rpe, setRpe] = useState<number>(0);
+  const [rpe, setRpe] = useState<number | null>(null);
   const [minutes, setMinutes] = useState<number>(90);
   const [isFallbackDuration, setIsFallbackDuration] = useState(true);
   
@@ -95,7 +95,7 @@ export default function PlayerFeedbackPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayerId || rpe === 0) {
+    if (!selectedPlayerId || rpe === null || rpe < 0 || rpe > 10) {
       toast.error("Por favor, selecciona tu nombre y tu nivel de esfuerzo.");
       return;
     }
@@ -236,17 +236,18 @@ export default function PlayerFeedbackPage() {
             <div className="space-y-3">
               <label className="block text-sm font-bold text-gray-700 flex items-center justify-between">
                 <span>2. ¿Cómo de duro ha sido? (RPE)</span>
-                <span className="text-blue-600 font-black text-lg">{rpe || '-'}</span>
+                <span className="text-blue-600 font-black text-lg">{rpe !== null ? rpe : '-'}</span>
               </label>
-              <div className="grid grid-cols-5 gap-2">
-                {[1,2,3,4,5,6,7,8,9,10].map(val => (
+              <div className="grid grid-cols-6 sm:grid-cols-11 gap-1.5 sm:gap-2">
+                {[0,1,2,3,4,5,6,7,8,9,10].map(val => (
                   <button
                     key={val}
                     type="button"
                     onClick={() => setRpe(val)}
                     className={`h-12 rounded-xl font-black text-lg transition-all ${
                       rpe === val 
-                        ? val <= 3 ? 'bg-emerald-500 text-white transform scale-110 shadow-md' 
+                        ? val === 0 ? 'bg-slate-600 text-white transform scale-110 shadow-md'
+                          : val <= 3 ? 'bg-emerald-500 text-white transform scale-110 shadow-md' 
                           : val <= 6 ? 'bg-yellow-500 text-white transform scale-110 shadow-md'
                           : val <= 8 ? 'bg-orange-500 text-white transform scale-110 shadow-md'
                           : 'bg-red-500 text-white transform scale-110 shadow-md'
@@ -258,7 +259,7 @@ export default function PlayerFeedbackPage() {
                 ))}
               </div>
               <div className="flex justify-between text-xs font-bold text-gray-400 uppercase px-1">
-                <span>Muy Suave</span>
+                <span>Reposo / Muy Suave</span>
                 <span>Extremo</span>
               </div>
             </div>
@@ -271,7 +272,7 @@ export default function PlayerFeedbackPage() {
               </label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 max="300"
                 value={minutes}
                 onChange={(e) => setMinutes(parseInt(e.target.value) || 0)}

@@ -422,14 +422,16 @@ export default function GlobalPlayerProfilePage() {
           if (a.events && a.events.event_type === 'Entrenamiento') {
             const evId = a.event_id || a.events.id;
             if (evId && !processedEvents.has(evId)) {
-              const met = metricsMap.get(evId) || { rpe: 7, minutes: 90 };
-              const rpe = met.rpe ?? 7;
-              const mins = met.minutes ?? 90;
-              const wl = mins * rpe;
+              const met = metricsMap.get(evId);
+              const rpe = met?.rpe ?? null;
+              const mins = met?.minutes ?? null;
+              const wl = rpe !== null && mins !== null ? mins * rpe : null;
 
-              const evDate = new Date(a.events.date || a.events.start_time);
-              if (evDate >= d7) acuteWorkload += wl;
-              if (evDate >= d28) chronicWorkload += wl;
+              if (wl !== null) {
+                const evDate = new Date(a.events.date || a.events.start_time);
+                if (evDate >= d7) acuteWorkload += wl;
+                if (evDate >= d28) chronicWorkload += wl;
+              }
 
               const attStatus = (a.status || '').toLowerCase() === 'presente' ? 'Presente' : ((a.status || '').toLowerCase() === 'ausente' ? 'Ausente' : 'Justificado');
 
@@ -450,31 +452,44 @@ export default function GlobalPlayerProfilePage() {
 
       teamEvents.forEach(e => {
         if (e.id && !processedEvents.has(e.id)) {
-          const met = metricsMap.get(e.id) || { rpe: 7, minutes: 90 };
+          const met = metricsMap.get(e.id);
+          const rpe = met?.rpe ?? null;
+          const mins = met?.minutes ?? null;
+          const wl = rpe !== null && mins !== null ? mins * rpe : null;
+
+          if (wl !== null) {
+            const evDate = new Date(e.date || e.start_time);
+            if (evDate >= d7) acuteWorkload += wl;
+            if (evDate >= d28) chronicWorkload += wl;
+          }
+
           tHistory.push({
             ...e,
             id: e.id,
             date: e.date || e.start_time,
             title: e.title || 'Entrenamiento',
             attendance: 'Pendiente',
-            rpe: met.rpe ?? 7,
-            minutes: met.minutes ?? 90
+            rpe: rpe,
+            minutes: mins
           });
           processedEvents.add(e.id);
         }
       });
       tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      // Calcular ratio ACWR (Rango óptimo: 0.85 a 1.25)
+      // Calcular ratio ACWR solo cuando existen datos reales suficientes (Rango óptimo: 0.85 a 1.25)
       const avgAcute = acuteWorkload / 7;
       const avgChronic = chronicWorkload / 28;
-      const acwrRatio = avgChronic > 0 ? Number((avgAcute / avgChronic).toFixed(2)) : 1.05;
 
-      setAcwrData({
-        acute: Math.round(avgAcute),
-        chronic: Math.round(avgChronic),
-        acwr: acwrRatio
-      });
+      if (avgChronic > 0) {
+        setAcwrData({
+          acute: Math.round(avgAcute),
+          chronic: Math.round(avgChronic),
+          acwr: Number((avgAcute / avgChronic).toFixed(2))
+        });
+      } else {
+        setAcwrData(null);
+      }
 
       // Actualizar minutos acumulados del jugador en estado local
       setPlayer(prev => prev ? ({

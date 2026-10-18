@@ -3,6 +3,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedContext, canUserAccessPlayer } from "@/lib/auth-helpers";
+import {
+  aggregatePlayerMultiTeamWorkload,
+  calculateTrainingLoad,
+  isConfirmedAttendanceStatus,
+  isTrainingSessionEligible,
+  resolveOfficialMatchMinutes,
+  SessionWorkloadEntryInput
+} from "@/lib/performance/minutes-service";
 
 export interface PersonalPerformanceData {
   player: {
@@ -44,7 +52,7 @@ export interface PersonalPerformanceData {
     date: string;
     rivalName: string;
     isStarter: boolean;
-    minutes: number;
+    minutes: number | null;
     goals: number;
     assists: number;
     yellowCards: number;
@@ -133,16 +141,22 @@ export async function getPersonalPerformanceAction(
     const recentMatches = (officialConvs || []).map((c: any) => {
       const match = c.partidos;
       const isFinished = match?.estado?.toLowerCase() === 'finalizado';
-      const rawMins = c.minutos_jugados ?? c.minutes_played;
-      const mins = isFinished ? (rawMins !== null && rawMins !== undefined ? Number(rawMins) : (c.titular ? 90 : 0)) : 0;
+      const mins = resolveOfficialMatchMinutes({
+        matchStatus: match?.estado,
+        minutosJugados: c.minutos_jugados,
+        minutesPlayed: c.minutes_played,
+        isStarter: c.titular
+      });
       const g = isFinished ? Number(c.goles ?? c.goals ?? 0) : 0;
       const a = isFinished ? Number(c.asistencias ?? c.assists ?? 0) : 0;
       const y = isFinished ? Number(c.tarjetas_amarillas ?? c.yellow_cards ?? 0) : 0;
       const r = isFinished ? Number(c.tarjetas_rojas ?? c.red_cards ?? 0) : 0;
 
-      if (isFinished && (mins > 0 || c.titular)) {
+      if (isFinished && ((mins !== null && mins > 0) || c.titular)) {
         totalMatchesPlayed++;
-        totalMatchMinutes += mins;
+        if (mins !== null) {
+          totalMatchMinutes += mins;
+        }
         totalGoals += g;
         totalAssists += a;
         totalYellows += y;
@@ -162,78 +176,101 @@ export async function getPersonalPerformanceAction(
       };
     });
 
-    // 4. Consultar eventos de entrenamiento del equipo
-    let teamEvents: any[] = [];
+    // 4. Consultar eventos de entrenamiento del equipo del jugador
+    let rawTeamEvents: any[] = [];
     if (teamId) {
       const { data: evData } = await adminClient
         .from('team_events')
-        .select('id, date, event_type, title')
+        .select('id, team_id, date, start_time, end_time, event_type, title')
         .eq('team_id', teamId)
         .eq('event_type', 'Entrenamiento')
         .order('date', { ascending: false });
-      if (evData) teamEvents = evData;
+      if (evData) rawTeamEvents = evData;
     }
 
-    const eventIds = teamEvents.map(e => e.id);
+    // 5. Consultar todas las métricas y asistencias del jugador en el club (para ACWR multi-equipo sin duplicar eventos)
+    const { data: allPlayerAtt } = await adminClient
+      .from('attendance')
+      .select('event_id, status, notes, event:team_events(id, team_id, date, start_time, end_time, event_type, title, teams(club_id))')
+      .eq('player_id', targetPlayerId);
 
-    // 5. Asistencia del jugador
-    let attendanceMap: Record<string, { status: string; notes?: string }> = {};
-    let presentTrainings = 0;
+    const { data: allPlayerMetrics } = await adminClient
+      .from('player_training_metrics')
+      .select('event_id, metric_id, value_number, club_metrics(name), event:team_events(id, team_id, date, start_time, end_time, event_type, title, teams(club_id))')
+      .eq('player_id', targetPlayerId);
 
-    if (eventIds.length > 0) {
-      const { data: attData } = await adminClient
-        .from('attendance')
-        .select('event_id, status, notes')
-        .eq('player_id', targetPlayerId)
-        .in('event_id', eventIds);
+    const attendanceMap: Record<string, { status: string; notes?: string }> = {};
+    const extraClubEventsMap = new Map<string, any>();
 
-      if (attData) {
-        attData.forEach(a => {
-          attendanceMap[a.event_id] = { status: a.status, notes: a.notes || undefined };
-          if (['presente', 'present', 'retraso', 'late'].includes((a.status || '').toLowerCase())) {
-            presentTrainings++;
-          }
-        });
+    (allPlayerAtt || []).forEach((a: any) => {
+      if (a.event_id) {
+        attendanceMap[a.event_id] = { status: a.status, notes: a.notes || undefined };
       }
-    }
+      const ev = a.event;
+      const evClubId = (ev?.teams as any)?.club_id;
+      if (ev && ev.id && ev.event_type === 'Entrenamiento' && (!evClubId || evClubId === clubId)) {
+        extraClubEventsMap.set(ev.id, ev);
+      }
+    });
 
-    // 6. Métricas de entrenamiento autorizadas (RPE y Minutos)
-    let metricsData: any[] = [];
-    if (eventIds.length > 0) {
-      const { data: pt } = await adminClient
-        .from('player_training_metrics')
-        .select('event_id, metric_id, value_number, club_metrics(name)')
-        .eq('player_id', targetPlayerId)
-        .in('event_id', eventIds);
-      if (pt) metricsData = pt;
-    }
+    const metricsByEvent = new Map<string, { rpe: number | null; minutes: number | null }>();
+    (allPlayerMetrics || []).forEach((m: any) => {
+      const evId = m.event_id;
+      if (!evId) return;
+      if (!metricsByEvent.has(evId)) {
+        metricsByEvent.set(evId, { rpe: null, minutes: null });
+      }
+      const entry = metricsByEvent.get(evId)!;
+      const metricName = (m.club_metrics?.name || '').toLowerCase();
+      const val = m.value_number;
+      if (metricName.includes('rpe') && typeof val === 'number' && !isNaN(val) && val >= 0 && val <= 10) {
+        entry.rpe = val;
+      } else if (metricName.includes('minut') && typeof val === 'number' && !isNaN(val) && val >= 0 && val <= 300) {
+        entry.minutes = val;
+      }
 
+      const ev = m.event;
+      const evClubId = (ev?.teams as any)?.club_id;
+      if (ev && ev.id && ev.event_type === 'Entrenamiento' && (!evClubId || evClubId === clubId)) {
+        extraClubEventsMap.set(ev.id, ev);
+      }
+    });
+
+    const now = new Date();
+
+    // Filtrar sesiones del equipo elegibles (excluyendo futuras y sesiones de hoy aún no iniciadas ni con lista pasada)
+    const eligibleTeamEvents = rawTeamEvents.filter(ev => {
+      const att = attendanceMap[ev.id];
+      const met = metricsByEvent.get(ev.id);
+      const hasMetrics = (met?.rpe !== null && met?.rpe !== undefined) || (met?.minutes !== null && met?.minutes !== undefined);
+      return isTrainingSessionEligible({
+        event: ev,
+        now,
+        attendanceStatuses: att ? [att.status] : [],
+        hasRecordedMetrics: hasMetrics
+      });
+    });
+
+    let presentTrainings = 0;
     let sumRpe = 0;
     let rpeCount = 0;
-    let totalTrainingMinutes = 0;
-    const dailyLoads: Record<string, number> = {};
 
-    const recentSessions = teamEvents.map(ev => {
+    const recentSessions = eligibleTeamEvents.map(ev => {
       const att = attendanceMap[ev.id];
-      const mList = metricsData.filter(m => m.event_id === ev.id);
-      const rpe = mList.find(m => m.club_metrics?.name?.toLowerCase().includes('rpe'))?.value_number;
-      const min = mList.find(m => m.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number;
-
-      if (typeof min === 'number') {
-        totalTrainingMinutes += min;
+      if (att && isConfirmedAttendanceStatus(att.status)) {
+        presentTrainings++;
       }
-      if (typeof rpe === 'number') {
+
+      const met = metricsByEvent.get(ev.id);
+      const rpe = met?.rpe ?? null;
+      const min = met?.minutes ?? null;
+
+      if (rpe !== null) {
         sumRpe += rpe;
         rpeCount++;
       }
 
-      const hasMin = typeof min === 'number';
-      const hasRpe = typeof rpe === 'number';
-      const load = (hasMin && hasRpe) ? (min * rpe) : null;
-
-      if (load !== null && ev.date) {
-        dailyLoads[ev.date] = (dailyLoads[ev.date] || 0) + load;
-      }
+      const loadRes = calculateTrainingLoad(rpe, min);
 
       return {
         eventId: ev.id,
@@ -241,38 +278,49 @@ export async function getPersonalPerformanceAction(
         title: ev.title || 'Entrenamiento',
         attendanceStatus: att?.status || 'No registrada',
         attendanceNotes: att?.notes,
-        rpe: typeof rpe === 'number' ? rpe : null,
-        minutes: typeof min === 'number' ? min : null,
-        load
+        rpe,
+        minutes: min,
+        load: loadRes.load
       };
     });
 
+    // Construir lista combinada de sesiones del jugador en el club (equipo propio + otros equipos del club) sin duplicar eventId
+    const combinedEventsMap = new Map<string, any>();
+    rawTeamEvents.forEach(ev => {
+      if (ev.id) combinedEventsMap.set(ev.id, ev);
+    });
+    extraClubEventsMap.forEach((ev, evId) => {
+      if (!combinedEventsMap.has(evId)) combinedEventsMap.set(evId, ev);
+    });
+
+    const workloadSessions: SessionWorkloadEntryInput[] = Array.from(combinedEventsMap.values()).map(ev => {
+      const att = attendanceMap[ev.id];
+      const met = metricsByEvent.get(ev.id);
+      return {
+        eventId: ev.id,
+        date: ev.date || '',
+        teamId: ev.team_id,
+        start_time: ev.start_time,
+        event_type: ev.event_type || 'Entrenamiento',
+        status: ev.status,
+        estado: ev.estado,
+        is_cancelled: ev.is_cancelled,
+        rpe: met?.rpe ?? null,
+        minutes: met?.minutes ?? null,
+        attendanceStatuses: att ? [att.status] : []
+      };
+    });
+
+    const multiTeamWorkload = aggregatePlayerMultiTeamWorkload({
+      sessions: workloadSessions,
+      contextTeamId: teamId,
+      now
+    });
+
     const avgRpe = rpeCount > 0 ? Math.round((sumRpe / rpeCount) * 10) / 10 : null;
-    const trainingAttendancePct = teamEvents.length > 0 ? Math.round((presentTrainings / teamEvents.length) * 100) : 0;
-
-    // 7. Cálculo defensivo de ACWR si hay histórico
-    let acwrRatio: number | null = null;
-    const dateKeys = Object.keys(dailyLoads);
-    if (dateKeys.length > 0) {
-      const timestamps = dateKeys.map(d => new Date(d).getTime());
-      const maxTime = Math.max(...timestamps);
-      const referenceDate = new Date(maxTime);
-
-      let acuteSum = 0;
-      let chronicSum = 0;
-
-      Object.entries(dailyLoads).forEach(([dStr, load]) => {
-        const diffDays = Math.abs((referenceDate.getTime() - new Date(dStr).getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays <= 7) acuteSum += load;
-        if (diffDays <= 28) chronicSum += load;
-      });
-
-      const acuteLoad = acuteSum / 7;
-      const chronicLoad = chronicSum / 28;
-      if (chronicLoad > 0) {
-        acwrRatio = Math.round((acuteLoad / chronicLoad) * 100) / 100;
-      }
-    }
+    const trainingAttendancePct = eligibleTeamEvents.length > 0
+      ? Math.round((presentTrainings / eligibleTeamEvents.length) * 100)
+      : 0;
 
     const payload: PersonalPerformanceData = {
       player: {
@@ -287,11 +335,11 @@ export async function getPersonalPerformanceAction(
         team_category: (fullPlayer.teams as any)?.category,
       },
       summary: {
-        totalTrainingSessions: teamEvents.length,
+        totalTrainingSessions: eligibleTeamEvents.length,
         trainingAttendancePct,
-        totalTrainingMinutes,
+        totalTrainingMinutes: multiTeamWorkload.contextTeamTrainingMinutes,
         avgRpe,
-        acwrRatio,
+        acwrRatio: multiTeamWorkload.acwr,
         totalMatchesPlayed,
         totalMatchMinutes,
         goals: totalGoals,

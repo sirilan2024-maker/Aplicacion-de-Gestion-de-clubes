@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedContext, canUserAccessPlayer } from "@/lib/auth-helpers";
-import { validateTrainingFeedbackInputs } from "@/lib/performance/minutes-service";
+import { validateTrainingFeedbackInputs, isConfirmedAttendanceStatus } from "@/lib/performance/minutes-service";
 import crypto from "crypto";
 
 export interface SubmitTrainingFeedbackOptions {
@@ -191,7 +191,7 @@ export async function submitTrainingFeedback(
         category: 'Carga Interna',
         module_type: 'rendimiento',
         type: 'number',
-        unit: '1-10'
+        unit: '0-10'
       }).select('id').single();
       if (newRpe) rpeMetricId = newRpe.id;
     }
@@ -278,9 +278,10 @@ export async function submitTrainingFeedback(
     }
 
     // 9. Persistencia complementaria en player_session_feedback (trazabilidad, validación y molestias)
+    // Nota: La columna rpe en player_session_feedback mantiene temporalmente CHECK (rpe BETWEEN 1 AND 10) en SQL hasta autorizar migración.
     let feedbackWarning: string | undefined;
     try {
-      const calculatedLoad = cleanMinutes !== undefined && cleanMinutes !== null && cleanMinutes > 0 ? cleanRpe * cleanMinutes : null;
+      const calculatedLoad = cleanMinutes !== undefined && cleanMinutes !== null && cleanMinutes >= 0 ? cleanRpe * cleanMinutes : null;
       const { data: existingSessionFeedback, error: fetchFeedbackErr } = await adminClient
         .from('player_session_feedback')
         .select('id, validation_status')
@@ -709,6 +710,7 @@ export interface GetTeamWellnessSummaryResult {
   success: boolean;
   canViewDiscomfort: boolean;
   entries: SanitizedPlayerWellnessEntry[];
+  confirmedPlayerIds?: string[];
   error?: string;
 }
 
@@ -725,7 +727,7 @@ export async function getAuthorizedTeamWellnessSummary(
   try {
     const { context } = await getAuthenticatedContext();
     if (!context || !context.user) {
-      return { success: false, canViewDiscomfort: false, entries: [], error: "No autenticado." };
+      return { success: false, canViewDiscomfort: false, entries: [], confirmedPlayerIds: [], error: "No autenticado." };
     }
 
     // Validación obligatoria de seasonId
@@ -734,6 +736,7 @@ export async function getAuthorizedTeamWellnessSummary(
         success: false,
         canViewDiscomfort: false,
         entries: [],
+        confirmedPlayerIds: [],
         error: "Identificador de temporada no válido o no proporcionado."
       };
     }
@@ -748,11 +751,11 @@ export async function getAuthorizedTeamWellnessSummary(
       .single();
 
     if (teamErr || !teamData) {
-      return { success: false, canViewDiscomfort: false, entries: [], error: "Equipo no encontrado." };
+      return { success: false, canViewDiscomfort: false, entries: [], confirmedPlayerIds: [], error: "Equipo no encontrado." };
     }
 
     if (context.profile.club_id !== teamData.club_id) {
-      return { success: false, canViewDiscomfort: false, entries: [], error: "Acceso denegado a este club." };
+      return { success: false, canViewDiscomfort: false, entries: [], confirmedPlayerIds: [], error: "Acceso denegado a este club." };
     }
 
     // 2. Determinar autorización para consultar este equipo y ver molestias
@@ -785,6 +788,7 @@ export async function getAuthorizedTeamWellnessSummary(
         success: false,
         canViewDiscomfort: false,
         entries: [],
+        confirmedPlayerIds: [],
         error: "No tienes permiso para consultar el rendimiento de este equipo."
       };
     }
@@ -803,16 +807,17 @@ export async function getAuthorizedTeamWellnessSummary(
         success: false,
         canViewDiscomfort,
         entries: [],
+        confirmedPlayerIds: [],
         error: historyErr.message
       };
     }
 
-    // Filtrar únicamente los historiales vigentes (descartando estados inactivos o de baja)
+    // Filtrar únicamente los historiales vigentes (descartando estados inactivos, de baja o sin marcar 'unmarked')
     const teamPlayerIds = Array.from(new Set(
       (historyPlayers || [])
         .filter((h: any) => {
           const st = (h.status || '').toLowerCase().trim();
-          return st !== 'inactive' && st !== 'inactivo' && st !== 'baja' && st !== 'pending_renewal';
+          return st !== 'inactive' && st !== 'inactivo' && st !== 'baja' && st !== 'pending_renewal' && st !== 'unmarked';
         })
         .map((h: any) => h.player_id)
     )).filter(Boolean) as string[];
@@ -822,8 +827,36 @@ export async function getAuthorizedTeamWellnessSummary(
       return {
         success: true,
         canViewDiscomfort,
-        entries: []
+        entries: [],
+        confirmedPlayerIds: []
       };
+    }
+
+    // 4b. Construir confirmedPlayerIds con criterio estricto de confirmación (nunca contabiliza 'unmarked')
+    let confirmedPlayerIds: string[] = [];
+    try {
+      const { data: dayEvents } = await adminClient
+        .from('team_events')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('date', date);
+
+      const dayEventIds = (dayEvents || []).map((ev: any) => ev.id).filter(Boolean);
+      if (dayEventIds.length > 0) {
+        const { data: attRows } = await adminClient
+          .from('attendance')
+          .select('player_id, status')
+          .in('event_id', dayEventIds)
+          .in('player_id', teamPlayerIds);
+
+        confirmedPlayerIds = Array.from(new Set(
+          (attRows || [])
+            .filter((att: any) => isConfirmedAttendanceStatus(att.status))
+            .map((att: any) => att.player_id)
+        )).filter(Boolean) as string[];
+      }
+    } catch {
+      // Degradación segura si no hay eventos o tabla de asistencia en entornos de prueba
     }
 
     // 5. Consultar player_daily_wellness acotado estrictamente a los jugadores de este equipo
@@ -835,7 +868,7 @@ export async function getAuthorizedTeamWellnessSummary(
       .in('player_id', teamPlayerIds);
 
     if (rowsErr) {
-      return { success: false, canViewDiscomfort, entries: [], error: rowsErr.message };
+      return { success: false, canViewDiscomfort, entries: [], confirmedPlayerIds, error: rowsErr.message };
     }
 
     // 6. Consultar incidencias de molestias complementarias (ej. dobles sesiones) acotadas a los mismos jugadores
@@ -898,11 +931,12 @@ export async function getAuthorizedTeamWellnessSummary(
     return {
       success: true,
       canViewDiscomfort,
-      entries
+      entries,
+      confirmedPlayerIds
     };
   } catch (err: any) {
     console.error("[getAuthorizedTeamWellnessSummary Error]:", err?.message || err);
-    return { success: false, canViewDiscomfort: false, entries: [], error: "Error en el servidor al consultar bienestar." };
+    return { success: false, canViewDiscomfort: false, entries: [], confirmedPlayerIds: [], error: "Error en el servidor al consultar bienestar." };
   }
 }
 

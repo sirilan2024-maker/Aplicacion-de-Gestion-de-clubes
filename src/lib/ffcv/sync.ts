@@ -288,7 +288,7 @@ export async function syncAllConfiguredFFCVTeams(
   const { data: teams, error: teamsErr } = await supabase
     .from('teams')
     .select(`
-      id, name, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, season_id,
+      id, name, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url, season_id,
       season:seasons!inner ( id, is_active )
     `)
     .not('ffcv_group_id', 'is', null)

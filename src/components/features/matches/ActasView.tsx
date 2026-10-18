@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { UploadCloud, CheckCircle2, AlertCircle, FileText, Search, RefreshCw, Eye, Edit3, ArrowRight, ShieldCheck, ChevronRight, ExternalLink, Maximize2, X, Trophy, Dumbbell, Sparkles, Layers } from "lucide-react"
 import { ActaConciliationModal } from "./ActaConciliationModal"
+import { FFCVActaModal } from "./FFCVActaModal"
 import { createClient } from "@/lib/supabase/client"
 
 interface ActasViewProps {
@@ -54,9 +55,18 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
 
   // Estado del visor y conciliación
   const [activeSignedUrl, setActiveSignedUrl] = useState<string | null>(null)
+  const [activeCodacta, setActiveCodacta] = useState<string | null>(null)
+  const [isExternalActa, setIsExternalActa] = useState(false)
   const [loadingSignedUrl, setLoadingSignedUrl] = useState(false)
   const [signedUrlError, setSignedUrlError] = useState<string | null>(null)
   const [conciliatingMatch, setConciliatingMatch] = useState<any>(null)
+  const [viewingFfcvModal, setViewingFfcvModal] = useState<{
+    codacta: string;
+    matchId?: string;
+    teamId?: string;
+    homeTeamName?: string;
+    awayTeamName?: string;
+  } | null>(null)
 
   // Estados optimización móvil
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false)
@@ -96,13 +106,25 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
     setLoadingSignedUrl(true)
     setSignedUrlError(null)
     setActiveSignedUrl(null)
+    setActiveCodacta(null)
+    setIsExternalActa(false)
     try {
       const res = await fetch(`/api/partidos/get-acta-url?partidoId=${matchId}`)
       const data = await res.json()
       if (data.signedUrl) {
         setActiveSignedUrl(data.signedUrl)
+        if (data.isExternal) setIsExternalActa(true)
+        if (data.codacta) setActiveCodacta(data.codacta)
       } else {
-        setSignedUrlError(data.error || "El partido seleccionado no tiene un acta oficial adjunta.")
+        const m = matches.find(match => match.id === matchId)
+        const matchCodacta = m?.ffcv_match_id || (m?.acta_oficial_url ? m.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null)
+        if (matchCodacta) {
+          setActiveCodacta(matchCodacta)
+          setIsExternalActa(true)
+          setActiveSignedUrl(`https://ffcv.es/dep/actas?CodPartido=${matchCodacta}`)
+        } else {
+          setSignedUrlError(data.error || "El partido seleccionado no tiene un acta oficial adjunta.")
+        }
       }
     } catch (err: any) {
       setSignedUrlError("Error de conexión al consultar el acta del partido.")
@@ -458,6 +480,31 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Botón Ver Acta Digital FFCV */}
+                  {(() => {
+                    const matchCodacta = activeCodacta || selectedMatch?.ffcv_match_id || (selectedMatch?.acta_oficial_url ? selectedMatch.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null);
+                    if (!matchCodacta) return null;
+                    const isUsLocal = selectedMatch.lugar === 'Local';
+                    const homeTeam = isUsLocal ? (selectedMatch.equipo?.name || 'Mi Equipo') : selectedMatch.rival_nombre;
+                    const awayTeam = isUsLocal ? selectedMatch.rival_nombre : (selectedMatch.equipo?.name || 'Mi Equipo');
+
+                    return (
+                      <button
+                        onClick={() => setViewingFfcvModal({
+                          codacta: matchCodacta,
+                          matchId: selectedMatch.id,
+                          teamId: selectedMatch.equipo_id,
+                          homeTeamName: homeTeam,
+                          awayTeamName: awayTeam
+                        })}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-blue-200" />
+                        Ver Acta FFCV
+                      </button>
+                    );
+                  })()}
+
                   {!isReadOnly && (
                     <button
                       onClick={() => setConciliatingMatch(selectedMatch)}
@@ -679,7 +726,67 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                   {loadingSignedUrl ? (
                     <div className="flex flex-col items-center gap-3 text-slate-400">
                       <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-                      <span className="text-xs font-medium">Cargando visor seguro de PDF...</span>
+                      <span className="text-xs font-medium">Cargando visor seguro de acta...</span>
+                    </div>
+                  ) : isExternalActa ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
+                      <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-3 text-blue-400">
+                        <ShieldCheck className="w-7 h-7" />
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 mb-2">
+                        Acta Digital Oficial FFCV
+                      </span>
+                      <h4 className="text-base font-black text-white mb-1.5">
+                        Acta Electrónica Federativa Disponible
+                      </h4>
+                      <p className="text-xs text-slate-400 leading-relaxed mb-5">
+                        Este partido dispone de acta oficial digital federativa (CodActa: <strong className="text-slate-200">{activeCodacta || selectedMatch?.ffcv_match_id}</strong>). Puedes abrir la ficha oficial interactiva con árbitros, alineaciones titulares y suplentes, goles y amonestaciones.
+                      </p>
+
+                      <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
+                        <button
+                          onClick={() => {
+                            const matchCodacta = activeCodacta || selectedMatch?.ffcv_match_id || (selectedMatch?.acta_oficial_url ? selectedMatch.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null);
+                            const isUsLocal = selectedMatch.lugar === 'Local';
+                            setViewingFfcvModal({
+                              codacta: matchCodacta,
+                              matchId: selectedMatch.id,
+                              teamId: selectedMatch.equipo_id,
+                              homeTeamName: isUsLocal ? (selectedMatch.equipo?.name || 'Mi Equipo') : selectedMatch.rival_nombre,
+                              awayTeamName: isUsLocal ? selectedMatch.rival_nombre : (selectedMatch.equipo?.name || 'Mi Equipo')
+                            });
+                          }}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition-all hover:scale-[1.02]"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Abrir Acta Digital FFCV
+                        </button>
+
+                        {activeSignedUrl && (
+                          <a
+                            href={activeSignedUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                            Abrir en FFCV.es
+                          </a>
+                        )}
+                      </div>
+
+                      {!isReadOnly && (
+                        <div className="mt-5 pt-4 border-t border-slate-800/80 w-full flex flex-col items-center">
+                          <p className="text-[11px] text-slate-500 mb-1.5">¿Quieres adjuntar además una copia en archivo PDF escaneado?</p>
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5 transition-colors"
+                          >
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            Subir archivo PDF físico
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : signedUrlError ? (
                     <div className="flex flex-col items-center gap-3 p-6 text-center max-w-sm">
@@ -768,6 +875,25 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
           onSaveSuccess={() => {
             loadSignedUrlForMatch(conciliatingMatch.id)
             fetchMatchEvents(conciliatingMatch.id)
+          }}
+        />
+      )}
+
+      {/* Modal Oficial Electrónico FFCV */}
+      {viewingFfcvModal && (
+        <FFCVActaModal
+          codacta={viewingFfcvModal.codacta}
+          matchId={viewingFfcvModal.matchId}
+          teamId={viewingFfcvModal.teamId}
+          homeTeamName={viewingFfcvModal.homeTeamName}
+          awayTeamName={viewingFfcvModal.awayTeamName}
+          onClose={() => {
+            const currentMatchId = viewingFfcvModal.matchId || selectedMatchId;
+            setViewingFfcvModal(null);
+            if (currentMatchId) {
+              loadSignedUrlForMatch(currentMatchId);
+              fetchMatchEvents(currentMatchId);
+            }
           }}
         />
       )}

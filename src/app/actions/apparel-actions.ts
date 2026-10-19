@@ -549,3 +549,42 @@ export async function updatePlayerDorsalAction(playerId: string, dorsal: string)
   return updatePlayerApparelSizesAction(playerId, {}, dorsal);
 }
 
+// 6. Obtener equipos de la temporada activa para los selectores de utillería
+export async function getApparelTeamsAction() {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext()
+    if (!context || authError) return { success: false, error: 'No autenticado' }
+
+    const adminClient = createAdminClient()
+
+    // Obtener temporada activa
+    const { data: activeSeasonRow } = await adminClient
+      .from('seasons')
+      .select('id')
+      .eq('club_id', context.profile.club_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const activeSeasonId = activeSeasonRow?.id
+
+    let query = adminClient
+      .from('teams')
+      .select('id, name')
+      .eq('club_id', context.profile.club_id)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .order('name')
+
+    if (activeSeasonId) {
+      query = query.eq('season_id', activeSeasonId)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error: any) {
+    console.error('Error in getApparelTeamsAction:', error.message)
+    return { success: false, error: error.message }
+  }
+}
+

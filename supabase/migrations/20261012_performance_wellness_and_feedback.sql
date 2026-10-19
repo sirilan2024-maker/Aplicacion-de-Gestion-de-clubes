@@ -657,3 +657,33 @@ CREATE POLICY "player_session_feedback_update"
             )
         )
     );
+
+-- ==============================================================================
+-- CONTROL ESTRICTO DE PRIVILEGIOS DCL (Principio de Mínimo Privilegio)
+-- ==============================================================================
+-- Neutraliza los privilegios predeterminados amplios (DEFAULT PRIVILEGES) de Supabase.
+-- RLS no protege contra TRUNCATE ni operaciones de trigger/foreign key. Se revoca
+-- todo acceso heredado o directo y se concede únicamente el DML estrictamente necesario.
+
+-- 1. Revocar absolutamente todos los privilegios a PUBLIC, anon, authenticated y service_role
+REVOKE ALL ON TABLE 
+    public.player_daily_wellness,
+    public.player_session_discomfort_incidents,
+    public.player_session_feedback
+FROM PUBLIC, anon, authenticated, service_role;
+
+-- 2. Conceder a 'authenticated' ÚNICAMENTE las operaciones contempladas en sus 9 políticas RLS
+-- (Excluye terminantemente DELETE, TRUNCATE, REFERENCES y TRIGGER)
+GRANT SELECT, INSERT, UPDATE ON TABLE 
+    public.player_daily_wellness,
+    public.player_session_discomfort_incidents,
+    public.player_session_feedback
+TO authenticated;
+
+-- 3. Conceder a 'service_role' exactamente el conjunto DML requerido por feedback-actions.ts
+-- (Excluye terminantemente TRUNCATE y DELETE; los borrados en cascada son gestionados por el owner de la FK)
+GRANT SELECT, INSERT, UPDATE ON TABLE 
+    public.player_daily_wellness,
+    public.player_session_discomfort_incidents,
+    public.player_session_feedback
+TO service_role;

@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react"
 import { Loader2, Search, Shirt, CheckSquare, BarChart3, AlertCircle, ShoppingBag, ClipboardList, X } from "lucide-react"
 import toast from "react-hot-toast"
-import { createClient } from "@/lib/supabase/client"
-import { getApparelDashboardDataAction, getApparelSummaryReportAction, toggleApparelDeliveryAction, updatePlayerApparelSizesAction, updateApparelStockAction, updatePlayerDorsalAction } from "@/app/actions/apparel-actions"
+import { 
+  getApparelDashboardDataAction, 
+  getApparelSummaryReportAction, 
+  toggleApparelDeliveryAction, 
+  updatePlayerApparelSizesAction, 
+  updateApparelStockAction, 
+  updatePlayerDorsalAction,
+  getApparelTeamsAction
+} from "@/app/actions/apparel-actions"
 import { UtilleroMatchKitPlanner } from "@/components/features/utilleria/UtilleroMatchKitPlanner"
 
 const CLOTHING_SIZES = [
@@ -94,16 +101,19 @@ export default function UtilleriaDashboardPage() {
   // Clickable Summary Modal State
   const [summaryModal, setSummaryModal] = useState<'total' | 'delivered' | 'pending' | null>(null)
 
-  const supabase = createClient()
-
   useEffect(() => {
     loadTeams()
+  }, [])
+
+  useEffect(() => {
     loadData()
   }, [selectedTeam])
 
   const loadTeams = async () => {
-    const { data } = await supabase.from('teams').select('id, name').order('name')
-    if (data) setTeams(data)
+    const res = await getApparelTeamsAction()
+    if (res.success && res.data) {
+      setTeams(res.data)
+    }
   }
 
   const loadData = async () => {

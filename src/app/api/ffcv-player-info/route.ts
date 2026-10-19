@@ -51,11 +51,13 @@ function matchFfcvPlayerInRoster(
   firstName: string,
   lastName: string,
   dorsal: string | number | null | undefined,
-  ffcvRoster: any[]
+  ffcvRoster: any[],
+  email?: string | null
 ) {
   const normFirst = normalizeStr(firstName);
   const normLast = normalizeStr(lastName);
   const dorsalStr = dorsal ? String(dorsal).trim() : '';
+  const cleanEmail = (email || '').trim().toLowerCase();
 
   const firstTokens = normFirst.split(' ').filter(Boolean);
   const lastTokens = normLast.split(' ').filter(Boolean);
@@ -66,6 +68,10 @@ function matchFfcvPlayerInRoster(
   for (const j of ffcvRoster) {
     const ffcvNorm = normalizeStr(j.nombre);
     const ffcvTokens = ffcvNorm.split(' ').filter(Boolean);
+    const jEmail = (j.email || '').trim().toLowerCase();
+
+    // 0. Email check (exact match with player or parent email registered in FFCV)
+    let emailMatched = Boolean(cleanEmail && jEmail && cleanEmail === jEmail);
 
     // 1. Check surname matching (exact token, alias, or root similarity)
     let surnameMatched = false;
@@ -105,33 +111,52 @@ function matchFfcvPlayerInRoster(
       }
     }
 
-    if (!surnameMatched && !firstNameMatched) continue;
+    const dorsalMatched = Boolean(dorsalStr && String(j.dorsal).trim() === dorsalStr);
+
+    if (!surnameMatched && !firstNameMatched && !emailMatched && !dorsalMatched) continue;
 
     let score = 0;
+    if (emailMatched) score += 10;
     if (surnameMatched) score += 4;
     if (firstNameMatched) score += 3;
+    if (dorsalMatched) score += 4;
 
     for (const t of [...firstTokens, ...lastTokens]) {
       if (t.length > 2 && ffcvTokens.includes(t)) score += 1;
     }
 
-    if (dorsalStr && String(j.dorsal).trim() === dorsalStr) {
-      score += 4;
-    }
+    const isMatchValid = (surnameMatched && firstNameMatched) ||
+      emailMatched ||
+      (dorsalMatched && (firstNameMatched || surnameMatched)) ||
+      (ffcvTokens.length === 1 && firstNameMatched && dorsalMatched);
 
-    if (surnameMatched && firstNameMatched && score > bestScore) {
+    if (isMatchValid && score > bestScore) {
       bestScore = score;
       bestCandidate = j;
     }
   }
 
-  // Fallback for players where official FFCV roster shortened to only First Name + Single Surname
+  // Fallback for players where official FFCV roster shortened to only First Name + Single Surname or single name with dorsal
   if (!bestCandidate) {
     for (const j of ffcvRoster) {
       const ffcvNorm = normalizeStr(j.nombre);
+      const ffcvTokens = ffcvNorm.split(' ').filter(Boolean);
+      const dorsalMatched = Boolean(dorsalStr && String(j.dorsal).trim() === dorsalStr);
+      const jEmail = (j.email || '').trim().toLowerCase();
+
+      if (cleanEmail && jEmail && cleanEmail === jEmail) {
+        bestCandidate = j;
+        break;
+      }
+
+      if (dorsalMatched && (firstTokens.some(ft => ffcvNorm.includes(ft)) || lastTokens.some(lt => ffcvNorm.includes(lt)))) {
+        bestCandidate = j;
+        break;
+      }
+
       const allTokens = [...firstTokens, ...lastTokens].filter(t => t.length > 3);
       const matchCount = allTokens.filter(t => ffcvNorm.includes(t)).length;
-      if (matchCount >= 2) {
+      if (matchCount >= 2 || (ffcvTokens.length === 1 && matchCount >= 1 && dorsalMatched)) {
         bestCandidate = j;
         break;
       }
@@ -161,7 +186,7 @@ export async function GET(req: Request) {
 
     const { data: player, error: pErr } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, club_id, team_id, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id, season_id)')
+      .select('id, first_name, last_name, dorsal, email, parent1_email, club_id, team_id, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id, season_id)')
       .eq('id', playerId)
       .single();
 
@@ -220,7 +245,8 @@ export async function GET(req: Request) {
       player.first_name,
       player.last_name,
       player.dorsal,
-      plantillaData.jugadores_equipo
+      plantillaData.jugadores_equipo,
+      player.parent1_email || player.email
     );
 
     if (!matchedFfcvPlayer || !matchedFfcvPlayer.codjugador) {
@@ -406,7 +432,9 @@ export async function GET(req: Request) {
       found: true,
       player: {
         codjugador: codJugador,
-        nombre: fullPlayerData.nombre_jugador || matchedFfcvPlayer.nombre,
+        nombre: (fullPlayerData.nombre_jugador && fullPlayerData.nombre_jugador.trim().split(/\s+/).length > 1)
+          ? fullPlayerData.nombre_jugador
+          : (fullName || matchedFfcvPlayer.nombre),
         email: matchedFfcvPlayer.email || null,
         dorsal: fullPlayerData.dorsal_jugador || matchedFfcvPlayer.dorsal || null,
         posicion: fullPlayerData.posicion_jugador || matchedFfcvPlayer.posicion || null,

@@ -1,6 +1,7 @@
 import { createAdminClient } from '../supabase/admin';
 import { fetchMatchDetails } from './client';
 import { FFCVRawMatchDetails } from './types';
+import { getOfficialMatchDuration } from '../utils';
 
 const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
 const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
@@ -235,10 +236,10 @@ export async function syncFFCVActaToConvocatorias(
     // 1. Locate the internal match in 'partidos' (ACTIVE SEASON ONLY)
     let { data: matches } = await supabase
       .from('partidos')
-      .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar')
+      .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar, equipo:teams(id, name, category)')
       .neq('season_id', CLOSED_SEASON_ID)
       .eq('season_id', ACTIVE_SEASON_ID)
-      .or(`acta_oficial_url.ilike.%CodPartido=${codacta}%,acta_oficial_url.ilike.%${codacta}%`);
+      .ilike('acta_oficial_url', `%${codacta}%`);
 
     let partido = matches?.[0];
 
@@ -258,7 +259,7 @@ export async function syncFFCVActaToConvocatorias(
       if (fm && fmInvolvesSaladar && fm.match_date) {
         const { data: team } = await supabase
           .from('teams')
-          .select('id, name')
+          .select('id, name, category')
           .neq('season_id', CLOSED_SEASON_ID)
           .eq('season_id', ACTIVE_SEASON_ID)
           .eq('ffcv_group_id', fm.ffcv_group_id)
@@ -269,7 +270,7 @@ export async function syncFFCVActaToConvocatorias(
           const fmRival = fmHome.includes('saladar') ? fmAway : fmHome;
           const { data: candidatePartidos } = await supabase
             .from('partidos')
-            .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar')
+            .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar, equipo:teams(id, name, category)')
             .neq('season_id', CLOSED_SEASON_ID)
             .eq('season_id', ACTIVE_SEASON_ID)
             .eq('equipo_id', team.id);
@@ -310,8 +311,16 @@ export async function syncFFCVActaToConvocatorias(
     });
 
     const matchTeam = (activeTeams || []).find((t: any) => t.id === partido.equipo_id);
-    const isSeniorMatch = Boolean((matchTeam?.name || '').toUpperCase().includes('SENIOR'));
+    const teamCategory = (partido.equipo as any)?.name || (partido.equipo as any)?.category || matchTeam?.name;
+    const isSeniorMatch = Boolean((teamCategory || '').toUpperCase().includes('SENIOR'));
     const teamPlayers = allPlayers.filter((p: any) => p.team_id === partido.equipo_id);
+    const maxMatchMinutes = getOfficialMatchDuration(teamCategory, partido.competicion_nombre || details.nombre_competicion);
+
+    // Load existing convocatorias for manual minute preservation in base football
+    const { data: existingConvocatorias } = await supabase
+      .from('convocatorias')
+      .select('player_id, minutos_jugados, minutes_played')
+      .eq('partido_id', partido.id);
 
     // 3. Build convocatorias payload
     const rowsToUpsert: any[] = [];
@@ -371,18 +380,25 @@ export async function syncFFCVActaToConvocatorias(
         }
       });
 
-      // Minutes played calculation
+      // Minutes played calculation (ajustado a la duración reglamentaria de la categoría)
+      // En fútbol formativo (Cadete e Infantil), los árbitros a menudo no registran las sustituciones en el acta electrónica.
+      const existingConv = (existingConvocatorias || []).find((c: any) => c.player_id === matched.id);
+      const hasManualMinutes = existingConv && typeof existingConv.minutos_jugados === 'number' && existingConv.minutos_jugados > 0 && existingConv.minutos_jugados <= maxMatchMinutes;
+
       let minutes = 0;
-      if (isTitular) {
+      if (ourSubs.length === 0 && hasManualMinutes) {
+        // Preservar minutos manuales registrados por el cuerpo técnico si el acta no incluye cambios
+        minutes = existingConv.minutos_jugados;
+      } else if (isTitular) {
         const subOut = ourSubs.find((s: any) => String(s.codjugador_sale) === String(fp.codjugador));
-        const outMin = subOut && subOut.minuto ? Number(subOut.minuto) : 90;
+        const outMin = subOut && subOut.minuto ? Number(subOut.minuto) : maxMatchMinutes;
         minutes = sendOffMinute !== null ? Math.min(outMin, sendOffMinute) : outMin;
       } else {
         const subIn = ourSubs.find((s: any) => String(s.codjugador_entra) === String(fp.codjugador));
         if (subIn && subIn.minuto) {
           const inMin = Number(subIn.minuto);
           const subOut = ourSubs.find((s: any) => String(s.codjugador_sale) === String(fp.codjugador));
-          const outMin = subOut && subOut.minuto ? Number(subOut.minuto) : 90;
+          const outMin = subOut && subOut.minuto ? Number(subOut.minuto) : maxMatchMinutes;
           const endMin = sendOffMinute !== null ? Math.min(outMin, sendOffMinute) : outMin;
           minutes = Math.max(0, endMin - inMin);
         } else {

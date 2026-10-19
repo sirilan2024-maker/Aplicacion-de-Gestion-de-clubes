@@ -8,6 +8,7 @@ import {
   FFCVSyncResult
 } from '../ffcv/types';
 import { matchPlayer } from '../ffcv/acta-sync';
+import { getOfficialMatchDuration } from '../utils';
 
 // Agent configured to bypass intermediate SSL certificate issue on apuntamelo.com
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
@@ -419,6 +420,9 @@ export async function syncApuntameloTeam(
                   }
                 }
 
+                const categoryDuration = getOfficialMatchDuration(config.teamName, 'Liga Brave');
+                const calculatedMins = pStats.Suplente ? Math.round(categoryDuration / 2) : categoryDuration;
+
                 convocatoriasToUpsert.push({
                   partido_id: resolvedMatchId,
                   player_id: matched.id,
@@ -430,8 +434,8 @@ export async function syncApuntameloTeam(
                   tarjetas_rojas: playerReds,
                   goals: playerGoals,
                   goles: playerGoals,
-                  minutes_played: pStats.Suplente ? 35 : 70,
-                  minutos_jugados: pStats.Suplente ? 35 : 70
+                  minutes_played: calculatedMins,
+                  minutos_jugados: calculatedMins
                 });
               }
 

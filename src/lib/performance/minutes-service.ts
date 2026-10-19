@@ -978,4 +978,605 @@ export function resolveTrainingFeedbackUIState(
   };
 }
 
+export const CLOSED_SEASON_ID_25_26 = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+
+export interface RawTrainingEventSource {
+  id: string;
+  team_id?: string | null;
+  season_id?: string | null;
+  date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  event_type?: string | null;
+  title?: string | null;
+  status?: string | null;
+  estado?: string | null;
+  is_cancelled?: boolean | null;
+  cancelled?: boolean | null;
+}
+
+export interface RawTrainingAttendanceSource {
+  event_id: string;
+  player_id?: string | null;
+  status?: string | null;
+  notes?: string | null;
+  event?: RawTrainingEventSource | null;
+}
+
+export interface RawTrainingMetricSource {
+  event_id: string;
+  player_id?: string | null;
+  rpe?: number | string | null;
+  minutes?: number | string | null;
+  metric_name?: string | null;
+  value?: number | string | null;
+  event?: RawTrainingEventSource | null;
+}
+
+export interface ContextTeamTrainingHistoryItem {
+  id: string;
+  teamId: string | null;
+  date: string;
+  title: string;
+  rpe: number | null;
+  minutes: number | null;
+  load: number | null;
+  status: string;
+  rawAttendanceStatus: string | null;
+  attendanceNotes?: string;
+  attended: boolean;
+  hasRealMetrics: boolean;
+}
+
+export interface ReconciledPlayerClubTrainingResult {
+  contextTeamHistory: ContextTeamTrainingHistoryItem[];
+  multiTeamSessions: SessionWorkloadEntryInput[];
+  workload: RollingWorkloadResult & {
+    contextTeamTrainingMinutes: number;
+    totalClubTrainingMinutes: number;
+    minutesByTeam: Record<string, number>;
+  };
+  contextAttendance: {
+    totalTrainings: number;
+    trainingsAttended: number;
+    attendancePct: number;
+  };
+}
+
+/**
+ * Calcula de forma uniforme el porcentaje de asistencia confirmada sobre un conjunto de eventos,
+ * utilizando `isConfirmedAttendanceStatus` como única regla para el numerador (excluyendo
+ * 'justificado', 'excused', 'lesionado', 'ausente', etc.) y evitando doble conteo por evento.
+ */
+export function computeConfirmedAttendancePercentage(
+  events: Array<{ id: string }>,
+  attendanceRecords: Array<{ event_id?: string | null; status?: string | null }>
+): { totalEvents: number; confirmedCount: number; pct: number } {
+  const validEvents = (events || []).filter(ev => Boolean(ev?.id));
+  const totalEvents = validEvents.length;
+  if (totalEvents === 0) {
+    return { totalEvents: 0, confirmedCount: 0, pct: 0 };
+  }
+
+  const confirmedEventIds = new Set<string>();
+  for (const a of attendanceRecords || []) {
+    if (a?.event_id && isConfirmedAttendanceStatus(a.status)) {
+      confirmedEventIds.add(a.event_id);
+    }
+  }
+
+  let confirmedCount = 0;
+  for (const ev of validEvents) {
+    if (confirmedEventIds.has(ev.id)) {
+      confirmedCount++;
+    }
+  }
+
+  const pct = Math.round((confirmedCount / totalEvents) * 100);
+  return { totalEvents, confirmedCount, pct };
+}
+
+/**
+ * Resuelve el conjunto de equipos verificados de la temporada activa del club y valida si
+ * `playerTeamId` (`players.team_id`) pertenece realmente a dicha temporada activa.
+ * Nunca añade `playerTeamId` por el mero hecho de figurar en `players.team_id`.
+ */
+export function resolveVerifiedActiveSeasonTeamIds(params: {
+  clubId: string | null;
+  activeSeasonId: string | null;
+  candidateTeams: Array<{ id?: string | null; club_id?: string | null; season_id?: string | null }>;
+  playerTeamId?: string | null;
+}): { activeSeasonTeamIds: Set<string>; verifiedContextTeamId: string | null } {
+  const { clubId, activeSeasonId, candidateTeams = [], playerTeamId = null } = params;
+  const activeSeasonTeamIds = new Set<string>();
+
+  for (const t of candidateTeams) {
+    if (!t?.id) continue;
+    if (clubId && t.club_id && t.club_id !== clubId) continue;
+    if (t.season_id === CLOSED_SEASON_ID_25_26) continue;
+    if (activeSeasonId) {
+      if (t.season_id !== activeSeasonId) continue;
+    } else {
+      if (!t.season_id) continue;
+    }
+    activeSeasonTeamIds.add(t.id);
+  }
+
+  const verifiedContextTeamId =
+    playerTeamId && activeSeasonTeamIds.has(playerTeamId) ? playerTeamId : null;
+
+  return { activeSeasonTeamIds, verifiedContextTeamId };
+}
+
+function parseValidRpeOrNull(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null;
+  const num = Number(val);
+  if (isNaN(num) || num < 0 || num > 10) return null;
+  return num;
+}
+
+function parseValidMinutesOrNull(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null;
+  const num = Number(val);
+  if (isNaN(num) || num < 0 || num > 300) return null;
+  return Math.round(num);
+}
+
+function classifyMetricRecordField(
+  metric: RawTrainingMetricSource
+): { rpe?: number | null; minutes?: number | null } {
+  const result: { rpe?: number | null; minutes?: number | null } = {};
+  if (metric.rpe !== undefined && metric.rpe !== null && metric.rpe !== '') {
+    result.rpe = parseValidRpeOrNull(metric.rpe);
+  }
+  if (metric.minutes !== undefined && metric.minutes !== null && metric.minutes !== '') {
+    result.minutes = parseValidMinutesOrNull(metric.minutes);
+  }
+
+  if (metric.metric_name && metric.value !== undefined && metric.value !== null && metric.value !== '') {
+    const mName = metric.metric_name.toLowerCase();
+    const isMinutesMetric =
+      mName.includes('min') || mName.includes('durac') || mName.includes('tiempo');
+    const isRpeMetric =
+      !isMinutesMetric &&
+      (mName.includes('rpe') ||
+        mName.includes('esfuerzo') ||
+        mName.includes('borg') ||
+        mName.includes('carga') ||
+        mName.includes('fatiga') ||
+        mName.includes('s-rpe'));
+    if (isMinutesMetric) {
+      result.minutes = parseValidMinutesOrNull(metric.value);
+    } else if (isRpeMetric) {
+      result.rpe = parseValidRpeOrNull(metric.value);
+    }
+  }
+  return result;
+}
+
+/**
+ * 16. Reconcilia todas las fuentes de entrenamientos de un jugador en el club (`teamEvents`,
+ * `attendanceEntries`, `metricEntries`) aplicando:
+ * - Aislamiento estricto de temporada: solo admite eventos cuyos `team_id` pertenezcan a
+ *   `activeSeasonTeamIds` (y nunca a la temporada cerrada 25/26 `584f508a-fc1a-4339-b5b2-4296ffde2f4c`),
+ *   y opcionalmente con fecha `>= seasonStartDate`.
+ * - Pre-fusión determinista por `eventId` ANTES de evaluar `isTrainingSessionEligible`, para que
+ *   una entrada inicial incompleta nunca bloquee datos válidos posteriores del mismo `eventId`.
+ * - Regla conservadora ante conflictos en el mismo `eventId` (`rpe` o `minutes` distintos válidos -> `null`).
+ * - Separación estricta entre:
+ *   a) `contextTeamHistory` y `contextAttendance`: solo sesiones elegibles del `contextTeamId` (equipo principal/consultado).
+ *   b) `multiTeamSessions` y `workload`: todas las sesiones elegibles del club en la temporada activa para el ACWR.
+ */
+export function reconcilePlayerClubTrainingHistory(params: {
+  contextTeamId: string | null;
+  activeSeasonTeamIds: Iterable<string>;
+  seasonStartDate?: string | null;
+  teamEvents?: RawTrainingEventSource[];
+  attendanceEntries?: RawTrainingAttendanceSource[];
+  metricEntries?: RawTrainingMetricSource[];
+  now?: Date | string | number;
+}): ReconciledPlayerClubTrainingResult {
+  const {
+    contextTeamId,
+    activeSeasonTeamIds,
+    seasonStartDate = null,
+    teamEvents = [],
+    attendanceEntries = [],
+    metricEntries = [],
+    now = new Date(),
+  } = params;
+
+  const allowedTeams = new Set<string>(activeSeasonTeamIds);
+  const minDateKey =
+    seasonStartDate && /^\d{4}-\d{2}-\d{2}/.test(seasonStartDate.trim())
+      ? seasonStartDate.trim().slice(0, 10)
+      : seasonStartDate
+      ? getSpainReferenceDate(seasonStartDate)
+      : null;
+
+  interface MergedCandidate {
+    id: string;
+    teamId: string | null;
+    seasonId: string | null;
+    date: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    eventType: string | null;
+    title: string | null;
+    status: string | null;
+    estado: string | null;
+    isCancelled: boolean;
+    attendanceStatus: string | null;
+    attendanceNotes: string | undefined;
+    attendanceStatuses: string[];
+    rpe: number | null;
+    rpeConflict: boolean;
+    minutes: number | null;
+    minutesConflict: boolean;
+  }
+
+  const candidates = new Map<string, MergedCandidate>();
+
+  const ensureCandidate = (eventId: string): MergedCandidate => {
+    let existing = candidates.get(eventId);
+    if (!existing) {
+      existing = {
+        id: eventId,
+        teamId: null,
+        seasonId: null,
+        date: null,
+        startTime: null,
+        endTime: null,
+        eventType: null,
+        title: null,
+        status: null,
+        estado: null,
+        isCancelled: false,
+        attendanceStatus: null,
+        attendanceNotes: undefined,
+        attendanceStatuses: [],
+        rpe: null,
+        rpeConflict: false,
+        minutes: null,
+        minutesConflict: false,
+      };
+      candidates.set(eventId, existing);
+    }
+    return existing;
+  };
+
+  const mergeEventMeta = (target: MergedCandidate, ev?: RawTrainingEventSource | null) => {
+    if (!ev) return;
+    if (ev.team_id && !target.teamId) target.teamId = ev.team_id;
+    if (ev.season_id === CLOSED_SEASON_ID_25_26) {
+      target.seasonId = CLOSED_SEASON_ID_25_26;
+    } else if (ev.season_id && !target.seasonId) {
+      target.seasonId = ev.season_id;
+    }
+    if (ev.date && !target.date) target.date = ev.date;
+    if (ev.start_time && !target.startTime) target.startTime = ev.start_time;
+    if (ev.end_time && !target.endTime) target.endTime = ev.end_time;
+    if (ev.event_type && !target.eventType) target.eventType = ev.event_type;
+    if (ev.title && !target.title) target.title = ev.title;
+    if (ev.status && !target.status) target.status = ev.status;
+    if (ev.estado && !target.estado) target.estado = ev.estado;
+    if (
+      Boolean(ev.is_cancelled) ||
+      Boolean(ev.cancelled) ||
+      isCancelledTrainingSession({
+        status: ev.status,
+        estado: ev.estado,
+        is_cancelled: ev.is_cancelled,
+        cancelled: ev.cancelled,
+      })
+    ) {
+      target.isCancelled = true;
+    }
+  };
+
+  for (const ev of teamEvents) {
+    if (!ev?.id) continue;
+    const c = ensureCandidate(ev.id);
+    mergeEventMeta(c, ev);
+  }
+
+  for (const att of attendanceEntries) {
+    const evId = att?.event_id || att?.event?.id;
+    if (!evId) continue;
+    const c = ensureCandidate(evId);
+    mergeEventMeta(c, att.event);
+    const cleanNotes =
+      typeof att.notes === 'string' && att.notes.trim() !== '' ? att.notes.trim() : undefined;
+    if (cleanNotes && !c.attendanceNotes) {
+      c.attendanceNotes = cleanNotes;
+    }
+    if (att.status && att.status.trim() !== '') {
+      const cleanStatus = att.status.trim();
+      if (!c.attendanceStatuses.includes(cleanStatus)) {
+        c.attendanceStatuses.push(cleanStatus);
+      }
+      // Priorizar estado válido de asistencia confirmada o decidida sobre estados vacíos o unmarked
+      if (
+        !c.attendanceStatus ||
+        (!isConfirmedAttendanceStatus(c.attendanceStatus) && isConfirmedAttendanceStatus(cleanStatus)) ||
+        (!hasRecordedAttendanceDecision(c.attendanceStatus) && hasRecordedAttendanceDecision(cleanStatus))
+      ) {
+        c.attendanceStatus = cleanStatus;
+        if (cleanNotes) {
+          c.attendanceNotes = cleanNotes;
+        }
+      }
+    }
+  }
+
+  for (const metric of metricEntries) {
+    const evId = metric?.event_id || metric?.event?.id;
+    if (!evId) continue;
+    const c = ensureCandidate(evId);
+    mergeEventMeta(c, metric.event);
+
+    const parsed = classifyMetricRecordField(metric);
+    if (parsed.rpe !== undefined && parsed.rpe !== null) {
+      if (c.rpe === null && !c.rpeConflict) {
+        c.rpe = parsed.rpe;
+      } else if (c.rpe !== null && c.rpe !== parsed.rpe) {
+        c.rpe = null;
+        c.rpeConflict = true;
+      }
+    }
+    if (parsed.minutes !== undefined && parsed.minutes !== null) {
+      if (c.minutes === null && !c.minutesConflict) {
+        c.minutes = parsed.minutes;
+      } else if (c.minutes !== null && c.minutes !== parsed.minutes) {
+        c.minutes = null;
+        c.minutesConflict = true;
+      }
+    }
+  }
+
+  const contextTeamHistory: ContextTeamTrainingHistoryItem[] = [];
+  const multiTeamSessions: SessionWorkloadEntryInput[] = [];
+
+  for (const c of candidates.values()) {
+    // 1. Excluir temporada cerrada 25/26 explícitamente
+    if (c.seasonId === CLOSED_SEASON_ID_25_26) continue;
+
+    // 2. Exigir pertenencia a los equipos de la temporada activa del club
+    if (!c.teamId || !allowedTeams.has(c.teamId)) continue;
+
+    // 3. Filtrar por tipo de evento entrenamiento
+    if (c.eventType && c.eventType !== 'Entrenamiento' && c.eventType.toLowerCase() !== 'training') {
+      continue;
+    }
+
+    // 4. Exigir fecha válida y opcionalmente >= inicio de temporada activa
+    if (!c.date) continue;
+    const dateKey = /^\d{4}-\d{2}-\d{2}/.test(c.date.trim())
+      ? c.date.trim().slice(0, 10)
+      : getSpainReferenceDate(c.date);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) continue;
+    if (minDateKey && dateKey < minDateKey) continue;
+
+    const hasRealMetrics = c.rpe !== null || c.minutes !== null;
+
+    // 5. Evaluar elegibilidad sobre el candidato ya fusionado (todas las fuentes combinadas)
+    const eligible = isTrainingSessionEligible({
+      eventDate: c.date,
+      eventStartTime: c.startTime,
+      event: {
+        id: c.id,
+        date: c.date,
+        start_time: c.startTime,
+        event_type: c.eventType || 'Entrenamiento',
+        status: c.status,
+        estado: c.estado,
+        is_cancelled: c.isCancelled,
+      },
+      attendanceStatus: c.attendanceStatus,
+      attendanceStatuses: c.attendanceStatuses,
+      hasRealMetrics,
+      now,
+    });
+
+    if (!eligible) continue;
+
+    const attended =
+      isConfirmedAttendanceStatus(c.attendanceStatus) ||
+      c.attendanceStatuses.some(st => isConfirmedAttendanceStatus(st));
+
+    const effectiveMinutes = c.minutes;
+    const loadRes = calculateTrainingLoad(c.rpe, effectiveMinutes);
+
+    // Todas las sesiones elegibles del club en la temporada activa alimentan el ACWR multi-equipo
+    multiTeamSessions.push({
+      eventId: c.id,
+      teamId: c.teamId,
+      date: c.date,
+      start_time: c.startTime,
+      startTime: c.startTime,
+      event_type: c.eventType || 'Entrenamiento',
+      status: c.status,
+      estado: c.estado,
+      is_cancelled: c.isCancelled,
+      attendanceStatus: c.attendanceStatus,
+      attendanceStatuses: c.attendanceStatuses,
+      rpe: c.rpe,
+      minutes: effectiveMinutes,
+    });
+
+    // Solo las sesiones del equipo principal/consultado entran en el historial y asistencia del equipo
+    if (contextTeamId && c.teamId === contextTeamId) {
+      contextTeamHistory.push({
+        id: c.id,
+        teamId: c.teamId,
+        date: c.date,
+        title: c.title || 'Entrenamiento',
+        rpe: c.rpe,
+        minutes: effectiveMinutes,
+        load: loadRes.load,
+        status: c.attendanceStatus || (hasRealMetrics ? 'Con Métricas' : 'Sin Registro'),
+        rawAttendanceStatus: c.attendanceStatus,
+        attendanceNotes: c.attendanceNotes,
+        attended,
+        hasRealMetrics,
+      });
+    }
+  }
+
+  contextTeamHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const workload = aggregatePlayerMultiTeamWorkload({
+    sessions: multiTeamSessions,
+    contextTeamId,
+    now,
+  });
+
+  const totalTrainings = contextTeamHistory.length;
+  const trainingsAttended = contextTeamHistory.filter(t => t.attended).length;
+  const attendancePct =
+    totalTrainings > 0 ? Math.round((trainingsAttended / totalTrainings) * 100) : 0;
+
+  return {
+    contextTeamHistory,
+    multiTeamSessions,
+    workload,
+    contextAttendance: {
+      totalTrainings,
+      trainingsAttended,
+      attendancePct,
+    },
+  };
+}
+
+export interface AuthorizedPlayerWorkloadSummary {
+  playerId: string;
+  acuteLoad: number;
+  chronicLoad: number;
+  acwr: number | null;
+  acuteTotalLoad: number;
+  chronicTotalLoad: number;
+  contextTeamTrainingMinutes: number;
+  totalClubTrainingMinutes: number;
+  totalContextTrainings: number;
+  contextTrainingsAttended: number;
+  contextTrainingAttendancePct: number;
+}
+
+export interface AuthorizedSquadWorkloadsResult {
+  authorized: boolean;
+  error?: string;
+  rejectedPlayerIds: string[];
+  summaries: Record<string, AuthorizedPlayerWorkloadSummary>;
+}
+
+/**
+ * 17. Calcula en servidor los agregados de carga y ACWR multi-equipo para la plantilla
+ * autorizada de un equipo (`contextTeamId`), garantizando:
+ * - Bloqueo inmediato si el usuario no está autorizado a gestionar `contextTeamId`.
+ * - Rechazo de cualquier `playerId` solicitado que no pertenezca a la plantilla autorizada de `contextTeamId`.
+ * - Inclusión de sesiones de otros equipos del mismo club y temporada activa en el ACWR
+ *   sin exponer eventos ni métricas crudas de esos otros equipos.
+ */
+export function computeAuthorizedTeamSquadWorkloads(params: {
+  isAuthorizedForTeam: boolean;
+  contextTeamId: string;
+  activeSeasonTeamIds: Iterable<string>;
+  authorizedSquadPlayerIds: Iterable<string>;
+  requestedPlayerIds?: string[] | null;
+  seasonStartDate?: string | null;
+  contextTeamEvents: RawTrainingEventSource[];
+  attendanceEntries: RawTrainingAttendanceSource[];
+  metricEntries: RawTrainingMetricSource[];
+  now?: Date | string | number;
+}): AuthorizedSquadWorkloadsResult {
+  const {
+    isAuthorizedForTeam,
+    contextTeamId,
+    activeSeasonTeamIds,
+    authorizedSquadPlayerIds,
+    requestedPlayerIds = null,
+    seasonStartDate = null,
+    contextTeamEvents,
+    attendanceEntries,
+    metricEntries,
+    now = new Date(),
+  } = params;
+
+  if (!isAuthorizedForTeam) {
+    return {
+      authorized: false,
+      error: 'No tienes permisos para consultar las métricas de rendimiento de este equipo.',
+      rejectedPlayerIds: requestedPlayerIds ? [...requestedPlayerIds] : [],
+      summaries: {},
+    };
+  }
+
+  const squadSet = new Set<string>(authorizedSquadPlayerIds);
+  const rejectedPlayerIds: string[] = [];
+  let targetPlayerIds: string[] = [];
+
+  if (requestedPlayerIds && requestedPlayerIds.length > 0) {
+    for (const pid of requestedPlayerIds) {
+      if (squadSet.has(pid)) {
+        targetPlayerIds.push(pid);
+      } else {
+        rejectedPlayerIds.push(pid);
+      }
+    }
+  } else {
+    targetPlayerIds = Array.from(squadSet);
+  }
+
+  const attendanceByPlayer = new Map<string, RawTrainingAttendanceSource[]>();
+  for (const att of attendanceEntries) {
+    if (!att.player_id || !squadSet.has(att.player_id)) continue;
+    const list = attendanceByPlayer.get(att.player_id) || [];
+    list.push(att);
+    attendanceByPlayer.set(att.player_id, list);
+  }
+
+  const metricsByPlayer = new Map<string, RawTrainingMetricSource[]>();
+  for (const m of metricEntries) {
+    if (!m.player_id || !squadSet.has(m.player_id)) continue;
+    const list = metricsByPlayer.get(m.player_id) || [];
+    list.push(m);
+    metricsByPlayer.set(m.player_id, list);
+  }
+
+  const summaries: Record<string, AuthorizedPlayerWorkloadSummary> = {};
+
+  for (const playerId of targetPlayerIds) {
+    const reconciled = reconcilePlayerClubTrainingHistory({
+      contextTeamId,
+      activeSeasonTeamIds,
+      seasonStartDate,
+      teamEvents: contextTeamEvents,
+      attendanceEntries: attendanceByPlayer.get(playerId) || [],
+      metricEntries: metricsByPlayer.get(playerId) || [],
+      now,
+    });
+
+    summaries[playerId] = {
+      playerId,
+      acuteLoad: reconciled.workload.acuteLoad,
+      chronicLoad: reconciled.workload.chronicLoad,
+      acwr: reconciled.workload.acwr,
+      acuteTotalLoad: reconciled.workload.acuteTotalLoad,
+      chronicTotalLoad: reconciled.workload.chronicTotalLoad,
+      contextTeamTrainingMinutes: reconciled.workload.contextTeamTrainingMinutes,
+      totalClubTrainingMinutes: reconciled.workload.totalClubTrainingMinutes,
+      totalContextTrainings: reconciled.contextAttendance.totalTrainings,
+      contextTrainingsAttended: reconciled.contextAttendance.trainingsAttended,
+      contextTrainingAttendancePct: reconciled.contextAttendance.attendancePct,
+    };
+  }
+
+  return {
+    authorized: true,
+    rejectedPlayerIds,
+    summaries,
+  };
+}
+
+
 

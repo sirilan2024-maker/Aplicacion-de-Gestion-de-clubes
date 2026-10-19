@@ -208,3 +208,31 @@ export function getFirstNameAndFirstSurname(firstName?: string | null, lastName?
   return `${first} ${firstSurname}`.trim();
 }
 
+/**
+ * Devuelve la duración reglamentaria oficial de un partido según la categoría:
+ * - Prebenjamín / Benjamín: 50 minutos (2 partes de 25')
+ * - Alevín: 60 minutos (2 partes de 30')
+ * - Infantil: 70 minutos (2 partes de 35')
+ * - Cadete: 80 minutos (2 partes de 40')
+ * - Juvenil / Senior: 90 minutos (2 partes de 45')
+ */
+export function getOfficialMatchDuration(categoryOrTeamName?: string | null, competitionName?: string | null): number {
+  const text = `${categoryOrTeamName || ''} ${competitionName || ''}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (text.includes('prebenjamin') || text.includes('benjamin') || text.includes('u8') || text.includes('u9') || text.includes('u10')) {
+    return 50;
+  }
+  if (text.includes('alevin') || text.includes('u11') || text.includes('u12')) {
+    return 60;
+  }
+  if (text.includes('infantil') || text.includes('u13') || text.includes('u14')) {
+    return 70;
+  }
+  if (text.includes('cadete') || text.includes('cadet') || text.includes('u15') || text.includes('u16')) {
+    return 80;
+  }
+  return 90;
+}

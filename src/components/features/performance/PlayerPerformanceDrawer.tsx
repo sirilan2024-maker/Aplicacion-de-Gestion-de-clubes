@@ -5,11 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, User as UserIcon, X, Calendar, Activity, Clock, Flame, CheckCircle2, AlertCircle, TrendingUp, Target, ShieldAlert, AlertTriangle, Moon, Battery, Smile, Brain } from "lucide-react";
 
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
+import { getAuthorizedTeamWorkloadSummariesAction } from "@/app/actions/performance-portal-actions";
 import { isFormativeCategory } from "@/lib/utils";
 import { InformationalAlert, HooperRatings, DiscomfortDetails } from "@/lib/performance/wellness-service";
 import {
-  isTrainingSessionEligible,
-  calculateTrainingLoad,
+  CLOSED_SEASON_ID_25_26,
+  reconcilePlayerClubTrainingHistory,
   resolveOfficialMatchMinutes,
 } from "@/lib/performance/minutes-service";
 
@@ -50,9 +51,12 @@ export function PlayerPerformanceDrawer({
   const [events, setEvents] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: string; notes?: string }>>({});
+  const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
+  const [seasonStartDate, setSeasonStartDate] = useState<string | null>(null);
   const [teamCategory, setTeamCategory] = useState<string>('');
   const [teamName, setTeamName] = useState<string>('');
   const [playerInfo, setPlayerInfo] = useState<any>(null);
+  const [fetchedTrainingStats, setFetchedTrainingStats] = useState<any>(null);
   const [officialMatches, setOfficialMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,16 +74,40 @@ export function PlayerPerformanceDrawer({
         }
 
         if (!onlyFormative) {
-          // 1. Obtener temporada activa de forma dinámica
+          // 1. Obtener temporada activa de forma dinámica (excluyendo temporada cerrada 25/26)
           let activeSeasonId: string | null = null;
+          let activeSeasonStart: string | null = null;
           if (tData?.club_id) {
             const { data: seasonData } = await supabase
               .from('seasons')
-              .select('id')
+              .select('id, start_date')
               .eq('club_id', tData.club_id)
               .eq('is_active', true)
-              .single();
-            if (seasonData) activeSeasonId = seasonData.id;
+              .neq('id', CLOSED_SEASON_ID_25_26)
+              .maybeSingle();
+            if (seasonData) {
+              activeSeasonId = seasonData.id;
+              activeSeasonStart = seasonData.start_date || null;
+            }
+          }
+          setSeasonStartDate(activeSeasonStart);
+
+          // Si no se recibieron globalTrainingStats desde la vista padre, obtener el resumen multi-equipo autorizado
+          if (!globalTrainingStats) {
+            const summaryRes = await getAuthorizedTeamWorkloadSummariesAction(teamId, activeSeasonId, [playerId]);
+            const playerSummary = summaryRes.success ? summaryRes.data?.[playerId] : undefined;
+            if (playerSummary) {
+              setFetchedTrainingStats({
+                acuteLoad: playerSummary.acuteLoad,
+                chronicLoad: playerSummary.chronicLoad,
+                acwr: playerSummary.acwr,
+                trainingMinutes: playerSummary.contextTeamTrainingMinutes,
+                totalClubTrainingMinutes: playerSummary.totalClubTrainingMinutes,
+                totalTrainings: playerSummary.totalContextTrainings,
+                trainingsAttended: playerSummary.contextTrainingsAttended,
+                trainingAttendancePct: playerSummary.contextTrainingAttendancePct,
+              });
+            }
           }
 
           // 2. Eventos del equipo (entrenamientos)
@@ -101,6 +129,7 @@ export function PlayerPerformanceDrawer({
               .in('event_id', eventIds);
 
             if (attData) {
+              setAttendanceRows(attData);
               const attObj: Record<string, { status: string; notes?: string }> = {};
               attData.forEach(a => {
                 attObj[a.event_id] = { status: a.status, notes: a.notes || undefined };
@@ -123,7 +152,7 @@ export function PlayerPerformanceDrawer({
             convsQuery = convsQuery.eq('partidos.season_id', activeSeasonId);
           } else {
             // Guardia de aislamiento: excluir temporada 25/26 archivada
-            convsQuery = convsQuery.neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+            convsQuery = convsQuery.neq('partidos.season_id', CLOSED_SEASON_ID_25_26);
           }
 
           const { data: officialConvs } = await convsQuery.order('created_at', { ascending: false });
@@ -169,9 +198,55 @@ export function PlayerPerformanceDrawer({
       setLoading(false);
     };
     fetchData();
-  }, [playerId, teamId, onlyFormative]);
+  }, [playerId, teamId, onlyFormative, globalTrainingStats, globalMatchStats]);
+
+  const reconciledDrawer = reconcilePlayerClubTrainingHistory({
+    contextTeamId: teamId || null,
+    activeSeasonTeamIds: teamId ? [teamId] : [],
+    seasonStartDate,
+    teamEvents: events.map(ev => ({
+      id: ev.id,
+      team_id: ev.team_id || teamId,
+      date: ev.date,
+      start_time: ev.start_time,
+      end_time: ev.end_time,
+      event_type: ev.event_type,
+      title: ev.title,
+      status: ev.status,
+      estado: ev.estado,
+      is_cancelled: ev.is_cancelled,
+      cancelled: ev.cancelled,
+    })),
+    attendanceEntries: (attendanceRows.length > 0
+      ? attendanceRows
+      : Object.entries(attendanceMap).map(([event_id, val]) => ({
+          event_id,
+          status: val.status,
+          notes: val.notes,
+        }))
+    ).map(a => ({
+      event_id: a.event_id,
+      status: a.status,
+      notes: a.notes || undefined,
+    })),
+    metricEntries: metrics.map(mx => ({
+      event_id: mx.event_id,
+      metric_name: mx.club_metrics?.name ?? mx.metric?.name ?? null,
+      value: mx.value_number,
+    })),
+  });
 
   const isFormative = isFormativeCategory(teamCategory, teamName);
+  const effectiveTrainingStats = globalTrainingStats || fetchedTrainingStats || {
+    acuteLoad: reconciledDrawer.workload.acuteLoad,
+    chronicLoad: reconciledDrawer.workload.chronicLoad,
+    acwr: reconciledDrawer.workload.acwr,
+    trainingMinutes: reconciledDrawer.workload.contextTeamTrainingMinutes,
+    totalClubTrainingMinutes: reconciledDrawer.workload.totalClubTrainingMinutes,
+    totalTrainings: reconciledDrawer.contextAttendance.totalTrainings,
+    trainingsAttended: reconciledDrawer.contextAttendance.trainingsAttended,
+    trainingAttendancePct: reconciledDrawer.contextAttendance.attendancePct,
+  };
   const effectivePlayer = globalTrainingStats || globalMatchStats || playerInfo;
   const pName = effectivePlayer?.first_name ? `${effectivePlayer.first_name} ${effectivePlayer.last_name || ''}`.trim() : 'Ficha del Jugador';
   const avatarUrl = effectivePlayer?.avatar_url;
@@ -368,21 +443,27 @@ export function PlayerPerformanceDrawer({
               <div className="grid grid-cols-3 gap-2.5">
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">
                   <div className="text-xl sm:text-2xl font-black text-slate-900">
-                    {typeof globalTrainingStats?.acwr === 'number' ? globalTrainingStats.acwr.toFixed(2) : '-'}
+                    {typeof effectiveTrainingStats?.acwr === 'number' ? effectiveTrainingStats.acwr.toFixed(2) : '-'}
                   </div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">ACWR</div>
                 </div>
 
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">
                   <div className="text-xl sm:text-2xl font-black text-slate-900">
-                    {typeof globalTrainingStats?.trainingMinutes === 'number' ? `${globalTrainingStats.trainingMinutes}'` : '-'}
+                    {typeof effectiveTrainingStats?.trainingMinutes === 'number' ? `${effectiveTrainingStats.trainingMinutes}'` : '-'}
                   </div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">Mins Entreno</div>
+                  {typeof effectiveTrainingStats?.totalClubTrainingMinutes === 'number' &&
+                    effectiveTrainingStats.totalClubTrainingMinutes > (effectiveTrainingStats.trainingMinutes ?? 0) && (
+                      <div className="text-[9px] font-bold text-emerald-700 mt-0.5">
+                        Club: {effectiveTrainingStats.totalClubTrainingMinutes}&apos;
+                      </div>
+                    )}
                 </div>
 
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">
                   <div className="text-xl sm:text-2xl font-black text-slate-900">
-                    {typeof globalTrainingStats?.trainingAttendancePct === 'number' ? `${globalTrainingStats.trainingAttendancePct}%` : '-'}
+                    {typeof effectiveTrainingStats?.trainingAttendancePct === 'number' ? `${effectiveTrainingStats.trainingAttendancePct}%` : '-'}
                   </div>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">Asistencia</div>
                 </div>
@@ -403,20 +484,7 @@ export function PlayerPerformanceDrawer({
                 ) : (
                   <div className="space-y-3">
                     {(() => {
-                      const eligibleTrainings = events.filter(ev => {
-                        if (ev.event_type !== 'Entrenamiento') return false;
-                        const att = attendanceMap[ev.id];
-                        const hasMetricsForEv = metrics.some(
-                          mx => mx.event_id === ev.id && mx.value_number !== null && mx.value_number !== undefined
-                        );
-                        return isTrainingSessionEligible({
-                          eventDate: ev.date,
-                          eventStartTime: ev.start_time,
-                          attendanceStatus: att?.status ?? null,
-                          hasRealMetrics: hasMetricsForEv,
-                          event: ev,
-                        });
-                      });
+                      const eligibleTrainings = reconciledDrawer.contextTeamHistory;
 
                       if (eligibleTrainings.length === 0) {
                         return (
@@ -426,43 +494,39 @@ export function PlayerPerformanceDrawer({
                         );
                       }
 
-                      return eligibleTrainings.map(ev => {
-                        const m = metrics.filter(mx => mx.event_id === ev.id);
-                        const rpeVal = m.find(x => x.club_metrics?.name?.toLowerCase().includes('rpe'))?.value_number ?? null;
-                        const minVal = m.find(x => x.club_metrics?.name?.toLowerCase().includes('minutos'))?.value_number ?? null;
-                        const att = attendanceMap[ev.id];
-
-                        const hasAttendanceInfo = att !== undefined;
-
-                        // Carga sRPE = RPE * Minutos confirmados (solo si ambos existen y son válidos)
-                        const load = calculateTrainingLoad(rpeVal, minVal);
+                      return eligibleTrainings.map(session => {
+                        const rpeVal = session.rpe;
+                        const minVal = session.minutes;
+                        const load = session.load;
+                        const rawStatus = session.rawAttendanceStatus;
+                        const hasAttendanceInfo = rawStatus !== null && rawStatus !== undefined && rawStatus !== '';
 
                         return (
                           <div 
-                            key={ev.id} 
+                            key={session.id} 
                             className="p-3.5 border border-slate-100 rounded-2xl bg-white shadow-xs hover:border-slate-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                           >
                             <div className="min-w-0">
                               <div className="text-xs font-bold text-slate-800">
-                                {ev.date ? new Date(ev.date).toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '-'}
+                                {session.date ? new Date(session.date).toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '-'}
                               </div>
                               <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                                {ev.title || 'Sesión de entrenamiento'}
+                                {session.title || 'Sesión de entrenamiento'}
                               </div>
 
                               {/* Estado de Asistencia si está registrado */}
                               {hasAttendanceInfo && (
                                 <div className="mt-1 flex items-center gap-1.5 text-[10px]">
                                   <span className={`font-bold px-2 py-0.5 rounded-md ${
-                                    att.status?.toLowerCase().includes('present') 
+                                    rawStatus.toLowerCase().includes('present') 
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                                      : att.status?.toLowerCase().includes('retraso')
+                                      : rawStatus.toLowerCase().includes('retraso')
                                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                       : 'bg-rose-50 text-rose-700 border border-rose-200'
                                   }`}>
-                                    {att.status}
+                                    {rawStatus}
                                   </span>
-                                  {att.notes && <span className="text-slate-400 italic truncate">({att.notes})</span>}
+                                  {session.attendanceNotes && <span className="text-slate-400 italic truncate">({session.attendanceNotes})</span>}
                                 </div>
                               )}
                             </div>

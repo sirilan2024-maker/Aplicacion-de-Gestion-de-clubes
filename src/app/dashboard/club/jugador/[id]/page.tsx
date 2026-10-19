@@ -22,11 +22,16 @@ import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
 import {
+  CLOSED_SEASON_ID_25_26,
+  computeConfirmedAttendancePercentage,
   isConfirmedAttendanceStatus,
   isTrainingSessionEligible,
-  aggregatePlayerMultiTeamWorkload,
+  reconcilePlayerClubTrainingHistory,
   resolveOfficialMatchMinutes,
-  MultiTeamSessionInput,
+  resolveVerifiedActiveSeasonTeamIds,
+  RawTrainingAttendanceSource,
+  RawTrainingEventSource,
+  RawTrainingMetricSource,
 } from "@/lib/performance/minutes-service";
 
 interface PlayerData {
@@ -138,6 +143,10 @@ export default function GlobalPlayerProfilePage() {
 
   // ACWR & History State
   const [acwrData, setAcwrData] = useState<{ acute: number, chronic: number, acwr: number } | null>(null);
+  const [trainingMinutesSummary, setTrainingMinutesSummary] = useState<{
+    contextTeamMinutes: number;
+    totalClubMinutes: number;
+  }>({ contextTeamMinutes: 0, totalClubMinutes: 0 });
   const [trainingHistory, setTrainingHistory] = useState<any[]>([]);
   const [matchHistory, setMatchHistory] = useState<any[]>([]);
   const [statsViewMode, setStatsViewMode] = useState<'entrenamientos' | 'partidos'>('entrenamientos');
@@ -256,37 +265,73 @@ export default function GlobalPlayerProfilePage() {
   const fetchPlayerACWR = async () => {
     const supabase = createClient();
     try {
-      const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
-      const teamId = pData?.team_id;
+      const { data: pData } = await supabase
+        .from('players')
+        .select('team_id, club_id')
+        .eq('id', playerId)
+        .single();
+      const teamId = pData?.team_id || null;
+      const clubId = pData?.club_id || null;
+
+      // 0. Resolver temporada activa del club y equipos activos (excluyendo siempre la temporada cerrada 25/26)
+      let activeSeasonId: string | null = null;
+      let seasonStartDate: string | null = null;
+      let activeSeasonTeamIds = new Set<string>();
+      let verifiedContextTeamId: string | null = null;
+
+      if (clubId) {
+        const { data: activeSeason } = await supabase
+          .from('seasons')
+          .select('id, start_date')
+          .eq('club_id', clubId)
+          .eq('is_active', true)
+          .neq('id', CLOSED_SEASON_ID_25_26)
+          .maybeSingle();
+
+        if (activeSeason) {
+          activeSeasonId = activeSeason.id;
+          seasonStartDate = activeSeason.start_date || null;
+        }
+
+        let teamsQuery = supabase
+          .from('teams')
+          .select('id, club_id, season_id')
+          .eq('club_id', clubId)
+          .neq('season_id', CLOSED_SEASON_ID_25_26);
+
+        if (activeSeasonId) {
+          teamsQuery = teamsQuery.eq('season_id', activeSeasonId);
+        }
+
+        const { data: activeTeams } = await teamsQuery;
+        const resolved = resolveVerifiedActiveSeasonTeamIds({
+          clubId,
+          activeSeasonId,
+          candidateTeams: activeTeams || [],
+          playerTeamId: teamId,
+        });
+        activeSeasonTeamIds = resolved.activeSeasonTeamIds;
+        verifiedContextTeamId = resolved.verifiedContextTeamId;
+      }
 
       // 1. Obtener métricas de entrenamiento (RPE y Minutos) del jugador
       const { data: pMetrics } = await supabase
         .from('player_training_metrics')
-        .select('event_id, value_number, metric:club_metrics(name), event:team_events(*)')
+        .select('event_id, value_number, metric:club_metrics(name), event:team_events(*, teams(club_id, season_id))')
         .eq('player_id', playerId);
 
-      const metricsMap = new Map<string, { rpe?: number; minutes?: number; event?: any }>();
-      (pMetrics || []).forEach((m: any) => {
-        const evId = m.event_id;
-        if (!metricsMap.has(evId)) metricsMap.set(evId, {});
-        const entry = metricsMap.get(evId)!;
-        if (m.event && !entry.event) {
-          entry.event = m.event;
-        }
-        const metricName = (m.metric?.name || '').toLowerCase();
-        if (metricName.includes('rpe')) {
-          entry.rpe = m.value_number;
-        } else if (metricName.includes('minut')) {
-          entry.minutes = m.value_number;
-        }
-      });
-
       // 2. Partidos, Convocatorias y Eventos de Acta (NUNCA de la temporada cerrada 25/26)
-      const { data: convocatoriasData } = await supabase
+      let convsQuery = supabase
         .from('convocatorias')
         .select('*, partidos:partido_id!inner(*)')
         .eq('player_id', playerId)
-        .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+        .neq('partidos.season_id', CLOSED_SEASON_ID_25_26);
+
+      if (activeSeasonId) {
+        convsQuery = convsQuery.eq('partidos.season_id', activeSeasonId);
+      }
+
+      const { data: convocatoriasData } = await convsQuery;
 
       const { data: pMatchEvents } = await supabase
         .from('match_events')
@@ -294,12 +339,18 @@ export default function GlobalPlayerProfilePage() {
         .eq('player_id', playerId);
 
       let teamMatches: any[] = [];
-      if (teamId) {
-        const { data: tm } = await supabase
+      if (verifiedContextTeamId) {
+        let tmQuery = supabase
           .from('partidos')
           .select('*')
-          .eq('equipo_id', teamId)
-          .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
+          .eq('equipo_id', verifiedContextTeamId)
+          .neq('season_id', CLOSED_SEASON_ID_25_26);
+
+        if (activeSeasonId) {
+          tmQuery = tmQuery.eq('season_id', activeSeasonId);
+        }
+
+        const { data: tm } = await tmQuery;
         if (tm) teamMatches = tm;
       }
 
@@ -313,6 +364,9 @@ export default function GlobalPlayerProfilePage() {
       if (convocatoriasData) {
         convocatoriasData.forEach(c => {
           if (c.partidos) {
+            if (c.partidos.season_id === CLOSED_SEASON_ID_25_26) return;
+            if (activeSeasonId && c.partidos.season_id && c.partidos.season_id !== activeSeasonId) return;
+
             const isPlayed = c.partidos.estado === 'Finalizado';
             const mEvs = (pMatchEvents || []).filter((e: any) => e.partido_id === c.partido_id);
             const rawG = c.goals ?? c.goles;
@@ -414,21 +468,28 @@ export default function GlobalPlayerProfilePage() {
       // Orden del más cercano en fecha al más lejano
       mHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      // 3. Entrenamientos, Asistencia y ACWR (unificado con Europe/Madrid y ventanas de 7/28 días)
+      // 3. Entrenamientos, Asistencia y ACWR (unificado con Europe/Madrid, pre-fusión por eventId y separación equipo vs club)
       const { data: attData } = await supabase
         .from('attendance')
-        .select('*, events:event_id(*)')
+        .select('*, events:event_id(*, teams(club_id, season_id))')
         .eq('player_id', playerId);
 
       let teamEvents: any[] = [];
-      if (teamId) {
-        const { data: te } = await supabase.from('team_events').select('*').eq('team_id', teamId).eq('event_type', 'Entrenamiento');
+      if (verifiedContextTeamId) {
+        let teQuery = supabase
+          .from('team_events')
+          .select('*')
+          .eq('team_id', verifiedContextTeamId)
+          .eq('event_type', 'Entrenamiento');
+
+        if (seasonStartDate) {
+          teQuery = teQuery.gte('date', seasonStartDate);
+        }
+
+        const { data: te } = await teQuery;
         if (te) teamEvents = te;
       }
 
-      const tHistory: any[] = [];
-      const multiTeamSessions: MultiTeamSessionInput[] = [];
-      const processedEvents = new Set<string>();
       const now = new Date();
 
       const formatAttendanceLabel = (rawStatus: string | null | undefined): string => {
@@ -440,77 +501,99 @@ export default function GlobalPlayerProfilePage() {
         return 'Pendiente';
       };
 
-      const registerTrainingEvent = (ev: any, rawAttStatus: string | null | undefined) => {
-        const evId = ev?.id;
-        if (!evId || processedEvents.has(evId) || ev.event_type !== 'Entrenamiento') return;
+      const rawTeamEventSources: RawTrainingEventSource[] = teamEvents.map((e: any) => ({
+        id: e.id,
+        team_id: e.team_id || verifiedContextTeamId,
+        season_id: activeSeasonId,
+        date: e.date || e.start_time,
+        start_time: e.start_time,
+        end_time: e.end_time,
+        event_type: e.event_type,
+        title: e.title,
+        status: e.status,
+        estado: e.estado,
+        is_cancelled: e.is_cancelled,
+        cancelled: e.cancelled,
+      }));
 
-        const met = metricsMap.get(evId);
-        const rpe = met?.rpe ?? null;
-        const mins = met?.minutes ?? null;
-        const hasRealMetrics = (rpe !== null && rpe !== undefined) || (mins !== null && mins !== undefined);
-
-        const isEligible = isTrainingSessionEligible({
-          eventDate: ev.date || ev.start_time,
-          eventStartTime: ev.start_time,
-          attendanceStatus: rawAttStatus ?? null,
-          hasRealMetrics,
-          event: ev,
-          now,
-        });
-
-        processedEvents.add(evId);
-        if (!isEligible) return;
-
-        multiTeamSessions.push({
-          eventId: evId,
-          teamId: ev.team_id || teamId || null,
-          date: ev.date || ev.start_time,
-          startTime: ev.start_time,
-          rpe,
-          minutes: mins,
-          attendanceStatus: rawAttStatus ?? null,
-          event: ev,
-        });
-
-        tHistory.push({
-          ...ev,
-          id: evId,
-          date: ev.date || ev.start_time,
-          title: ev.title || 'Entrenamiento',
-          attendance: formatAttendanceLabel(rawAttStatus),
-          rpe,
-          minutes: mins,
-        });
-      };
-
-      if (attData) {
-        attData.forEach((a) => {
-          if (a.events && a.events.event_type === 'Entrenamiento') {
-            registerTrainingEvent(
-              { ...a.events, id: a.event_id || a.events.id },
-              a.status
-            );
-          }
-        });
-      }
-
-      teamEvents.forEach((e) => {
-        registerTrainingEvent(e, null);
+      const rawAttendanceSources: RawTrainingAttendanceSource[] = (attData || []).map((a: any) => {
+        const ev = a.events as any;
+        const evTeam = ev?.teams as any;
+        return {
+          event_id: a.event_id || ev?.id,
+          player_id: playerId,
+          status: a.status,
+          event: ev
+            ? {
+                id: a.event_id || ev.id,
+                team_id: ev.team_id,
+                season_id: evTeam?.season_id ?? null,
+                date: ev.date || ev.start_time,
+                start_time: ev.start_time,
+                end_time: ev.end_time,
+                event_type: ev.event_type,
+                title: ev.title,
+                status: ev.status,
+                estado: ev.estado,
+                is_cancelled: ev.is_cancelled,
+                cancelled: ev.cancelled,
+              }
+            : null,
+        };
       });
 
-      metricsMap.forEach((entry, evId) => {
-        if (entry.event && !processedEvents.has(evId)) {
-          registerTrainingEvent({ ...entry.event, id: evId }, null);
-        }
+      const rawMetricSources: RawTrainingMetricSource[] = (pMetrics || []).map((m: any) => {
+        const ev = m.event as any;
+        const evTeam = ev?.teams as any;
+        return {
+          event_id: m.event_id || ev?.id,
+          player_id: playerId,
+          metric_name: (m.metric as any)?.name ?? null,
+          value: m.value_number,
+          event: ev
+            ? {
+                id: m.event_id || ev.id,
+                team_id: ev.team_id,
+                season_id: evTeam?.season_id ?? null,
+                date: ev.date || ev.start_time,
+                start_time: ev.start_time,
+                end_time: ev.end_time,
+                event_type: ev.event_type,
+                title: ev.title,
+                status: ev.status,
+                estado: ev.estado,
+                is_cancelled: ev.is_cancelled,
+                cancelled: ev.cancelled,
+              }
+            : null,
+        };
       });
 
-      tHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      // Calcular ratio ACWR biológico unificado (7 días / 7 y 28 días / 28 en Europe/Madrid)
-      const workloadSummary = aggregatePlayerMultiTeamWorkload({
-        sessions: multiTeamSessions,
-        contextTeamId: teamId || null,
+      const reconciled = reconcilePlayerClubTrainingHistory({
+        contextTeamId: verifiedContextTeamId,
+        activeSeasonTeamIds,
+        seasonStartDate,
+        teamEvents: rawTeamEventSources,
+        attendanceEntries: rawAttendanceSources,
+        metricEntries: rawMetricSources,
         now,
+      });
+
+      const tHistory = reconciled.contextTeamHistory.map(item => ({
+        id: item.id,
+        team_id: item.teamId,
+        date: item.date,
+        title: item.title,
+        attendance: formatAttendanceLabel(item.status),
+        rpe: item.rpe,
+        minutes: item.minutes,
+      }));
+
+      const workloadSummary = reconciled.workload;
+
+      setTrainingMinutesSummary({
+        contextTeamMinutes: workloadSummary.contextTeamTrainingMinutes,
+        totalClubMinutes: workloadSummary.totalClubTrainingMinutes,
       });
 
       if (workloadSummary.acwr !== null) {
@@ -541,33 +624,112 @@ export default function GlobalPlayerProfilePage() {
     setAttendanceLoading(true);
     const supabase = createClient();
     try {
-      const { data: pData } = await supabase.from('players').select('team_id').eq('id', playerId).single();
-      const teamId = pData?.team_id;
+      const { data: pData } = await supabase
+        .from('players')
+        .select('team_id, club_id')
+        .eq('id', playerId)
+        .single();
+      const teamId = pData?.team_id || null;
+      const clubId = pData?.club_id || null;
+
+      let activeSeasonId: string | null = null;
+      let seasonStartDate: string | null = null;
+      let verifiedTeamId: string | null = null;
+
+      if (clubId) {
+        const { data: activeSeason } = await supabase
+          .from('seasons')
+          .select('id, start_date')
+          .eq('club_id', clubId)
+          .eq('is_active', true)
+          .neq('id', CLOSED_SEASON_ID_25_26)
+          .maybeSingle();
+
+        if (activeSeason) {
+          activeSeasonId = activeSeason.id;
+          seasonStartDate = activeSeason.start_date || null;
+        }
+
+        if (teamId) {
+          let teamCheckQuery = supabase
+            .from('teams')
+            .select('id, club_id, season_id')
+            .eq('id', teamId)
+            .eq('club_id', clubId)
+            .neq('season_id', CLOSED_SEASON_ID_25_26);
+
+          if (activeSeasonId) {
+            teamCheckQuery = teamCheckQuery.eq('season_id', activeSeasonId);
+          }
+
+          const { data: validTeam } = await teamCheckQuery.maybeSingle();
+          const resolved = resolveVerifiedActiveSeasonTeamIds({
+            clubId,
+            activeSeasonId,
+            candidateTeams: validTeam ? [validTeam] : [],
+            playerTeamId: teamId,
+          });
+          verifiedTeamId = resolved.verifiedContextTeamId;
+        }
+      }
 
       let allEvents: any[] = [];
-      if (teamId) {
-        const { data: tEvents } = await supabase.from('team_events').select('*').eq('team_id', teamId);
+      if (verifiedTeamId) {
+        let tEventsQuery = supabase.from('team_events').select('*').eq('team_id', verifiedTeamId);
+        if (seasonStartDate) {
+          tEventsQuery = tEventsQuery.gte('date', seasonStartDate);
+        }
+        const { data: tEvents } = await tEventsQuery;
         if (tEvents) allEvents = [...tEvents];
       }
 
       const { data: atts } = await supabase
         .from('attendance')
-        .select('*, events:event_id(*)')
+        .select('*, events:event_id(*, teams(club_id, season_id))')
         .eq('player_id', playerId);
-        
-      setPlayerAttendance(atts || []);
 
-      if (atts) {
-        atts.forEach(a => {
-          if (a.events && !allEvents.find(e => e.id === a.event_id)) {
-            allEvents.push(a.events);
-          }
-        });
-      }
+      // Filtrar estrictamente a los eventos del equipo principal verificado en la temporada activa (sin mezclar otros equipos ni temporadas pasadas)
+      const validAtts = (atts || []).filter((a: any) => {
+        if (!verifiedTeamId) return false;
+        const ev = a.events as any;
+        if (!ev) return true;
+        const evTeam = ev.teams as any;
+        if (evTeam?.season_id === CLOSED_SEASON_ID_25_26) return false;
+        if (activeSeasonId && evTeam?.season_id && evTeam.season_id !== activeSeasonId) return false;
+        if (ev.team_id && ev.team_id !== verifiedTeamId) return false;
+        if (seasonStartDate && ev.date && String(ev.date).slice(0, 10) < String(seasonStartDate).slice(0, 10)) {
+          return false;
+        }
+        return true;
+      });
+
+      setPlayerAttendance(validAtts);
+
+      validAtts.forEach((a: any) => {
+        const ev = a.events as any;
+        if (ev && verifiedTeamId && ev.team_id === verifiedTeamId && !allEvents.find(e => e.id === a.event_id)) {
+          allEvents.push(ev);
+        }
+      });
+
+      const now = new Date();
+      const eligibleEvents = allEvents.filter(ev => {
+        if (ev.event_type === 'Entrenamiento') {
+          const attRec = validAtts.find((a: any) => a.event_id === ev.id);
+          return isTrainingSessionEligible({
+            eventDate: ev.date || ev.start_time,
+            eventStartTime: ev.start_time,
+            attendanceStatus: attRec?.status ?? null,
+            event: ev,
+            now,
+          });
+        }
+        return true;
+      });
       
       // Orden del más cercano en fecha al más lejano
-      allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      setPlayerEvents(allEvents);
+      eligibleEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setPlayerEvents(eligibleEvents);
     } catch (err) {
       console.error(err);
     } finally {
@@ -1699,6 +1861,17 @@ export default function GlobalPlayerProfilePage() {
                             <span className="text-sm font-bold text-slate-600 uppercase">Carga Crónica (28 días)</span>
                             <span className="text-2xl font-black text-slate-900">{Math.round(acwrData.chronic)}</span>
                           </div>
+                          <div className="flex justify-between items-center bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                            <span className="text-sm font-bold text-slate-600 uppercase">Minutos Entreno (Equipo)</span>
+                            <div className="text-right">
+                              <span className="text-2xl font-black text-slate-900">{trainingMinutesSummary.contextTeamMinutes}&apos;</span>
+                              {trainingMinutesSummary.totalClubMinutes > trainingMinutesSummary.contextTeamMinutes && (
+                                <span className="block text-xs font-bold text-emerald-700">
+                                  Total Club: {trainingMinutesSummary.totalClubMinutes}&apos;
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         
                         <div className="flex-1 w-full flex flex-col items-center justify-center border-l-0 md:border-l border-slate-200 py-4">
@@ -1988,11 +2161,10 @@ export default function GlobalPlayerProfilePage() {
               const filteredEventIds = filteredEvents.map(e => e.id);
               const filteredAttendance = playerAttendance.filter(a => filteredEventIds.includes(a.event_id));
 
-              const presents = filteredAttendance.filter(a => ['presente', 'present', 'justificado', 'excused', 'lesionado'].includes(a.status?.toLowerCase())).length;
               const retrasos = filteredAttendance.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
               const absents = filteredAttendance.filter(a => ['ausente', 'absent'].includes(a.status?.toLowerCase())).length;
               const excused = filteredAttendance.filter(a => a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused').length;
-              const pct = totalEvents > 0 ? Math.round(((presents + retrasos) / totalEvents) * 100) : 0;
+              const { pct } = computeConfirmedAttendancePercentage(filteredEvents, filteredAttendance);
 
               const faltasDetalle = filteredEvents.filter(ev => {
                 const rec = filteredAttendance.find(a => a.event_id === ev.id || a.date === ev.date);

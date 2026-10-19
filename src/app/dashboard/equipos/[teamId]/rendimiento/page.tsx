@@ -7,6 +7,7 @@ import { Loader2, Activity, Calendar, Clock, TrendingUp, User as UserIcon, Targe
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer";
 import { getTeamFormativeOverview, TeamPlayerFormativeSummary } from "@/app/actions/formative-actions";
 import { getAuthorizedTeamWellnessSummary } from "@/app/actions/feedback-actions";
+import { getAuthorizedTeamWorkloadSummariesAction } from "@/app/actions/performance-portal-actions";
 import { useSeason } from "@/components/providers/SeasonProvider";
 import { isFormativeCategory } from "@/lib/utils";
 import { generateInformationalAlerts, InformationalAlert, HooperRatings, DiscomfortDetails, getSpainDateString } from "@/lib/performance/wellness-service";
@@ -64,6 +65,7 @@ interface TrainingStats {
   chronicLoad: number;
   acwr: number | null;
   trainingMinutes: number;
+  totalClubTrainingMinutes: number;
   totalTrainings: number;
   trainingsAttended: number;
   trainingAttendancePct: number;
@@ -259,6 +261,15 @@ export default function RendimientoGlobalPage() {
       const tResults: TrainingStats[] = [];
       const mResults: MatchStats[] = [];
 
+      // 6. Consultar agregados autorizados de carga multi-equipo en servidor (sin exponer eventos de otros equipos)
+      const workloadSummariesRes = await getAuthorizedTeamWorkloadSummariesAction(
+        teamId,
+        currentSeasonId || null,
+        players.map(p => p.id)
+      );
+      if (checkCancelled() || reqId !== requestIdRef.current) return;
+      const serverWorkloads = workloadSummariesRes.success ? workloadSummariesRes.data : undefined;
+
       for (const p of players) {
         // --- TRAINING STATS ---
         const playerAtt = attendanceData.filter(a => a.player_id === p.id);
@@ -298,11 +309,13 @@ export default function RendimientoGlobalPage() {
           };
         });
 
-        const workloadSummary = aggregatePlayerMultiTeamWorkload({
+        const fallbackWorkload = aggregatePlayerMultiTeamWorkload({
           sessions: multiTeamSessions,
           contextTeamId: teamId,
           now: today,
         });
+
+        const serverPlayerWorkload = serverWorkloads?.[p.id];
 
         tResults.push({
           id: p.id,
@@ -310,13 +323,18 @@ export default function RendimientoGlobalPage() {
           last_name: p.last_name,
           dorsal: p.dorsal,
           avatar_url: p.avatar_url,
-          acuteLoad: workloadSummary.acuteLoad,
-          chronicLoad: workloadSummary.chronicLoad,
-          acwr: workloadSummary.acwr,
-          trainingMinutes: workloadSummary.contextTeamTrainingMinutes,
-          totalTrainings,
-          trainingsAttended: tPresents,
-          trainingAttendancePct: tPct
+          acuteLoad: serverPlayerWorkload ? serverPlayerWorkload.acuteLoad : fallbackWorkload.acuteLoad,
+          chronicLoad: serverPlayerWorkload ? serverPlayerWorkload.chronicLoad : fallbackWorkload.chronicLoad,
+          acwr: serverPlayerWorkload ? serverPlayerWorkload.acwr : fallbackWorkload.acwr,
+          trainingMinutes: serverPlayerWorkload
+            ? serverPlayerWorkload.contextTeamTrainingMinutes
+            : fallbackWorkload.contextTeamTrainingMinutes,
+          totalClubTrainingMinutes: serverPlayerWorkload
+            ? serverPlayerWorkload.totalClubTrainingMinutes
+            : fallbackWorkload.totalClubTrainingMinutes,
+          totalTrainings: serverPlayerWorkload ? serverPlayerWorkload.totalContextTrainings : totalTrainings,
+          trainingsAttended: serverPlayerWorkload ? serverPlayerWorkload.contextTrainingsAttended : tPresents,
+          trainingAttendancePct: serverPlayerWorkload ? serverPlayerWorkload.contextTrainingAttendancePct : tPct
         });
 
         // --- MATCH STATS (From Official Convocatorias / Actas FFCV) ---
@@ -1159,6 +1177,11 @@ export default function RendimientoGlobalPage() {
                           <span className="text-[10px] font-bold text-slate-500 uppercase">Mins.</span>
                         </div>
                         <span className="font-black text-slate-900">{player.trainingMinutes}</span>
+                        {player.totalClubTrainingMinutes > player.trainingMinutes && (
+                          <span className="text-[9px] font-bold text-emerald-700 mt-0.5">
+                            Club: {player.totalClubTrainingMinutes}&apos;
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -283,7 +283,7 @@ async function run() {
     }
     assert(uniqueViolation, 'PostgreSQL rechaza inserción duplicada en la misma fecha para el mismo jugador (UNIQUE player_id, date)');
 
-    // 6.4 Feedback post-sesión: RPE fuera de rango (rpe = 11)
+    // 6.4 Feedback post-sesión: RPE fuera de rango (rpe = 11 y rpe = -1)
     let rpeViolation = false;
     try {
       await adminClient.query(`
@@ -294,15 +294,34 @@ async function run() {
     } catch (e: any) {
       rpeViolation = e.code === '23514';
     }
-    assert(rpeViolation, 'PostgreSQL rechaza RPE fuera de rango (rpe = 11)');
+    assert(rpeViolation, 'PostgreSQL rechaza RPE fuera de rango superior (rpe = 11)');
 
-    // 6.5 Feedback post-sesión válido
+    let rpeNegativeViolation = false;
+    try {
+      await adminClient.query(`
+        INSERT INTO public.player_session_feedback 
+          (club_id, event_id, player_id, rpe, minutes_played)
+        VALUES ('${uClubA}', '${uEvent1}', '${uPlayer1}', -1, 0);
+      `);
+    } catch (e: any) {
+      rpeNegativeViolation = e.code === '23514';
+    }
+    assert(rpeNegativeViolation, 'PostgreSQL rechaza RPE negativo fuera de rango (rpe = -1)');
+
+    // 6.5 Feedback post-sesión válido (RPE = 8 y RPE = 0)
     await adminClient.query(`
       INSERT INTO public.player_session_feedback 
         (club_id, event_id, player_id, rpe, minutes_played, training_load)
       VALUES ('${uClubA}', '${uEvent1}', '${uPlayer1}', 8, 75, 600);
     `);
     assert(true, 'PostgreSQL acepta feedback post-sesión válido con cálculo sRPE');
+
+    await adminClient.query(`
+      INSERT INTO public.player_session_feedback 
+        (club_id, event_id, player_id, rpe, minutes_played, training_load)
+      VALUES ('${uClubA}', '${uEvent1}', '${uPlayer2}', 0, 0, 0);
+    `);
+    assert(true, 'PostgreSQL acepta feedback post-sesión con RPE = 0 y minutos = 0 (reposo)');
 
     // 7. PRUEBAS DE POLÍTICAS RLS (Row Level Security)
     console.log('\n--- 2. Pruebas de Políticas RLS y Aislamiento de Autorización ---');
@@ -494,6 +513,35 @@ async function run() {
     await setAuthUser(rlsClient, uCoachA2);
     const unassignedCoachFeedSelect = await rlsClient.query(`SELECT COUNT(*) FROM public.player_session_feedback WHERE player_id = '${uPlayer1}';`);
     assert(parseInt(unassignedCoachFeedSelect.rows[0].count) === 0, 'Entrenador no asignado NO ve el feedback post-sesión de jugadores ajenos');
+
+    // Tutor legal (uTutor1) NO puede cambiar validation_status a 'confirmed'
+    await setAuthUser(rlsClient, uTutor1);
+    let tutorConfirmBlocked = false;
+    try {
+      await rlsClient.query(`
+        UPDATE public.player_session_feedback
+        SET validation_status = 'confirmed'
+        WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+      `);
+    } catch (e: any) {
+      tutorConfirmBlocked = e.code === '42501';
+    }
+    assert(tutorConfirmBlocked, 'RLS bloquea que el tutor/jugador cambie validation_status a confirmed');
+
+    // Entrenador asignado (uCoachA1) SÍ puede cambiar validation_status a 'confirmed'
+    await setAuthUser(rlsClient, uCoachA1);
+    let coachConfirmSucceeded = false;
+    try {
+      await rlsClient.query(`
+        UPDATE public.player_session_feedback
+        SET validation_status = 'confirmed'
+        WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+      `);
+      coachConfirmSucceeded = true;
+    } catch (e: any) {
+      coachConfirmSucceeded = false;
+    }
+    assert(coachConfirmSucceeded, 'RLS permite al entrenador asignado cambiar validation_status a confirmed');
 
     await rlsClient.end();
 

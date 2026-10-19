@@ -121,10 +121,15 @@ export async function saveMatchStats(
         .from('convocatorias')
         .update({
           minutos_jugados: playerStats.minutos_jugados,
+          minutes_played: playerStats.minutos_jugados,
           goles: playerStats.goles,
+          goals: playerStats.goles,
           asistencias: playerStats.asistencias,
+          assists: playerStats.asistencias,
           tarjetas_amarillas: playerStats.tarjetas_amarillas,
-          tarjetas_rojas: playerStats.tarjetas_rojas
+          yellow_cards: playerStats.tarjetas_amarillas,
+          tarjetas_rojas: playerStats.tarjetas_rojas,
+          red_cards: playerStats.tarjetas_rojas
         })
         .eq('partido_id', partidoId)
         .eq('player_id', playerId)

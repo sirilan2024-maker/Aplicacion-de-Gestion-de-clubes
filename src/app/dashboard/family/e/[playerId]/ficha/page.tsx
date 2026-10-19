@@ -18,6 +18,7 @@ import Subscriptions from "@/components/features/treasury/Subscriptions";
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
+import { getOfficialMatchDuration } from "@/lib/utils";
 
 interface PlayerData {
   id: string;
@@ -207,14 +208,14 @@ export default function PlayerProfilePage() {
   const fetchPlayerACWR = async () => {
     const supabase = createClient();
     try {
-      const { data: pData } = await supabase.from('players').select('team_id, teams:team_id(name)').eq('id', playerId).single();
+      const { data: pData } = await supabase.from('players').select('team_id, teams:team_id(id, name, category)').eq('id', playerId).single();
       const teamId = pData?.team_id;
       const currentTeamName = (pData?.teams as any)?.name || 'Sporting Saladar';
 
       // Partidos y Convocatorias (NUNCA de la temporada cerrada 25/26)
       const { data: convocatoriasData } = await supabase
         .from('convocatorias')
-        .select('*, partidos:partido_id!inner(*)')
+        .select('*, partidos:partido_id!inner(*, equipo:teams(id, name, category))')
         .eq('player_id', playerId)
         .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
@@ -249,8 +250,10 @@ export default function PlayerProfilePage() {
             const gCount = !isPlayed ? 0 : Number(c.goals ?? c.goles ?? mEvs.filter(isLegitGoal).length);
             const yCount = !isPlayed ? 0 : Number(c.yellow_cards ?? c.tarjetas_amarillas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length);
             const rCount = !isPlayed ? 0 : Number(c.red_cards ?? c.tarjetas_rojas ?? mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length);
+            const teamCat = `${c.partidos?.equipo?.category || ''} ${c.partidos?.equipo?.name || ''} ${(pData?.teams as any)?.category || ''} ${currentTeamName}`;
+            const defaultStarterMins = getOfficialMatchDuration(teamCat);
             const rawM = c.minutes_played ?? c.minutos_jugados;
-            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 90 : 0);
+            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? defaultStarterMins : 0);
 
             const isLocal = c.partidos.lugar === 'Local' || (c.partidos.lugar !== 'Visitante' && !/\b(fuera|visitante)\b/i.test(c.partidos.lugar || ''));
             const baseTitle = isLocal

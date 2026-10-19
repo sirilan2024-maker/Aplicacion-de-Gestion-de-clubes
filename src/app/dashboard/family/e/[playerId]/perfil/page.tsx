@@ -17,6 +17,7 @@ import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal"
 import { getApparelForPlayerAction } from "@/app/actions/apparel-actions"
 import { Shirt, Shield } from "lucide-react"
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar"
+import { getOfficialMatchDuration } from "@/lib/utils"
 
 export default function PlayerDashboardPage() {
   const router = useRouter()
@@ -107,10 +108,12 @@ export default function PlayerDashboardPage() {
       const rawR = c.red_cards ?? c.tarjetas_rojas;
       const r = (rawR !== null && rawR !== undefined) ? Number(rawR) : mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
 
+      const teamCat = `${c.partidos?.equipo?.category || ''} ${c.partidos?.equipo?.name || ''}`;
+      const defaultStarterMins = getOfficialMatchDuration(teamCat);
       const rawM = c.minutes_played ?? c.minutos_jugados;
       const m = (rawM !== null && rawM !== undefined)
         ? Number(rawM)
-        : (c.titular ? 90 : 0);
+        : (c.titular ? defaultStarterMins : 0);
 
       goals += g;
       yellowCards += y;
@@ -289,10 +292,12 @@ export default function PlayerDashboardPage() {
             const rawR = c.red_cards ?? c.tarjetas_rojas;
             const r = (rawR !== null && rawR !== undefined) ? Number(rawR) : mEvs.filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
 
+            const teamCat = `${c.partidos?.equipo?.category || ''} ${c.partidos?.equipo?.name || ''}`;
+            const defaultStarterMins = getOfficialMatchDuration(teamCat);
             const rawM = c.minutes_played ?? c.minutos_jugados;
             const m = (rawM !== null && rawM !== undefined)
               ? Number(rawM)
-              : (c.titular ? 90 : 0);
+              : (c.titular ? defaultStarterMins : 0);
 
             goals += g;
             yellowCards += y;

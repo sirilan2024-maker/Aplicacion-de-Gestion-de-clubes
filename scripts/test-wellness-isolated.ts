@@ -165,6 +165,25 @@ console.log('\n4. Validación de Feedback Post-Entrenamiento:');
   assert(pendingMinutesFeedback.cleanData?.trainingLoad === null, 'Carga sRPE queda null si minutos están ausentes');
   assert(pendingMinutesFeedback.cleanData?.loadStatus === 'pending_minutes', 'Estado de carga marcado como pending_minutes');
 
+  const zeroRpeFeedback = validateSessionFeedbackInput({
+    eventId: 'ev-1',
+    playerId: 'p-1',
+    rpe: 0,
+    minutes: 0,
+    hasDiscomfort: false,
+  });
+  assert(zeroRpeFeedback.isValid === true, 'Acepta RPE 0 y minutos 0 como válidos (reposo / no participación)');
+  assert(zeroRpeFeedback.cleanData?.trainingLoad === 0, 'Calcula carga de entrenamiento 0 cuando RPE es 0 y minutos es 0');
+  assert(zeroRpeFeedback.cleanData?.loadStatus === 'calculated', 'Estado de carga calculated para RPE 0 y minutos 0');
+
+  const negativeRpe = validateSessionFeedbackInput({
+    eventId: 'ev-1',
+    playerId: 'p-1',
+    rpe: -1,
+    minutes: 60,
+  });
+  assert(negativeRpe.isValid === false, 'Rechaza RPE menor que 0 (rpe = -1)');
+
   const invalidRpe = validateSessionFeedbackInput({
     eventId: 'ev-1',
     playerId: 'p-1',

@@ -144,7 +144,7 @@ function MinutosPageContent() {
         while (true) {
           const { data: convs, error } = await supabase
             .from('convocatorias')
-            .select('player_id, minutes_played, partidos!inner(equipo_id, estado, season_id)')
+            .select('player_id, minutes_played, minutos_jugados, partidos!inner(equipo_id, estado, season_id)')
             .in('partidos.equipo_id', teamIds)
             .eq('partidos.estado', 'Finalizado')
             .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
@@ -189,7 +189,7 @@ function MinutosPageContent() {
       matchMinutes.forEach(row => {
         const p = playerMap.get(row.player_id)
         if (p) {
-          const mins = row.minutes_played || 0
+          const mins = row.minutes_played ?? row.minutos_jugados ?? 0
           p.matchMinutes += mins
         }
       })

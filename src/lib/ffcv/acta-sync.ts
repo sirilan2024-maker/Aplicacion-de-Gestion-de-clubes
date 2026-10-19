@@ -294,7 +294,7 @@ export async function syncFFCVActaToConvocatorias(
     // 2. Load club players for matching (ACTIVE SEASON ONLY, NEVER 25/26, NEVER INACTIVE)
     const { data: activeTeams } = await supabase
       .from('teams')
-      .select('id, name')
+      .select('id, name, category')
       .neq('season_id', CLOSED_SEASON_ID)
       .eq('season_id', ACTIVE_SEASON_ID);
     const activeTeamIds = (activeTeams || []).map((t: any) => t.id);
@@ -311,10 +311,10 @@ export async function syncFFCVActaToConvocatorias(
     });
 
     const matchTeam = (activeTeams || []).find((t: any) => t.id === partido.equipo_id);
-    const teamCategory = (partido.equipo as any)?.name || (partido.equipo as any)?.category || matchTeam?.name;
+    const teamCategory = `${(partido.equipo as any)?.category || ''} ${(partido.equipo as any)?.name || ''} ${matchTeam?.category || ''} ${matchTeam?.name || ''}`.trim();
     const isSeniorMatch = Boolean((teamCategory || '').toUpperCase().includes('SENIOR'));
     const teamPlayers = allPlayers.filter((p: any) => p.team_id === partido.equipo_id);
-    const maxMatchMinutes = getOfficialMatchDuration(teamCategory, partido.competicion_nombre || details.nombre_competicion);
+    const maxMatchMinutes = getOfficialMatchDuration(teamCategory, details.nombre_competicion);
 
     // Load existing convocatorias for manual minute preservation in base football
     const { data: existingConvocatorias } = await supabase
@@ -405,6 +405,8 @@ export async function syncFFCVActaToConvocatorias(
           minutes = 0;
         }
       }
+
+      minutes = Math.max(0, Math.min(minutes, maxMatchMinutes));
 
       rowsToUpsert.push({
         partido_id: partido.id,

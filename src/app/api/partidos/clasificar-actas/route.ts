@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getOfficialMatchDuration } from "@/lib/utils";
 
 // @ts-ignore
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
@@ -586,8 +587,9 @@ export async function POST(req: NextRequest) {
                     }
                   }
 
-                  // Calcular minutos exactos (90 mins total)
-                  const matchTotalMinutes = 90;
+                  // Calcular minutos exactos según la categoría del equipo (Infantil 70', Cadete 80', Juvenil/Senior 90')
+                  const matchTeamCat = `${bestMatch.equipo?.category || ''} ${bestMatch.equipo?.name || ''}`;
+                  const matchTotalMinutes = getOfficialMatchDuration(matchTeamCat);
                   titulares.forEach(t => {
                     calculatedMinutesMap.set(t.player.id, { minutes: matchTotalMinutes, isTitular: true });
                   });
@@ -597,10 +599,10 @@ export async function POST(req: NextRequest) {
 
                   sustituciones.forEach(sub => {
                     if (sub.pSale && calculatedMinutesMap.has(sub.pSale.id)) {
-                      calculatedMinutesMap.set(sub.pSale.id, { ...calculatedMinutesMap.get(sub.pSale.id)!, minutes: sub.minSub });
+                      calculatedMinutesMap.set(sub.pSale.id, { ...calculatedMinutesMap.get(sub.pSale.id)!, minutes: Math.min(sub.minSub, matchTotalMinutes) });
                     }
                     if (sub.pEntra && calculatedMinutesMap.has(sub.pEntra.id)) {
-                      calculatedMinutesMap.set(sub.pEntra.id, { ...calculatedMinutesMap.get(sub.pEntra.id)!, minutes: matchTotalMinutes - sub.minSub });
+                      calculatedMinutesMap.set(sub.pEntra.id, { ...calculatedMinutesMap.get(sub.pEntra.id)!, minutes: Math.max(0, matchTotalMinutes - sub.minSub) });
                     }
                   });
                 }
@@ -646,10 +648,13 @@ export async function POST(req: NextRequest) {
               const rCount = pEvents.filter(e => e.tipo_evento === 'Tarjeta Roja').length;
 
               const minutesInfo = calculatedMinutesMap.get(pId);
-              const minutos = minutesInfo ? minutesInfo.minutes : (conv.status === 'convocado' || pEvents.length > 0 ? 90 : 0);
+              const matchTeamCat = `${bestMatch.equipo?.category || ''} ${bestMatch.equipo?.name || ''}`;
+              const defaultMins = getOfficialMatchDuration(matchTeamCat);
+              const minutos = minutesInfo ? minutesInfo.minutes : (conv.status === 'convocado' || pEvents.length > 0 ? defaultMins : 0);
 
               await supabase.from('convocatorias').update({
                 minutes_played: minutos,
+                minutos_jugados: minutos,
                 goals: gCount,
                 yellow_cards: aCount,
                 red_cards: rCount

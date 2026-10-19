@@ -167,7 +167,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           while (true) {
             const { data: convocatoriasData, error } = await supabase
               .from('convocatorias')
-              .select('player_id, goals, yellow_cards, red_cards, minutes_played, partido_id')
+              .select('player_id, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, minutes_played, minutos_jugados, partido_id')
               .in('partido_id', matchIds)
               .range(page * pageSize, (page + 1) * pageSize - 1);
             if (error || !convocatoriasData || convocatoriasData.length === 0) break;
@@ -183,10 +183,10 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
           // Retain all match entries per player and team
           matchStats = allConvs.map((c: any) => ({
             player_id: c.player_id,
-            goals: c.goals || 0,
-            yellow_cards: c.yellow_cards || 0,
-            red_cards: c.red_cards || 0,
-            minutes_played: c.minutes_played || 0,
+            goals: c.goals ?? c.goles ?? 0,
+            yellow_cards: c.yellow_cards ?? c.tarjetas_amarillas ?? 0,
+            red_cards: c.red_cards ?? c.tarjetas_rojas ?? 0,
+            minutes_played: c.minutes_played ?? c.minutos_jugados ?? 0,
             team_id: matchTeamMap.get(c.partido_id) || null
           }));
         }

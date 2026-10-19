@@ -1002,10 +1002,15 @@ export async function updateMatchStatsBatch(matchId: string, stats: { playerId: 
       .from('convocatorias')
       .update({
         goals: stat.goals,
+        goles: stat.goals,
         assists: stat.assists,
+        asistencias: stat.assists,
         yellow_cards: stat.yellows,
+        tarjetas_amarillas: stat.yellows,
         red_cards: stat.reds,
-        minutes_played: stat.minutes
+        tarjetas_rojas: stat.reds,
+        minutes_played: stat.minutes,
+        minutos_jugados: stat.minutes
       })
       .eq('partido_id', matchId)
       .eq('player_id', stat.playerId);
@@ -1052,10 +1057,15 @@ export async function updateMatchFullReportBatch(
       coach_rating: report.rating,
       actitud: report.actitud,
       goals: report.goals,
+      goles: report.goals,
       assists: report.assists,
+      asistencias: report.assists,
       yellow_cards: report.yellows,
+      tarjetas_amarillas: report.yellows,
       red_cards: report.reds,
-      minutes_played: report.minutes
+      tarjetas_rojas: report.reds,
+      minutes_played: report.minutes,
+      minutos_jugados: report.minutes
     };
 
     if (existing) {

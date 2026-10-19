@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { getAuthenticatedContext, ADMIN_ROLES, COACH_ROLES, canUserAccessMatch } from "@/lib/auth-helpers"
 import { isSeasonEditable } from "@/lib/season-utils"
+import { getOfficialMatchDuration } from "@/lib/utils"
 
 async function checkLiveMatchAccess(matchId: string) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -212,19 +213,15 @@ async function syncMatchEventsToConvocatorias(matchId: string, supabase: any) {
   // 1. Obtener información del partido para saber la duración total
   const { data: partido } = await supabase
     .from("partidos")
-    .select("live_timer_elapsed_seconds, equipo:teams(category)")
+    .select("live_timer_elapsed_seconds, equipo:teams(name, category)")
     .eq("id", matchId)
     .single();
 
-  let totalMatchMinutes = 90;
+  const teamCat = `${partido?.equipo?.category || ''} ${partido?.equipo?.name || ''}`;
+  const maxOfficialMins = getOfficialMatchDuration(teamCat);
+  let totalMatchMinutes = maxOfficialMins;
   if (partido?.live_timer_elapsed_seconds) {
-    totalMatchMinutes = Math.max(1, Math.round(partido.live_timer_elapsed_seconds / 60));
-  } else if (partido?.equipo?.category) {
-    const cat = partido.equipo.category.toLowerCase();
-    if (cat.includes("benjamín") || cat.includes("prebenjamín")) totalMatchMinutes = 50;
-    else if (cat.includes("alevín")) totalMatchMinutes = 60;
-    else if (cat.includes("infantil")) totalMatchMinutes = 70;
-    else if (cat.includes("cadete")) totalMatchMinutes = 80;
+    totalMatchMinutes = Math.min(maxOfficialMins, Math.max(1, Math.round(partido.live_timer_elapsed_seconds / 60)));
   }
 
   // 2. Obtener todos los eventos del partido

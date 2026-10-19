@@ -17,7 +17,7 @@ import { UtileriaTab } from "@/components/features/club/UtileriaTab";
 import { PhotoAdjustModal } from "@/components/ui/PhotoAdjustModal";
 import { uploadPlayerAvatarAction } from "@/app/actions/player-actions";
 import { PlayerProgressView } from "@/components/features/formative/PlayerProgressView";
-import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
+import { isFormativeCategory, getFirstNameAndFirstSurname, getOfficialMatchDuration } from "@/lib/utils";
 import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
@@ -273,7 +273,7 @@ export default function GlobalPlayerProfilePage() {
       // 2. Partidos, Convocatorias y Eventos de Acta (NUNCA de la temporada cerrada 25/26)
       const { data: convocatoriasData } = await supabase
         .from('convocatorias')
-        .select('*, partidos:partido_id!inner(*)')
+        .select('*, partidos:partido_id!inner(*, equipo:teams(id, name, category))')
         .eq('player_id', playerId)
         .neq('partidos.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
@@ -308,8 +308,10 @@ export default function GlobalPlayerProfilePage() {
             const yCount = !isPlayed ? 0 : Number(c.yellow_cards ?? c.tarjetas_amarillas ?? mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Amarilla').length);
             const rawR = c.red_cards ?? c.tarjetas_rojas;
             const rCount = !isPlayed ? 0 : Number((rawR !== null && rawR !== undefined) ? rawR : mEvs.filter((e: any) => e.tipo_evento === 'Tarjeta Roja').length);
+            const teamCat = `${c.partidos?.equipo?.category || ''} ${c.partidos?.equipo?.name || ''} ${teamName || ''}`;
+            const defaultStarterMins = getOfficialMatchDuration(teamCat);
             const rawM = c.minutes_played ?? c.minutos_jugados;
-            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 90 : 0);
+            const mins = !isPlayed ? 0 : (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? defaultStarterMins : 0);
 
             totalMatchMinutes += mins;
             totalGoalsCount += gCount;

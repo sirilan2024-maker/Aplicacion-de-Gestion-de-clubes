@@ -161,7 +161,7 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
       assists: conv?.assists || 0,
       yellowCards: conv?.yellow_cards || 0,
       redCards: conv?.red_cards || 0,
-      minutes: conv?.minutes_played || 0,
+      minutes: conv?.minutes_played ?? conv?.minutos_jugados ?? 0,
       status: (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado') ? conv.estado_asistencia : 'Presente'
     };
   })

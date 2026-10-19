@@ -25,7 +25,7 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
       assists: conv?.assists || 0,
       yellowCards: conv?.yellow_cards || 0,
       redCards: conv?.red_cards || 0,
-      minutes: conv?.minutes_played || 0,
+      minutes: conv?.minutes_played ?? conv?.minutos_jugados ?? 0,
       titular: conv?.titular || false
     };
   });

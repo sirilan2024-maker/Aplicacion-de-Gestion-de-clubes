@@ -50,6 +50,7 @@ ALTER TABLE public.player_daily_wellness ENABLE ROW LEVEL SECURITY;
 -- 1. Admins, coordinadores, preparadores físicos y metodólogos del club (acceso global club).
 -- 2. Entrenadores ('coach', 'entrenador'): ÚNICAMENTE si están asignados al equipo del jugador (team_coaches o teams.coach_id).
 -- 3. Jugador autenticado o su tutor legal.
+DROP POLICY IF EXISTS "player_daily_wellness_select" ON public.player_daily_wellness;
 CREATE POLICY "player_daily_wellness_select"
     ON public.player_daily_wellness FOR SELECT TO authenticated
     USING (
@@ -94,10 +95,16 @@ CREATE POLICY "player_daily_wellness_select"
     );
 
 -- Inserción / Edición autenticada:
+DROP POLICY IF EXISTS "player_daily_wellness_insert" ON public.player_daily_wellness;
 CREATE POLICY "player_daily_wellness_insert"
     ON public.player_daily_wellness FOR INSERT TO authenticated
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.players p
+            WHERE p.id = player_daily_wellness.player_id
+            AND p.club_id = player_daily_wellness.club_id
+        )
         AND (
             -- Roles con potestad de gestión o preparación física pueden registrar justificadamente
             EXISTS (
@@ -135,6 +142,7 @@ CREATE POLICY "player_daily_wellness_insert"
         )
     );
 
+DROP POLICY IF EXISTS "player_daily_wellness_update" ON public.player_daily_wellness;
 CREATE POLICY "player_daily_wellness_update"
     ON public.player_daily_wellness FOR UPDATE TO authenticated
     USING (
@@ -175,6 +183,11 @@ CREATE POLICY "player_daily_wellness_update"
     )
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.players p
+            WHERE p.id = player_daily_wellness.player_id
+            AND p.club_id = player_daily_wellness.club_id
+        )
         AND (
             EXISTS (
                 SELECT 1 FROM public.profiles pr
@@ -241,6 +254,7 @@ CREATE INDEX IF NOT EXISTS idx_discomfort_incidents_event ON public.player_sessi
 
 ALTER TABLE public.player_session_discomfort_incidents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "discomfort_incidents_select" ON public.player_session_discomfort_incidents;
 CREATE POLICY "discomfort_incidents_select"
     ON public.player_session_discomfort_incidents FOR SELECT TO authenticated
     USING (
@@ -276,10 +290,23 @@ CREATE POLICY "discomfort_incidents_select"
         )
     );
 
+DROP POLICY IF EXISTS "discomfort_incidents_insert" ON public.player_session_discomfort_incidents;
 CREATE POLICY "discomfort_incidents_insert"
     ON public.player_session_discomfort_incidents FOR INSERT TO authenticated
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.players p
+            WHERE p.id = player_session_discomfort_incidents.player_id
+            AND p.club_id = player_session_discomfort_incidents.club_id
+        )
+        AND EXISTS (
+            SELECT 1 FROM public.team_events te
+            JOIN public.teams t_ev ON t_ev.id = te.team_id
+            WHERE te.id = player_session_discomfort_incidents.event_id
+            AND t_ev.club_id = player_session_discomfort_incidents.club_id
+        )
+        AND (created_by IS NULL OR created_by = auth.uid())
         AND (
             EXISTS (
                 SELECT 1 FROM public.profiles pr
@@ -302,15 +329,21 @@ CREATE POLICY "discomfort_incidents_insert"
                     )
                 )
             )
-            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
-            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
-            OR EXISTS (
-                SELECT 1 FROM public.player_tutors pt
-                WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+            OR (
+                source IN ('wellness_flow', 'session_feedback', 'kiosk')
+                AND (
+                    auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
             )
         )
     );
 
+DROP POLICY IF EXISTS "discomfort_incidents_update" ON public.player_session_discomfort_incidents;
 CREATE POLICY "discomfort_incidents_update"
     ON public.player_session_discomfort_incidents FOR UPDATE TO authenticated
     USING (
@@ -337,16 +370,33 @@ CREATE POLICY "discomfort_incidents_update"
                     )
                 )
             )
-            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
-            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
-            OR EXISTS (
-                SELECT 1 FROM public.player_tutors pt
-                WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+            OR (
+                source IN ('wellness_flow', 'session_feedback', 'kiosk')
+                AND (
+                    auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
             )
         )
     )
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.players p
+            WHERE p.id = player_session_discomfort_incidents.player_id
+            AND p.club_id = player_session_discomfort_incidents.club_id
+        )
+        AND EXISTS (
+            SELECT 1 FROM public.team_events te
+            JOIN public.teams t_ev ON t_ev.id = te.team_id
+            WHERE te.id = player_session_discomfort_incidents.event_id
+            AND t_ev.club_id = player_session_discomfort_incidents.club_id
+        )
+        AND (created_by IS NULL OR created_by = auth.uid())
         AND (
             EXISTS (
                 SELECT 1 FROM public.profiles pr
@@ -369,11 +419,16 @@ CREATE POLICY "discomfort_incidents_update"
                     )
                 )
             )
-            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
-            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
-            OR EXISTS (
-                SELECT 1 FROM public.player_tutors pt
-                WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+            OR (
+                source IN ('wellness_flow', 'session_feedback', 'kiosk')
+                AND (
+                    auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_discomfort_incidents.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_session_discomfort_incidents.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
             )
         )
     );
@@ -410,12 +465,19 @@ CREATE TABLE IF NOT EXISTS public.player_session_feedback (
     CONSTRAINT uq_player_session_feedback_event_player UNIQUE (event_id, player_id)
 );
 
+-- Garantía de equivalencia estructural: si la tabla preexistía con el CHECK antiguo (1..10),
+-- fuerza la actualización idempotente de la restricción a 0..10.
+ALTER TABLE public.player_session_feedback
+    DROP CONSTRAINT IF EXISTS player_session_feedback_rpe_check,
+    ADD CONSTRAINT player_session_feedback_rpe_check CHECK (rpe BETWEEN 0 AND 10);
+
 CREATE INDEX IF NOT EXISTS idx_player_session_feedback_event ON public.player_session_feedback (event_id);
 CREATE INDEX IF NOT EXISTS idx_player_session_feedback_player ON public.player_session_feedback (player_id);
 
 -- RLS: player_session_feedback
 ALTER TABLE public.player_session_feedback ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "player_session_feedback_select" ON public.player_session_feedback;
 CREATE POLICY "player_session_feedback_select"
     ON public.player_session_feedback FOR SELECT TO authenticated
     USING (
@@ -451,10 +513,22 @@ CREATE POLICY "player_session_feedback_select"
         )
     );
 
+DROP POLICY IF EXISTS "player_session_feedback_insert" ON public.player_session_feedback;
 CREATE POLICY "player_session_feedback_insert"
     ON public.player_session_feedback FOR INSERT TO authenticated
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.players p
+            WHERE p.id = player_session_feedback.player_id
+            AND p.club_id = player_session_feedback.club_id
+        )
+        AND EXISTS (
+            SELECT 1 FROM public.team_events te
+            JOIN public.teams t_ev ON t_ev.id = te.team_id
+            WHERE te.id = player_session_feedback.event_id
+            AND t_ev.club_id = player_session_feedback.club_id
+        )
         AND (
             EXISTS (
                 SELECT 1 FROM public.profiles pr
@@ -477,15 +551,22 @@ CREATE POLICY "player_session_feedback_insert"
                     )
                 )
             )
-            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
-            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
-            OR EXISTS (
-                SELECT 1 FROM public.player_tutors pt
-                WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+            OR (
+                validation_status = 'provisional'
+                AND source IN ('player_feedback', 'kiosk')
+                AND (
+                    auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
             )
         )
     );
 
+DROP POLICY IF EXISTS "player_session_feedback_update" ON public.player_session_feedback;
 CREATE POLICY "player_session_feedback_update"
     ON public.player_session_feedback FOR UPDATE TO authenticated
     USING (
@@ -512,16 +593,33 @@ CREATE POLICY "player_session_feedback_update"
                     )
                 )
             )
-            OR auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
-            OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
-            OR EXISTS (
-                SELECT 1 FROM public.player_tutors pt
-                WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+            OR (
+                -- Jugadores y tutores solo pueden editar filas que aún estén en estado 'provisional'
+                validation_status = 'provisional'
+                AND (
+                    auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+                    OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
+                    OR EXISTS (
+                        SELECT 1 FROM public.player_tutors pt
+                        WHERE pt.player_id = player_session_feedback.player_id AND pt.tutor_id = auth.uid()
+                    )
+                )
             )
         )
     )
     WITH CHECK (
         club_id IN (SELECT pr.club_id FROM public.profiles pr WHERE pr.id = auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.players p
+            WHERE p.id = player_session_feedback.player_id
+            AND p.club_id = player_session_feedback.club_id
+        )
+        AND EXISTS (
+            SELECT 1 FROM public.team_events te
+            JOIN public.teams t_ev ON t_ev.id = te.team_id
+            WHERE te.id = player_session_feedback.event_id
+            AND t_ev.club_id = player_session_feedback.club_id
+        )
         AND (
             EXISTS (
                 SELECT 1 FROM public.profiles pr
@@ -545,8 +643,9 @@ CREATE POLICY "player_session_feedback_update"
                 )
             )
             OR (
-                -- Jugadores y tutores no pueden auto-confirmar ni rechazar; solo mantener estado 'provisional'
+                -- Jugadores y tutores no pueden auto-confirmar, rechazar ni suplantar 'coach_entry'
                 validation_status = 'provisional'
+                AND source IN ('player_feedback', 'kiosk')
                 AND (
                     auth.uid() = (SELECT p.user_auth_id FROM public.players p WHERE p.id = player_session_feedback.player_id)
                     OR auth.uid() = (SELECT p.tutor_id FROM public.players p WHERE p.id = player_session_feedback.player_id)

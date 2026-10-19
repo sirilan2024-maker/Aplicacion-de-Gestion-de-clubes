@@ -503,6 +503,20 @@ async function run() {
     const unlinkedIncSelect = await rlsClient.query(`SELECT COUNT(*) FROM public.player_session_discomfort_incidents WHERE player_id = '${uPlayer1}';`);
     assert(parseInt(unlinkedIncSelect.rows[0].count) === 0, 'Tutor no vinculado tiene bloqueada la consulta de incidencias por RLS');
 
+    // Tutor legal (uTutor1) NO puede reasignar player_id ni club_id en discomfort_incidents para eludir su ámbito
+    await setAuthUser(rlsClient, uTutor1);
+    let tutorDiscomfortReassignBlocked = false;
+    try {
+      await rlsClient.query(`
+        UPDATE public.player_session_discomfort_incidents
+        SET player_id = '${uPlayer2}'
+        WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+      `);
+    } catch (e: any) {
+      tutorDiscomfortReassignBlocked = e.code === '42501';
+    }
+    assert(tutorDiscomfortReassignBlocked, 'RLS bloquea que el tutor reasigne player_id a un jugador ajeno en incidencias');
+
     // 7.11 RLS en player_session_feedback
     // Entrenador asignado ve el feedback
     await setAuthUser(rlsClient, uCoachA1);
@@ -514,8 +528,46 @@ async function run() {
     const unassignedCoachFeedSelect = await rlsClient.query(`SELECT COUNT(*) FROM public.player_session_feedback WHERE player_id = '${uPlayer1}';`);
     assert(parseInt(unassignedCoachFeedSelect.rows[0].count) === 0, 'Entrenador no asignado NO ve el feedback post-sesión de jugadores ajenos');
 
-    // Tutor legal (uTutor1) NO puede cambiar validation_status a 'confirmed'
+    // Tutor legal (uTutor1) NO puede reasignar club_id ni player_id en player_session_feedback
     await setAuthUser(rlsClient, uTutor1);
+    let tutorFeedbackPlayerReassignBlocked = false;
+    try {
+      await rlsClient.query(`
+        UPDATE public.player_session_feedback
+        SET player_id = '${uPlayer2}'
+        WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+      `);
+    } catch (e: any) {
+      tutorFeedbackPlayerReassignBlocked = e.code === '42501';
+    }
+    assert(tutorFeedbackPlayerReassignBlocked, 'RLS bloquea modificar player_id hacia un jugador ajeno en feedback');
+
+    let tutorFeedbackClubReassignBlocked = false;
+    try {
+      await rlsClient.query(`
+        UPDATE public.player_session_feedback
+        SET club_id = '${uClubB}'
+        WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+      `);
+    } catch (e: any) {
+      tutorFeedbackClubReassignBlocked = e.code === '42501';
+    }
+    assert(tutorFeedbackClubReassignBlocked, 'RLS bloquea modificar club_id hacia otro club en feedback');
+
+    // Tutor legal (uTutor1) NO puede suplantar source = 'coach_entry'
+    let tutorSpoofSourceBlocked = false;
+    try {
+      await rlsClient.query(`
+        UPDATE public.player_session_feedback
+        SET source = 'coach_entry'
+        WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+      `);
+    } catch (e: any) {
+      tutorSpoofSourceBlocked = e.code === '42501';
+    }
+    assert(tutorSpoofSourceBlocked, 'RLS bloquea que el tutor/jugador suplante source = coach_entry');
+
+    // Tutor legal (uTutor1) NO puede cambiar validation_status a 'confirmed'
     let tutorConfirmBlocked = false;
     try {
       await rlsClient.query(`
@@ -532,16 +584,152 @@ async function run() {
     await setAuthUser(rlsClient, uCoachA1);
     let coachConfirmSucceeded = false;
     try {
-      await rlsClient.query(`
+      const res = await rlsClient.query(`
         UPDATE public.player_session_feedback
         SET validation_status = 'confirmed'
         WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
       `);
-      coachConfirmSucceeded = true;
+      coachConfirmSucceeded = res.rowCount === 1;
     } catch (e: any) {
       coachConfirmSucceeded = false;
     }
     assert(coachConfirmSucceeded, 'RLS permite al entrenador asignado cambiar validation_status a confirmed');
+
+    // Una vez confirmado por el entrenador, el tutor NO puede sobrescribir ni revertir el feedback a provisional
+    await setAuthUser(rlsClient, uTutor1);
+    const tutorRevertRes = await rlsClient.query(`
+      UPDATE public.player_session_feedback
+      SET validation_status = 'provisional', rpe = 1
+      WHERE player_id = '${uPlayer1}' AND event_id = '${uEvent1}';
+    `);
+    assert(tutorRevertRes.rowCount === 0, 'RLS impide que el tutor/jugador modifique o revierta un feedback ya confirmado por el entrenador');
+
+    // 7.12 Pruebas adicionales Fase 1D: Idempotencia, coherencia player_id<->club_id, event_id<->club_id y autoría created_by
+    const uTeamB = 'bbbbbbbb-9999-0000-0000-000000000002';
+    const uPlayerB = 'cccccccc-9999-0000-0000-000000000002';
+    const uEventB = 'dddddddd-9999-0000-0000-000000000002';
+    await adminClient.query(`
+      INSERT INTO public.teams (id, club_id, name, category) VALUES ('${uTeamB}', '${uClubB}', 'Rival Team', 'Cadete');
+      INSERT INTO public.players (id, club_id, team_id, first_name, last_name, birth_date) VALUES ('${uPlayerB}', '${uClubB}', '${uTeamB}', 'Rival', 'Player', '2012-01-01');
+      INSERT INTO public.team_events (id, team_id, title, event_type, date, start_time) VALUES ('${uEventB}', '${uTeamB}', 'Rival Session', 'Entrenamiento', '2026-10-15', '18:00');
+    `);
+
+    // 7.12.1 Admin de Club A NO puede insertar bienestar en su club apuntando a un jugador de Club B
+    await setAuthUser(rlsClient, uAdminA);
+    let crossClubPlayerWellnessBlocked = false;
+    try {
+      await rlsClient.query(`
+        INSERT INTO public.player_daily_wellness
+          (club_id, player_id, date, sleep_quality, fatigue, soreness, stress, mood)
+        VALUES ('${uClubA}', '${uPlayerB}', '2026-10-16', 3, 3, 3, 3, 3);
+      `);
+    } catch (e: any) {
+      crossClubPlayerWellnessBlocked = e.code === '42501';
+    }
+    assert(crossClubPlayerWellnessBlocked, 'RLS bloquea asociar un player_id de otro club en player_daily_wellness');
+
+    // 7.12.2 Tutor de Club A NO puede insertar feedback vinculando su hijo a un event_id de Club B
+    await setAuthUser(rlsClient, uTutor1);
+    let crossClubEventFeedbackBlocked = false;
+    try {
+      await rlsClient.query(`
+        INSERT INTO public.player_session_feedback
+          (club_id, event_id, player_id, rpe, minutes_played)
+        VALUES ('${uClubA}', '${uEventB}', '${uPlayer1}', 5, 60);
+      `);
+    } catch (e: any) {
+      crossClubEventFeedbackBlocked = e.code === '42501';
+    }
+    assert(crossClubEventFeedbackBlocked, 'RLS bloquea asociar un event_id de otro club en player_session_feedback');
+
+    // 7.12.3 Tutor NO puede falsificar created_by con el UUID del entrenador en discomfort_incidents
+    let forgedCreatedByBlocked = false;
+    try {
+      await rlsClient.query(`
+        INSERT INTO public.player_session_discomfort_incidents
+          (club_id, player_id, event_id, timing, zone, intensity, source, created_by)
+        VALUES ('${uClubA}', '${uPlayer1}', '${uEvent1}', 'post_session', 'Rodilla', 5, 'session_feedback', '${uCoachA1}');
+      `);
+    } catch (e: any) {
+      forgedCreatedByBlocked = e.code === '42501';
+    }
+    assert(forgedCreatedByBlocked, 'RLS bloquea falsificar created_by con el perfil de otro usuario en incidencias');
+
+    // 7.12.4 Verificación de idempotencia real y equivalencia estructural (Fase 1E)
+    const getCatalogSnapshot = async () => {
+      const tables = await adminClient.query(`
+        SELECT relname, relrowsecurity
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relname IN ('player_daily_wellness', 'player_session_discomfort_incidents', 'player_session_feedback')
+        ORDER BY relname;
+      `);
+      const policies = await adminClient.query(`
+        SELECT tablename, policyname, cmd, roles::text, qual, with_check
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename IN ('player_daily_wellness', 'player_session_discomfort_incidents', 'player_session_feedback')
+        ORDER BY tablename, policyname;
+      `);
+      const constraints = await adminClient.query(`
+        SELECT conrelid::regclass::text AS table_name, conname, contype, pg_get_constraintdef(oid) AS def
+        FROM pg_constraint
+        WHERE conrelid IN (
+          'public.player_daily_wellness'::regclass,
+          'public.player_session_discomfort_incidents'::regclass,
+          'public.player_session_feedback'::regclass
+        )
+        ORDER BY table_name, conname;
+      `);
+      const indexes = await adminClient.query(`
+        SELECT tablename, indexname, indexdef
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename IN ('player_daily_wellness', 'player_session_discomfort_incidents', 'player_session_feedback')
+        ORDER BY tablename, indexname;
+      `);
+      return {
+        tables: tables.rows,
+        policies: policies.rows,
+        constraints: constraints.rows,
+        indexes: indexes.rows,
+      };
+    };
+
+    const snapshotRun1 = await getCatalogSnapshot();
+    assert(snapshotRun1.tables.length === 3 && snapshotRun1.tables.every((t: any) => t.relrowsecurity === true), 'Las 3 tablas existen y tienen RLS activo tras la 1ª ejecución');
+    assert(snapshotRun1.policies.length === 9, 'Existen exactamente las 9 políticas RLS previstas tras la 1ª ejecución');
+
+    let idempotentMigrationSucceeded = false;
+    try {
+      await executeSqlFile(adminClient, migrationPath);
+      idempotentMigrationSucceeded = true;
+    } catch (e: any) {
+      idempotentMigrationSucceeded = false;
+    }
+    assert(idempotentMigrationSucceeded, 'La migración soporta 2ª ejecución completa sin errores');
+
+    const snapshotRun2 = await getCatalogSnapshot();
+    assert(JSON.stringify(snapshotRun1.tables) === JSON.stringify(snapshotRun2.tables), 'Idéntico estado de tablas y RLS entre 1ª y 2ª ejecución');
+    assert(JSON.stringify(snapshotRun1.policies) === JSON.stringify(snapshotRun2.policies), 'Las 9 políticas RLS conservan exactamente las mismas expresiones USING y WITH CHECK tras la 2ª ejecución');
+    assert(JSON.stringify(snapshotRun1.constraints) === JSON.stringify(snapshotRun2.constraints), 'Todas las restricciones CHECK, UNIQUE, PK y FK permanecen idénticas tras la 2ª ejecución');
+    assert(JSON.stringify(snapshotRun1.indexes) === JSON.stringify(snapshotRun2.indexes), 'Todos los índices permanecen idénticos tras la 2ª ejecución');
+
+    const rpeConstraintDef = snapshotRun2.constraints.find((c: any) => c.conname === 'player_session_feedback_rpe_check')?.def || '';
+    assert(rpeConstraintDef.includes('>= 0') && rpeConstraintDef.includes('<= 10'), `Restricción player_session_feedback_rpe_check verificada en catálogo: ${rpeConstraintDef}`);
+
+    // 7.12.5 Simulación de entorno con tabla preexistente que tenía el CHECK antiguo (1..10)
+    await adminClient.query(`
+      DELETE FROM public.player_session_feedback WHERE rpe = 0;
+      ALTER TABLE public.player_session_feedback
+        DROP CONSTRAINT IF EXISTS player_session_feedback_rpe_check,
+        ADD CONSTRAINT player_session_feedback_rpe_check CHECK (rpe BETWEEN 1 AND 10);
+    `);
+    await executeSqlFile(adminClient, migrationPath);
+    const snapshotAfterUpgrade = await getCatalogSnapshot();
+    const upgradedRpeDef = snapshotAfterUpgrade.constraints.find((c: any) => c.conname === 'player_session_feedback_rpe_check')?.def || '';
+    assert(upgradedRpeDef.includes('>= 0') && upgradedRpeDef.includes('<= 10'), 'Reejecutar la migración sobre una tabla con CHECK antiguo (1..10) actualiza la restricción a (0..10)');
 
     await rlsClient.end();
 

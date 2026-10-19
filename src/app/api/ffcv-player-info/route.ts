@@ -186,7 +186,7 @@ export async function GET(req: Request) {
 
     const { data: player, error: pErr } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, email, parent1_email, club_id, team_id, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id, season_id)')
+      .select('id, first_name, last_name, dorsal, email, parent1_email, club_id, team_id, avatar_url, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id, season_id)')
       .eq('id', playerId)
       .single();
 
@@ -425,6 +425,36 @@ export async function GET(req: Request) {
         finalPhoto = cleanPhoto;
       } else {
         finalPhoto = 'data:image/jpeg;base64,' + cleanPhoto;
+      }
+    }
+
+    // Si el jugador no tiene avatar en BD pero FFCV dispone de foto, persistirla automáticamente
+    if (finalPhoto && (!player.avatar_url || player.avatar_url.trim().length === 0)) {
+      try {
+        const rawBase64 = finalPhoto.replace(/^data:image\/[a-z]+;base64,/, '').trim();
+        const buffer = Buffer.from(rawBase64, 'base64');
+        const fileName = `${player.id}-${Date.now()}.jpg`;
+        const filePath = `jugadores/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, buffer, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+          await supabase
+            .from('players')
+            .update({ avatar_url: publicUrl })
+            .eq('id', player.id);
+        }
+      } catch (uploadErr: any) {
+        console.warn('[ffcv-player-info] Non-blocking avatar persistence error:', uploadErr?.message);
       }
     }
 

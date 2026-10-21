@@ -80,13 +80,14 @@ export default function AsistenciaEquipoPage() {
       if (!targetSeasonId) return;
       setActiveSeasonId(targetSeasonId);
 
-      // 3. Fetch players via player_season_history
+      // 3. Fetch players via player_season_history (solo jugadores activos en la temporada activa)
       const { data: playersData, error } = await supabase
         .from("player_season_history")
         .select(`
           player_id,
+          status,
           players (
-            id, first_name, last_name, dorsal, avatar_url
+            id, first_name, last_name, dorsal, avatar_url, status
           )
         `)
         .eq("team_id", teamId)
@@ -94,13 +95,21 @@ export default function AsistenciaEquipoPage() {
 
       if (error) throw error;
       
-      const mappedPlayers = (playersData || []).map((history: any) => ({
-        id: history.players.id,
-        first_name: history.players.first_name,
-        last_name: history.players.last_name,
-        dorsal: history.players.dorsal,
-        avatar_url: history.players.avatar_url
-      })).sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
+      const mappedPlayers = (playersData || [])
+        .filter((history: any) => {
+          const hStatus = history.status?.toLowerCase();
+          const pStatus = history.players?.status?.toLowerCase();
+          const isHistoryActive = !hStatus || hStatus === 'active' || hStatus === 'activo';
+          const isPlayerActive = pStatus === 'active' || pStatus === 'activo';
+          return isHistoryActive && isPlayerActive;
+        })
+        .map((history: any) => ({
+          id: history.players.id,
+          first_name: history.players.first_name,
+          last_name: history.players.last_name,
+          dorsal: history.players.dorsal,
+          avatar_url: history.players.avatar_url
+        })).sort((a: any, b: any) => (a.last_name || '').localeCompare(b.last_name || ''));
 
       setPlayers(mappedPlayers);
     } catch (err: any) {
@@ -119,11 +128,12 @@ export default function AsistenciaEquipoPage() {
       const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
       const teamSeasonId = teamData?.season_id;
 
-      // 2. Cargar eventos de team_events (entrenamientos y sesiones)
+      // 2. Cargar eventos de team_events (entrenamientos y sesiones, excluyendo partidos)
       let eventsQuery = supabase
         .from('team_events')
         .select('id, title, date, event_type')
         .eq('team_id', teamId)
+        .neq('event_type', 'Partido')
         .lte('date', today)
         .order('date', { ascending: false })
         .limit(20);
@@ -214,18 +224,19 @@ export default function AsistenciaEquipoPage() {
             // - Si su status es 'convocado' y no 'lesionado'/'ausente'/'no_convocado'
             const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
             const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
-            const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'no_convocado';
             const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado';
+            const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'ausente';
+            const isNotCalled = conv.status === 'no_convocado' || conv.status === 'desconvocado';
 
             let deducedStatus: string | null = null;
-            if (minPlayed > 0 || conv.titular || isConfirmed) {
+            if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
               deducedStatus = 'present';
             } else if (isInjured) {
               deducedStatus = 'excused';
             } else if (isAbsent) {
               deducedStatus = 'absent';
-            } else if (conv.status === 'convocado') {
-              deducedStatus = 'present';
+            } else if (isNotCalled) {
+              deducedStatus = 'not_called';
             }
 
             if (deducedStatus) {
@@ -331,8 +342,9 @@ export default function AsistenciaEquipoPage() {
         matchConvs.forEach(conv => {
           const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
           const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
-          const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'no_convocado';
           const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado';
+          const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'ausente';
+          const isNotCalled = conv.status === 'no_convocado' || conv.status === 'desconvocado';
 
           if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
             attMap[conv.player_id] = 'present';
@@ -340,6 +352,8 @@ export default function AsistenciaEquipoPage() {
             attMap[conv.player_id] = 'excused';
           } else if (isAbsent) {
             attMap[conv.player_id] = 'absent';
+          } else if (isNotCalled) {
+            attMap[conv.player_id] = 'not_called';
           }
         });
       }
@@ -426,21 +440,34 @@ export default function AsistenciaEquipoPage() {
 
   const getPlayerPercentage = (playerId: string, eventsToUse: PastEvent[]) => {
     if (eventsToUse.length === 0) return { pct: 0, faltas: 0 };
-    const totalEvents = eventsToUse.length;
+    
+    // Filtrar los eventos computables para este jugador:
+    // - Los entrenamientos aplican a todos los jugadores activos del equipo.
+    // - Los partidos solo computan si el jugador estuvo convocado (se excluyen partidos donde fue 'no_convocado' o no convocado).
+    const applicableEvents = eventsToUse.filter(ev => {
+      if (ev.event_type !== 'Partido') return true;
+      const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
+      if (att && (att.status === 'not_called' || att.status === 'no_convocado')) return false;
+      if (!att) return false;
+      return true;
+    });
+
+    if (applicableEvents.length === 0) return { pct: 100, faltas: 0 };
+
     const presents = summaryData.filter(a => 
       a.player_id === playerId && 
-      (eventsToUse.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
+      (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
       (a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'retraso' || a.status?.toLowerCase() === 'late')
     ).length;
     
     const absents = summaryData.filter(a => 
       a.player_id === playerId && 
-      (eventsToUse.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
+      (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
       (a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent')
     ).length;
     
     return {
-      pct: Math.round((presents / totalEvents) * 100),
+      pct: Math.round((presents / applicableEvents.length) * 100),
       faltas: absents
     };
   };
@@ -452,6 +479,7 @@ export default function AsistenciaEquipoPage() {
     if (s === 'retraso' || s === 'late') return 'bg-orange-500 text-white shadow-sm';
     if (s === 'ausente' || s === 'absent') return 'bg-red-500 text-white shadow-sm';
     if (s === 'lesionado' || s === 'excused') return 'bg-amber-500 text-white shadow-sm';
+    if (s === 'not_called' || s === 'no_convocado') return 'bg-slate-100 text-slate-400 border border-slate-200';
     return 'bg-gray-100 text-gray-400';
   };
 
@@ -780,7 +808,15 @@ export default function AsistenciaEquipoPage() {
             <p className="text-gray-500 text-xs sm:text-sm mt-1">Cuadrícula con el historial de los últimos eventos. Pulsa en el título de un evento para pasar lista o editarlo.</p>
           </div>
           
-          <div className="w-full sm:w-auto grid grid-cols-3 sm:flex bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner gap-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => router.push(`/dashboard/equipos/${teamId}/calendario`)}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold rounded-xl border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+            >
+              <CalendarIcon className="w-4 h-4 text-blue-600" />
+              <span>Ver Calendario Mes</span>
+            </button>
+            <div className="w-full sm:w-auto grid grid-cols-3 sm:flex bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner gap-1">
             <button
               onClick={() => setAttendanceFilter('todos')}
               className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
@@ -814,6 +850,7 @@ export default function AsistenciaEquipoPage() {
             </button>
           </div>
         </div>
+      </div>
         
         {loadingSummary ? (
           <div className="p-12 text-center">
@@ -910,6 +947,7 @@ export default function AsistenciaEquipoPage() {
                               title={att?.notes ? `${stat || 'Registrado'}: ${att.notes}` : stat || 'Sin registrar'}
                             >
                               {!stat && <span className="text-gray-300">-</span>}
+                              {(stat?.toLowerCase() === 'not_called' || stat?.toLowerCase() === 'no_convocado') && <span className="text-xs font-bold text-slate-400" title="No convocado">-</span>}
                               {(stat?.toLowerCase() === 'presente' || stat?.toLowerCase() === 'present') && <Check className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'retraso' || stat?.toLowerCase() === 'late') && <Clock className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'ausente' || stat?.toLowerCase() === 'absent') && <X className="w-4 h-4" />}
@@ -946,12 +984,20 @@ export default function AsistenciaEquipoPage() {
 function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: string, events: PastEvent[], summaryData: AttendanceRecord[] }) {
   if (events.length === 0) return <div className="p-3 text-center text-xs text-slate-500">No hay eventos para mostrar.</div>;
 
-  const totalEvents = events.length;
-  const presents = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && ['presente', 'present', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
-  const absents = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent')).length;
-  const excused = summaryData.filter(a => a.player_id === playerId && (events.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused')).length;
+  const applicableEvents = events.filter(ev => {
+    if (ev.event_type !== 'Partido') return true;
+    const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
+    if (att && (att.status === 'not_called' || att.status === 'no_convocado')) return false;
+    if (!att) return false;
+    return true;
+  });
 
-  const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 0;
+  const totalEvents = applicableEvents.length;
+  const presents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && ['presente', 'present', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
+  const absents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent')).length;
+  const excused = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused')).length;
+
+  const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 100;
 
   const absencesList = events.filter(ev => {
     const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));

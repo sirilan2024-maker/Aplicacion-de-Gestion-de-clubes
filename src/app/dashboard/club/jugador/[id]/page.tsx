@@ -465,8 +465,8 @@ export default function GlobalPlayerProfilePage() {
           }
         }
       });
-      // Orden del más cercano en fecha al más lejano
-      mHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Orden del más reciente al más antiguo (los entrenamientos y partidos actuales arriba)
+      mHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       // 3. Entrenamientos, Asistencia y ACWR (unificado con Europe/Madrid, pre-fusión por eventId y separación equipo vs club)
       const { data: attData } = await supabase
@@ -727,8 +727,8 @@ export default function GlobalPlayerProfilePage() {
         return true;
       });
       
-      // Orden del más cercano en fecha al más lejano
-      eligibleEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Orden del más reciente al más antiguo (sesiones actuales arriba)
+      eligibleEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPlayerEvents(eligibleEvents);
     } catch (err) {
       console.error(err);
@@ -2155,18 +2155,35 @@ export default function GlobalPlayerProfilePage() {
                 ? playerEvents 
                 : playerEvents.filter(ev => ev.event_type === (attendanceFilter === 'entrenamientos' ? 'Entrenamiento' : 'Partido'));
                 
-              const totalEvents = filteredEvents.length;
+              const todayStr = new Date().toISOString().split('T')[0];
+
+              // Eventos que realmente computan para el % de asistencia:
+              // 1. Excluir eventos futuros (date > todayStr): quedan como "Pendiente" y no restan.
+              // 2. Para partidos pasados: si el jugador no fue convocado (no_convocado / not_called o sin acta para este jugador), se excluyen para no penalizarlo.
+              const evaluatedEvents = filteredEvents.filter(ev => {
+                const evDate = (ev.date || ev.start_time || '').slice(0, 10);
+                if (evDate > todayStr) return false;
+                if (ev.event_type === 'Partido') {
+                  const rec = playerAttendance.find(a => a.event_id === ev.id || a.date === ev.date);
+                  if (!rec || rec.status === 'not_called' || rec.status === 'no_convocado') return false;
+                }
+                return true;
+              });
+
+              const totalEvents = evaluatedEvents.length;
               
-              // We must only count attendance for the filtered events
-              const filteredEventIds = filteredEvents.map(e => e.id);
-              const filteredAttendance = playerAttendance.filter(a => filteredEventIds.includes(a.event_id));
+              // We must only count attendance for the evaluated events
+              const evaluatedEventIds = evaluatedEvents.map(e => e.id);
+              const filteredAttendance = playerAttendance.filter(a => evaluatedEventIds.includes(a.event_id));
 
               const retrasos = filteredAttendance.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
               const absents = filteredAttendance.filter(a => ['ausente', 'absent'].includes(a.status?.toLowerCase())).length;
               const excused = filteredAttendance.filter(a => a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused').length;
-              const { pct } = computeConfirmedAttendancePercentage(filteredEvents, filteredAttendance);
+              const { pct } = evaluatedEvents.length > 0 
+                ? computeConfirmedAttendancePercentage(evaluatedEvents, filteredAttendance)
+                : { pct: 100 };
 
-              const faltasDetalle = filteredEvents.filter(ev => {
+              const faltasDetalle = evaluatedEvents.filter(ev => {
                 const rec = filteredAttendance.find(a => a.event_id === ev.id || a.date === ev.date);
                 return rec && (rec.status?.toLowerCase() === 'ausente' || rec.status?.toLowerCase() === 'absent');
               });
@@ -2211,7 +2228,7 @@ export default function GlobalPlayerProfilePage() {
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-slate-900">{totalEvents}</div>
-                      <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mt-1">Sesiones</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mt-1">Evaluadas</div>
                     </div>
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-emerald-700">{pct}%</div>
@@ -2255,26 +2272,36 @@ export default function GlobalPlayerProfilePage() {
 
                   {/* Historial Completo */}
                   <div>
-                    <h4 className="font-bold text-slate-900 mb-4">Últimos Eventos Registrados</h4>
+                    <h4 className="font-bold text-slate-900 mb-4">Últimos Eventos y Sesiones</h4>
                     {filteredEvents.length === 0 ? (
                       <div className="text-center text-slate-500 py-8 bg-slate-50 rounded-xl">No hay eventos para esta categoría.</div>
                     ) : (
                     <div className="space-y-2">
-                      {filteredEvents.slice(0, 10).map(ev => {
-                        const rec = filteredAttendance.find(a => a.event_id === ev.id || a.date === ev.date);
+                      {filteredEvents.slice(0, 15).map(ev => {
+                        const rec = playerAttendance.find(a => a.event_id === ev.id || a.date === ev.date);
                         const status = rec?.status?.toLowerCase();
+                        const isFuture = (ev.date || '').slice(0, 10) > todayStr;
                         
                         return (
                           <div key={ev.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-center gap-3">
-                              <div className="w-2 h-8 bg-gray-200 rounded-full"></div>
+                              <div className={`w-2 h-8 rounded-full ${ev.event_type === 'Partido' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
                               <div>
-                                <div className="font-bold text-slate-800 text-sm">{ev.title}</div>
-                                <div className="text-xs text-slate-500">{new Date(ev.date).toLocaleDateString('es-ES')}</div>
+                                <div className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                                  <span>{ev.title}</span>
+                                  {ev.event_type === 'Partido' && (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">Partido</span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-slate-500">{new Date(ev.date).toLocaleDateString('es-ES')} {ev.start_time ? `• ${ev.start_time.substring(0, 5)}` : ''}</div>
                               </div>
                             </div>
                             <div className="flex flex-col sm:flex-row items-end gap-2 shrink-0">
-                              {!status ? (
+                              {isFuture ? (
+                                <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md">Pendiente</span>
+                              ) : status === 'not_called' || status === 'no_convocado' ? (
+                                <span className="text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md">No convocado</span>
+                              ) : !status ? (
                                 <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-md">Sin registrar</span>
                               ) : status === 'presente' || status === 'present' ? (
                                 <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md">Presente</span>

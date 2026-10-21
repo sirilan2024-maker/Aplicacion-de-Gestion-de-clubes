@@ -100,12 +100,13 @@ export default function CalendarioEquipoPage() {
 
     const effectiveSeasonId = activeSeason?.id || (teamData?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' ? teamData?.season_id : null);
 
-    // 2. Cargar eventos manuales del equipo (entrenamientos, reuniones, etc.)
+    // 2. Cargar eventos manuales del equipo (entrenamientos, reuniones, etc., excluyendo partidos para evitar duplicados con partidos oficiales)
     let eventsQuery = supabase
       .from('team_events')
       .select('*')
       .eq('team_id', effectiveTeamId)
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .neq('event_type', 'Partido')
       .gte('date', start)
       .lte('date', end);
 

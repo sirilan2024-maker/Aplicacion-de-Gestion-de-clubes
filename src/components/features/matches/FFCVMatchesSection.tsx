@@ -102,19 +102,24 @@ export function FFCVMatchesSection({
   // Smart initial matchday selection
   useEffect(() => {
     if (matches.length > 0) {
-      const now = new Date();
-      // Find first matchday with an unplayed match or match in future
+      const todayStr = new Date().toISOString().split("T")[0];
+      // Find first matchday that has matches scheduled today or in the future
       const upcomingMatch = matches.find((m) => {
-        if (m.status === "scheduled") return true;
-        if (m.match_date && new Date(m.match_date) >= now) return true;
-        return false;
+        return m.match_date && m.match_date >= todayStr;
       });
 
       if (upcomingMatch && upcomingMatch.matchday) {
         setSelectedJornada(upcomingMatch.matchday);
       } else {
-        const firstJ = matches[0]?.matchday || 1;
-        setSelectedJornada(firstJ);
+        // Fallback: the latest matchday with played games, or first matchday
+        const playedMatches = matches.filter((m) => m.status === "played");
+        if (playedMatches.length > 0) {
+          const lastPlayedJ = Math.max(...playedMatches.map((m) => m.matchday));
+          setSelectedJornada(lastPlayedJ);
+        } else {
+          const firstJ = matches[0]?.matchday || 1;
+          setSelectedJornada(firstJ);
+        }
       }
     }
   }, [matches]);

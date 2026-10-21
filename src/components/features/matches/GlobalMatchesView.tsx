@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Swords, Calendar, Clock, MapPin, User, Pencil, Trash2, Plus, Users, AlertCircle, Search, Filter, Trophy, CalendarCheck, ChevronRight, ClipboardCheck, FileText, CheckCircle2, Edit3, RefreshCw, ExternalLink } from "lucide-react"
 
@@ -315,6 +315,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
             }
           }
         }
+        await loadFfcvMatches()
       } else {
         setSyncMessage(`Error: ${res.error || "No se pudo sincronizar"}`)
       }
@@ -334,48 +335,48 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
     awayTeamName: string;
   } | null>(null)
 
+  const loadFfcvMatches = useCallback(async () => {
+    try {
+      const groupIds = Array.from(new Set(teams.map(t => t.ffcv_group_id).filter(Boolean)));
+      if (groupIds.length === 0) return;
+      const supabase = createClient();
+      
+      // Fetch matches per group to avoid Supabase PostgREST 1000-row limit truncation
+      const [groupMatchResponses, standingsMap] = await Promise.all([
+        Promise.all(groupIds.map(gid =>
+          supabase
+            .from('ffcv_matches')
+            .select('*')
+            .eq('ffcv_group_id', gid)
+            .neq('ffcv_season_id', '21')
+            .eq('ffcv_season_id', '22')
+            .limit(1000)
+        )),
+        fetchLatestStandingsForGroups(supabase, groupIds)
+      ]);
+
+      const allFfcvMatches: any[] = [];
+      groupMatchResponses.forEach(res => {
+        if (!res.error && res.data) {
+          allFfcvMatches.push(...res.data);
+        }
+      });
+      setFfcvMatches(allFfcvMatches);
+
+      if (standingsMap) {
+        setLatestStandingsMap(standingsMap);
+        const allStandingsRows: any[] = [];
+        standingsMap.forEach(rows => allStandingsRows.push(...rows));
+        setFfcvStandings(allStandingsRows);
+      }
+    } catch (err) {
+      console.error('Error loading FFCV matches/standings in GlobalMatchesView:', err);
+    }
+  }, [teams]);
 
   useEffect(() => {
-    async function loadFfcvMatches() {
-      try {
-        const groupIds = Array.from(new Set(teams.map(t => t.ffcv_group_id).filter(Boolean)));
-        if (groupIds.length === 0) return;
-        const supabase = createClient();
-        
-        // Fetch matches per group to avoid Supabase PostgREST 1000-row limit truncation
-        const [groupMatchResponses, standingsMap] = await Promise.all([
-          Promise.all(groupIds.map(gid =>
-            supabase
-              .from('ffcv_matches')
-              .select('*')
-              .eq('ffcv_group_id', gid)
-              .neq('ffcv_season_id', '21')
-              .eq('ffcv_season_id', '22')
-              .limit(1000)
-          )),
-          fetchLatestStandingsForGroups(supabase, groupIds)
-        ]);
-
-        const allFfcvMatches: any[] = [];
-        groupMatchResponses.forEach(res => {
-          if (!res.error && res.data) {
-            allFfcvMatches.push(...res.data);
-          }
-        });
-        setFfcvMatches(allFfcvMatches);
-
-        if (standingsMap) {
-          setLatestStandingsMap(standingsMap);
-          const allStandingsRows: any[] = [];
-          standingsMap.forEach(rows => allStandingsRows.push(...rows));
-          setFfcvStandings(allStandingsRows);
-        }
-      } catch (err) {
-        console.error('Error loading FFCV matches/standings in GlobalMatchesView:', err);
-      }
-    }
     loadFfcvMatches();
-  }, [teams]);
+  }, [loadFfcvMatches]);
 
   // Calculate apercibidos
   const apercibidosCount = useMemo(() => {

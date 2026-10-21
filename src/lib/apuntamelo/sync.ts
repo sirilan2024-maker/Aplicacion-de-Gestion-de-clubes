@@ -255,6 +255,25 @@ export async function syncApuntameloTeam(
         errors.push(`Error al guardar partidos en ffcv_matches: ${mErr.message}`);
       } else {
         matchesUpdated = matchRecords.length;
+
+        // Limpiar registros huérfanos obsoletos en ffcv_matches para este grupo
+        // (ocurre cuando Apúntamelo sustituye el ID provisional de calendario por un ID nuevo de acta disputada)
+        const currentMatchIds = new Set(matchRecords.map((m: any) => m.ffcv_match_id));
+        const { data: existingGroupMatches } = await supabase
+          .from('ffcv_matches')
+          .select('ffcv_match_id')
+          .eq('ffcv_group_id', groupIdStr);
+
+        const orphanIds = (existingGroupMatches || [])
+          .map((m: any) => m.ffcv_match_id)
+          .filter((id: string) => !currentMatchIds.has(id));
+
+        if (orphanIds.length > 0) {
+          await supabase
+            .from('ffcv_matches')
+            .delete()
+            .in('ffcv_match_id', orphanIds);
+        }
       }
     }
   } catch (err: any) {

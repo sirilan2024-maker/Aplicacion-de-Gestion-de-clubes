@@ -203,6 +203,7 @@ export async function syncApuntameloTeam(
 
   // 3. Obtener todos los partidos del grupo desde Apúntamelo
   let allGroupMatches: any[] = [];
+  const realScoresMap = new Map<string, { homeScore: number; awayScore: number }>();
   try {
     const rawMatches = await fetchApuntameloJson(
       `https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=${config.orgId}&grupo=${config.grupoId}`
@@ -213,12 +214,46 @@ export async function syncApuntameloTeam(
       const matchdayNumbers = rawMatches.map((m: any) => Number(m.Jornada)).filter(Boolean);
       totalMatchdays = matchdayNumbers.length > 0 ? Math.max(...matchdayNumbers) : 0;
 
+      // Obtener resultados reales de los partidos jugados para evitar truncamiento por regla de 5 goles en formativo
+      const playedMatchesInGroup = rawMatches.filter(
+        (m: any) => m.Goles_A !== null && m.Goles_B !== null && m.Goles_A !== undefined && m.Goles_B !== undefined
+      );
+
+      await Promise.all(
+        playedMatchesInGroup.map(async (pm: any) => {
+          try {
+            const mDetail = await fetchApuntameloJson<any[]>(`https://apuntamelo.com/obtenerInfoPartido?id=${pm.Id}`);
+            if (Array.isArray(mDetail) && mDetail.length > 0 && mDetail[0].Json_goles) {
+              const gList = JSON.parse(mDetail[0].Json_goles || '[]');
+              let cA = 0;
+              let cB = 0;
+              gList.forEach((g: any) => {
+                if (Number(g.FK_EquipoLiga) === Number(pm.FK_EquipoLiga_A)) cA++;
+                if (Number(g.FK_EquipoLiga) === Number(pm.FK_EquipoLiga_B)) cB++;
+              });
+              if (cA + cB > 0) {
+                realScoresMap.set(String(pm.Id), {
+                  homeScore: Math.max(Number(pm.Goles_A) || 0, cA),
+                  awayScore: Math.max(Number(pm.Goles_B) || 0, cB)
+                });
+              }
+            }
+          } catch (err) {
+            // Mantener goles de cabecera si falla la petición individual
+          }
+        })
+      );
+
       const matchRecords: FFCVMatchRecord[] = rawMatches.map((m: any) => {
         const hasScore = m.Goles_A !== null && m.Goles_B !== null && m.Goles_A !== undefined && m.Goles_B !== undefined;
         const horaFormateada = m.Hora && typeof m.Hora === 'string' && m.Hora.trim() !== '' && m.Hora !== '00:00:00'
           ? m.Hora.slice(0, 5)
           : null;
         const isoDateTime = formatSpainDateTimeToIso(m.Fecha, horaFormateada);
+
+        const realScore = realScoresMap.get(String(m.Id));
+        const finalHomeScore = hasScore ? (realScore ? realScore.homeScore : Number(m.Goles_A)) : null;
+        const finalAwayScore = hasScore ? (realScore ? realScore.awayScore : Number(m.Goles_B)) : null;
 
         return {
           ffcv_match_id: String(m.Id),
@@ -235,8 +270,8 @@ export async function syncApuntameloTeam(
           away_team_name: m.Nombre_B || 'Visitante',
           home_shield_url: m.Escudo_A || null,
           away_shield_url: m.Escudo_B || null,
-          home_score: hasScore ? Number(m.Goles_A) : null,
-          away_score: hasScore ? Number(m.Goles_B) : null,
+          home_score: finalHomeScore,
+          away_score: finalAwayScore,
           status: hasScore ? 'played' : 'scheduled',
           pitch_name: m.Nombre_campo || null,
           codacta: String(m.Id),
@@ -325,8 +360,12 @@ export async function syncApuntameloTeam(
         : null;
       const isoDateTime = formatSpainDateTimeToIso(sm.Fecha, horaFormateada) || `${sm.Fecha}T10:00:00+02:00`;
       const hasScore = sm.Goles_A !== null && sm.Goles_B !== null && sm.Goles_A !== undefined && sm.Goles_B !== undefined;
-      const scorePropio = hasScore ? (isHome ? Number(sm.Goles_A) : Number(sm.Goles_B)) : null;
-      const scoreRival = hasScore ? (isHome ? Number(sm.Goles_B) : Number(sm.Goles_A)) : null;
+      
+      const realScore = realScoresMap.get(String(sm.Id));
+      const effectiveHomeScore = realScore ? realScore.homeScore : (hasScore ? Number(sm.Goles_A) : null);
+      const effectiveAwayScore = realScore ? realScore.awayScore : (hasScore ? Number(sm.Goles_B) : null);
+      const scorePropio = hasScore ? (isHome ? effectiveHomeScore : effectiveAwayScore) : null;
+      const scoreRival = hasScore ? (isHome ? effectiveAwayScore : effectiveHomeScore) : null;
       const estado = hasScore ? 'Finalizado' : 'Programado';
       const lugar = isHome ? 'Local' : 'Visitante';
 
@@ -395,6 +434,45 @@ export async function syncApuntameloTeam(
 
           if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
             const mInfo = matchInfoArr[0];
+
+            // Reconciliar goles reales de los jugadores si difieren del marcador truncado por regla formativa de 5 goles
+            try {
+              const gList = JSON.parse(mInfo.Json_goles || '[]');
+              let cA = 0;
+              let cB = 0;
+              gList.forEach((g: any) => {
+                if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_A)) cA++;
+                if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_B)) cB++;
+              });
+              if (cA + cB > 0) {
+                const finalA = Math.max(Number(sm.Goles_A) || 0, cA);
+                const finalB = Math.max(Number(sm.Goles_B) || 0, cB);
+                const finalPropio = isHome ? finalA : finalB;
+                const finalRival = isHome ? finalB : finalA;
+
+                await supabase
+                  .from('partidos')
+                  .update({
+                    resultado_propio: finalPropio,
+                    resultado_rival: finalRival,
+                    estado: 'Finalizado'
+                  })
+                  .eq('id', resolvedMatchId);
+
+                await supabase
+                  .from('ffcv_matches')
+                  .update({
+                    home_score: finalA,
+                    away_score: finalB,
+                    status: 'played',
+                    is_closed: true
+                  })
+                  .eq('ffcv_match_id', String(sm.Id));
+              }
+            } catch (errGoles) {
+              console.warn('[syncApuntameloTeam] Error reconciliando Json_goles:', errGoles);
+            }
+
             const { data: teamPlayers } = await supabase
               .from('players')
               .select('id, first_name, last_name, dorsal, team_id')
@@ -409,6 +487,16 @@ export async function syncApuntameloTeam(
                   Number(p.FK_EquipoLiga) === config.teamApuntameloId ||
                   Number(p.EquipoLiga) === config.teamApuntameloId
               );
+
+              // Cargar convocatorias existentes para preservar minutos manuales si los hay
+              const { data: existingConvs } = await supabase
+                .from('convocatorias')
+                .select('player_id, minutos_jugados, minutes_played')
+                .eq('partido_id', resolvedMatchId);
+              const existingConvMap = new Map((existingConvs || []).map((c: any) => [c.player_id, c.minutos_jugados ?? c.minutes_played]));
+
+              // Duración reglamentaria exacta: Infantil 70 mins (2x35'), Cadete 80 mins (2x40'), Juvenil 90 mins (2x45')
+              const categoryDuration = getOfficialMatchDuration(config.category || team.name, 'Liga Brave');
 
               const convocatoriasToUpsert: any[] = [];
               for (const pStats of teamPuntuaciones) {
@@ -439,8 +527,12 @@ export async function syncApuntameloTeam(
                   }
                 }
 
-                const categoryDuration = getOfficialMatchDuration(config.teamName, 'Liga Brave');
-                const calculatedMins = pStats.Suplente ? Math.round(categoryDuration / 2) : categoryDuration;
+                const prevMins = existingConvMap.get(matched.id);
+                const hasManualMins = typeof prevMins === 'number' && prevMins > 0 && prevMins <= categoryDuration;
+
+                const calculatedMins = hasManualMins
+                  ? prevMins
+                  : (pStats.Suplente ? Math.round(categoryDuration / 2) : categoryDuration);
 
                 convocatoriasToUpsert.push({
                   partido_id: resolvedMatchId,

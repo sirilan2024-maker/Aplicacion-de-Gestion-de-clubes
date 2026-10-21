@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Loader2, Settings, Mail, Lock, ShieldCheck, AlertCircle } from "lucide-react"
 import toast from "react-hot-toast"
 import { NotificationPreferencesCard } from "@/components/features/profile/NotificationPreferencesCard"
+import { updateUserEmailAction } from "@/app/actions/user-actions"
 
 export default function MiPerfilPage() {
   const router = useRouter()
@@ -39,13 +40,16 @@ export default function MiPerfilPage() {
     if (!trimmedEmail || trimmedEmail === userEmail) return
 
     setEmailLoading(true)
-    const { error } = await supabase.auth.updateUser({ email: trimmedEmail })
+    const result = await updateUserEmailAction(trimmedEmail)
     setEmailLoading(false)
 
-    if (error) {
-      toast.error(error.message)
+    if (!result.success) {
+      toast.error(result.error || "Error al actualizar email")
     } else {
-      toast.success("Te hemos enviado un correo de confirmación a ambas direcciones. Debes confirmar el cambio.")
+      toast.success(result.message || "Email actualizado con éxito")
+      if (result.email) {
+        setUserEmail(result.email)
+      }
       setNewEmail("")
     }
   }

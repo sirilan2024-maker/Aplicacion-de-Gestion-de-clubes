@@ -306,8 +306,11 @@ export default function PlayerProfilePage() {
           processedMatches.add(m.id);
         }
       });
-      // Orden del más cercano en fecha al más lejano
-      mHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Ordenar partidos: próximos del más cercano al más lejano; pasados del más reciente al más antiguo
+      const todayDateStr = new Date().toISOString().slice(0, 10);
+      const upcomingMatches = mHistory.filter(m => (m.date || '') >= todayDateStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const pastMatches = mHistory.filter(m => (m.date || '') < todayDateStr).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const sortedMHistory = [...upcomingMatches, ...pastMatches];
 
       // Entrenamientos y Asistencia
       const { data: attData } = await supabase
@@ -339,11 +342,13 @@ export default function PlayerProfilePage() {
           processedEvents.add(e.id);
         }
       });
-      // Orden del más cercano en fecha al más lejano
-      tHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Ordenar entrenamientos: próximos del más cercano al más lejano; pasados del más reciente al más antiguo
+      const upcomingT = tHistory.filter(t => (t.date || '') >= todayDateStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const pastT = tHistory.filter(t => (t.date || '') < todayDateStr).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const sortedTHistory = [...upcomingT, ...pastT];
 
-      setTrainingHistory(tHistory);
-      setMatchHistory(mHistory);
+      setTrainingHistory(sortedTHistory);
+      setMatchHistory(sortedMHistory);
 
     } catch (err) {
       console.error("Error fetching ACWR/Stats:", err);
@@ -378,8 +383,10 @@ export default function PlayerProfilePage() {
         });
       }
       
-      allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setPlayerEvents(allEvents);
+      const todayDateStr = new Date().toISOString().slice(0, 10);
+      const upcomingEvents = allEvents.filter(e => (e.date || '') >= todayDateStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const pastEvents = allEvents.filter(e => (e.date || '') < todayDateStr).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setPlayerEvents([...upcomingEvents, ...pastEvents]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -1526,16 +1533,28 @@ export default function PlayerProfilePage() {
                 ? playerEvents 
                 : playerEvents.filter(ev => ev.event_type === (attendanceFilter === 'entrenamientos' ? 'Entrenamiento' : 'Partido'));
                 
-              const totalEvents = filteredEvents.length;
+              const todayStr = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Europe/Madrid',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              }).format(new Date());
               
               // We must only count attendance for the filtered events
               const filteredEventIds = filteredEvents.map(e => e.id);
               const filteredAttendance = playerAttendance.filter(a => filteredEventIds.includes(a.event_id));
 
+              // Solo computan los eventos ya celebrados o con registro de asistencia (los futuros pendientes no penalizan el %)
+              const evaluatedEvents = filteredEvents.filter(ev => {
+                const hasRecord = filteredAttendance.some(a => a.event_id === ev.id || a.date === ev.date);
+                const isPast = ev.date && ev.date <= todayStr;
+                return hasRecord || isPast;
+              });
+
               const presents = filteredAttendance.filter(a => ['presente', 'present', 'justificado', 'excused', 'lesionado', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
               const absents = filteredAttendance.filter(a => a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent').length;
               const excused = filteredAttendance.filter(a => a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused').length;
-              const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 0;
+              const pct = evaluatedEvents.length > 0 ? Math.round((presents / evaluatedEvents.length) * 100) : 0;
 
               const faltasDetalle = filteredEvents.filter(ev => {
                 const rec = filteredAttendance.find(a => a.event_id === ev.id || a.date === ev.date);
@@ -1642,7 +1661,11 @@ export default function PlayerProfilePage() {
                             </div>
                             <div>
                               {!status ? (
-                                <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-md">Sin registrar</span>
+                                (ev.date && ev.date > todayStr) ? (
+                                  <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md">Pendiente</span>
+                                ) : (
+                                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-md">Sin registrar</span>
+                                )
                               ) : status === 'presente' || status === 'present' ? (
                                 <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-md">Presente</span>
                               ) : status === 'retraso' || status === 'late' ? (

@@ -400,21 +400,19 @@ export function SecretariaInscripciones() {
         parent1_name, parent1_phone, parent1_email, payment_method, payment_plan,
         registration_status, created_at, is_foreign, never_federated,
         player_documents(document_type, file_url, status),
-        teams(id, name, category)
+        teams(id, name, category, season_id)
       `)
       .eq("club_id", profile.club_id)
       .in("registration_status", ["pending_revision", "pending_payment", "formalized", "rejected"])
       .order("created_at", { ascending: false })
 
-    if (seasonPlayerIds.length > 0) {
-      playersQuery = playersQuery.in("id", seasonPlayerIds)
-    } else if (seasonRow?.start_date && seasonRow?.end_date) {
-      playersQuery = playersQuery.gte("created_at", `${seasonRow.start_date}T00:00:00.000Z`).lte("created_at", `${seasonRow.end_date}T23:59:59.999Z`)
+    if (seasonRow?.start_date && seasonRow?.end_date) {
+      playersQuery = playersQuery.gte("created_at", `${seasonRow.start_date}T00:00:00.000Z`)
     }
 
     let teamsQuery = supabase
       .from("teams")
-      .select("id, name, category")
+      .select("id, name, category, season_id")
       .eq("club_id", profile.club_id)
       .order("name", { ascending: true })
 
@@ -432,7 +430,30 @@ export function SecretariaInscripciones() {
       console.error("Error fetching inscriptions:", playersRes.error)
       toast.error("Error al cargar inscripciones")
     } else if (playersRes.data) {
-      setRequests(playersRes.data as any)
+      const activeTeamIds = new Set((teamsRes.data || []).map((t: any) => t.id));
+
+      const filteredPlayers = (playersRes.data as any[]).filter((p: any) => {
+        // 1. Exclusión estricta de la temporada 25/26 archivada (REGLA 1)
+        if (p.teams?.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+
+        // 2. Si la inscripción está pendiente de revisión, SIEMPRE debe mostrarse en Secretaría para gestionarla
+        if (p.registration_status === 'pending_revision') return true;
+
+        // 3. Si pertenece a la temporada por player_season_history
+        if (seasonPlayerIds.includes(p.id)) return true;
+
+        // 4. Si pertenece a un equipo de la temporada consultada
+        if (p.team_id && activeTeamIds.has(p.team_id)) return true;
+
+        // 5. Si fue creada durante las fechas de la temporada y aún no tiene equipo asignado
+        if (!p.team_id && seasonRow?.start_date && seasonRow?.end_date) {
+          return p.created_at >= `${seasonRow.start_date}T00:00:00.000Z` && p.created_at <= `${seasonRow.end_date}T23:59:59.999Z`;
+        }
+
+        return false;
+      });
+
+      setRequests(filteredPlayers)
     }
     setLoading(false)
   }, [selectedSeasonId])

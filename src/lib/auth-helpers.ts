@@ -126,12 +126,14 @@ export async function getAuthenticatedContext(): Promise<{
             }
           }
 
-          const { data: impProfile } = await adminClient
+          let impProfileQuery = adminClient
             .from("profiles")
-            .select("id, role, roles, club_id, first_name, last_name")
-            .eq("id", impersonatedUserId)
-            .eq("club_id", profile.club_id)
-            .maybeSingle();
+            .select("id, role, roles, club_id, first_name, last_name, linked_player_id")
+            .eq("id", impersonatedUserId);
+          if (profile.club_id) {
+            impProfileQuery = impProfileQuery.or(`club_id.eq.${profile.club_id},club_id.is.null`);
+          }
+          const { data: impProfile } = await impProfileQuery.maybeSingle();
 
           if (impProfile) {
             return {
@@ -155,12 +157,14 @@ export async function getAuthenticatedContext(): Promise<{
           }
 
           // Fallback: verificar si es un ID de jugador directo sin prefijo
-          const { data: fallbackPlayer } = await adminClient
+          let fallbackPlayerQuery = adminClient
             .from("players")
             .select("id, first_name, last_name, club_id, team_id, user_auth_id, tutor_id, teams(name)")
-            .eq("id", impersonatedUserId)
-            .eq("club_id", profile.club_id)
-            .maybeSingle();
+            .eq("id", impersonatedUserId);
+          if (profile.club_id) {
+            fallbackPlayerQuery = fallbackPlayerQuery.or(`club_id.eq.${profile.club_id},club_id.is.null`);
+          }
+          const { data: fallbackPlayer } = await fallbackPlayerQuery.maybeSingle();
 
           if (fallbackPlayer) {
             const teamName = (fallbackPlayer.teams as any)?.name;

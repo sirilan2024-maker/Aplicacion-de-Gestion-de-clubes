@@ -12,7 +12,7 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, roles")
+    .select("role, roles, linked_player_id")
     .eq("id", authData.user.id)
     .single();
 
@@ -25,17 +25,32 @@ export default async function DashboardPage() {
   } else if (role === 'coordinador' || role === 'coordinador_general') {
     redirect('/admin/coordinador');
   } else if (COACH_ROLES.includes(role || '')) {
+    // Si no tiene equipos como entrenador pero sí un jugador vinculado, redirigir a su ficha de jugador
+    const { data: coachTeams } = await supabase
+      .from('team_coaches')
+      .select('team_id')
+      .eq('user_id', authData.user.id)
+      .limit(1);
+
+    if ((!coachTeams || coachTeams.length === 0) && profile?.linked_player_id) {
+      redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
+    }
     redirect('/dashboard/mis-equipos');
   } else if (role === 'metodologo' || role === 'metodologia') {
     redirect('/admin/metodologia');
   } else if (role === 'utillero') {
     redirect('/dashboard/utilleria');
   } else if (role === 'jugador') {
+    if (profile?.linked_player_id) {
+      redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
+    }
+
     const { data: playerRec } = await supabase
       .from('players')
       .select('id')
-      .eq('user_auth_id', authData.user.id)
+      .or(`user_auth_id.eq.${authData.user.id},tutor_id.eq.${authData.user.id},user_id.eq.${authData.user.id}`)
       .neq('status', 'inactive')
+      .limit(1)
       .maybeSingle();
 
     if (playerRec) {
@@ -54,6 +69,9 @@ export default async function DashboardPage() {
     }
     redirect('/dashboard/family');
   } else if (role === 'tutor' || role === 'familia' || role === 'family') {
+    if (profile?.linked_player_id) {
+      redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
+    }
     redirect('/dashboard/family');
   }
 
@@ -64,10 +82,11 @@ export default async function DashboardPage() {
   else if (userRoles.includes('metodologo') || userRoles.includes('metodologia')) redirect('/admin/metodologia');
   else if (userRoles.includes('utillero')) redirect('/dashboard/utilleria');
   else if (userRoles.includes('jugador')) {
+    if (profile?.linked_player_id) redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
     const { data: playerRec } = await supabase
       .from('players')
       .select('id')
-      .eq('user_auth_id', authData.user.id)
+      .or(`user_auth_id.eq.${authData.user.id},tutor_id.eq.${authData.user.id},user_id.eq.${authData.user.id}`)
       .neq('status', 'inactive')
       .maybeSingle();
     if (playerRec) redirect(`/dashboard/family/e/${playerRec.id}/perfil`);

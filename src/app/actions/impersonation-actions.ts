@@ -46,7 +46,7 @@ export async function startImpersonationAction(targetUserId: string) {
     // 2. Caso: Perfil de usuario existente en profiles
     const { data: targetProfile } = await adminClient
       .from('profiles')
-      .select('id, role, roles, first_name, last_name, club_id')
+      .select('id, role, roles, first_name, last_name, club_id, linked_player_id')
       .eq('id', targetUserId)
       .maybeSingle();
 
@@ -62,12 +62,36 @@ export async function startImpersonationAction(targetUserId: string) {
       const role = targetProfile.role || 'family';
       const targetRoles: string[] = targetProfile.roles || [];
 
+      // Buscar si este perfil tiene un jugador directamente asociado
+      let associatedPlayerId = targetProfile.linked_player_id;
+      if (!associatedPlayerId) {
+        const { data: pRec } = await adminClient
+          .from('players')
+          .select('id')
+          .or(`user_auth_id.eq.${targetUserId},tutor_id.eq.${targetUserId}`)
+          .neq('status', 'inactive')
+          .limit(1)
+          .maybeSingle();
+        if (pRec) associatedPlayerId = pRec.id;
+      }
+
       if (role === 'admin' || role === 'superadmin' || targetRoles.includes('admin') || targetRoles.includes('superadmin')) {
         redirectUrl = '/admin/inicio';
       } else if (role === 'coordinador' || targetRoles.includes('coordinador')) {
         redirectUrl = '/admin/coordinador';
       } else if (role === 'coach' || role === 'entrenador' || role === 'delegado' || targetRoles.includes('coach') || targetRoles.includes('entrenador')) {
-        redirectUrl = '/dashboard/mis-equipos';
+        // Si no tiene equipos como entrenador pero sí un jugador vinculado, ir a la vista de jugador
+        const { data: coachingTeams } = await adminClient
+          .from('team_coaches')
+          .select('team_id')
+          .eq('user_id', targetUserId)
+          .limit(1);
+
+        if ((!coachingTeams || coachingTeams.length === 0) && associatedPlayerId) {
+          redirectUrl = `/dashboard/family/e/${associatedPlayerId}/perfil`;
+        } else {
+          redirectUrl = '/dashboard/mis-equipos';
+        }
       } else if (role === 'utillero') {
         redirectUrl = '/dashboard/utilleria';
       } else if (role === 'secretario') {
@@ -75,15 +99,8 @@ export async function startImpersonationAction(targetUserId: string) {
       } else if (role === 'tesorero') {
         redirectUrl = '/admin/tesoreria';
       } else if (role === 'tutor' || role === 'familia' || role === 'family' || role === 'jugador') {
-        const { data: playerRec } = await adminClient
-          .from('players')
-          .select('id')
-          .eq('user_auth_id', targetUserId)
-          .neq('status', 'inactive')
-          .maybeSingle();
-
-        if (playerRec) {
-          redirectUrl = `/dashboard/family/e/${playerRec.id}/perfil`;
+        if (associatedPlayerId) {
+          redirectUrl = `/dashboard/family/e/${associatedPlayerId}/perfil`;
         } else {
           const { data: tutorLink } = await adminClient
             .from('player_tutors')
@@ -197,7 +214,7 @@ export async function getClubUsersForImpersonationAction() {
       .order('first_name', { ascending: true });
 
     if (clubId) {
-      profilesQuery = profilesQuery.eq('club_id', clubId);
+      profilesQuery = profilesQuery.or(`club_id.eq.${clubId},club_id.is.null`);
     }
 
     const { data: profiles, error: profilesError } = await profilesQuery;
@@ -216,8 +233,9 @@ export async function getClubUsersForImpersonationAction() {
     }
     const { data: activeSeason } = await activeSeasonQuery.maybeSingle();
 
-    // 5. Mapear jugadores de la temporada activa
+    // 5. Mapear jugadores y equipos de la temporada activa
     const seasonPlayerMap = new Map<string, { teamName: string }>();
+    const activeSeasonTeamIds = new Set<string>();
 
     if (activeSeason) {
       let pshQuery = adminClient
@@ -236,12 +254,22 @@ export async function getClubUsersForImpersonationAction() {
           });
         }
       });
+
+      let teamsQuery = adminClient
+        .from('teams')
+        .select('id, name')
+        .eq('season_id', activeSeason.id);
+      if (clubId) {
+        teamsQuery = teamsQuery.eq('club_id', clubId);
+      }
+      const { data: sTeams } = await teamsQuery;
+      (sTeams || []).forEach((t: any) => activeSeasonTeamIds.add(t.id));
     }
 
     // 6. Obtener jugadores activos del club
     let playersQuery = adminClient
       .from('players')
-      .select('id, first_name, last_name, avatar_url, team_id, teams(name), user_auth_id, status')
+      .select('id, first_name, last_name, avatar_url, team_id, teams(name, season_id), user_auth_id, status')
       .neq('status', 'inactive')
       .order('first_name', { ascending: true });
     if (clubId) {
@@ -278,25 +306,24 @@ export async function getClubUsersForImpersonationAction() {
       avatarUrl?: string | null;
     }> = [];
 
-    // Añadir perfiles de cuentas (Administración, Cuerpo Técnico, Familias)
+    // Añadir perfiles de cuentas (Administración, Cuerpo Técnico, Familias, Jugadores con cuenta)
     (profiles || []).forEach(p => {
-      const isStaff = ['coach', 'entrenador', 'delegado', 'coordinador', 'utillero'].includes(p.role);
-      const isAdmin = ['admin', 'superadmin', 'secretario', 'tesorero', 'directivo'].includes(p.role);
-      const roleLabel = roleLabels[p.role] || p.role || 'Usuario';
+      const isPlayer = p.role === 'jugador' || Boolean(p.linked_player_id);
+      const roleLabel = isPlayer ? 'Jugador' : (roleLabels[p.role] || p.role || 'Usuario');
+      const roleKey = isPlayer ? 'jugador' : (p.role || 'family');
 
       formattedList.push({
         id: p.id,
         name: `${p.first_name || 'Usuario'} ${p.last_name || ''}`.trim(),
-        roleKey: p.role || 'family',
+        roleKey: roleKey,
         roleLabel: roleLabel,
         avatarUrl: p.avatar_url,
       });
     });
 
-    // Añadir EXCLUSIVAMENTE los jugadores de la temporada actual activa
-    // Si hay temporada activa, mostramos solo sus jugadores (34-38), no los históricos de años anteriores
+    // Añadir jugadores de la temporada actual activa
     const playersToUse = activeSeason
-      ? (activePlayers || []).filter(p => seasonPlayerMap.has(p.id))
+      ? (activePlayers || []).filter(p => seasonPlayerMap.has(p.id) || (p.team_id && activeSeasonTeamIds.has(p.team_id)))
       : (activePlayers || []).filter(p => p.team_id);
 
     playersToUse.forEach(p => {

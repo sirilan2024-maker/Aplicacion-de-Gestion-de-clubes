@@ -10,14 +10,25 @@ export default async function FamilyPage() {
     redirect("/dashboard")
   }
 
-  // 1. Fetch direct tutor players
+  // 0. Check profile linked_player_id
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("linked_player_id")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+
+  if (profile?.linked_player_id) {
+    redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
+  }
+
+  // 1. Fetch direct tutor or player account
   const { data: directPlayers } = await supabase
     .from("players")
     .select(`
       id, first_name, last_name, avatar_url, dorsal, posicion_principal, status,
       teams (id, name)
     `)
-    .eq("tutor_id", authData.user.id)
+    .or(`tutor_id.eq.${authData.user.id},user_auth_id.eq.${authData.user.id},user_id.eq.${authData.user.id}`)
     .neq("status", "inactive");
 
   if (directPlayers && directPlayers.length > 0) {

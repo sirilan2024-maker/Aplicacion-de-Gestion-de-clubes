@@ -83,7 +83,7 @@ export async function POST(request: Request) {
               title: `⏰ Recordatorio: ${eventTitle} (${teamName})`,
               content: `Recordatorio de cita para ${p.first_name}: ${eventTitle} el ${formattedDate} a las ${formattedTime}.`,
               link: `/dashboard/family/e/${p.id}/eventos`,
-              channels: ['IN_APP' as const, 'EMAIL' as const],
+              channels: ['IN_APP' as const, 'EMAIL' as const, 'PUSH' as const],
               idempotencyKey: `reminder:event:${ev.id}:${p.id}:${targetUserId}`,
               emailSubject: `⏰ Recordatorio (Próximas 24h): ${eventTitle} - ${teamName}`,
               emailHtml: getEventReminderEmailHtml({
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
               title: `⚽ Recordatorio de Partido: ${teamName} vs ${p.rival_nombre || 'Rival'}`,
               content: `Recordatorio de partido para ${pl.first_name}: ${teamName} vs ${p.rival_nombre || 'Rival'} el ${matchDate} a las ${matchTime}.`,
               link: `/dashboard/family/e/${pl.id}/partidos`,
-              channels: ['IN_APP' as const, 'EMAIL' as const],
+              channels: ['IN_APP' as const, 'EMAIL' as const, 'PUSH' as const],
               idempotencyKey: `reminder:match:${p.id}:${pl.id}:${targetUserId}`,
               emailSubject: `⚽ Recordatorio de Partido: ${teamName} vs ${p.rival_nombre}`,
               emailHtml: getConvocationEmailHtml({
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
                 title: `🔋 Cuestionario de Bienestar: ${training.title || 'Entrenamiento'}`,
                 content: `Hola ${wellnessEval.recipient.displayName}. Por favor completa el estado físico previo de ${player.first_name} antes del entrenamiento.`,
                 link: `/wellness/${training.id}?p=${player.id}`,
-                channels: ['IN_APP' as const, 'EMAIL' as const],
+                channels: ['IN_APP' as const, 'EMAIL' as const, 'PUSH' as const],
                 idempotencyKey: wellnessEval.idempotencyKey,
                 emailSubject: `🔋 Bienestar previo: ${training.title || 'Entrenamiento'} - ${teamName}`,
               })
@@ -283,7 +283,7 @@ export async function POST(request: Request) {
                   title: `📊 Valoración de Esfuerzo (RPE): ${training.title || 'Entrenamiento'}`,
                   content: `Hola ${feedbackEval.recipient.displayName}. Registra el esfuerzo percibido y minutos de ${player.first_name} en la sesión.`,
                   link: `/feedback/${training.id}?p=${player.id}`,
-                  channels: ['IN_APP' as const, 'EMAIL' as const],
+                  channels: ['IN_APP' as const, 'EMAIL' as const, 'PUSH' as const],
                   idempotencyKey: feedbackEval.idempotencyKey,
                   emailSubject: `📊 Valoración de sesión (RPE): ${training.title || 'Entrenamiento'} - ${teamName}`,
                 })

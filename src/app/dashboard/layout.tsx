@@ -5,6 +5,7 @@ import { MobileNavigation } from "@/components/layout/MobileNavigation"
 import { GlobalAdminNotifications } from "@/components/features/admin/GlobalAdminNotifications"
 import { RgpdGuard } from "@/components/layout/RgpdGuard"
 import { EmailVerificationGuard } from "@/components/layout/EmailVerificationGuard"
+import { PushNotificationBanner } from "@/components/features/notifications/PushNotificationBanner"
 
 export const metadata: Metadata = {
   title: "Dashboard | Gestión Club Deportivo",
@@ -34,6 +35,7 @@ export default function DashboardLayout({
         {/* Page Content */}
         <div className="flex-1 p-2 sm:p-4 md:p-8 md:overflow-y-auto w-full md:h-full no-scrollbar">
           <div className="max-w-7xl mx-auto w-full">
+            <PushNotificationBanner />
             {children}
           </div>
         </div>

@@ -4,6 +4,7 @@ import { MobileNavigation } from "@/components/layout/MobileNavigation"
 import { redirect } from "next/navigation"
 import { signOut } from "@/lib/auth-actions"
 import { getAuthenticatedContext, ADMIN_ROLES } from "@/lib/auth-helpers"
+import { PushNotificationBanner } from "@/components/features/notifications/PushNotificationBanner"
 
 export default async function AdminLayout({
   children,
@@ -35,8 +36,10 @@ export default async function AdminLayout({
       <MobileNavigation signOutAction={signOut} />
 
       <main className="flex-1 md:overflow-y-auto relative pb-16 md:pb-0 w-full md:h-full no-scrollbar">
-        {/* We can add a top navbar here if needed later */}
-        {children}
+        <div className="p-3 sm:p-5 md:p-8 max-w-7xl mx-auto w-full">
+          <PushNotificationBanner />
+          {children}
+        </div>
       </main>
     </div>
   )

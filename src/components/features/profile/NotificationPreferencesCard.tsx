@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Mail, Smartphone, Loader2, CheckCircle2, Lock, ShieldAlert } from "lucide-react"
+import { Bell, Mail, Smartphone, Loader2, CheckCircle2, Lock, ShieldAlert, Send, SmartphoneNfc } from "lucide-react"
 import { getUserPreferencesAction, updateUserPreferenceAction, UserPreferenceItem } from "@/app/actions/preference-actions"
+import { isPushSupported, getCurrentPushSubscription, subscribeToPush } from "@/lib/push-client"
 import toast from "react-hot-toast"
 
 interface PreferenceCategory {
@@ -55,10 +56,21 @@ export function NotificationPreferencesCard() {
   const [preferences, setPreferences] = useState<Record<string, UserPreferenceItem>>({})
   const [loading, setLoading] = useState(true)
   const [updatingKey, setUpdatingKey] = useState<string | null>(null)
+  const [isPushActive, setIsPushActive] = useState(false)
+  const [testingPush, setTestingPush] = useState(false)
+  const [enablingPush, setEnablingPush] = useState(false)
 
   useEffect(() => {
     loadPreferences()
+    checkDevicePushStatus()
   }, [])
+
+  const checkDevicePushStatus = async () => {
+    if (isPushSupported()) {
+      const sub = await getCurrentPushSubscription()
+      setIsPushActive(Boolean(sub))
+    }
+  }
 
   const loadPreferences = async () => {
     setLoading(true)
@@ -69,7 +81,7 @@ export function NotificationPreferencesCard() {
     setLoading(false)
   }
 
-  const handleToggle = async (type: string, channel: 'in_app' | 'email') => {
+  const handleToggle = async (type: string, channel: 'in_app' | 'email' | 'push') => {
     const current = preferences[type]
     if (!current) return
 
@@ -88,8 +100,14 @@ export function NotificationPreferencesCard() {
       return
     }
 
+    if (channel === 'push' && !current.clubPush) {
+      toast.error("Este canal está desactivado globalmente por la política del club", { id: "club-off-push" })
+      return
+    }
+
     const nextInApp = channel === 'in_app' ? !current.inAppEnabled : current.inAppEnabled
     const nextEmail = channel === 'email' ? !current.emailEnabled : current.emailEnabled
+    const nextPush = channel === 'push' ? !current.pushEnabled : current.pushEnabled
 
     // Update optimistic state
     setPreferences(prev => ({
@@ -98,8 +116,10 @@ export function NotificationPreferencesCard() {
         ...current,
         inAppEnabled: nextInApp,
         emailEnabled: nextEmail,
+        pushEnabled: nextPush,
         effectiveInApp: current.clubInApp && nextInApp,
         effectiveEmail: current.clubEmail && nextEmail,
+        effectivePush: current.clubPush && nextPush,
       },
     }))
 
@@ -108,6 +128,7 @@ export function NotificationPreferencesCard() {
       notificationType: type,
       inAppEnabled: nextInApp,
       emailEnabled: nextEmail,
+      pushEnabled: nextPush,
     })
     setUpdatingKey(null)
 
@@ -116,6 +137,40 @@ export function NotificationPreferencesCard() {
     } else {
       toast.error(res.error || "Error al guardar preferencia")
       loadPreferences() // rollback
+    }
+  }
+
+  const handleEnableDevicePush = async () => {
+    setEnablingPush(true)
+    try {
+      const res = await subscribeToPush()
+      if (res.success && res.subscription) {
+        setIsPushActive(true)
+        toast.success("¡Dispositivo suscrito con éxito a las notificaciones Push!")
+      } else {
+        toast.error(res.error || "No se pudo suscribir este dispositivo.")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error al habilitar notificaciones.")
+    } finally {
+      setEnablingPush(false)
+    }
+  }
+
+  const handleSendTestPush = async () => {
+    setTestingPush(true)
+    try {
+      const res = await fetch('/api/push/test', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast.success("¡Aviso de prueba enviado a tu móvil!", { icon: '📲', duration: 4000 })
+      } else {
+        toast.error(data.error || "No se pudo enviar el aviso de prueba.")
+      }
+    } catch {
+      toast.error("Error de conexión al enviar la prueba.")
+    } finally {
+      setTestingPush(false)
     }
   }
 
@@ -155,7 +210,8 @@ export function NotificationPreferencesCard() {
 
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      {/* HEADER CON BOTÓN DE TEST */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
             <Bell className="w-5 h-5" />
@@ -165,11 +221,37 @@ export function NotificationPreferencesCard() {
             <p className="text-xs text-slate-500">Configura dónde deseas recibir cada tipo de aviso del club.</p>
           </div>
         </div>
+
+        {/* ESTADO PUSH & PRUEBA */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {isPushActive ? (
+            <button
+              type="button"
+              onClick={handleSendTestPush}
+              disabled={testingPush}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
+              title="Envía una notificación push de prueba a tu móvil para comprobar que todo funciona"
+            >
+              {testingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              <span>Enviar aviso de prueba</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleEnableDevicePush}
+              disabled={enablingPush}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
+              title="Activar notificaciones push en este dispositivo"
+            >
+              {enablingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SmartphoneNfc className="w-3.5 h-3.5" />}
+              <span>Activar en este móvil</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="divide-y divide-slate-100">
         {visibleCategories.map(cat => {
-          // Primary type for this category
           const primaryType = cat.types[0]
           const pref = preferences[primaryType]
           if (!pref) return null
@@ -177,6 +259,7 @@ export function NotificationPreferencesCard() {
           const isLocked = !pref.canModify
           const isClubInAppOff = !pref.clubInApp
           const isClubEmailOff = !pref.clubEmail
+          const isClubPushOff = !pref.clubPush
 
           return (
             <div key={cat.id} className="py-4.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -196,7 +279,7 @@ export function NotificationPreferencesCard() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 sm:gap-4 pl-6 sm:pl-0">
+              <div className="flex items-center gap-2 sm:gap-3 pl-6 sm:pl-0 flex-wrap sm:flex-nowrap">
                 {/* IN_APP TOGGLE */}
                 <button
                   type="button"
@@ -257,15 +340,35 @@ export function NotificationPreferencesCard() {
                   {isLocked && !isClubEmailOff && <Lock className="w-2.5 h-2.5 text-slate-400 ml-0.5" />}
                 </button>
 
-                {/* PUSH (NO OPERATIVO / PRÓXIMAMENTE) */}
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100/60 border border-slate-200/60 text-slate-400 text-[11px] font-semibold cursor-not-allowed opacity-60"
-                  title="Canal Web Push en fase de preparación de infraestructura"
+                {/* PUSH TOGGLE */}
+                <button
+                  type="button"
+                  onClick={() => cat.types.forEach(t => handleToggle(t, 'push'))}
+                  disabled={Boolean(updatingKey) || isLocked || isClubPushOff}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                    isClubPushOff
+                      ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60 line-through"
+                      : isLocked
+                      ? pref.effectivePush
+                        ? "bg-purple-50/70 border-purple-200/70 text-purple-700 cursor-not-allowed opacity-80"
+                        : "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                      : pref.effectivePush
+                      ? "bg-purple-50 border-purple-200 text-purple-700 shadow-xs hover:bg-purple-100"
+                      : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600"
+                  }`}
+                  title={
+                    isClubPushOff
+                      ? "Canal Push desactivado por política global del club"
+                      : isLocked
+                      ? "Preferencia fijada por la administración del club"
+                      : "Activar/desactivar notificaciones push en el móvil"
+                  }
                 >
                   <Smartphone className="w-3.5 h-3.5" />
-                  <span>Push</span>
-                  <span className="text-[9px] bg-slate-200 text-slate-600 px-1 rounded-sm">Pronto</span>
-                </div>
+                  <span>Móvil (Push)</span>
+                  {pref.effectivePush && !isClubPushOff && <CheckCircle2 className="w-3 h-3 text-purple-600" />}
+                  {isLocked && !isClubPushOff && <Lock className="w-2.5 h-2.5 text-slate-400 ml-0.5" />}
+                </button>
               </div>
             </div>
           )
@@ -274,4 +377,3 @@ export function NotificationPreferencesCard() {
     </div>
   )
 }
-

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { Bell, Check, X } from "lucide-react"
+import Link from "next/link"
+import { Bell, Check, X, Smartphone, ArrowRight } from "lucide-react"
 import { getUnreadNotificationsAction, markNotificationAsReadAction, markAllNotificationsAsReadAction } from "@/app/actions/notification-actions"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -40,7 +41,7 @@ export function NotificationBell() {
       if (!error && data) {
         setNotifications(data)
       }
-    } catch (err) {
+    } catch {
       // Safe silent catch: best-effort polling should never throw or trigger reloads
     }
   }
@@ -72,7 +73,7 @@ export function NotificationBell() {
           setLinkedPlayerId(players[0].id)
         }
       }
-    } catch (e) {
+    } catch {
       // silently fail - context is best-effort
     }
   }
@@ -89,7 +90,6 @@ export function NotificationBell() {
     // Deep link based on notification type
     switch (type) {
       case 'reminder':
-        // Entrenamiento/evento reminder → go to eventos page for family
         if (isFamilyRole && linkedPlayerId) {
           return `/dashboard/family/e/${linkedPlayerId}/eventos`
         }
@@ -97,14 +97,12 @@ export function NotificationBell() {
 
       case 'partido':
       case 'convocatoria':
-        // Match notification → go to partidos page for family
         if (isFamilyRole && linkedPlayerId) {
           return `/dashboard/family/e/${linkedPlayerId}/partidos`
         }
         return '/dashboard/matches'
 
       case 'tesoreria':
-        // Treasury notification → go to family perfil (shows pending fees)
         if (isFamilyRole && linkedPlayerId) {
           return `/dashboard/family/e/${linkedPlayerId}/perfil`
         }
@@ -120,7 +118,6 @@ export function NotificationBell() {
 
   const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    // Remove from state immediately (optimistic UI)
     setNotifications(prev => prev.filter(n => n.id !== id))
     try {
       await markNotificationAsReadAction(id)
@@ -130,7 +127,6 @@ export function NotificationBell() {
   }
 
   const handleMarkAllAsRead = async () => {
-    // Clear entire list immediately (optimistic UI)
     setNotifications([])
     setIsOpen(false)
     try {
@@ -141,17 +137,15 @@ export function NotificationBell() {
   }
 
   const handleNotificationClick = async (notification: any) => {
-    // Optimistic removal
     setNotifications(prev => prev.filter(n => n.id !== notification.id))
     setIsOpen(false)
 
     try {
       markNotificationAsReadAction(notification.id).catch(() => {})
-    } catch (err) {
+    } catch {
       // ignore
     }
 
-    // Navigate to the right place
     const url = getNavigationUrl(notification)
     router.push(url)
   }
@@ -165,7 +159,8 @@ export function NotificationBell() {
           e.stopPropagation();
           setIsOpen(prev => !prev);
         }}
-        className="relative p-2 transition-transform hover:scale-105 rounded-full hover:bg-slate-100 flex items-center justify-center"
+        className="relative p-2 transition-transform hover:scale-105 rounded-full hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+        aria-label="Abrir notificaciones"
       >
         <Bell className="w-5 h-5 text-slate-700" />
         {unreadCount > 0 && (
@@ -192,14 +187,14 @@ export function NotificationBell() {
               {unreadCount > 0 && (
                 <button 
                   onClick={handleMarkAllAsRead}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+                  className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
                 >
                   <Check size={14} /> Borrar todas
                 </button>
               )}
             </div>
             
-            <div className="max-h-[65vh] overflow-y-auto divide-y divide-slate-100">
+            <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100">
               {notifications.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-sm space-y-1">
                   <p className="font-bold text-slate-700">Sin notificaciones</p>
@@ -227,7 +222,7 @@ export function NotificationBell() {
 
                     <button 
                       onClick={(e) => handleMarkAsRead(notif.id, e)}
-                      className="absolute right-3 top-3.5 p-1 text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute right-3 top-3.5 p-1 text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       title="Descartar notificación"
                     >
                       <X size={14} />
@@ -235,6 +230,21 @@ export function NotificationBell() {
                   </div>
                 ))
               )}
+            </div>
+
+            {/* FOOTER DIRECTO A AJUSTES DE AVISOS EN EL MÓVIL */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100">
+              <Link
+                href="/dashboard/mi-perfil"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-between text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-indigo-600" />
+                  <span>Avisos Push en tu móvil</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-indigo-400" />
+              </Link>
             </div>
           </div>
         </>,

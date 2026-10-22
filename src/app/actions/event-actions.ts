@@ -74,7 +74,7 @@ export async function createTeamEventAction(teamId: string, eventData: any, clie
             title: `📅 Nuevo ${eventTitle} - ${teamName}`,
             content: `Se ha programado una nueva sesión (${eventTitle}) para el ${formattedDate} a las ${formattedTime}.`,
             link: `/dashboard/family/e/${p.id}/eventos`,
-            channels: ['IN_APP' as const, 'EMAIL' as const],
+            channels: ['IN_APP' as const, 'EMAIL' as const, 'PUSH' as const],
             idempotencyKey: `new_event:${data.id}:${p.id}:${targetUserId}`,
             emailSubject: `📅 [${teamName}] Nuevo ${eventTitle}: ${formattedDate}`,
             emailHtml: getEventReminderEmailHtml({

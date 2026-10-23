@@ -253,10 +253,12 @@ export default function ArchivedMembersPage() {
                 filteredMembers.map((member) => (
                   <tr 
                     key={member.id} 
-                    className={`hover:bg-gray-50/80 transition-colors ${member.team_id ? 'cursor-pointer' : ''}`}
+                    className="hover:bg-gray-50/80 transition-colors cursor-pointer"
                     onClick={() => {
                       if (member.team_id) {
                         router.push(`/dashboard/equipos/${member.team_id}/jugador/${member.id}`)
+                      } else {
+                        router.push(`/dashboard/club/jugador/${member.id}`)
                       }
                     }}
                   >

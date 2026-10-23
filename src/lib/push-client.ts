@@ -142,9 +142,9 @@ export async function subscribeToPush(): Promise<{
       };
     }
 
-    // 4. Enviar la suscripción al backend con timeout de seguridad
+    // 4. Enviar la suscripción al backend con timeout de seguridad (15s)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch('/api/push/subscribe', {
       method: 'POST',

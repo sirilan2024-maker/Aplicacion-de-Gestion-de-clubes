@@ -8,6 +8,7 @@ import toast, { Toaster } from "react-hot-toast"
 import { archivePlayerAction, updatePlayerPositionAction, exportRgpdAction, createFamilyAndPlayerAction, getClubStaffAction } from "@/app/actions/player-actions"
 import { updateUserRoleAction, updateUserRolesAction, generateStaffInviteAction, assignStaffToTeamAction, cancelStaffInvitationAction, promotePlayerToStaffAction, updateMemberRolesAndTeamsAction } from "@/app/actions/club-actions"
 import Link from "next/link"
+import { DeletePlayerModal } from "@/components/features/players/DeletePlayerModal"
 import { PendingRequestsReview } from "@/components/features/admin/PendingRequestsReview"
 import { X, Copy, Check, Link as LinkIcon, Edit3, XCircle } from "lucide-react"
 import { useSeason } from "@/components/providers/SeasonProvider"
@@ -1016,6 +1017,7 @@ function GlobalMembersContent() {
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showAltaAsistida, setShowAltaAsistida] = useState(false);
   const [managingMember, setManagingMember] = useState<Member | null>(null)
+  const [selectedPlayerForDeletion, setSelectedPlayerForDeletion] = useState<Member | null>(null)
   const [exportingRgpd, setExportingRgpd] = useState(false)
 
   const handleExportRgpd = async () => {
@@ -1770,11 +1772,14 @@ function GlobalMembersContent() {
                       )}
                       {member.type === 'player' && (
                         <button 
-                          onClick={(e) => handleArchive(e, member.id)}
-                          disabled={archivingId === member.id}
-                          className="text-red-500 p-1.5 rounded-md hover:bg-red-50 disabled:opacity-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPlayerForDeletion(member);
+                          }}
+                          className="text-red-500 hover:text-red-700 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                          title="Dar de baja o eliminar jugador"
                         >
-                          {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                          <Archive className="w-4 h-4" />
                         </button>
                       )}
                   </div>
@@ -1928,12 +1933,14 @@ function GlobalMembersContent() {
                         )}
                         {member.type === 'player' && (
                           <button 
-                            onClick={(e) => handleArchive(e, member.id)}
-                            disabled={archivingId === member.id}
-                            className="text-red-500 hover:text-red-700 p-1.5 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
-                            title="Archivar miembro"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPlayerForDeletion(member);
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                            title="Dar de baja o eliminar jugador"
                           >
-                            {archivingId === member.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                            <Archive className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -1950,6 +1957,23 @@ function GlobalMembersContent() {
       <AddPlayerModal open={showAddPlayer} onClose={() => setShowAddPlayer(false)} onSuccess={fetchMembers} clubId={clubId} teams={allTeams} />
       <AltaAsistidaModal open={showAltaAsistida} onClose={() => { setShowAltaAsistida(false); fetchMembers(); }} clubId={clubId} />
       <ManageStaffModal open={!!managingMember} onClose={() => setManagingMember(null)} member={managingMember} teams={allTeams} onSuccess={fetchMembers} />
+      <DeletePlayerModal
+        isOpen={!!selectedPlayerForDeletion}
+        onClose={() => setSelectedPlayerForDeletion(null)}
+        player={
+          selectedPlayerForDeletion
+            ? {
+                id: selectedPlayerForDeletion.id,
+                first_name: selectedPlayerForDeletion.first_name,
+                last_name: selectedPlayerForDeletion.last_name,
+                team_name: selectedPlayerForDeletion.team_name,
+              }
+            : null
+        }
+        onSuccess={() => {
+          fetchMembers();
+        }}
+      />
     </div>
   )
 }

@@ -18,6 +18,7 @@ import { PlayerProgressView } from "@/components/features/formative/PlayerProgre
 import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjuriesSection";
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { ManagePlayerPinModal } from "@/components/features/players/ManagePlayerPinModal";
+import { DeletePlayerModal } from "@/components/features/players/DeletePlayerModal";
 import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
@@ -157,6 +158,7 @@ export default function GlobalPlayerProfilePage() {
   const [openInjuryModal, setOpenInjuryModal] = useState<boolean>(false);
   const [showFfcvModal, setShowFfcvModal] = useState<boolean>(false);
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
 
   // Foto oficial FFCV en vivo (efímera en memoria, sin almacenar en BD)
   const ephemeralAvatar = useEphemeralFfcvAvatar(player?.id, Boolean(player?.avatar_url));
@@ -1080,6 +1082,16 @@ export default function GlobalPlayerProfilePage() {
                 >
                   <Edit3 size={16} /> Editar Perfil
                 </button>
+                {player.status !== 'inactive' && (
+                  <button 
+                    type="button"
+                    onClick={() => setShowDeleteModal(true)}
+                    className="flex items-center justify-center w-full sm:w-auto gap-2 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-2 rounded-lg font-medium transition-colors border border-rose-200/60 text-xs sm:text-sm active:scale-95"
+                    title="Dar de baja o eliminar jugador"
+                  >
+                    <Trash2 size={16} /> Dar de baja
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex w-full sm:w-auto gap-2 mt-2 sm:mt-0">
@@ -2354,6 +2366,23 @@ export default function GlobalPlayerProfilePage() {
           onClose={() => setShowPinModal(false)}
           playerId={player.id}
           playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
+        />
+      )}
+
+      {/* MODAL GESTIÓN DE BAJA / ELIMINACIÓN */}
+      {player && (
+        <DeletePlayerModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          player={{
+            id: player.id,
+            first_name: player.first_name,
+            last_name: player.last_name,
+            team_name: teamName || "Este equipo",
+          }}
+          onSuccess={() => {
+            router.push('/dashboard/club/miembros');
+          }}
         />
       )}
     </div>

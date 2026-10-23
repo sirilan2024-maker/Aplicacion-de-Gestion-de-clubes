@@ -2,28 +2,13 @@
  * Sporting Saladar - Service Worker Oficial para PWA y Web Push
  */
 
-const CACHE_NAME = 'sporting-saladar-v2';
-
-// Recursos esenciales que siempre deben estar disponibles
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/icons/icon-192x192.svg',
-  '/icons/icon-512x512.svg',
-];
+const CACHE_NAME = 'sporting-saladar-v3';
 
 // ==============================================================================
-// 1. INSTALACIÓN INMEDIATA (Sin dependencias de chunks estáticos obsoletos)
+// 1. INSTALACIÓN INMEDIATA (0 ms, sin bloqueos de red ni precache fallido)
 // ==============================================================================
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[SW] Error en precache básico (no crítico):', err);
-      });
-    })
-  );
 });
 
 // ==============================================================================
@@ -40,6 +25,13 @@ self.addEventListener('activate', (event) => {
       }),
     ])
   );
+});
+
+// Escuchar orden explícita de activación
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // ==============================================================================

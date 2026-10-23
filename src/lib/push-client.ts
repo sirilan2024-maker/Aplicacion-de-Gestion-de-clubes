@@ -51,10 +51,23 @@ export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegis
       return reg;
     }
 
-    // Esperar a ready con timeout defensivo de 5 segundos
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+
+    // Esperar a ready con timeout defensivo de 8 segundos
     const readyPromise = navigator.serviceWorker.ready;
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
     const readyReg = await Promise.race([readyPromise, timeoutPromise]);
+
+    if (readyReg && readyReg.active) {
+      return readyReg;
+    }
+
+    const freshReg = await navigator.serviceWorker.getRegistration();
+    if (freshReg?.active) {
+      return freshReg;
+    }
 
     return (readyReg as ServiceWorkerRegistration) || reg;
   } catch (error) {
@@ -116,7 +129,7 @@ export async function subscribeToPush(): Promise<{
     }
 
     // 2. Obtener registro del Service Worker y asegurar que esté activo
-    const registration = await getServiceWorkerRegistration();
+    let registration = await getServiceWorkerRegistration();
     if (!registration) {
       return {
         success: false,
@@ -124,17 +137,37 @@ export async function subscribeToPush(): Promise<{
       };
     }
 
+    // Si aún no está activo, esperar a navigator.serviceWorker.ready
     if (!registration.active) {
       const readyReg = await Promise.race([
         navigator.serviceWorker.ready,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
       ]);
-      if (!readyReg?.active && !registration.active) {
-        return {
-          success: false,
-          error: 'El Service Worker se está instalando. Por favor, pulsa el botón de nuevo en un segundo.',
-        };
+      if (readyReg?.active) {
+        registration = readyReg;
       }
+    }
+
+    // Sondeo defensivo si sigue instalando
+    if (!registration.active) {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const currentReg = await navigator.serviceWorker.getRegistration();
+        if (currentReg?.active) {
+          registration = currentReg;
+          break;
+        }
+        if (currentReg?.waiting) {
+          currentReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+    }
+
+    if (!registration.active) {
+      return {
+        success: false,
+        error: 'El servicio de notificaciones se está inicializando. Por favor, pulsa el botón de nuevo.',
+      };
     }
 
     // 3. Preparar clave pública en ArrayBuffer exacto

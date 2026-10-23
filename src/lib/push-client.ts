@@ -71,6 +71,8 @@ export async function getCurrentPushSubscription(): Promise<PushSubscription | n
   }
 }
 
+const DEFAULT_VAPID_PUBLIC_KEY = 'BE0ACBxtzHhw-ELSeWXKduhChMlCMzfKDA5eQzgNmzYtmD0xDmTeIcvydHa94EKX2WDFmf1ZSvEtUvgsVEKtTtg';
+
 /**
  * Solicita permiso y registra la suscripción en el servidor (/api/push/subscribe)
  */
@@ -86,7 +88,7 @@ export async function subscribeToPush(): Promise<{
     };
   }
 
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
   if (!vapidPublicKey) {
     return {
       success: false,

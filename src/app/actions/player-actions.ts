@@ -264,8 +264,10 @@ export async function archivePlayerAction(playerId: string, isArchived: boolean 
       return { success: false, error: { message: authError || "No autenticado" } };
     }
 
-    if (!ADMIN_ROLES.includes(context.profile.role)) {
-      return { success: false, error: { message: "Solo los administradores pueden archivar o desarchivar jugadores" } };
+    const userRole = (context.profile.role || "").toLowerCase();
+    const isStaff = ADMIN_ROLES.some(r => r.toLowerCase() === userRole) || COACH_ROLES.some(r => r.toLowerCase() === userRole);
+    if (!isStaff) {
+      return { success: false, error: { message: "Solo los administradores y técnicos autorizados pueden archivar o desarchivar jugadores" } };
     }
 
     const adminClient = createAdminClient();
@@ -302,7 +304,10 @@ export async function archivePlayerAction(playerId: string, isArchived: boolean 
     }
 
     revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/dashboard/club/miembros/archivo');
+    revalidatePath('/dashboard/equipos');
     revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page');
+    revalidatePath('/dashboard/equipos/[teamId]/asistencia', 'page');
     
     return { success: true };
   } catch (err: any) {
@@ -393,8 +398,10 @@ export async function deletePlayerAction(playerId: string) {
       return { success: false, error: { message: authError || "No autenticado" } };
     }
 
-    if (!ADMIN_ROLES.includes(context.profile.role)) {
-      return { success: false, error: { message: "Solo los administradores pueden eliminar jugadores" } };
+    const userRole = (context.profile.role || "").toLowerCase();
+    const isStaff = ADMIN_ROLES.some(r => r.toLowerCase() === userRole) || COACH_ROLES.some(r => r.toLowerCase() === userRole);
+    if (!isStaff) {
+      return { success: false, error: { message: "Solo los administradores y técnicos autorizados pueden eliminar jugadores" } };
     }
 
     const adminClient = createAdminClient();
@@ -403,10 +410,25 @@ export async function deletePlayerAction(playerId: string) {
       return { success: false, error: { message: access.reason || "No autorizado para eliminar este jugador" } };
     }
 
-    // 1. Manually cascade delete from related tables to avoid FK constraint errors
-    await adminClient.from('player_season_history').delete().eq('player_id', playerId).eq('club_id', context.profile.club_id);
-    await adminClient.from('player_tutors').delete().eq('player_id', playerId);
-    await adminClient.from('player_medical_records').delete().eq('player_id', playerId);
+    // 1. Manually cascade delete from all related child tables in parallel to prevent FK constraint errors
+    const cascadeDeletions = [
+      adminClient.from('attendance').delete().eq('player_id', playerId),
+      adminClient.from('convocatorias').delete().eq('player_id', playerId),
+      adminClient.from('partidos_convocados').delete().eq('player_id', playerId),
+      adminClient.from('player_evaluations').delete().eq('player_id', playerId),
+      adminClient.from('player_wellness').delete().eq('player_id', playerId),
+      adminClient.from('player_notes').delete().eq('player_id', playerId),
+      adminClient.from('player_injuries').delete().eq('player_id', playerId),
+      adminClient.from('player_penalties').delete().eq('player_id', playerId),
+      adminClient.from('player_equipment').delete().eq('player_id', playerId),
+      adminClient.from('player_fees').delete().eq('player_id', playerId),
+      adminClient.from('player_authorizations').delete().eq('player_id', playerId),
+      adminClient.from('player_documents').delete().eq('player_id', playerId),
+      adminClient.from('player_medical_records').delete().eq('player_id', playerId),
+      adminClient.from('player_tutors').delete().eq('player_id', playerId),
+      adminClient.from('player_season_history').delete().eq('player_id', playerId).eq('club_id', context.profile.club_id),
+    ];
+    await Promise.allSettled(cascadeDeletions);
 
     // 2. Hard delete from players table
     const { error } = await adminClient
@@ -421,6 +443,10 @@ export async function deletePlayerAction(playerId: string) {
     }
 
     revalidatePath('/dashboard/club/miembros');
+    revalidatePath('/dashboard/club/miembros/archivo');
+    revalidatePath('/dashboard/equipos');
+    revalidatePath('/dashboard/equipos/[teamId]/plantilla', 'page');
+    revalidatePath('/dashboard/equipos/[teamId]/asistencia', 'page');
     
     return { success: true };
   } catch (err: any) {

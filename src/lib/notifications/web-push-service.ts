@@ -23,11 +23,13 @@ export interface SendPushParams {
   payload: string | WebPushPayload;
 }
 
+const DEFAULT_VAPID_PUBLIC_KEY = 'BE0ACBxtzHhw-ELSeWXKduhChMlCMzfKDA5eQzgNmzYtmD0xDmTeIcvydHa94EKX2WDFmf1ZSvEtUvgsVEKtTtg';
+
 /**
  * Comprueba si las variables de entorno VAPID están configuradas en el servidor
  */
 export function isVapidConfigured(): boolean {
-  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   return Boolean(publicKey && privateKey);
 }
@@ -36,7 +38,7 @@ export function isVapidConfigured(): boolean {
  * Inicializa los detalles VAPID en web-push si las claves están presentes
  */
 function ensureVapidDetails(): boolean {
-  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const publicKey = process.env.VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT || 'mailto:soporte@sportingsaladar.com';
 

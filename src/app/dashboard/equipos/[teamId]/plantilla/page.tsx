@@ -9,6 +9,7 @@ import { updatePlayerPositionAction } from "@/app/actions/player-actions";
 import { getTeamCoachesProfilesAction } from "@/app/actions/team-actions";
 import { useExport } from "@/components/providers/ExportContext";
 import { ExportPinsModal } from "@/components/features/teams/ExportPinsModal";
+import { DeletePlayerModal } from "@/components/features/players/DeletePlayerModal";
 
 interface Player {
   id: string;
@@ -38,6 +39,8 @@ export default function PlantillaEquipoPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState<string>("");
+  const [selectedPlayerForDeletion, setSelectedPlayerForDeletion] = useState<Player | null>(null);
 
   // Edit Modal State
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -67,6 +70,9 @@ export default function PlantillaEquipoPage() {
     if (!teamId) return;
     const supabase = createClient();
     try {
+      const { data: teamData } = await supabase.from('teams').select('name').eq('id', teamId).maybeSingle();
+      if (teamData?.name) setTeamName(teamData.name);
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
@@ -409,6 +415,19 @@ export default function PlantillaEquipoPage() {
                       {!isReadOnly && (
                         <td className="px-6 py-4 text-center rounded-r-xl border-y border-r border-gray-200 group-hover:border-gray-300">
                           <div className="flex items-center justify-center gap-2">
+                            {!esEntrenador && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPlayerForDeletion(player);
+                                }}
+                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
+                                title="Dar de baja o eliminar jugador"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
                             <div className="p-2 text-slate-300 group-hover:text-blue-500 transition-colors bg-slate-50 rounded-full group-hover:bg-blue-50">
                               <ChevronRight size={18} />
                             </div>
@@ -501,13 +520,28 @@ export default function PlantillaEquipoPage() {
                     </div>
                   </div>
 
-                  {/* Dorsal a la derecha sin almohadilla */}
-                  {player.dorsal && (
-                    <div className="flex flex-col items-center justify-center min-w-10 px-2.5 py-1 bg-slate-900 text-white rounded-xl shadow-xs ml-3 flex-shrink-0">
-                      <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 leading-none">Dorsal</span>
-                      <span className="text-base font-black leading-tight">{player.dorsal}</span>
-                    </div>
-                  )}
+                  {/* Dorsal y acciones a la derecha */}
+                  <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                    {player.dorsal && (
+                      <div className="flex flex-col items-center justify-center min-w-10 px-2.5 py-1 bg-slate-900 text-white rounded-xl shadow-xs">
+                        <span className="text-[9px] uppercase font-extrabold tracking-wider text-slate-400 leading-none">Dorsal</span>
+                        <span className="text-base font-black leading-tight">{player.dorsal}</span>
+                      </div>
+                    )}
+                    {!isReadOnly && !esEntrenador && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPlayerForDeletion(player);
+                        }}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors border border-slate-100"
+                        title="Dar de baja o eliminar jugador"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs relative z-10">
@@ -702,6 +736,25 @@ export default function PlantillaEquipoPage() {
         teamId={teamId}
         players={players}
         onPinsUpdated={fetchData}
+      />
+
+      {/* MODAL DE GESTIÓN DE BAJA / ELIMINACIÓN DE JUGADOR */}
+      <DeletePlayerModal
+        isOpen={!!selectedPlayerForDeletion}
+        onClose={() => setSelectedPlayerForDeletion(null)}
+        player={
+          selectedPlayerForDeletion
+            ? {
+                id: selectedPlayerForDeletion.id,
+                first_name: selectedPlayerForDeletion.first_name,
+                last_name: selectedPlayerForDeletion.last_name,
+                team_name: teamName || "Este equipo",
+              }
+            : null
+        }
+        onSuccess={() => {
+          fetchData();
+        }}
       />
     </div>
   );

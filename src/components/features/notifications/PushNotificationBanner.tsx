@@ -65,6 +65,9 @@ export function PushNotificationBanner() {
         setPermission('granted')
         toast.success('¡Notificaciones activadas en este dispositivo!')
       } else {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+          setPermission('denied')
+        }
         toast.error(res.error || 'No se pudieron activar las notificaciones.')
       }
     } catch (err: any) {

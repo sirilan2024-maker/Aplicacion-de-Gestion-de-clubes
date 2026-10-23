@@ -34,21 +34,27 @@ export function getPushPermissionState(): NotificationPermission | 'unsupported'
 }
 
 /**
- * Registra o reutiliza el Service Worker del proyecto
+ * Registra o reutiliza el Service Worker del proyecto sin bloqueos
  */
 export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) return null;
 
   try {
-    const existing = await navigator.serviceWorker.getRegistration();
-    if (existing) {
-      await navigator.serviceWorker.ready;
-      return existing;
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     }
 
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-    await navigator.serviceWorker.ready;
-    return reg;
+    if (reg.active) {
+      return reg;
+    }
+
+    // Esperar a ready con timeout defensivo de 3 segundos para evitar que cuelgue en móviles
+    const readyPromise = navigator.serviceWorker.ready;
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+    const readyReg = await Promise.race([readyPromise, timeoutPromise]);
+
+    return (readyReg as ServiceWorkerRegistration) || reg;
   } catch (error) {
     console.warn('[PushClient] Error obteniendo Service Worker Registration:', error);
     return null;
@@ -75,6 +81,9 @@ const DEFAULT_VAPID_PUBLIC_KEY = 'BE0ACBxtzHhw-ELSeWXKduhChMlCMzfKDA5eQzgNmzYtmD
 
 /**
  * Solicita permiso y registra la suscripción en el servidor (/api/push/subscribe)
+ * IMPORTANTE: Notification.requestPermission() se invoca de forma prioritaria
+ * para aprovechar el gesto directo del usuario ('User Gesture') sin que el navegador
+ * lo revoque o lo bloquee por esperas asíncronas previas.
  */
 export async function subscribeToPush(): Promise<{
   success: boolean;
@@ -89,32 +98,33 @@ export async function subscribeToPush(): Promise<{
   }
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
-  if (!vapidPublicKey) {
-    return {
-      success: false,
-      error: 'NEXT_PUBLIC_VAPID_PUBLIC_KEY no está configurada.',
-    };
-  }
 
   try {
+    // 1. SOLICITAR PERMISO INMEDIATAMENTE ANTE EL CLICK DEL USUARIO
+    let permission: NotificationPermission = Notification.permission;
+    if (permission !== 'granted') {
+      permission = await Notification.requestPermission();
+    }
+
+    if (permission !== 'granted') {
+      return {
+        success: false,
+        error: permission === 'denied' 
+          ? 'Has bloqueado las notificaciones en los ajustes del navegador.' 
+          : 'Permiso de notificaciones no concedido.',
+      };
+    }
+
+    // 2. Obtener registro del Service Worker
     const registration = await getServiceWorkerRegistration();
     if (!registration) {
       return {
         success: false,
-        error: 'No se pudo inicializar el Service Worker.',
+        error: 'No se pudo inicializar el Service Worker en segundo plano.',
       };
     }
 
-    // 1. Solicitar permiso explícito al usuario
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      return {
-        success: false,
-        error: 'Permiso de notificaciones no concedido.',
-      };
-    }
-
-    // 2. Obtener o crear la suscripción en el navegador
+    // 3. Obtener o crear la suscripción en el navegador
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
@@ -128,16 +138,20 @@ export async function subscribeToPush(): Promise<{
     if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
       return {
         success: false,
-        error: 'Estructura de PushSubscription incompleta proporcionada por el navegador.',
+        error: 'Estructura de suscripción incompleta recibida del navegador.',
       };
     }
 
-    // 3. Enviar la suscripción al backend
+    // 4. Enviar la suscripción al backend con timeout de seguridad
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         endpoint: subJson.endpoint,
         keys: {
@@ -146,6 +160,7 @@ export async function subscribeToPush(): Promise<{
         },
       }),
     });
+    clearTimeout(timeoutId);
 
     const result = await response.json();
     if (!response.ok || !result.success) {
@@ -163,7 +178,9 @@ export async function subscribeToPush(): Promise<{
     console.error('[PushClient.subscribeToPush Error]:', error);
     return {
       success: false,
-      error: error.message || 'Error inesperado durante la suscripción Push.',
+      error: error.name === 'AbortError' 
+        ? 'Tiempo de espera agotado al conectar con el servidor.' 
+        : (error.message || 'Error inesperado durante la activación.'),
     };
   }
 }

@@ -34,7 +34,7 @@ export function getPushPermissionState(): NotificationPermission | 'unsupported'
 }
 
 /**
- * Registra o reutiliza el Service Worker del proyecto sin bloqueos
+ * Registra o reutiliza el Service Worker del proyecto asegurando estado activo
  */
 export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushSupported()) return null;
@@ -43,15 +43,17 @@ export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegis
     let reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
       reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    } else {
+      reg.update().catch(() => {});
     }
 
     if (reg.active) {
       return reg;
     }
 
-    // Esperar a ready con timeout defensivo de 4 segundos
+    // Esperar a ready con timeout defensivo de 5 segundos
     const readyPromise = navigator.serviceWorker.ready;
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
     const readyReg = await Promise.race([readyPromise, timeoutPromise]);
 
     return (readyReg as ServiceWorkerRegistration) || reg;
@@ -81,8 +83,6 @@ const DEFAULT_VAPID_PUBLIC_KEY = 'BE0ACBxtzHhw-ELSeWXKduhChMlCMzfKDA5eQzgNmzYtmD
 
 /**
  * Solicita permiso y registra la suscripción en el servidor (/api/push/subscribe)
- * Notification.requestPermission() se invoca de forma inmediata para
- * garantizar el gesto directo del usuario.
  */
 export async function subscribeToPush(): Promise<{
   success: boolean;
@@ -100,7 +100,7 @@ export async function subscribeToPush(): Promise<{
   let controller: AbortController | null = null;
 
   try {
-    // 1. SOLICITAR PERMISO INMEDIATAMENTE ANTE EL CLICK DEL USUARIO
+    // 1. SOLICITAR PERMISO INMEDIATAMENTE ANTE EL CLICK DEL USUARIO (User Gesture)
     let permission: NotificationPermission = Notification.permission;
     if (permission !== 'granted') {
       permission = await Notification.requestPermission();
@@ -115,13 +115,26 @@ export async function subscribeToPush(): Promise<{
       };
     }
 
-    // 2. Obtener registro del Service Worker
+    // 2. Obtener registro del Service Worker y asegurar que esté activo
     const registration = await getServiceWorkerRegistration();
     if (!registration) {
       return {
         success: false,
         error: 'No se pudo inicializar el Service Worker en segundo plano.',
       };
+    }
+
+    if (!registration.active) {
+      const readyReg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      if (!readyReg?.active && !registration.active) {
+        return {
+          success: false,
+          error: 'El Service Worker se está instalando. Por favor, pulsa el botón de nuevo en un segundo.',
+        };
+      }
     }
 
     // 3. Preparar clave pública en ArrayBuffer exacto

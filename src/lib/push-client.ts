@@ -49,9 +49,9 @@ export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegis
       return reg;
     }
 
-    // Esperar a ready con timeout defensivo de 3 segundos para evitar que cuelgue en móviles
+    // Esperar a ready con timeout defensivo de 4 segundos
     const readyPromise = navigator.serviceWorker.ready;
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
     const readyReg = await Promise.race([readyPromise, timeoutPromise]);
 
     return (readyReg as ServiceWorkerRegistration) || reg;
@@ -81,9 +81,8 @@ const DEFAULT_VAPID_PUBLIC_KEY = 'BE0ACBxtzHhw-ELSeWXKduhChMlCMzfKDA5eQzgNmzYtmD
 
 /**
  * Solicita permiso y registra la suscripción en el servidor (/api/push/subscribe)
- * IMPORTANTE: Notification.requestPermission() se invoca de forma prioritaria
- * para aprovechar el gesto directo del usuario ('User Gesture') sin que el navegador
- * lo revoque o lo bloquee por esperas asíncronas previas.
+ * Notification.requestPermission() se invoca de forma inmediata para
+ * garantizar el gesto directo del usuario.
  */
 export async function subscribeToPush(): Promise<{
   success: boolean;
@@ -98,6 +97,7 @@ export async function subscribeToPush(): Promise<{
   }
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+  let controller: AbortController | null = null;
 
   try {
     // 1. SOLICITAR PERMISO INMEDIATAMENTE ANTE EL CLICK DEL USUARIO
@@ -110,7 +110,7 @@ export async function subscribeToPush(): Promise<{
       return {
         success: false,
         error: permission === 'denied' 
-          ? 'Has bloqueado las notificaciones en los ajustes del navegador.' 
+          ? 'Has bloqueado las notificaciones en los ajustes de tu navegador.' 
           : 'Permiso de notificaciones no concedido.',
       };
     }
@@ -124,14 +124,34 @@ export async function subscribeToPush(): Promise<{
       };
     }
 
-    // 3. Obtener o crear la suscripción en el navegador
-    let subscription = await registration.pushManager.getSubscription();
+    // 3. Preparar clave pública en ArrayBuffer exacto
+    const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+    const applicationServerKey = convertedVapidKey.buffer.slice(
+      convertedVapidKey.byteOffset,
+      convertedVapidKey.byteOffset + convertedVapidKey.byteLength
+    );
+
+    // 4. Obtener o crear la suscripción en el navegador
+    let subscription: PushSubscription | null = null;
+    try {
+      subscription = await registration.pushManager.getSubscription();
+    } catch (e) {
+      console.warn('[PushClient] Error leyendo suscripción previa:', e);
+    }
+
     if (!subscription) {
-      const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey as unknown as BufferSource,
-      });
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as ArrayBuffer,
+        });
+      } catch (subErr: any) {
+        console.error('[PushClient] Error en pushManager.subscribe:', subErr);
+        return {
+          success: false,
+          error: `Error en servicio push del navegador: ${subErr.message || subErr.name}`,
+        };
+      }
     }
 
     const subJson = subscription.toJSON();
@@ -142,9 +162,9 @@ export async function subscribeToPush(): Promise<{
       };
     }
 
-    // 4. Enviar la suscripción al backend con timeout de seguridad (15s)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    // 5. Enviar la suscripción al backend con timeout de seguridad (15s)
+    controller = new AbortController();
+    const timeoutId = setTimeout(() => controller?.abort(), 15000);
 
     const response = await fetch('/api/push/subscribe', {
       method: 'POST',
@@ -176,11 +196,15 @@ export async function subscribeToPush(): Promise<{
     };
   } catch (error: any) {
     console.error('[PushClient.subscribeToPush Error]:', error);
+    if (controller?.signal?.aborted) {
+      return {
+        success: false,
+        error: 'Tiempo de espera agotado al conectar con el servidor (15s).',
+      };
+    }
     return {
       success: false,
-      error: error.name === 'AbortError' 
-        ? 'Tiempo de espera agotado al conectar con el servidor.' 
-        : (error.message || 'Error inesperado durante la activación.'),
+      error: error.message || error.name || 'Error inesperado durante la activación.',
     };
   }
 }

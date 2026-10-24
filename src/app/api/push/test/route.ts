@@ -32,15 +32,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Despachar notificación de prueba a través de NotificationService
+    // Despachar notificación de prueba a través de NotificationService (Push, In-App y Email)
     const result = await NotificationService.dispatch({
       userId: user.id,
       userEmail: user.email,
       type: 'GENERAL_ALERT',
       title: '🔔 Sporting Saladar - Notificación de prueba',
-      content: '¡Excelente! Tu móvil está listo para recibir avisos de partidos, eventos y cambios de última hora en segundo plano.',
+      content: '¡Excelente! Tu dispositivo y tu correo están listos para recibir avisos de partidos, eventos y cambios de última hora.',
       link: '/dashboard',
-      channels: ['PUSH', 'IN_APP'],
+      channels: ['PUSH', 'IN_APP', 'EMAIL'],
       idempotencyKey: `test_push:${user.id}:${Date.now()}`,
     });
 

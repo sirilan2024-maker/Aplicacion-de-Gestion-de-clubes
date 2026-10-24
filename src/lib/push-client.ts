@@ -92,6 +92,55 @@ export async function getCurrentPushSubscription(): Promise<PushSubscription | n
   }
 }
 
+/**
+ * Asegura que la suscripción Push local del navegador esté sincronizada en el servidor para el usuario autenticado actual
+ */
+export async function syncPushSubscriptionToServer(existingSub?: PushSubscription | null): Promise<{
+  success: boolean;
+  synced: boolean;
+  error?: string;
+}> {
+  if (!isPushSupported()) {
+    return { success: false, synced: false, error: 'Web Push no soportado' };
+  }
+
+  try {
+    const sub = existingSub || (await getCurrentPushSubscription());
+    if (!sub) {
+      return { success: false, synced: false, error: 'No hay suscripción en este navegador' };
+    }
+
+    const subJson = sub.toJSON();
+    if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) {
+      return { success: false, synced: false, error: 'Suscripción incompleta' };
+    }
+
+    const response = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        endpoint: subJson.endpoint,
+        keys: {
+          p256dh: subJson.keys.p256dh,
+          auth: subJson.keys.auth,
+        },
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    return {
+      success: response.ok && Boolean(result.success),
+      synced: true,
+      error: result.error,
+    };
+  } catch (err: any) {
+    console.warn('[PushClient] Error sincronizando suscripción en servidor:', err);
+    return { success: false, synced: false, error: err.message };
+  }
+}
+
 const DEFAULT_VAPID_PUBLIC_KEY = 'BE0ACBxtzHhw-ELSeWXKduhChMlCMzfKDA5eQzgNmzYtmD0xDmTeIcvydHa94EKX2WDFmf1ZSvEtUvgsVEKtTtg';
 
 /**

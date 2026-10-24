@@ -7,6 +7,7 @@ import {
   getPushPermissionState,
   getCurrentPushSubscription,
   subscribeToPush,
+  syncPushSubscriptionToServer,
 } from '@/lib/push-client'
 import toast from 'react-hot-toast'
 
@@ -44,6 +45,9 @@ export function PushNotificationBanner() {
         setPermission(state)
         getCurrentPushSubscription().then((sub) => {
           setIsSubscribed(Boolean(sub))
+          if (sub && state === 'granted') {
+            syncPushSubscriptionToServer(sub).catch(() => {})
+          }
         })
       }
     }
@@ -80,8 +84,23 @@ export function PushNotificationBanner() {
   const handleTestNotification = async () => {
     setTesting(true)
     try {
-      const res = await fetch('/api/push/test', { method: 'POST' })
-      const data = await res.json()
+      // 1. Sincronizar suscripción actual con el usuario de la sesión
+      await syncPushSubscriptionToServer()
+
+      let res = await fetch('/api/push/test', { method: 'POST' })
+      let data = await res.json()
+
+      // 2. Si el servidor dice que no hay suscripciones, intentar activar/re-vincular automáticamente
+      if (!res.ok && res.status === 400) {
+        const subRes = await subscribeToPush()
+        if (subRes.success) {
+          setIsSubscribed(true)
+          setPermission('granted')
+          res = await fetch('/api/push/test', { method: 'POST' })
+          data = await res.json()
+        }
+      }
+
       if (res.ok && data.success) {
         toast.success('¡Notificación enviada! Comprueba tu barra de notificaciones.', {
           icon: '📲',

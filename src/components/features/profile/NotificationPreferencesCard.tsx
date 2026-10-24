@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Bell, Mail, Smartphone, Loader2, CheckCircle2, Lock, ShieldAlert, Send, SmartphoneNfc } from "lucide-react"
 import { getUserPreferencesAction, updateUserPreferenceAction, UserPreferenceItem } from "@/app/actions/preference-actions"
-import { isPushSupported, getCurrentPushSubscription, subscribeToPush } from "@/lib/push-client"
+import { isPushSupported, getCurrentPushSubscription, subscribeToPush, syncPushSubscriptionToServer } from "@/lib/push-client"
 import toast from "react-hot-toast"
 
 interface PreferenceCategory {
@@ -68,7 +68,11 @@ export function NotificationPreferencesCard() {
   const checkDevicePushStatus = async () => {
     if (isPushSupported()) {
       const sub = await getCurrentPushSubscription()
-      setIsPushActive(Boolean(sub))
+      const active = Boolean(sub)
+      setIsPushActive(active)
+      if (sub && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        syncPushSubscriptionToServer(sub).catch(() => {})
+      }
     }
   }
 
@@ -160,8 +164,22 @@ export function NotificationPreferencesCard() {
   const handleSendTestPush = async () => {
     setTestingPush(true)
     try {
-      const res = await fetch('/api/push/test', { method: 'POST' })
-      const data = await res.json()
+      // 1. Asegurar sincronización de la suscripción local con la cuenta del usuario actual
+      await syncPushSubscriptionToServer()
+
+      let res = await fetch('/api/push/test', { method: 'POST' })
+      let data = await res.json()
+
+      // 2. Si el servidor responde que no hay suscripciones vinculadas para este usuario, vincular automáticamente
+      if (!res.ok && res.status === 400) {
+        const subRes = await subscribeToPush()
+        if (subRes.success) {
+          setIsPushActive(true)
+          res = await fetch('/api/push/test', { method: 'POST' })
+          data = await res.json()
+        }
+      }
+
       if (res.ok && data.success) {
         toast.success("¡Aviso de prueba enviado a tu móvil!", { icon: '📲', duration: 4000 })
       } else {
@@ -223,18 +241,30 @@ export function NotificationPreferencesCard() {
         </div>
 
         {/* ESTADO PUSH & PRUEBA */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           {isPushActive ? (
-            <button
-              type="button"
-              onClick={handleSendTestPush}
-              disabled={testingPush}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
-              title="Envía una notificación push de prueba a tu móvil para comprobar que todo funciona"
-            >
-              {testingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              <span>Enviar aviso de prueba</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleSendTestPush}
+                disabled={testingPush}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
+                title="Envía una notificación push de prueba a tu móvil para comprobar que todo funciona"
+              >
+                {testingPush ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>Enviar aviso de prueba</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleEnableDevicePush}
+                disabled={enablingPush}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-medium transition-colors disabled:opacity-60 cursor-pointer"
+                title="Re-sincronizar este dispositivo con tu cuenta actual"
+              >
+                {enablingPush ? <Loader2 className="w-3 h-3 animate-spin" /> : <SmartphoneNfc className="w-3 h-3" />}
+                <span>Re-vincular</span>
+              </button>
+            </>
           ) : (
             <button
               type="button"

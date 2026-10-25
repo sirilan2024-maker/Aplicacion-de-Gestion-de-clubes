@@ -1051,10 +1051,10 @@ export function LineupTab({
                       }
                     }}
                     className={[
-                      "rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group",
+                      "w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group",
                       isSelected 
-                        ? "w-11 h-11 border-2 border-cyan-300 bg-cyan-500/50 text-white shadow-lg shadow-cyan-400/60 ring-4 ring-cyan-400/40 scale-110 animate-pulse z-20"
-                        : "w-10 h-10 border-2 border-dashed border-white/60 bg-emerald-950/45 hover:bg-emerald-900/70 hover:border-white text-white/90 hover:scale-105"
+                        ? "border-2 border-cyan-300 bg-cyan-500/50 text-white shadow-lg shadow-cyan-400/60 ring-4 ring-cyan-400/40 scale-110 animate-pulse z-20"
+                        : "border-2 border-dashed border-white/60 bg-emerald-950/45 hover:bg-emerald-900/70 hover:border-white text-white/90 hover:scale-105"
                     ].join(" ")}
                     title={`Posición vacía: ${slot.label}. Toca para iluminar y colocar jugador.`}
                   >
@@ -1070,7 +1070,7 @@ export function LineupTab({
                     ].join(" ")} />
                   </button>
                   <span className={[
-                    "text-[8px] font-black uppercase tracking-wider mt-0.5 px-1 py-0.2 rounded shadow-2xs whitespace-nowrap select-none",
+                    "text-[8px] font-black uppercase tracking-wider mt-0.5 px-1.5 py-0.2 rounded shadow-2xs whitespace-nowrap select-none",
                     isSelected ? "bg-cyan-600 text-white font-extrabold" : "bg-emerald-950/80 text-emerald-200/90"
                   ].join(" ")}>
                     {isSelected ? 'Elegir' : 'Libre'}
@@ -1093,18 +1093,18 @@ export function LineupTab({
                   className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all duration-75 touch-none"
                 >
                   <div className="relative group flex flex-col items-center">
-                    {/* Badge de posición táctica que se mueve CON el jugador */}
+                    {/* Badge de posición táctica centrada en la parte superior del jugador */}
                     {tacticalPositionLabel && (
-                      <div className="absolute -top-2.5 -right-2.5 bg-blue-600 border border-white text-white text-[8px] font-black px-1.5 py-0.2 rounded-full shadow-md uppercase tracking-tight z-20 pointer-events-none select-none">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 border border-white text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md uppercase tracking-tight z-20 pointer-events-none select-none whitespace-nowrap">
                         {tacticalPositionLabel}
                       </div>
                     )}
 
                     <div
                       className={[
-                        "w-10 h-10 rounded-full bg-slate-900 border-2 flex items-center justify-center text-sm font-black shadow-md transition-all duration-200 select-none",
+                        "w-11 h-11 rounded-full bg-slate-900 border-2 overflow-hidden flex items-center justify-center shadow-md transition-all duration-200 select-none",
                         isFamilyView ? "cursor-default select-none border-white text-white" : "cursor-grab active:cursor-grabbing",
-                        selectedPlayerId === player.id ? "border-blue-400 text-blue-400 scale-110 shadow-blue-500/50 shadow-lg ring-4 ring-blue-500/30" : "border-white text-white"
+                        selectedPlayerId === player.id ? "border-cyan-400 scale-110 shadow-cyan-500/50 shadow-lg ring-4 ring-cyan-400/40" : "border-white"
                       ].join(" ")}
                       draggable={!isFamilyView}
                       onClick={(e) => {
@@ -1140,12 +1140,26 @@ export function LineupTab({
                          setDraggedPlayerId(null);
                       }}
                     >
-                      {player.number != null && player.number !== '' ? player.number : (player.avatar || '?')}
+                      {/* Foto del jugador o iniciales como fallback */}
+                      {player.avatarUrl ? (
+                        <img 
+                          src={player.avatarUrl} 
+                          alt={player.name} 
+                          draggable={false}
+                          className="w-full h-full object-cover object-[center_20%] pointer-events-none select-none" 
+                        />
+                      ) : (
+                        <span className="text-xs font-black text-white tracking-wider pointer-events-none select-none">
+                          {player.avatar || (player.name ? player.name[0] : 'J')}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/85 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap flex items-center gap-1">
-                      {tacticalPositionLabel && (
-                        <span className="text-blue-300 font-extrabold uppercase text-[8px] bg-blue-900/80 px-1 py-0.2 rounded">
-                          {tacticalPositionLabel}
+
+                    {/* Pastilla inferior: Dorsal (#) y Nombre juntos */}
+                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/90 border border-white/20 px-2 py-0.5 rounded-md shadow-md whitespace-nowrap flex items-center gap-1.5 select-none">
+                      {player.number != null && player.number !== '' && player.number !== '-' && (
+                        <span className="text-amber-400 font-mono font-black text-[9px]">
+                          #{player.number}
                         </span>
                       )}
                       <span>{pitchPlayerDisplayNames[player.id] || player.firstName || player.name.split(" ")[0]}</span>

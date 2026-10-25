@@ -871,6 +871,27 @@ export async function updatePlayerRatingsBatch(matchId: string, ratings: { playe
   return { success: true };
 }
 
+export async function updatePlayerNickname(playerId: string, nickname: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const trimmed = (nickname || '').trim();
+  const { error } = await adminSupabase
+    .from('players')
+    .update({ nickname: trimmed || null })
+    .eq('id', playerId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/dashboard', 'layout');
+  return { success: true, nickname: trimmed || null };
+}
+
+
 export async function saveLineup(matchId: string, assignedPlayers: {playerId: string, x: number, y: number}[], tactic: string) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {

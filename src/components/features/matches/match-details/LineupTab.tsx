@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useTransition, useEffect, useRef, useMemo } from "react"
-import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle, RotateCcw } from "lucide-react"
+import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle, RotateCcw, Pencil } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
-import { saveLineup } from "@/app/actions/match-actions"
+import { saveLineup, updatePlayerNickname } from "@/app/actions/match-actions"
 
 interface Player {
   id: string
@@ -12,6 +12,7 @@ interface Player {
   lastName?: string
   fullName?: string
   displayNameShort?: string
+  nickname?: string | null
   pos: string
   avatar: string
   demarcation: string
@@ -115,6 +116,37 @@ export const DEFAULT_FORMATIONS: Record<string, { id: string; label: string; x: 
   ]
 }
 
+
+function formatToTitleCase(str: string): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function getSingleFirstName(rawFirstName: string): string {
+  if (!rawFirstName) return 'Jugador';
+  const words = rawFirstName.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'Jugador';
+  if (words.length >= 2 && /^(el|al)$/i.test(words[0])) {
+    return formatToTitleCase(`${words[0]} ${words[1]}`);
+  }
+  return formatToTitleCase(words[0]);
+}
+
+function getFirstSurname(rawLastName: string): string {
+  if (!rawLastName) return '';
+  const parts = rawLastName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length >= 2 && /^(de|del|de\s+la|el|al)$/i.test(parts[0])) {
+    return formatToTitleCase(`${parts[0]} ${parts[1]}`);
+  }
+  return formatToTitleCase(parts[0]);
+}
+
 export function LineupTab({ 
   matchId, 
   players = [], 
@@ -129,29 +161,47 @@ export function LineupTab({
   const { rol } = useUserRole()
   const [isPending, startTransition] = useTransition()
   
-  const mappedPlayers: Player[] = players.map(p => {
-    const firstName = (p.first_name || '').trim();
-    const lastName = (p.last_name || '').trim();
-    const firstSurname = lastName.split(' ')[0] || '';
-    const fullName = `${firstName} ${lastName}`.trim();
-    const displayNameShort = firstSurname ? `${firstName} ${firstSurname}` : (firstName || "Jugador");
+  const buildMappedPlayers = (sourcePlayers: any[]): Player[] => {
+    return sourcePlayers.map(p => {
+      const rawFirst = (p.first_name || '').trim();
+      const rawLast = (p.last_name || '').trim();
+      const customNickname = (p.nickname || '').trim();
+      const singleFirstName = customNickname ? formatToTitleCase(customNickname) : getSingleFirstName(rawFirst);
+      const firstSurname = getFirstSurname(rawLast);
+      const displayNameShort = customNickname 
+        ? formatToTitleCase(customNickname) 
+        : (firstSurname ? `${singleFirstName} ${firstSurname}` : singleFirstName);
+      const fullName = `${formatToTitleCase(rawFirst)} ${formatToTitleCase(rawLast)}`.trim();
 
-    return {
-      id: p.id,
-      name: displayNameShort,
-      firstName,
-      lastName,
-      fullName: fullName || "Jugador",
-      displayNameShort,
-      pos: p.posicion_principal || p.posicion || "N/A",
-      avatar: `${(firstName && firstName[0]) || ''}${(firstSurname && firstSurname[0]) || ''}`,
-      demarcation: p.posicion || "Jugador",
-      number: p.dorsal,
-      avatarUrl: p.avatar_url
-    };
+      return {
+        id: p.id,
+        name: displayNameShort,
+        firstName: singleFirstName,
+        lastName: rawLast,
+        fullName: fullName || singleFirstName,
+        displayNameShort,
+        nickname: customNickname || null,
+        pos: p.posicion_principal || p.posicion || "N/A",
+        avatar: `${(singleFirstName && singleFirstName[0]) || ''}${(firstSurname && firstSurname[0]) || ''}`,
+        demarcation: p.posicion || "Jugador",
+        number: p.dorsal,
+        avatarUrl: p.avatar_url
+      };
+    });
+  };
+
+  const [playersList, setPlayersList] = useState<Player[]>(() => {
+    const list = buildMappedPlayers(players);
+    return list.length > 0 ? list : INITIAL_PLAYERS;
   });
-  
-  const initialPlayersList = mappedPlayers.length > 0 ? mappedPlayers : INITIAL_PLAYERS;
+
+  useEffect(() => {
+    if (players && players.length > 0) {
+      setPlayersList(buildMappedPlayers(players));
+    }
+  }, [players]);
+
+  const initialPlayersList = playersList;
 
   // Cargar sistemas personalizados guardados en localStorage
   const [customFormations, setCustomFormations] = useState<Record<string, { id: string; label: string; x: number; y: number }[]>>({})
@@ -176,7 +226,7 @@ export function LineupTab({
   
   // Titulares
   const titularesDb = convocatorias.filter(c => c.titular);
-  if (titularesDb.length > 0 && mappedPlayers.length > 0) {
+  if (titularesDb.length > 0 && playersList.length > 0) {
     titularesDb.forEach(c => {
       initialPitchPlayers[c.player_id] = { 
         x: c.tactical_x != null ? c.tactical_x : 50, 
@@ -204,6 +254,44 @@ export function LineupTab({
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showClearPitchModal, setShowClearPitchModal] = useState(false);
+  const [editingNicknamePlayer, setEditingNicknamePlayer] = useState<Player | null>(null);
+  const [newNicknameInput, setNewNicknameInput] = useState("");
+  const [isSavingNickname, setIsSavingNickname] = useState(false);
+
+  const handleSavePlayerNickname = async () => {
+    if (!editingNicknamePlayer) return;
+    setIsSavingNickname(true);
+    try {
+      const trimmed = newNicknameInput.trim();
+      const res = await updatePlayerNickname(editingNicknamePlayer.id, trimmed);
+      if (res.success) {
+        setPlayersList(prev => prev.map(p => {
+          if (p.id !== editingNicknamePlayer.id) return p;
+          const rawLast = p.lastName || '';
+          const singleFirst = trimmed ? formatToTitleCase(trimmed) : getSingleFirstName(p.fullName || p.name);
+          const firstSurname = getFirstSurname(rawLast);
+          const displayNameShort = trimmed 
+            ? formatToTitleCase(trimmed) 
+            : (firstSurname ? `${singleFirst} ${firstSurname}` : singleFirst);
+
+          return {
+            ...p,
+            nickname: trimmed || null,
+            firstName: singleFirst,
+            displayNameShort,
+            name: displayNameShort
+          };
+        }));
+        setEditingNicknamePlayer(null);
+      } else {
+        alert(res.error || 'Error al guardar el apodo');
+      }
+    } catch (err: any) {
+      console.error('Error saving nickname:', err);
+    } finally {
+      setIsSavingNickname(false);
+    }
+  };
 
   // Mapa de nombres calculados para los jugadores actualmente en el campo:
   // Si hay más de uno con el mismo nombre de pila, se muestra "Nombre + Inicial del Apellido" (ej. "Carlos G." y "Carlos M.")
@@ -211,32 +299,34 @@ export function LineupTab({
   const pitchPlayerDisplayNames = useMemo(() => {
     const activePitchIds = Object.keys(pitchPlayers);
     const activePitchPlayers = activePitchIds
-      .map(id => initialPlayersList.find(p => p.id === id))
+      .map(id => playersList.find(p => p.id === id))
       .filter(Boolean) as Player[];
 
     const firstNameCounts = new Map<string, number>();
     activePitchPlayers.forEach(p => {
-      const fn = (p.firstName || p.name.split(' ')[0] || '').toLowerCase().trim();
+      const fn = (p.firstName || '').toLowerCase().trim();
       firstNameCounts.set(fn, (firstNameCounts.get(fn) || 0) + 1);
     });
 
     const displayMap: Record<string, string> = {};
     activePitchPlayers.forEach(p => {
-      const fn = p.firstName || p.name.split(' ')[0] || '';
+      const fn = p.firstName || 'Jugador';
       const fnKey = fn.toLowerCase().trim();
       const count = firstNameCounts.get(fnKey) || 0;
 
       if (count > 1) {
-        const firstSurname = (p.lastName || '').trim().split(' ')[0] || '';
+        // Si hay 2 o más jugadores con el mismo nombre en el campo, desambiguamos con inicial del primer apellido
+        const firstSurname = getFirstSurname(p.lastName || '');
         const initial = firstSurname ? `${firstSurname[0].toUpperCase()}.` : '';
         displayMap[p.id] = initial ? `${fn} ${initial}` : fn;
       } else {
+        // Nombre único en el campo -> estrictamente solo el primer nombre o apodo
         displayMap[p.id] = fn;
       }
     });
 
     return displayMap;
-  }, [pitchPlayers, initialPlayersList]);
+  }, [pitchPlayers, playersList]);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTouchStartPlayer = (playerId: string) => {
@@ -603,6 +693,74 @@ export function LineupTab({
           </div>
         )}
 
+{/* Modal para Editar Apodo / Nombre Deportivo */}
+        {editingNicknamePlayer && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 border border-slate-200 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
+                    {editingNicknamePlayer.number != null && editingNicknamePlayer.number !== '' ? editingNicknamePlayer.number : '-'}
+                  </span>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 leading-tight">
+                      {editingNicknamePlayer.fullName || editingNicknamePlayer.name}
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nombre Deportivo / Apodo</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingNicknamePlayer(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">
+                  Apodo o nombre a mostrar en el campo:
+                </label>
+                <input
+                  type="text"
+                  value={newNicknameInput}
+                  onChange={(e) => setNewNicknameInput(e.target.value)}
+                  placeholder={`Ej. ${editingNicknamePlayer.firstName || 'Nombre'}`}
+                  className="w-full text-xs font-bold px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSavePlayerNickname();
+                    }
+                  }}
+                />
+                <p className="text-[10px] text-slate-400 font-medium">
+                  Este nombre se guardará en su ficha y se mostrará en la pizarra táctica y convocatorias.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingNicknamePlayer(null)}
+                  className="flex-1 px-3 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePlayerNickname}
+                  disabled={isSavingNickname}
+                  className="flex-1 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl shadow-sm transition-colors active:scale-98"
+                >
+                  {isSavingNickname ? 'Guardando...' : 'Guardar Apodo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal para Guardar Nuevo Sistema Personalizado */}
         {showSaveTacticModal && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -806,28 +964,63 @@ export function LineupTab({
               </div>
 
               {availablePlayers.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80">
+                <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 max-h-[300px] overflow-y-auto">
                   {availablePlayers.map(player => (
-                    <button
+                    <div
                       key={player.id}
-                      type="button"
-                      onClick={() => handleQuickAddPlayer(player.id)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg text-xs font-bold text-slate-800 shadow-2xs active:scale-95 transition-all"
+                      className="flex items-center justify-between p-2.5 bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 rounded-xl shadow-xs transition-all text-left"
                     >
-                      <div className="w-5 h-5 rounded-full overflow-hidden bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center shrink-0">
-                        {player.avatarUrl ? (
-                          <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
-                        ) : (
-                          <span>{player.number || "?"}</span>
-                        )}
+                      {/* Información y toque para añadir */}
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddPlayer(player.id)}
+                        className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-98 transition-transform"
+                      >
+                        {/* Dorsal destacado y visible */}
+                        <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                          {player.number != null && player.number !== '' ? player.number : '-'}
+                        </span>
+
+                        {/* Nombre y posición */}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-black text-slate-800 truncate leading-tight">
+                            {player.displayNameShort || player.name}
+                          </h4>
+                          <span className="text-[10px] text-slate-400 font-semibold block truncate">
+                            {player.demarcation || 'Jugador'}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Botones de acción: Editar apodo (✏️) y Añadir (+) */}
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingNicknamePlayer(player);
+                            setNewNicknameInput(player.nickname || player.firstName || "");
+                          }}
+                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-700 flex items-center justify-center transition-colors shadow-2xs"
+                          title="Editar apodo o nombre deportivo"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddPlayer(player.id)}
+                          className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors shadow-2xs active:scale-95"
+                          title="Añadir al campo"
+                        >
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                        </button>
                       </div>
-                      <span className="truncate max-w-[130px] sm:max-w-none">{player.displayNameShort || player.name}</span>
-                      <Plus className="w-3.5 h-3.5 text-blue-600 ml-0.5 stroke-[2.5]" />
-                    </button>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 text-center">
+                <p className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-2.5 rounded-xl border border-emerald-200 text-center">
                   ✅ Todos los jugadores han sido colocados en el campo
                 </p>
               )}
@@ -908,12 +1101,16 @@ export function LineupTab({
                   onDragEnd={() => setDraggedPlayerId(null)}
                   className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
+                    {/* Dorsal destacado */}
+                    <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                      {player.number != null && player.number !== '' ? player.number : '-'}
+                    </span>
                     <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 border border-blue-200 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
                       {player.avatarUrl ? (
                         <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
                       ) : (
-                        <span>{player.number || player.avatar}</span>
+                        <span>{player.avatar}</span>
                       )}
                     </div>
                     <div>
@@ -922,9 +1119,23 @@ export function LineupTab({
                     </div>
                   </div>
 
-                  <span className="text-[9px] font-extrabold uppercase tracking-wide text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                    + Añadir
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingNicknamePlayer(player);
+                        setNewNicknameInput(player.nickname || player.firstName || "");
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                      title="Editar apodo o nombre deportivo"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      + Añadir
+                    </span>
+                  </div>
                 </div>
               ))}
 

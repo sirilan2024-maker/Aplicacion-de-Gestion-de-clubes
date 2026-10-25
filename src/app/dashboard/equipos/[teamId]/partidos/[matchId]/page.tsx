@@ -34,7 +34,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
 
   const { data: teamPlayers } = await supabase
     .from("players")
-    .select("id, first_name, last_name, dorsal, avatar_url, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
+    .select("id, first_name, last_name, nickname, dorsal, avatar_url, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
     .eq("team_id", teamId)
     .neq("team.season_id", CLOSED_SEASON_ID)
     .eq("team.season_id", ACTIVE_SEASON_ID)
@@ -46,7 +46,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
   if (foreignConvIds.length > 0) {
     const { data: extra } = await supabase
       .from("players")
-      .select("id, first_name, last_name, dorsal, avatar_url, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
+      .select("id, first_name, last_name, nickname, dorsal, avatar_url, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
       .in("id", foreignConvIds)
       .neq("team.season_id", CLOSED_SEASON_ID)
       .eq("team.season_id", ACTIVE_SEASON_ID)

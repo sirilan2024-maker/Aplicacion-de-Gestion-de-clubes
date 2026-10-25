@@ -83,6 +83,12 @@ export function FFCVMatchesSection({
     }
 
     loadFFCVMatches();
+
+    const handleUpdate = () => {
+      loadFFCVMatches();
+    };
+    window.addEventListener('saladar-matches-updated', handleUpdate);
+    return () => window.removeEventListener('saladar-matches-updated', handleUpdate);
   }, [ffcvGroupId, refreshTrigger]);
 
   // Available matchdays in competition (e.g., 1 to 30)

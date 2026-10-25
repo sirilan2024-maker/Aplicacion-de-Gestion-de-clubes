@@ -1,20 +1,26 @@
-name: Sincronizacion Horaria FFCV Sporting Saladar
+name: Sincronizacion Horaria FFCV y Liga Brave Sporting Saladar
 
 on:
   schedule:
-    # Se ejecuta cada hora en punto (0 * * * *)
-    - cron: '0 * * * *'
+    # Fines de semana (sábados y domingos de 07:00 a 21:00 UTC / 09:00 a 23:00 España): cada 20 min para captar actas y resultados ~1h post-partido
+    - cron: '*/20 7-21 * * 6,0'
+    # Días laborables: cada hora en punto
+    - cron: '0 * * * 1-5'
   workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub Actions
 
 jobs:
   sync-ffcv:
-    name: Sincronizar FFCV (Partidos y Clasificaciones)
+    name: Sincronizar FFCV y Liga Brave (Partidos, Actas y Clasificaciones)
     runs-on: ubuntu-latest
     steps:
-      - name: Disparar endpoint de sincronizacion FFCV
+      - name: Disparar endpoint de sincronizacion FFCV y Liga Brave
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET || '1c2116fd25f2d9b436b10705daae6f053a84dea1957d9effaee3dd5238d8c081' }}
         run: |
-          echo "Iniciando sincronizacion horaria FFCV para Sporting Saladar..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "https://app.clubsportingsaladar.com/api/ffcv/cron")
+          echo "Iniciando sincronizacion horaria FFCV y Liga Brave para Sporting Saladar..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -X GET "https://app.clubsportingsaladar.com/api/ffcv/cron?secret=$CRON_SECRET")
           echo "$RESPONSE"
           HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
           if [ "$HTTP_STATUS" -ne 200 ]; then

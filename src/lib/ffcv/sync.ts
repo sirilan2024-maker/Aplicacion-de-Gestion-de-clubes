@@ -18,6 +18,7 @@ import {
   FFCVMatchRecord
 } from './types';
 import { syncFFCVActaToConvocatorias } from './acta-sync';
+import { getOfficialMatchDuration } from '../utils';
 
 /**
  * Synchronizes FFCV group data (calendar, standings, matches) into Supabase
@@ -116,10 +117,43 @@ export async function syncGroupFFCV(
     targetMatchdays = [specificMatchday];
   } else if (syncAllMatchdays && allMatchdays.length > 0) {
     targetMatchdays = allMatchdays;
-  } else if (allMatchdays.length > 0) {
-    targetMatchdays = allMatchdays;
   } else {
-    targetMatchdays = [1];
+    // Smart routine sync: only process the active matchdays around current date
+    const { data: existingGroupMatches } = await supabase
+      .from('ffcv_matches')
+      .select('matchday, match_date')
+      .eq('ffcv_group_id', groupId);
+
+    if (!existingGroupMatches || existingGroupMatches.length === 0) {
+      // First-time sync for this group: populate full calendar
+      targetMatchdays = allMatchdays.length > 0 ? allMatchdays : [1];
+    } else {
+      const today = new Date();
+      const relevantMatchdaySet = new Set<number>();
+      let closestMatchday = 1;
+      let minDiff = Infinity;
+
+      for (const m of existingGroupMatches) {
+        if (!m.match_date || !m.matchday) continue;
+        const mDate = new Date(m.match_date);
+        const diffMs = Math.abs(mDate.getTime() - today.getTime());
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        if (diffDays <= 7) {
+          relevantMatchdaySet.add(Number(m.matchday));
+        }
+        if (diffMs < minDiff) {
+          minDiff = diffMs;
+          closestMatchday = Number(m.matchday);
+        }
+      }
+
+      if (relevantMatchdaySet.size === 0) {
+        relevantMatchdaySet.add(closestMatchday);
+      }
+
+      targetMatchdays = Array.from(relevantMatchdaySet).sort((a: number, b: number) => a - b);
+    }
   }
 
   // 5. Process matches and standings for each target matchday
@@ -324,11 +358,19 @@ export async function syncAllConfiguredFFCVTeams(
   let groupsSuccess = 0;
   let groupsFailed = 0;
 
-  // 2. Process each unique group once
-  for (const [key, groupInfo] of Array.from(groupMap.entries())) {
+  // 2. Process each unique group once (prioritizing ultra-fast Apúntamelo groups first)
+  const { isApuntameloTeam, syncApuntameloTeam } = await import('../apuntamelo/sync');
+  const sortedGroupEntries = Array.from(groupMap.entries()).sort((a, b) => {
+    const teamA = configuredTeams.find((t: any) => t.id === a[1].teamIds[0]);
+    const teamB = configuredTeams.find((t: any) => t.id === b[1].teamIds[0]);
+    const aIsAp = teamA && isApuntameloTeam(teamA) ? 1 : 0;
+    const bIsAp = teamB && isApuntameloTeam(teamB) ? 1 : 0;
+    return bIsAp - aIsAp;
+  });
+
+  for (const [key, groupInfo] of sortedGroupEntries) {
     try {
       let syncRes: FFCVSyncResult;
-      const { isApuntameloTeam, syncApuntameloTeam } = await import('../apuntamelo/sync');
       const sampleTeam = configuredTeams.find((t: any) => t.id === groupInfo.teamIds[0]);
       
       if (sampleTeam && isApuntameloTeam(sampleTeam)) {
@@ -624,4 +666,131 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   }
 
   return updatedCount;
+}
+
+
+/**
+ * Detects matches in the active season that finished within the post-match window
+ * (between ~45 minutes and 14 hours after kick-off) and synchronizes them
+ * with official FFCV / Apúntamelo scoreboards, electronic match reports (actas),
+ * player minutes, and events.
+ */
+export async function syncRecentlyFinishedMatches(
+  customSupabaseClient?: any
+): Promise<{
+  success: boolean;
+  checkedCount: number;
+  matchesToSyncCount: number;
+  teamsSynced: string[];
+  errors?: string[];
+}> {
+  const supabase = customSupabaseClient || createAdminClient();
+  const errors: string[] = [];
+  const teamsSynced: string[] = [];
+
+  // 1. Get active season
+  const { data: activeSeason, error: seasonErr } = await supabase
+    .from('seasons')
+    .select('id, name')
+    .eq('is_active', true)
+    .single();
+
+  if (seasonErr || !activeSeason) {
+    return {
+      success: false,
+      checkedCount: 0,
+      matchesToSyncCount: 0,
+      teamsSynced: [],
+      errors: ['No active season found']
+    };
+  }
+
+  // 2. Fetch matches from 'partidos' scheduled within the last 24 hours
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const nowIso = now.toISOString();
+
+  const { data: recentPartidos, error: pErr } = await supabase
+    .from('partidos')
+    .select(`
+      id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival, acta_oficial_url,
+      equipo_id,
+      team:teams!inner ( id, name, ffcv_last_synced_at, ffcv_group_id, ffcv_season_id, ffcv_competition_id, ffcv_url )
+    `)
+    .eq('season_id', activeSeason.id)
+    .gte('fecha_hora', twentyFourHoursAgo)
+    .lte('fecha_hora', nowIso);
+
+  if (pErr) {
+    return {
+      success: false,
+      checkedCount: 0,
+      matchesToSyncCount: 0,
+      teamsSynced: [],
+      errors: [pErr.message]
+    };
+  }
+
+  const partidosList = recentPartidos || [];
+  const { isApuntameloTeam, syncApuntameloTeam } = await import('../apuntamelo/sync');
+
+  const teamsToSync = new Map<string, { team: any }>();
+
+  for (const partido of partidosList) {
+    const team = (partido as any).team;
+    if (!partido.fecha_hora || !team) continue;
+
+    const matchStart = new Date(partido.fecha_hora);
+    const durationMinutes = getOfficialMatchDuration(team.name);
+    const breakMinutes = 15;
+    const matchEndMs = matchStart.getTime() + (durationMinutes + breakMinutes) * 60 * 1000;
+    
+    // Post-match sync threshold: 45 minutes after match regulation end (~1 hour after whistle)
+    const postMatchSyncThresholdMs = matchEndMs + 45 * 60 * 1000;
+
+    // Check if we have passed the 45-60 min post-match threshold
+    if (now.getTime() >= postMatchSyncThresholdMs) {
+      const lastSyncedMs = team.ffcv_last_synced_at
+        ? new Date(team.ffcv_last_synced_at).getTime()
+        : 0;
+
+      const matchNotFinalized = partido.estado !== 'Finalizado';
+      const notSyncedAfterMatch = lastSyncedMs < postMatchSyncThresholdMs;
+
+      if (matchNotFinalized || notSyncedAfterMatch) {
+        teamsToSync.set(team.id, { team });
+      }
+    }
+  }
+
+  const matchesToSyncCount = teamsToSync.size;
+
+  for (const [teamId, { team }] of Array.from(teamsToSync.entries())) {
+    try {
+      if (isApuntameloTeam(team)) {
+        await syncApuntameloTeam(teamId, supabase);
+      } else {
+        await syncTeamFFCV(teamId, { syncAllMatchdays: false }, supabase);
+      }
+      teamsSynced.push(team.name);
+    } catch (err: any) {
+      errors.push(`Error syncing team ${team.name} (${teamId}): ${err.message}`);
+    }
+  }
+
+  if (teamsSynced.length > 0) {
+    try {
+      await propagateFfcvMatchesToClubPartidos(supabase);
+    } catch (e: any) {
+      errors.push(`Error in propagateFfcvMatchesToClubPartidos: ${e.message}`);
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    checkedCount: partidosList.length,
+    matchesToSyncCount,
+    teamsSynced,
+    errors: errors.length > 0 ? errors : undefined
+  };
 }

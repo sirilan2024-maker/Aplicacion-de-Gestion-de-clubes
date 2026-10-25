@@ -316,7 +316,7 @@ async function getFfcvTacticalAnalytics(team: any, supabase: any): Promise<Tacti
   }
 
   // Get top scorers from convocatorias
-  const matchIds = finishedMatches.map(m => m.id);
+  const matchIds = finishedMatches.map((m: any) => m.id);
   const pichichis: { name: string; goals: number; dorsal?: number }[] = [];
 
   if (matchIds.length > 0) {
@@ -412,17 +412,23 @@ export async function getPlayerAchievements(playerId: string): Promise<PlayerAch
   const totalMatches = convs.filter(c => c.status === 'convocado' || (Number(c.minutes_played) || 0) > 0).length;
   const titularMatches = convs.filter(c => c.titular).length;
 
+  const getPartido = (p: any): { id?: string; fecha_hora?: string; rival_nombre?: string; resultado_propio?: number; resultado_rival?: number; estado?: string } | null => {
+    if (!p) return null;
+    return Array.isArray(p) ? p[0] : p;
+  };
+
   // Badge 1: Primer Gol de la Temporada
   if (totalGoals > 0) {
     const firstGoalConv = convs.find(c => Number(c.goals) > 0);
-    const rival = firstGoalConv?.partido?.rival_nombre ? `vs ${firstGoalConv.partido.rival_nombre}` : 'en partido oficial';
+    const partido = getPartido(firstGoalConv?.partido);
+    const rival = partido?.rival_nombre ? `vs ${partido.rival_nombre}` : 'en partido oficial';
     badges.push({
       id: 'first-goal',
       title: 'Goleador Oficial',
       subtitle: `${totalGoals} ${totalGoals === 1 ? 'gol anotado' : 'goles anotados'}`,
       icon: 'goal',
       badgeColor: 'amber',
-      unlockedAt: firstGoalConv?.partido?.fecha_hora ? new Date(firstGoalConv.partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
+      unlockedAt: partido?.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
       description: `Inauguró su casillero goleador oficial ${rival}.`
     });
   }
@@ -432,24 +438,26 @@ export async function getPlayerAchievements(playerId: string): Promise<PlayerAch
   const braceMatch = convs.find(c => Number(c.goals) === 2);
 
   if (hatTrickMatch) {
+    const partido = getPartido(hatTrickMatch.partido);
     badges.push({
       id: 'hat-trick',
       title: 'Hat-Trick Hero',
       subtitle: '3+ goles en un encuentro',
       icon: 'hattrick',
       badgeColor: 'purple',
-      unlockedAt: hatTrickMatch.partido?.fecha_hora ? new Date(hatTrickMatch.partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
-      description: `Actuación estelar con triplete frente a ${hatTrickMatch.partido?.rival_nombre || 'el rival'}.`
+      unlockedAt: partido?.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
+      description: `Actuación estelar con triplete frente a ${partido?.rival_nombre || 'el rival'}.`
     });
   } else if (braceMatch) {
+    const partido = getPartido(braceMatch.partido);
     badges.push({
       id: 'brace',
       title: 'Doblete Imparable',
       subtitle: '2 goles en el mismo partido',
       icon: 'hattrick',
       badgeColor: 'blue',
-      unlockedAt: braceMatch.partido?.fecha_hora ? new Date(braceMatch.partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
-      description: `Demostró pegada marcando por partida doble ante ${braceMatch.partido?.rival_nombre || 'el rival'}.`
+      unlockedAt: partido?.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
+      description: `Demostró pegada marcando por partida doble ante ${partido?.rival_nombre || 'el rival'}.`
     });
   }
 
@@ -457,19 +465,20 @@ export async function getPlayerAchievements(playerId: string): Promise<PlayerAch
   const pos = (player.posicion || '').toLowerCase();
   const isGoalkeeper = pos.includes('porter') || pos.includes('goalkeeper');
   const cleanSheetMatch = convs.find(c => {
-    const p = c.partido;
+    const p = getPartido(c.partido);
     return p && Number(p.resultado_rival) === 0 && (Number(c.minutes_played) || 0) >= 30;
   });
 
   if (cleanSheetMatch && isGoalkeeper) {
+    const partido = getPartido(cleanSheetMatch.partido);
     badges.push({
       id: 'clean-sheet',
       title: 'Muro Infranqueable',
       subtitle: 'Portería a cero',
       icon: 'shield',
       badgeColor: 'emerald',
-      unlockedAt: cleanSheetMatch.partido?.fecha_hora ? new Date(cleanSheetMatch.partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
-      description: `Mantuvo el cerrojo defensivo y la portería a cero ante ${cleanSheetMatch.partido?.rival_nombre || 'el rival'}.`
+      unlockedAt: partido?.fecha_hora ? new Date(partido.fecha_hora).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }) : undefined,
+      description: `Mantuvo el cerrojo defensivo y la portería a cero ante ${partido?.rival_nombre || 'el rival'}.`
     });
   }
 

@@ -138,8 +138,8 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
     setConvocatorias(initialConvocatorias)
   }, [initialMatches, initialTeams, initialPlayers, initialConvocatorias])
 
-  // Recarga reactiva de partidos y equipos cuando cambia la temporada seleccionada
-  useEffect(() => {
+  // Recarga reactiva de partidos y equipos cuando cambia la temporada seleccionada o tras sincronizaciones
+  const reloadSeasonData = useCallback(async () => {
     const isArchivePage = typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard/archivo');
     const PAST_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
     
@@ -150,78 +150,86 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
 
     if (!targetSeasonId) return;
 
-    async function reloadSeasonData() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
-        if (!profile?.club_id) return;
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
+      if (!profile?.club_id) return;
 
-        // Cargar partidos de la temporada seleccionada (excluyendo estrictamente la 25/26 fuera de archivo)
-        let mQuery = supabase
-          .from('partidos')
-          .select(`
-            *,
-            equipo:teams (id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url)
-          `)
-          .eq('club_id', profile.club_id)
-          .order('fecha_hora', { ascending: true });
+      // Cargar partidos de la temporada seleccionada (excluyendo estrictamente la 25/26 fuera de archivo)
+      let mQuery = supabase
+        .from('partidos')
+        .select(`
+          *,
+          equipo:teams (id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url)
+        `)
+        .eq('club_id', profile.club_id)
+        .order('fecha_hora', { ascending: true });
 
-        if (!isArchivePage) {
-          mQuery = mQuery.neq('season_id', PAST_SEASON_ID);
-        }
-
-        if (targetSeasonId) {
-          mQuery = mQuery.eq('season_id', targetSeasonId);
-        }
-
-        if (fixedTeamId) {
-          mQuery = mQuery.eq('equipo_id', fixedTeamId);
-        }
-
-        const { data: mData } = await mQuery;
-
-        if (mData) setMatches(mData);
-
-        // Cargar equipos de la temporada seleccionada
-        let tQuery = supabase
-          .from('teams')
-          .select('id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url')
-          .eq('club_id', profile.club_id)
-          .order('name', { ascending: true });
-
-        if (!isArchivePage) {
-          tQuery = tQuery.neq('season_id', PAST_SEASON_ID);
-        }
-
-        if (targetSeasonId) {
-          tQuery = tQuery.eq('season_id', targetSeasonId);
-        }
-
-        const { data: tData } = await tQuery;
-
-        if (tData) setTeams(tData);
-
-        // Cargar convocatorias de los partidos de la temporada seleccionada
-        const mIds = (mData || []).map(m => m.id);
-        if (mIds.length > 0) {
-          const { data: convData } = await supabase
-            .from('convocatorias')
-            .select('*')
-            .in('partido_id', mIds)
-            .limit(5000);
-          if (convData) setConvocatorias(convData);
-        } else {
-          setConvocatorias([]);
-        }
-      } catch (err) {
-        console.error('Error reloading matches for selected season:', err);
+      if (!isArchivePage) {
+        mQuery = mQuery.neq('season_id', PAST_SEASON_ID);
       }
-    }
 
-    reloadSeasonData();
+      if (targetSeasonId) {
+        mQuery = mQuery.eq('season_id', targetSeasonId);
+      }
+
+      if (fixedTeamId) {
+        mQuery = mQuery.eq('equipo_id', fixedTeamId);
+      }
+
+      const { data: mData } = await mQuery;
+
+      if (mData) setMatches(mData);
+
+      // Cargar equipos de la temporada seleccionada
+      let tQuery = supabase
+        .from('teams')
+        .select('id, name, category, color, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_url')
+        .eq('club_id', profile.club_id)
+        .order('name', { ascending: true });
+
+      if (!isArchivePage) {
+        tQuery = tQuery.neq('season_id', PAST_SEASON_ID);
+      }
+
+      if (targetSeasonId) {
+        tQuery = tQuery.eq('season_id', targetSeasonId);
+      }
+
+      const { data: tData } = await tQuery;
+
+      if (tData) setTeams(tData);
+
+      // Cargar convocatorias de los partidos de la temporada seleccionada
+      const mIds = (mData || []).map(m => m.id);
+      if (mIds.length > 0) {
+        const { data: convData } = await supabase
+          .from('convocatorias')
+          .select('*')
+          .in('partido_id', mIds)
+          .limit(5000);
+        if (convData) setConvocatorias(convData);
+      } else {
+        setConvocatorias([]);
+      }
+    } catch (err) {
+      console.error('Error reloading matches for selected season:', err);
+    }
   }, [selectedSeasonId, activeSeason?.id, fixedTeamId]);
+
+  useEffect(() => {
+    reloadSeasonData();
+  }, [reloadSeasonData]);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      reloadSeasonData();
+    };
+    window.addEventListener('saladar-matches-updated', handleUpdate);
+    return () => window.removeEventListener('saladar-matches-updated', handleUpdate);
+  }, [reloadSeasonData]);
 
   useEffect(() => {
     if (fixedTeamId) {
@@ -377,6 +385,43 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
   useEffect(() => {
     loadFfcvMatches();
   }, [loadFfcvMatches]);
+  // Comprobación inteligente post-partido (~1 hora tras el pitido final)
+  // Si hay algún partido del club programado para hoy cuyo tiempo estimado de finalización + 45 min
+  // ya ha transcurrido y aún figura sin finalizar, disparar sync post-partido en segundo plano.
+  useEffect(() => {
+    if (!matches || matches.length === 0) return;
+
+    const now = Date.now();
+    const lastCheckKey = 'saladar_post_match_last_check';
+    const lastCheck = sessionStorage.getItem(lastCheckKey);
+    if (lastCheck && now - Number(lastCheck) < 5 * 60 * 1000) {
+      return; // Cooldown de 5 minutos en la sesión para evitar llamadas reiteradas
+    }
+
+    const hasCandidateMatch = matches.some((m: any) => {
+      if (!m.fecha_hora || m.estado === 'Finalizado') return false;
+      const mDate = new Date(m.fecha_hora).getTime();
+      const diffMs = now - mDate;
+      // Partido empezado hace más de 105 minutos (90' + 15' descanso) y menos de 14 horas
+      return diffMs >= 105 * 60 * 1000 && diffMs <= 14 * 60 * 60 * 1000;
+    });
+
+    if (hasCandidateMatch) {
+      sessionStorage.setItem(lastCheckKey, String(now));
+      fetch('/api/ffcv/post-match')
+        .then(res => res.json())
+        .then(data => {
+          if (data?.result?.matchesToSyncCount > 0) {
+            loadFfcvMatches();
+            reloadSeasonData();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('saladar-matches-updated'));
+            }
+          }
+        })
+        .catch(err => console.debug('[PostMatchAutoSync] Silently handled:', err));
+    }
+  }, [matches, loadFfcvMatches, reloadSeasonData]);
 
   // Calculate apercibidos
   const apercibidosCount = useMemo(() => {

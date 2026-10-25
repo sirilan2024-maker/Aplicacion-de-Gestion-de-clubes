@@ -1014,7 +1014,7 @@ export function LineupTab({
 
           <div 
             ref={pitchRef}
-            className="relative aspect-[3/4.2] min-h-[420px] md:aspect-auto md:w-full md:h-[420px] max-w-[390px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all cursor-pointer md:cursor-default touch-none"
+            className="relative aspect-[3/4.3] min-h-[460px] md:aspect-auto md:w-full md:h-[480px] max-w-[420px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all cursor-pointer md:cursor-default touch-none"
             onDragOver={isFamilyView ? undefined : e => e.preventDefault()}
             onDrop={handlePitchDrop}
             onClick={handlePitchClick}
@@ -1059,7 +1059,7 @@ export function LineupTab({
                       }
                     }}
                     className={[
-                      "w-10 h-10 sm:w-10.5 sm:h-10.5 rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group",
+                      "w-12 h-12 sm:w-13 sm:h-13 rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group",
                       isSelected 
                         ? "border-2 border-cyan-300 bg-cyan-500/50 text-white shadow-lg shadow-cyan-400/60 ring-4 ring-cyan-400/40 scale-110 animate-pulse z-20"
                         : "border-2 border-dashed border-white/60 bg-emerald-950/45 hover:bg-emerald-900/70 hover:border-white text-white/90 hover:scale-105"
@@ -1068,17 +1068,17 @@ export function LineupTab({
                   >
                     <span className={[
                       "font-black tracking-tight leading-none",
-                      isSelected ? "text-[10px] sm:text-[11px] text-white drop-shadow-md" : "text-[9px] sm:text-[10px] text-white/90"
+                      isSelected ? "text-xs sm:text-sm text-white drop-shadow-md" : "text-[11px] sm:text-xs text-white/90"
                     ].join(" ")}>
                       {slot.label}
                     </span>
                     <Plus className={[
                       "transition-transform",
-                      isSelected ? "w-2.5 h-2.5 text-cyan-200 mt-0.5" : "w-2.5 h-2.5 text-white/60 -mt-0.5 group-hover:scale-110"
+                      isSelected ? "w-3 h-3 text-cyan-200 mt-0.5" : "w-3 h-3 text-white/60 -mt-0.5 group-hover:scale-110"
                     ].join(" ")} />
                   </button>
                   <span className={[
-                    "text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider mt-0.5 px-1.5 py-0.2 rounded shadow-2xs whitespace-nowrap select-none leading-tight",
+                    "text-[8px] sm:text-[9px] font-black uppercase tracking-wider mt-0.5 px-2 py-0.5 rounded shadow-2xs whitespace-nowrap select-none leading-tight",
                     isSelected ? "bg-cyan-600 text-white font-extrabold" : "bg-emerald-950/80 text-emerald-200/90"
                   ].join(" ")}>
                     {isSelected ? 'Elegir' : 'Libre'}
@@ -1103,14 +1103,14 @@ export function LineupTab({
                   <div className="relative group flex flex-col items-center">
                     {/* Badge de posición táctica centrada y ajustada a la parte superior del círculo */}
                     {tacticalPositionLabel && (
-                      <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-blue-600 border border-white text-white text-[8px] font-black px-1.5 py-0.2 rounded-full shadow-xs uppercase tracking-tight z-20 pointer-events-none select-none whitespace-nowrap leading-none">
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-600 border border-white text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md uppercase tracking-tight z-20 pointer-events-none select-none whitespace-nowrap leading-none">
                         {tacticalPositionLabel}
                       </div>
                     )}
 
                     <div
                       className={[
-                        "w-10 h-10 sm:w-10.5 sm:h-10.5 rounded-full bg-slate-900 border-[1.5px] overflow-hidden flex items-center justify-center shadow-md transition-all duration-200 select-none",
+                        "w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-slate-900 border-2 overflow-hidden flex items-center justify-center shadow-md transition-all duration-200 select-none",
                         isFamilyView ? "cursor-default select-none border-white text-white" : "cursor-grab active:cursor-grabbing",
                         selectedPlayerId === player.id ? "border-cyan-400 scale-110 shadow-cyan-500/50 shadow-lg ring-4 ring-cyan-400/40" : "border-white"
                       ].join(" ")}
@@ -1156,20 +1156,20 @@ export function LineupTab({
                           className="w-full h-full object-cover object-[center_20%] pointer-events-none select-none" 
                         />
                       ) : (
-                        <span className="text-[11px] font-black text-white tracking-wider pointer-events-none select-none">
+                        <span className="text-sm font-black text-white tracking-wider pointer-events-none select-none">
                           {player.avatar || ((player.fullName || player.name) ? (player.fullName || player.name)[0] : 'J')}
                         </span>
                       )}
                     </div>
 
-                    {/* Pastilla inferior: Dorsal (#) y Nombre de pila/apodo desambiguado */}
-                    <span className="text-[8px] font-black text-white mt-0.5 bg-slate-950/90 border border-white/20 px-1.5 py-0.2 rounded shadow-md whitespace-nowrap flex items-center gap-1 select-none max-w-[85px] leading-tight">
+                    {/* Pastilla inferior: Dorsal (#) y Nombre de pila/apodo desambiguado sin puntos suspensivos */}
+                    <span className="text-[9px] sm:text-[9.5px] font-black text-white mt-1 bg-slate-950/90 border border-white/20 px-2 py-0.5 rounded-md shadow-md whitespace-nowrap flex items-center gap-1.5 select-none leading-tight">
                       {player.number != null && player.number !== '' && player.number !== '-' && (
-                        <span className="text-amber-400 font-mono font-black text-[8px] shrink-0">
+                        <span className="text-amber-400 font-mono font-black text-[9px] sm:text-[9.5px] shrink-0">
                           #{player.number}
                         </span>
                       )}
-                      <span className="truncate">{pitchPlayerDisplayNames[player.id] || player.firstName || player.name.split(" ")[0]}</span>
+                      <span>{pitchPlayerDisplayNames[player.id] || player.firstName || player.name.split(" ")[0]}</span>
                     </span>
                   </div>
                 </div>
@@ -1298,7 +1298,7 @@ export function LineupTab({
                         title={`Añadir ${player.fullName || player.name}`}
                       >
                         <h4 
-                          className="text-xs sm:text-sm font-black text-slate-800 leading-snug break-words line-clamp-2"
+                          className="text-xs sm:text-sm font-black text-slate-800 leading-tight break-words whitespace-normal"
                           title={player.fullName || player.name}
                         >
                           {player.fullName || player.name}
@@ -1308,7 +1308,7 @@ export function LineupTab({
                             </span>
                           )}
                         </h4>
-                        <span className="text-[10px] text-slate-400 font-semibold block truncate">
+                        <span className="text-[10px] text-slate-400 font-semibold block whitespace-normal">
                           {player.demarcation || 'Jugador'}
                         </span>
                       </button>
@@ -1465,7 +1465,7 @@ export function LineupTab({
                     title={`Añadir ${player.fullName || player.name}`}
                   >
                     <h4 
-                      className="text-xs font-bold text-slate-900 leading-snug break-words line-clamp-2"
+                      className="text-xs font-bold text-slate-900 leading-tight break-words whitespace-normal"
                       title={player.fullName || player.name}
                     >
                       {player.fullName || player.name}
@@ -1475,7 +1475,7 @@ export function LineupTab({
                         </span>
                       )}
                     </h4>
-                    <span className="text-[9px] text-slate-400 font-semibold block truncate">{player.demarcation}</span>
+                    <span className="text-[9px] text-slate-400 font-semibold block whitespace-normal">{player.demarcation}</span>
                   </div>
 
                   {/* Columna 3: Botones de acción (Lápiz + Botón Añadir) */}
@@ -1587,7 +1587,7 @@ export function LineupTab({
                         }}
                         className="min-w-0 overflow-hidden text-left cursor-pointer active:opacity-75 transition-opacity pr-1"
                       >
-                        <h4 className="text-xs font-bold text-slate-900 leading-snug break-words line-clamp-2" title={player.fullName || player.name}>
+                        <h4 className="text-xs font-bold text-slate-900 leading-tight break-words whitespace-normal" title={player.fullName || player.name}>
                           {player.fullName || player.name}
                           {player.nickname && (
                             <span className="ml-1 text-blue-600 font-extrabold text-[10px]">
@@ -1595,7 +1595,7 @@ export function LineupTab({
                             </span>
                           )}
                         </h4>
-                        <span className="text-[10px] text-slate-500 font-semibold block truncate">{player.demarcation}</span>
+                        <span className="text-[10px] text-slate-500 font-semibold block whitespace-normal">{player.demarcation}</span>
                       </button>
 
                       {/* Columna 3: Botones */}

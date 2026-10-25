@@ -253,10 +253,68 @@ export function LineupTab({
   const [showBenchListModal, setShowBenchListModal] = useState(false);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [showClearPitchModal, setShowClearPitchModal] = useState(false);
   const [editingNicknamePlayer, setEditingNicknamePlayer] = useState<Player | null>(null);
   const [newNicknameInput, setNewNicknameInput] = useState("");
   const [isSavingNickname, setIsSavingNickname] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const currentFormationSlots = useMemo(() => {
+    return allFormations[tactic] || DEFAULT_FORMATIONS["4-3-3"] || [];
+  }, [allFormations, tactic]);
+
+  // Slots tácticos vacíos en el campo de la formación actual
+  const emptySlots = useMemo(() => {
+    const activePlayerCount = Object.keys(pitchPlayers).length;
+    if (activePlayerCount >= 11) return [];
+
+    const playerCoords = Object.values(pitchPlayers);
+    const occupiedSlotIds = new Set<string>();
+
+    for (const coords of playerCoords) {
+      let closestSlot: { id: string; dist: number } | null = null;
+      for (const slot of currentFormationSlots) {
+        if (occupiedSlotIds.has(slot.id)) continue;
+        const dist = Math.hypot(coords.x - slot.x, coords.y - slot.y);
+        if (dist < 8) {
+          if (!closestSlot || dist < closestSlot.dist) {
+            closestSlot = { id: slot.id, dist };
+          }
+        }
+      }
+      if (closestSlot) {
+        occupiedSlotIds.add(closestSlot.id);
+      }
+    }
+
+    return currentFormationSlots.filter(slot => !occupiedSlotIds.has(slot.id));
+  }, [pitchPlayers, currentFormationSlots]);
+
+  const selectedSlot = useMemo(() => {
+    if (!selectedSlotId) return null;
+    return currentFormationSlots.find(s => s.id === selectedSlotId) || null;
+  }, [selectedSlotId, currentFormationSlots]);
+
+  const getCoordsStyle = (x: number, y: number) => {
+    if (isDesktop) {
+      return {
+        left: `${y}%`,
+        top: `${100 - x}%`
+      };
+    }
+    return {
+      left: `${x}%`,
+      top: `${y}%`
+    };
+  };
 
   const handleSavePlayerNickname = async () => {
     if (!editingNicknamePlayer) return;
@@ -360,7 +418,7 @@ export function LineupTab({
     setTimeout(() => setLimitWarning(null), 4000)
   }
 
-  // Función de un toque para añadir jugador al campo en el primer slot libre
+  // Función de un toque para añadir jugador al campo en el slot seleccionado o en el primer slot libre
   const handleQuickAddPlayer = (playerId: string) => {
     if (isFamilyView) return
     if (pitchPlayers[playerId]) return
@@ -370,12 +428,23 @@ export function LineupTab({
       return
     }
 
-    const currentSlots = allFormations[tactic] || DEFAULT_FORMATIONS["4-3-3"]
-    
-    // Buscar un slot libre de la formación actual
-    const freeSlot = currentSlots.find(slot => {
+    // 1. Si hay una posición táctica vacía seleccionada en el campo, colocar directamente ahí
+    if (selectedSlotId) {
+      const targetSlot = currentFormationSlots.find(s => s.id === selectedSlotId);
+      if (targetSlot) {
+        setPitchPlayers(prev => ({
+          ...prev,
+          [playerId]: { x: targetSlot.x, y: targetSlot.y }
+        }));
+        setSelectedSlotId(null);
+        return;
+      }
+    }
+
+    // 2. Si no hay posición seleccionada, buscar el primer slot libre de la formación táctica
+    const freeSlot = currentFormationSlots.find(slot => {
       return !Object.values(pitchPlayers).some(
-        coords => Math.abs(coords.x - slot.x) < 4 && Math.abs(coords.y - slot.y) < 4
+        coords => Math.hypot(coords.x - slot.x, coords.y - slot.y) < 6
       )
     })
 
@@ -385,9 +454,9 @@ export function LineupTab({
         [playerId]: { x: freeSlot.x, y: freeSlot.y }
       }))
     } else {
-      // Si no hay slot exacto de la formación libre, colocar en el siguiente índice libre o centro
+      // Si todos los slots tácticos están ocupados pero hay menos de 11 jugadores
       const assignedCount = Object.keys(pitchPlayers).length
-      const fallbackSlot = currentSlots[assignedCount] || { x: 50, y: 50 }
+      const fallbackSlot = currentFormationSlots[assignedCount] || { x: 50, y: 50 }
       setPitchPlayers(prev => ({
         ...prev,
         [playerId]: { x: fallbackSlot.x, y: fallbackSlot.y }
@@ -410,6 +479,7 @@ export function LineupTab({
     }
     setPitchPlayers(newPitchPlayers);
     setSelectedPlayerId(null);
+    setSelectedSlotId(null);
   }
 
   const handleSaveCustomTactic = () => {
@@ -516,6 +586,7 @@ export function LineupTab({
       [playerId]: { x, y }
     }));
     setSelectedPlayerId(null);
+    setSelectedSlotId(null);
   }
 
   const handlePitchDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -533,13 +604,15 @@ export function LineupTab({
   }
 
   const handlePitchClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isFamilyView || !selectedPlayerId) return;
+    if (isFamilyView) return;
     
-    const rect = e.currentTarget.getBoundingClientRect();
-    const xRatio = (e.clientX - rect.left) / rect.width;
-    const yRatio = (e.clientY - rect.top) / rect.height;
-
-    placePlayerOnPitchAtCoords(selectedPlayerId, xRatio, yRatio);
+    if (selectedPlayerId) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const xRatio = (e.clientX - rect.left) / rect.width;
+      const yRatio = (e.clientY - rect.top) / rect.height;
+      placePlayerOnPitchAtCoords(selectedPlayerId, xRatio, yRatio);
+    }
+    setSelectedSlotId(null);
   }
 
   // Soporte Touch (Arrastrar en móvil)
@@ -571,6 +644,7 @@ export function LineupTab({
       delete next[playerId];
       return next;
     });
+    if (selectedPlayerId === playerId) setSelectedPlayerId(null);
   }
 
   return (
@@ -682,6 +756,7 @@ export function LineupTab({
                   onClick={() => {
                     setPitchPlayers({});
                     setSelectedPlayerId(null);
+                    setSelectedSlotId(null);
                     setShowClearPitchModal(false);
                   }}
                   className="flex-1 px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-colors active:scale-98"
@@ -798,14 +873,28 @@ export function LineupTab({
 
         {/* Pitch Container */}
         <div className="bg-white border border-slate-150 rounded-xl p-5 shadow-sm space-y-4">
-          {/* Badge de contador de titulares */}
-          <div className="flex items-center justify-between text-xs font-bold px-1">
+          {/* Badge de contador de titulares y posición seleccionada */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold px-1">
             <span className="text-slate-500">
               Titulares en campo: <strong className={assignedPlayerIds.length === 11 ? "text-emerald-600" : "text-slate-800"}>{assignedPlayerIds.length}/11</strong>
             </span>
-            {selectedPlayerId && (
+            {selectedSlot && (
+              <span className="flex items-center gap-1.5 text-cyan-800 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg text-[11px] font-bold animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
+                Posición <strong>{selectedSlot.label}</strong> iluminada: elige un jugador de la lista
+                <button
+                  type="button"
+                  onClick={() => setSelectedSlotId(null)}
+                  className="ml-1 text-cyan-600 hover:text-cyan-900 font-extrabold"
+                  title="Cancelar selección"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {!selectedSlot && selectedPlayerId && (
               <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-[11px] animate-pulse">
-                Toca una zona del campo para colocar al jugador seleccionado
+                Toca una zona o posición vacía del campo para colocar al jugador seleccionado
               </span>
             )}
           </div>
@@ -827,6 +916,59 @@ export function LineupTab({
               <div className="absolute bottom-0 left-1/4 right-1/4 h-12 border-t border-x border-white/20" />
             </div>
 
+            {/* Posiciones Tácticas Vacías del Sistema */}
+            {!isFamilyView && emptySlots.map((slot) => {
+              const isSelected = selectedSlotId === slot.id;
+              return (
+                <div
+                  key={slot.id}
+                  style={getCoordsStyle(slot.x, slot.y)}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all duration-150 select-none"
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedPlayerId) {
+                        setPitchPlayers(prev => ({
+                          ...prev,
+                          [selectedPlayerId]: { x: slot.x, y: slot.y }
+                        }));
+                        setSelectedPlayerId(null);
+                        setSelectedSlotId(null);
+                      } else {
+                        setSelectedSlotId(isSelected ? null : slot.id);
+                      }
+                    }}
+                    className={[
+                      "rounded-full flex flex-col items-center justify-center transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group",
+                      isSelected 
+                        ? "w-11 h-11 border-2 border-cyan-300 bg-cyan-500/50 text-white shadow-lg shadow-cyan-400/60 ring-4 ring-cyan-400/40 scale-110 animate-pulse z-20"
+                        : "w-10 h-10 border-2 border-dashed border-white/60 bg-emerald-950/45 hover:bg-emerald-900/70 hover:border-white text-white/90 hover:scale-105"
+                    ].join(" ")}
+                    title={`Posición vacía: ${slot.label}. Toca para iluminar y colocar jugador.`}
+                  >
+                    <span className={[
+                      "font-black tracking-tight leading-none",
+                      isSelected ? "text-[11px] text-white drop-shadow-md" : "text-[10px] text-white/90"
+                    ].join(" ")}>
+                      {slot.label}
+                    </span>
+                    <Plus className={[
+                      "transition-transform",
+                      isSelected ? "w-3 h-3 text-cyan-200 mt-0.5" : "w-2.5 h-2.5 text-white/60 -mt-0.5 group-hover:scale-110"
+                    ].join(" ")} />
+                  </button>
+                  <span className={[
+                    "text-[8px] font-black uppercase tracking-wider mt-0.5 px-1 py-0.2 rounded shadow-2xs whitespace-nowrap select-none",
+                    isSelected ? "bg-cyan-600 text-white font-extrabold" : "bg-emerald-950/80 text-emerald-200/90"
+                  ].join(" ")}>
+                    {isSelected ? 'Elegir' : 'Libre'}
+                  </span>
+                </div>
+              );
+            })}
+
             {/* Jugadores en el campo */}
             {Object.entries(pitchPlayers).map(([playerId, coords]) => {
               const player = initialPlayersList.find(p => p.id === playerId);
@@ -835,18 +977,8 @@ export function LineupTab({
               return (
                 <div
                   key={playerId}
+                  style={getCoordsStyle(coords.x, coords.y)}
                   className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all duration-75 touch-none"
-                  ref={(el) => {
-                    if(el) {
-                      if (window.innerWidth >= 768) {
-                        el.style.left = `${coords.y}%`;
-                        el.style.top = `${100 - coords.x}%`;
-                      } else {
-                        el.style.left = `${coords.x}%`;
-                        el.style.top = `${coords.y}%`;
-                      }
-                    }
-                  }}
                 >
                   <div className="relative group flex flex-col items-center">
                     <div
@@ -860,6 +992,7 @@ export function LineupTab({
                         if (!isFamilyView) {
                           e.stopPropagation();
                           setSelectedPlayerId(selectedPlayerId === player.id ? null : player.id);
+                          setSelectedSlotId(null);
                         }
                       }}
                       onTouchStart={(e) => {
@@ -954,7 +1087,7 @@ export function LineupTab({
             <div className="block lg:hidden border-t border-slate-100 pt-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">
-                  Toca para añadir ({availablePlayers.length} disponibles)
+                  {selectedSlot ? `Toca para colocar en ${selectedSlot.label}` : `Toca para añadir (${availablePlayers.length} disponibles)`}
                 </span>
                 {limitWarning && (
                   <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
@@ -963,12 +1096,32 @@ export function LineupTab({
                 )}
               </div>
 
+              {selectedSlot && (
+                <div className="flex items-center justify-between p-2.5 bg-cyan-50 border border-cyan-300 rounded-xl text-cyan-900 text-xs font-bold animate-in fade-in shadow-xs">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping shrink-0" />
+                    <span>Colocando en posición: <strong className="underline uppercase tracking-wide">{selectedSlot.label}</strong></span>
+                  </span>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedSlotId(null)}
+                    className="text-[10px] font-extrabold text-cyan-700 bg-cyan-100 hover:bg-cyan-200 px-2.5 py-1 rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+
               {availablePlayers.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 max-h-[300px] overflow-y-auto">
                   {availablePlayers.map(player => (
                     <div
                       key={player.id}
-                      className="flex items-center justify-between p-2.5 bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 rounded-xl shadow-xs transition-all text-left"
+                      className={`flex items-center justify-between p-2.5 rounded-xl shadow-xs transition-all text-left ${
+                        selectedSlot 
+                          ? 'bg-cyan-50/50 border border-cyan-300 hover:bg-cyan-100/60' 
+                          : 'bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300'
+                      }`}
                     >
                       {/* Información y toque para añadir */}
                       <button
@@ -1010,8 +1163,12 @@ export function LineupTab({
                         <button
                           type="button"
                           onClick={() => handleQuickAddPlayer(player.id)}
-                          className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors shadow-2xs active:scale-95"
-                          title="Añadir al campo"
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors shadow-2xs active:scale-95 ${
+                            selectedSlot 
+                              ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-cyan-500/30 ring-2 ring-cyan-400/40' 
+                              : 'bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white'
+                          }`}
+                          title={selectedSlot ? `Colocar en ${selectedSlot.label}` : "Añadir al campo"}
                         >
                           <Plus className="w-4 h-4 stroke-[2.5]" />
                         </button>
@@ -1088,6 +1245,10 @@ export function LineupTab({
                         showLimitError();
                         return;
                       }
+                      if (selectedSlotId) {
+                        handleQuickAddPlayer(player.id);
+                        return;
+                      }
                       setBenchPlayerModalId(player.id);
                     }
                   }}
@@ -1099,7 +1260,13 @@ export function LineupTab({
                     setDraggedPlayerId(player.id);
                   }}
                   onDragEnd={() => setDraggedPlayerId(null)}
-                  className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none ${selectedPlayerId === player.id ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'}`}
+                  className={`flex items-center justify-between p-3 border rounded-xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none ${
+                    selectedSlotId
+                      ? 'bg-cyan-50/40 border-cyan-200 hover:bg-cyan-50 hover:border-cyan-300'
+                      : selectedPlayerId === player.id 
+                        ? 'bg-blue-50/50 border-blue-300 ring-2 ring-blue-500 shadow-md' 
+                        : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'
+                  }`}
                 >
                   <div className="flex items-center gap-2.5">
                     {/* Dorsal destacado */}
@@ -1132,9 +1299,20 @@ export function LineupTab({
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-[9px] font-extrabold uppercase tracking-wide text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      + Añadir
-                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleQuickAddPlayer(player.id);
+                      }}
+                      className={`text-[9px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
+                        selectedSlot 
+                          ? 'text-cyan-700 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300 animate-pulse' 
+                          : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+                      }`}
+                    >
+                      {selectedSlot ? `+ En ${selectedSlot.label}` : '+ Añadir'}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1181,6 +1359,10 @@ export function LineupTab({
                           showLimitError();
                           return;
                         }
+                        if (selectedSlotId) {
+                          handleQuickAddPlayer(player.id);
+                          return;
+                        }
                         setBenchPlayerModalId(player.id);
                       }}
                       className="w-full flex items-center justify-between p-3 border border-slate-150 rounded-xl bg-slate-50/60 hover:bg-blue-50/50 hover:border-blue-300 transition-all text-left active:scale-98"
@@ -1195,8 +1377,12 @@ export function LineupTab({
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
-                        + Seleccionar
+                      <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg border transition-all ${
+                        selectedSlot 
+                          ? 'text-cyan-700 bg-cyan-100 border-cyan-300 animate-pulse' 
+                          : 'text-blue-600 bg-blue-50 border-blue-200'
+                      }`}>
+                        {selectedSlot ? `+ En ${selectedSlot.label}` : '+ Seleccionar'}
                       </span>
                     </button>
                   ))}

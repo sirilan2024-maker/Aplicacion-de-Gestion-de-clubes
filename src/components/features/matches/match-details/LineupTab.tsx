@@ -985,7 +985,7 @@ export function LineupTab({
         )}
 
         {/* Pitch Container */}
-        <div className="bg-white border border-slate-150 rounded-xl p-5 shadow-sm space-y-4">
+        <div className="bg-white border border-slate-150 rounded-xl p-3 sm:p-5 shadow-sm space-y-4">
           {/* Badge de contador de titulares y posición seleccionada */}
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold px-1">
             <span className="text-slate-500">
@@ -1014,7 +1014,7 @@ export function LineupTab({
 
           <div 
             ref={pitchRef}
-            className="relative aspect-[3/4.3] min-h-[460px] md:aspect-auto md:w-full md:h-[480px] max-w-[420px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all cursor-pointer md:cursor-default touch-none"
+            className="relative w-full aspect-[3/4.2] max-w-[360px] md:max-w-none md:aspect-auto md:w-full md:h-[480px] mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all cursor-pointer md:cursor-default touch-none"
             onDragOver={isFamilyView ? undefined : e => e.preventDefault()}
             onDrop={handlePitchDrop}
             onClick={handlePitchClick}
@@ -1022,7 +1022,7 @@ export function LineupTab({
             onTouchEnd={handleTouchEnd}
           >
             {/* Campo de fútbol marcajes */}
-            <div className="absolute inset-4 border border-white/20 pointer-events-none md:-rotate-90 md:origin-center md:scale-[1.3] md:w-[150%] md:-left-[25%]">
+            <div className="absolute inset-3 sm:inset-4 border border-white/20 pointer-events-none md:-rotate-90 md:origin-center md:scale-[1.3] md:w-[150%] md:-left-[25%]">
               <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-white/20" />
               <div className="absolute top-0 left-1/4 right-1/4 h-12 border-b border-x border-white/20" />

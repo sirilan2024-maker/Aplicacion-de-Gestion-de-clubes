@@ -97,7 +97,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
         />
 
         {/* ─── 3. DYNAMIC CONTAINER ─── */}
-        <div className="bg-white rounded-xl border border-slate-150 p-6 shadow-sm min-h-[400px]">
+        <div className="bg-white rounded-xl border border-slate-150 p-3 sm:p-6 shadow-sm min-h-[400px]">
           
           {/* TAB: RESUMEN */}
           {activeTab === "resumen" && <SummaryTab matchId={matchId} match={match} players={activePlayers} convocatorias={currentConvocatorias} />}

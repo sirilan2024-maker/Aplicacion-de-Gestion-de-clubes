@@ -1,13 +1,17 @@
 "use client"
 
-import { useState, useTransition, useEffect, useRef } from "react"
-import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle } from "lucide-react"
+import { useState, useTransition, useEffect, useRef, useMemo } from "react"
+import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle, RotateCcw } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import { saveLineup } from "@/app/actions/match-actions"
 
 interface Player {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
+  fullName?: string
+  displayNameShort?: string
   pos: string
   avatar: string
   demarcation: string
@@ -125,15 +129,27 @@ export function LineupTab({
   const { rol } = useUserRole()
   const [isPending, startTransition] = useTransition()
   
-  const mappedPlayers: Player[] = players.map(p => ({
-    id: p.id,
-    name: p.first_name || "",
-    pos: p.posicion_principal || "N/A",
-    avatar: `${(p.first_name && p.first_name[0]) || ''}${(p.last_name && p.last_name[0]) || ''}`,
-    demarcation: "Mediocampista",
-    number: p.dorsal,
-    avatarUrl: p.avatar_url
-  }))
+  const mappedPlayers: Player[] = players.map(p => {
+    const firstName = (p.first_name || '').trim();
+    const lastName = (p.last_name || '').trim();
+    const firstSurname = lastName.split(' ')[0] || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    const displayNameShort = firstSurname ? `${firstName} ${firstSurname}` : (firstName || "Jugador");
+
+    return {
+      id: p.id,
+      name: displayNameShort,
+      firstName,
+      lastName,
+      fullName: fullName || "Jugador",
+      displayNameShort,
+      pos: p.posicion_principal || p.posicion || "N/A",
+      avatar: `${(firstName && firstName[0]) || ''}${(firstSurname && firstSurname[0]) || ''}`,
+      demarcation: p.posicion || "Jugador",
+      number: p.dorsal,
+      avatarUrl: p.avatar_url
+    };
+  });
   
   const initialPlayersList = mappedPlayers.length > 0 ? mappedPlayers : INITIAL_PLAYERS;
 
@@ -187,6 +203,40 @@ export function LineupTab({
   const [showBenchListModal, setShowBenchListModal] = useState(false);
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [showClearPitchModal, setShowClearPitchModal] = useState(false);
+
+  // Mapa de nombres calculados para los jugadores actualmente en el campo:
+  // Si hay más de uno con el mismo nombre de pila, se muestra "Nombre + Inicial del Apellido" (ej. "Carlos G." y "Carlos M.")
+  // Si no hay duplicados, se muestra solo el nombre de pila ("Carlos")
+  const pitchPlayerDisplayNames = useMemo(() => {
+    const activePitchIds = Object.keys(pitchPlayers);
+    const activePitchPlayers = activePitchIds
+      .map(id => initialPlayersList.find(p => p.id === id))
+      .filter(Boolean) as Player[];
+
+    const firstNameCounts = new Map<string, number>();
+    activePitchPlayers.forEach(p => {
+      const fn = (p.firstName || p.name.split(' ')[0] || '').toLowerCase().trim();
+      firstNameCounts.set(fn, (firstNameCounts.get(fn) || 0) + 1);
+    });
+
+    const displayMap: Record<string, string> = {};
+    activePitchPlayers.forEach(p => {
+      const fn = p.firstName || p.name.split(' ')[0] || '';
+      const fnKey = fn.toLowerCase().trim();
+      const count = firstNameCounts.get(fnKey) || 0;
+
+      if (count > 1) {
+        const firstSurname = (p.lastName || '').trim().split(' ')[0] || '';
+        const initial = firstSurname ? `${firstSurname[0].toUpperCase()}.` : '';
+        displayMap[p.id] = initial ? `${fn} ${initial}` : fn;
+      } else {
+        displayMap[p.id] = fn;
+      }
+    });
+
+    return displayMap;
+  }, [pitchPlayers, initialPlayersList]);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTouchStartPlayer = (playerId: string) => {
@@ -485,6 +535,18 @@ export function LineupTab({
                 <span className="hidden sm:inline">Guardar Sistema</span>
               </button>
 
+              {assignedPlayerIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowClearPitchModal(true)}
+                  className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs active:scale-95"
+                  title="Quitar a todos los titulares del campo"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Vaciar Campo</span>
+                </button>
+              )}
+
               {customFormations[tactic] && (
                 <button
                   onClick={() => handleDeleteCustomTactic(tactic)}
@@ -501,6 +563,43 @@ export function LineupTab({
         {savedAlert && (
           <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-3 rounded-xl animate-in fade-in duration-200">
             ✅ ¡Alineación táctica guardada con éxito!
+          </div>
+        )}
+
+{/* Modal de Confirmación para Vaciar Campo */}
+        {showClearPitchModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 border border-slate-200 animate-in zoom-in-95 duration-150">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+                <Trash2 className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div className="text-center space-y-1.5">
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide">¿Vaciar alineación del campo?</h4>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  Se quitarán los <strong>{assignedPlayerIds.length} titulares</strong> del campo y volverán a la lista de disponibles para que puedas rearmar el once desde cero.
+                </p>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClearPitchModal(false)}
+                  className="flex-1 px-3 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPitchPlayers({});
+                    setSelectedPlayerId(null);
+                    setShowClearPitchModal(false);
+                  }}
+                  className="flex-1 px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-colors active:scale-98"
+                >
+                  Sí, vaciar campo
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -634,7 +733,7 @@ export function LineupTab({
                       {player.number || "?"}
                     </div>
                     <span className="text-[9px] font-black text-white mt-1 bg-slate-950/80 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                      {player.name.split(" ")[0]}
+                      {pitchPlayerDisplayNames[player.id] || player.firstName || player.name.split(" ")[0]}
                     </span>
                   </div>
                 </div>
@@ -722,7 +821,7 @@ export function LineupTab({
                           <span>{player.number || "?"}</span>
                         )}
                       </div>
-                      <span className="truncate max-w-[90px]">{player.name}</span>
+                      <span className="truncate max-w-[130px] sm:max-w-none">{player.displayNameShort || player.name}</span>
                       <Plus className="w-3.5 h-3.5 text-blue-600 ml-0.5 stroke-[2.5]" />
                     </button>
                   ))}
@@ -818,7 +917,7 @@ export function LineupTab({
                       )}
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">{player.name}</h4>
+                      <h4 className="text-xs font-bold text-slate-900">{player.displayNameShort || player.name}</h4>
                       <span className="text-[9px] text-slate-400 font-semibold">{player.demarcation}</span>
                     </div>
                   </div>

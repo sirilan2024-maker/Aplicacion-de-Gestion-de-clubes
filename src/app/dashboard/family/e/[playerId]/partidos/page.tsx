@@ -383,7 +383,11 @@ export default function FamilyMatchesPage() {
               );
             }
 
-            const showScore = hasInternalScore || hasFfcvScore;
+            const isSuspendedMatch = match.estado === 'Suspendido' || ffcvMatch?.status === 'suspended';
+            const isPostponedMatch = match.estado === 'Aplazado' || ffcvMatch?.status === 'postponed';
+            const statusReason = ffcvMatch?.status_reason || (match as any).motivo_suspension || null;
+
+            const showScore = (hasInternalScore || hasFfcvScore) && !isSuspendedMatch && !isPostponedMatch;
 
             // Extraer codacta para ver si hay acta oficial FFCV disponible
             let codacta = ffcvMatch?.codacta || null;
@@ -408,13 +412,17 @@ export default function FamilyMatchesPage() {
                         </div>
                       )}
                       <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
-                        match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
+                        isSuspendedMatch
+                          ? "bg-red-100 text-red-700 border border-red-300 font-black"
+                          : isPostponedMatch
+                          ? "bg-orange-100 text-orange-700 border border-orange-300 font-black"
+                          : match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : match.estado === 'En Curso'
                           ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : "bg-slate-100 text-slate-500 border border-slate-200"
                       }`}>
-                        {(match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
+                        {isSuspendedMatch ? 'Suspendido' : isPostponedMatch ? 'Aplazado' : (match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
                       </div>
 
                       {isDifferentTeam && (
@@ -501,7 +509,29 @@ export default function FamilyMatchesPage() {
                     
                     {/* Marcador o VS */}
                     <div className="px-2 sm:px-4 flex flex-col items-center justify-center shrink-0">
-                      {!showScore ? (
+                      {isSuspendedMatch ? (
+                        <div className="flex flex-col items-center text-center max-w-[140px]">
+                          <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-red-600 text-white shadow-md shadow-red-500/25 border border-red-700 animate-pulse">
+                            SUSPENDIDO
+                          </span>
+                          {statusReason && (
+                            <span className="text-[10px] text-red-700 font-bold mt-1 line-clamp-2 leading-tight">
+                              {statusReason}
+                            </span>
+                          )}
+                        </div>
+                      ) : isPostponedMatch ? (
+                        <div className="flex flex-col items-center text-center max-w-[140px]">
+                          <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-orange-500 text-white shadow-xs">
+                            APLAZADO
+                          </span>
+                          {statusReason && (
+                            <span className="text-[10px] text-orange-700 font-bold mt-1 line-clamp-2 leading-tight">
+                              {statusReason}
+                            </span>
+                          )}
+                        </div>
+                      ) : !showScore ? (
                         <span className="text-slate-300 font-black text-xl italic">VS</span>
                       ) : (
                         <div className="flex flex-col items-center">

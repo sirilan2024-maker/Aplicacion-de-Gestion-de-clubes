@@ -267,9 +267,9 @@ export function FFCVMatchesSection({
                       isPlayed
                         ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                         : isPostponed
-                        ? "bg-amber-100 text-amber-700 border border-amber-200"
+                        ? "bg-orange-100 text-orange-700 border border-orange-300 font-black"
                         : isSuspended
-                        ? "bg-rose-100 text-rose-700 border border-rose-200"
+                        ? "bg-red-100 text-red-700 border border-red-300 font-black"
                         : "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}>
                       {isPlayed ? "Finalizado" : isPostponed ? "Aplazado" : isSuspended ? "Suspendido" : "Programado"}
@@ -323,6 +323,28 @@ export function FFCVMatchesSection({
                         <span className="text-2xl font-black text-slate-900">{m.home_score}</span>
                         <span className="text-slate-300 font-bold">-</span>
                         <span className="text-2xl font-black text-slate-900">{m.away_score}</span>
+                      </div>
+                    ) : isSuspended ? (
+                      <div className="flex flex-col items-center">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-black tracking-wider bg-red-600 text-white shadow-md shadow-red-500/25 border border-red-700 animate-pulse">
+                          SUSPENDIDO
+                        </span>
+                        {m.status_reason && (
+                          <span className="text-[9px] text-red-700 font-bold mt-1 text-center max-w-[120px] leading-tight">
+                            {m.status_reason}
+                          </span>
+                        )}
+                      </div>
+                    ) : isPostponed ? (
+                      <div className="flex flex-col items-center">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-black tracking-wider bg-orange-500 text-white shadow-xs">
+                          APLAZADO
+                        </span>
+                        {m.status_reason && (
+                          <span className="text-[9px] text-orange-700 font-semibold mt-1 text-center max-w-[120px] leading-tight">
+                            {m.status_reason}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center">

@@ -517,7 +517,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
       return <span className="text-amber-500 font-bold text-xs uppercase tracking-wider animate-pulse">EN DIRECTO</span>
     }
     if (match.estado === 'Suspendido') {
-      return <span className="text-amber-600 font-bold text-xs uppercase tracking-wider">SUSPENDIDO</span>
+      return <span className="text-red-600 font-black text-xs uppercase tracking-wider">SUSPENDIDO</span>
     }
     if (match.estado === 'Aplazado') {
       return <span className="text-orange-500 font-bold text-xs uppercase tracking-wider">APLAZADO</span>
@@ -962,7 +962,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                     )}
                     <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider shrink-0 ${
                       isSuspendedMatch
-                        ? "bg-amber-100 text-amber-800 border border-amber-300 font-black"
+                        ? "bg-red-100 text-red-700 border border-red-300 font-black"
                         : isPostponedMatch
                         ? "bg-orange-100 text-orange-800 border border-orange-300 font-black"
                         : match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
@@ -1014,11 +1014,11 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                   <div className="px-1.5 sm:px-4 flex flex-col items-center justify-center shrink-0">
                     {isSuspendedMatch ? (
                       <div className="flex flex-col items-center text-center max-w-[140px]">
-                        <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-amber-500 text-white shadow-xs">
+                        <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-red-600 text-white shadow-md shadow-red-500/25 border border-red-700 animate-pulse">
                           SUSPENDIDO
                         </span>
                         {statusReason && (
-                          <span className="text-[10px] text-amber-700 font-bold mt-1 line-clamp-2 leading-tight">
+                          <span className="text-[10px] text-red-700 font-bold mt-1 line-clamp-2 leading-tight">
                             {statusReason}
                           </span>
                         )}

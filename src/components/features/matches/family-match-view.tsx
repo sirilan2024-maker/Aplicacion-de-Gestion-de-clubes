@@ -262,8 +262,8 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
           </Link>
 
           {match?.estado === 'Suspendido' ? (
-            <div className="bg-amber-100 text-amber-900 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-amber-300 uppercase tracking-widest">
-              ⚠️ SUSPENDIDO
+            <div className="bg-red-100 text-red-700 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-red-300 uppercase tracking-widest shadow-xs">
+              🚫 SUSPENDIDO
             </div>
           ) : match?.estado === 'Aplazado' ? (
             <div className="bg-orange-100 text-orange-900 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-orange-300 uppercase tracking-widest">
@@ -282,15 +282,29 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
         </div>
 
         {/* ─── AVISO DE PARTIDO SUSPENDIDO O APLAZADO ─── */}
-        {(match?.estado === 'Suspendido' || match?.estado === 'Aplazado') && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-xs mb-6 flex items-start gap-3.5">
-            <span className="text-3xl shrink-0">⚠️</span>
+        {match?.estado === 'Suspendido' && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-5 shadow-xs mb-6 flex items-start gap-3.5">
+            <span className="text-3xl shrink-0">🚫</span>
             <div>
-              <h3 className="text-amber-950 font-bold text-base">
-                Partido {match?.estado === 'Suspendido' ? 'Suspendido' : 'Aplazado'}
+              <h3 className="text-red-950 font-black text-base flex items-center gap-2">
+                <span>Partido Suspendido</span>
+                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-red-600 text-white rounded">Oficial</span>
               </h3>
-              <p className="text-amber-800 text-sm mt-1 leading-relaxed">
-                Este partido ha sido {match?.estado === 'Suspendido' ? 'suspendido' : 'aplazado'} y no se disputará en el horario inicialmente previsto. En cuanto la federación o el club asigne una nueva fecha y hora oficial, se actualizará el calendario y se comunicará a las familias.
+              <p className="text-red-800 text-sm mt-1 leading-relaxed font-medium">
+                Este partido ha sido <strong>suspendido</strong> y no se disputará en el horario inicialmente previsto. En cuanto la federación o el club asigne una nueva fecha y hora oficial, se actualizará el calendario y se comunicará a las familias.
+              </p>
+            </div>
+          </div>
+        )}
+        {match?.estado === 'Aplazado' && (
+          <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-5 shadow-xs mb-6 flex items-start gap-3.5">
+            <span className="text-3xl shrink-0">⏳</span>
+            <div>
+              <h3 className="text-orange-950 font-black text-base">
+                Partido Aplazado
+              </h3>
+              <p className="text-orange-800 text-sm mt-1 leading-relaxed font-medium">
+                Este partido ha sido aplazado y no se disputará en el horario previsto. Pendiente de señalamiento de nueva fecha oficial.
               </p>
             </div>
           </div>
@@ -508,12 +522,21 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
             </div>
 
             {/* Score & Timer */}
-            {(match?.estado === 'Suspendido' || match?.estado === 'Aplazado') ? (
-              <div className="flex flex-col items-center justify-center p-4 bg-amber-50 rounded-2xl border border-amber-200 text-center min-w-[220px]">
-                <span className="px-3 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase bg-amber-500 text-white shadow-xs">
-                  {match?.estado === 'Suspendido' ? 'SUSPENDIDO' : 'APLAZADO'}
+            {match?.estado === 'Suspendido' ? (
+              <div className="flex flex-col items-center justify-center p-4 bg-red-50 rounded-2xl border-2 border-red-300 text-center min-w-[220px]">
+                <span className="px-4 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase bg-red-600 text-white shadow-md shadow-red-500/20 animate-pulse">
+                  SUSPENDIDO
                 </span>
-                <span className="text-xs text-amber-800 font-semibold mt-2">
+                <span className="text-xs text-red-800 font-bold mt-2">
+                  Sin disputar • Pendiente de nueva fecha
+                </span>
+              </div>
+            ) : match?.estado === 'Aplazado' ? (
+              <div className="flex flex-col items-center justify-center p-4 bg-orange-50 rounded-2xl border border-orange-200 text-center min-w-[220px]">
+                <span className="px-3 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase bg-orange-500 text-white shadow-xs">
+                  APLAZADO
+                </span>
+                <span className="text-xs text-orange-800 font-semibold mt-2">
                   Sin disputar • Pendiente de nueva fecha
                 </span>
               </div>

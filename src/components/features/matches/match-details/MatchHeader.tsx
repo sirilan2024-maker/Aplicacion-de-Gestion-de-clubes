@@ -156,13 +156,26 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
             const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && (match?.estado === 'En curso' || match?.estado === 'En Curso' || match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
             const isSecondHalf = match?.first_half_duration_seconds !== null && match?.first_half_duration_seconds > 0;
 
-            if (isSuspended || isPostponed) {
+            if (isSuspended) {
               return (
-                <div className="flex flex-col items-center justify-center p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-center my-2 md:my-0 min-w-[200px]">
-                  <span className="px-3 py-1.5 rounded-xl text-xs font-black tracking-widest uppercase bg-amber-500 text-white shadow-xs">
-                    {isSuspended ? 'SUSPENDIDO' : 'APLAZADO'}
+                <div className="flex flex-col items-center justify-center p-3.5 bg-red-50 rounded-2xl border-2 border-red-300 text-center my-2 md:my-0 min-w-[200px]">
+                  <span className="px-4 py-1.5 rounded-xl text-xs font-black tracking-widest uppercase bg-red-600 text-white shadow-md shadow-red-500/20 animate-pulse">
+                    SUSPENDIDO
                   </span>
-                  <span className="text-[11px] text-amber-800 font-semibold mt-1.5">
+                  <span className="text-[11px] text-red-800 font-bold mt-1.5">
+                    Pendiente de reprogramación por la FFCV
+                  </span>
+                </div>
+              );
+            }
+
+            if (isPostponed) {
+              return (
+                <div className="flex flex-col items-center justify-center p-3.5 bg-orange-50 rounded-2xl border border-orange-200 text-center my-2 md:my-0 min-w-[200px]">
+                  <span className="px-3 py-1.5 rounded-xl text-xs font-black tracking-widest uppercase bg-orange-500 text-white shadow-xs">
+                    APLAZADO
+                  </span>
+                  <span className="text-[11px] text-orange-800 font-semibold mt-1.5">
                     Pendiente de reprogramación por la FFCV
                   </span>
                 </div>

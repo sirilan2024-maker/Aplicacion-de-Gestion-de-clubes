@@ -301,10 +301,10 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           <div className="flex flex-col items-center justify-center w-1/3 shrink-0 text-center mx-auto">
             {isSuspended ? (
               <div className="flex flex-col items-center text-center">
-                <span className="px-2.5 py-1 rounded-lg text-xs font-black tracking-wider bg-amber-500 text-white shadow-xs">
+                <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-red-600 text-white shadow-md shadow-red-500/25 border border-red-700 animate-pulse">
                   SUSPENDIDO
                 </span>
-                <span className="text-[10px] text-amber-700 font-semibold mt-1">
+                <span className="text-[10px] text-red-700 font-bold mt-1">
                   Sin disputar
                 </span>
               </div>

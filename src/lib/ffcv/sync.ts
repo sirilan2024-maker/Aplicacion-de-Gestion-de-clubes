@@ -19,6 +19,7 @@ import {
 } from './types';
 import { syncFFCVActaToConvocatorias } from './acta-sync';
 import { getOfficialMatchDuration } from '../utils';
+import { NotificationService } from '../notifications/notification-service';
 
 /**
  * Synchronizes FFCV group data (calendar, standings, matches) into Supabase
@@ -580,17 +581,42 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
     const isSaladarHome = (teamFfcvId && String(fm.home_team_ffcv_id) === String(teamFfcvId)) || (fm.home_team_name || '').toLowerCase().includes('saladar');
     const isPlayed = fm.status === 'played' || (fm.home_score !== null && fm.away_score !== null);
+    const isSuspended = fm.status === 'suspended';
+    const isPostponed = fm.status === 'postponed';
     const sportingScore = isSaladarHome ? fm.home_score : fm.away_score;
     const rivalScore = isSaladarHome ? fm.away_score : fm.home_score;
-    const targetStatus = isPlayed ? 'Finalizado' : 'Programado';
 
     const updates: Record<string, any> = {};
 
-    // Check status & score updates
-    if (isPlayed && (pm.estado !== 'Finalizado' || pm.resultado_propio !== sportingScore || pm.resultado_rival !== rivalScore)) {
-      updates.estado = targetStatus;
-      updates.resultado_propio = sportingScore;
-      updates.resultado_rival = rivalScore;
+    // 1. Caso PARTIDO JUGADO / FINALIZADO
+    if (isPlayed) {
+      if (pm.estado !== 'Finalizado' || pm.resultado_propio !== sportingScore || pm.resultado_rival !== rivalScore) {
+        updates.estado = 'Finalizado';
+        updates.resultado_propio = sportingScore;
+        updates.resultado_rival = rivalScore;
+      }
+    } 
+    // 2. Caso PARTIDO SUSPENDIDO
+    else if (isSuspended) {
+      if (pm.estado !== 'Suspendido' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
+        updates.estado = 'Suspendido';
+        updates.resultado_propio = null;
+        updates.resultado_rival = null;
+      }
+    } 
+    // 3. Caso PARTIDO APLAZADO
+    else if (isPostponed) {
+      if (pm.estado !== 'Aplazado' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
+        updates.estado = 'Aplazado';
+        updates.resultado_propio = null;
+        updates.resultado_rival = null;
+      }
+    } 
+    // 4. Caso PARTIDO REPROGRAMADO (si antes estaba suspendido o aplazado y la FFCV lo vuelve a programar)
+    else if (!isPlayed && !isSuspended && !isPostponed && (pm.estado === 'Suspendido' || pm.estado === 'Aplazado')) {
+      updates.estado = 'Programado';
+      updates.resultado_propio = null;
+      updates.resultado_rival = null;
     }
 
     // Check date and time updates if published by FFCV
@@ -629,6 +655,51 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
       if (!upErr) {
         updatedCount++;
+
+        // Si el estado ha cambiado a Suspendido o Aplazado, notificar a las familias y jugadores del equipo
+        if ((updates.estado === 'Suspendido' || updates.estado === 'Aplazado') && pm.estado !== updates.estado) {
+          try {
+            const { data: teamPlayers } = await supabase
+              .from('players')
+              .select('id, user_id, first_name, last_name, player_tutors(tutor_id)')
+              .eq('team_id', pm.equipo_id)
+              .eq('is_active', true);
+
+            const targetUserIds = new Set<string>();
+            (teamPlayers || []).forEach((p: any) => {
+              if (p.user_id) targetUserIds.add(p.user_id);
+              (p.player_tutors || []).forEach((pt: any) => {
+                if (pt.tutor_id) targetUserIds.add(pt.tutor_id);
+              });
+            });
+
+            const matchDateObj = new Date(updates.fecha_hora || pm.fecha_hora);
+            const formattedDate = !isNaN(matchDateObj.getTime())
+              ? matchDateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+              : 'próximamente';
+            const teamName = (pm.teams as any)?.name || 'Sporting Saladar';
+            const statusLabel = updates.estado;
+            const reasonText = fm.status_reason ? ` por motivo: "${fm.status_reason}"` : '';
+            const title = `⚠️ Partido ${statusLabel}: ${teamName} vs ${pm.rival_nombre}`;
+            const content = `El partido programado para el ${formattedDate} contra ${pm.rival_nombre} ha sido ${statusLabel.toLowerCase()}${reasonText}. Consulta la app para más detalles.`;
+
+            for (const uId of targetUserIds) {
+              await NotificationService.dispatch({
+                userId: uId,
+                type: 'GENERAL_ALERT',
+                title,
+                content,
+                link: `/dashboard/matches/${pm.id}`,
+                channels: ['PUSH', 'IN_APP', 'EMAIL'],
+                idempotencyKey: `match_status_change:${pm.id}:${statusLabel}:${uId}`,
+              }).catch((notifErr) => {
+                console.warn('[propagateFfcvMatchesToClubPartidos] Error enviando notificación:', notifErr);
+              });
+            }
+          } catch (notifErr) {
+            console.warn('[propagateFfcvMatchesToClubPartidos] Error al preparar aviso de suspensión:', notifErr);
+          }
+        }
 
         // Keep linked team_events synchronized if date or time changed
         if (updates.fecha_hora && fm.match_date && fm.match_time) {

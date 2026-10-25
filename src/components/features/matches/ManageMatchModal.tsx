@@ -50,6 +50,7 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           const placeStr = formData.get("place") as string;
           const equipoIdStr = formData.get("equipo_id") as string || defaultTeamId;
           const tipoPartidoStr = (formData.get("tipo_partido") as string) || match.tipo_partido || 'liga';
+          const manualEstado = (formData.get("estado") as string) || '';
           
           const golesPropiosStr = formData.get("resultado_propio") as string;
           const golesRivalStr = formData.get("resultado_rival") as string;
@@ -59,16 +60,27 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           const rsvpDateStr = formData.get("rsvp_date") as string;
           const rsvpTimeStr = formData.get("rsvp_time") as string;
 
-          const golesPropios = golesPropiosStr !== "" ? parseInt(golesPropiosStr) : null;
-          const golesRival = golesRivalStr !== "" ? parseInt(golesRivalStr) : null;
+          let golesPropios = golesPropiosStr !== "" ? parseInt(golesPropiosStr) : null;
+          let golesRival = golesRivalStr !== "" ? parseInt(golesRivalStr) : null;
           
           let rsvpReminderTime = null;
           if (autoRsvp && rsvpDateStr && rsvpTimeStr) {
             rsvpReminderTime = new Date(`${rsvpDateStr}T${rsvpTimeStr}:00`).toISOString();
           }
           
-          // Determine status based on scores
-          const estado = (golesPropios !== null && golesRival !== null) ? 'Finalizado' : 'Programado';
+          // Determine status based on explicit choice or scores
+          let estado = 'Programado';
+          if (manualEstado === 'Suspendido' || manualEstado === 'Aplazado') {
+            estado = manualEstado;
+            golesPropios = null;
+            golesRival = null;
+          } else if (golesPropios !== null && golesRival !== null) {
+            estado = 'Finalizado';
+          } else if (manualEstado === 'Finalizado') {
+            estado = 'Finalizado';
+          } else {
+            estado = 'Programado';
+          }
           
           if (dateStr && timeStr) {
             const combinedISO = new Date(`${dateStr}T${timeStr}`).toISOString();
@@ -196,12 +208,23 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo de Partido</label>
-            <select name="tipo_partido" defaultValue={match.tipo_partido || 'liga'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
-              <option value="liga">Oficial de Liga</option>
-              <option value="amistoso">Amistoso (no computa en liga)</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo de Partido</label>
+              <select name="tipo_partido" defaultValue={match.tipo_partido || 'liga'} required className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <option value="liga">Oficial de Liga</option>
+                <option value="amistoso">Amistoso (no computa en liga)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Estado del Partido</label>
+              <select name="estado" defaultValue={match.estado || 'Programado'} className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <option value="Programado">Programado</option>
+                <option value="Finalizado">Finalizado</option>
+                <option value="Suspendido">⚠️ Suspendido</option>
+                <option value="Aplazado">🟠 Aplazado</option>
+              </select>
+            </div>
           </div>
 
           <div className="p-4 bg-slate-100/80 rounded-xl border border-slate-200">

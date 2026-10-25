@@ -261,11 +261,40 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
             Volver a Partidos
           </Link>
 
-          <div className="bg-emerald-50 text-emerald-700 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-emerald-200 uppercase tracking-widest">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            EN DIRECTO
-          </div>
+          {match?.estado === 'Suspendido' ? (
+            <div className="bg-amber-100 text-amber-900 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-amber-300 uppercase tracking-widest">
+              ⚠️ SUSPENDIDO
+            </div>
+          ) : match?.estado === 'Aplazado' ? (
+            <div className="bg-orange-100 text-orange-900 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-orange-300 uppercase tracking-widest">
+              🟠 APLAZADO
+            </div>
+          ) : match?.estado === 'Finalizado' ? (
+            <div className="bg-slate-100 text-slate-700 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-slate-200 uppercase tracking-widest">
+              FINALIZADO
+            </div>
+          ) : (
+            <div className="bg-emerald-50 text-emerald-700 flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full border border-emerald-200 uppercase tracking-widest">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              {match?.estado === 'En Curso' ? 'EN DIRECTO' : 'PROGRAMADO'}
+            </div>
+          )}
         </div>
+
+        {/* ─── AVISO DE PARTIDO SUSPENDIDO O APLAZADO ─── */}
+        {(match?.estado === 'Suspendido' || match?.estado === 'Aplazado') && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-xs mb-6 flex items-start gap-3.5">
+            <span className="text-3xl shrink-0">⚠️</span>
+            <div>
+              <h3 className="text-amber-950 font-bold text-base">
+                Partido {match?.estado === 'Suspendido' ? 'Suspendido' : 'Aplazado'}
+              </h3>
+              <p className="text-amber-800 text-sm mt-1 leading-relaxed">
+                Este partido ha sido {match?.estado === 'Suspendido' ? 'suspendido' : 'aplazado'} y no se disputará en el horario inicialmente previsto. En cuanto la federación o el club asigne una nueva fecha y hora oficial, se actualizará el calendario y se comunicará a las familias.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ─── ASISTENCIA CONVOCATORIA (Convocado) ─── */}
         {playerConv && ['convocado', 'titular', 'suplente'].includes(playerConv.status) && (
@@ -479,51 +508,62 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
             </div>
 
             {/* Score & Timer */}
-            <div className="flex items-center gap-5 shrink-0">
-              <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
-                {displayLocalGoals}
-              </span>
-              
-              <div className="flex flex-col items-center justify-center px-4">
-                {(() => {
-                  const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
-                  const isDescanso = match?.estado === 'Descanso' || 
-                                     (match?.first_half_duration_seconds !== null &&
-                                      match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
-                                      !match?.live_timer_started_at);
-                  
-                  if (isFinalizado || isDescanso) {
-                    return (
-                      <div className="flex flex-col items-center">
-                        <span className={`text-[14px] font-black tracking-[0.2em] uppercase px-4 py-2 rounded-xl border-2 ${isFinalizado ? 'text-slate-800 bg-slate-100 border-slate-200' : 'text-amber-800 bg-amber-100 border-amber-200'}`}>
-                          {isFinalizado ? 'Finalizado' : 'Descanso'}
-                        </span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <>
-                      <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">
-                        Tiempo de Juego
-                      </span>
-                      <div className={`text-2xl font-black tabular-nums tracking-tight px-4 py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-2 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
-                        {match?.live_timer_started_at && (
-                          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                        )}
-                        {formatTime(seconds)}
-                      </div>
-                      <span className={`text-[10px] font-bold mt-2 uppercase tracking-widest px-2 py-0.5 rounded ${(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
-                        {match?.live_timer_started_at !== null ? (match?.first_half_duration_seconds ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado')}
-                      </span>
-                    </>
-                  );
-                })()}
+            {(match?.estado === 'Suspendido' || match?.estado === 'Aplazado') ? (
+              <div className="flex flex-col items-center justify-center p-4 bg-amber-50 rounded-2xl border border-amber-200 text-center min-w-[220px]">
+                <span className="px-3 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase bg-amber-500 text-white shadow-xs">
+                  {match?.estado === 'Suspendido' ? 'SUSPENDIDO' : 'APLAZADO'}
+                </span>
+                <span className="text-xs text-amber-800 font-semibold mt-2">
+                  Sin disputar • Pendiente de nueva fecha
+                </span>
               </div>
+            ) : (
+              <div className="flex items-center gap-5 shrink-0">
+                <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
+                  {displayLocalGoals}
+                </span>
+                
+                <div className="flex flex-col items-center justify-center px-4">
+                  {(() => {
+                    const isFinalizado = match?.estado?.trim().toLowerCase() === 'finalizado';
+                    const isDescanso = match?.estado === 'Descanso' || 
+                                       (match?.first_half_duration_seconds !== null &&
+                                        match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds &&
+                                        !match?.live_timer_started_at);
+                    
+                    if (isFinalizado || isDescanso) {
+                      return (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-[14px] font-black tracking-[0.2em] uppercase px-4 py-2 rounded-xl border-2 ${isFinalizado ? 'text-slate-800 bg-slate-100 border-slate-200' : 'text-amber-800 bg-amber-100 border-amber-200'}`}>
+                            {isFinalizado ? 'Finalizado' : 'Descanso'}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">
+                          Tiempo de Juego
+                        </span>
+                        <div className={`text-2xl font-black tabular-nums tracking-tight px-4 py-1.5 rounded-xl border-2 shadow-inner flex items-center gap-2 ${match?.live_timer_started_at ? 'bg-slate-900 text-white border-slate-800' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                          {match?.live_timer_started_at && (
+                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                          )}
+                          {formatTime(seconds)}
+                        </div>
+                        <span className={`text-[10px] font-bold mt-2 uppercase tracking-widest px-2 py-0.5 rounded ${(match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
+                          {match?.live_timer_started_at !== null ? (match?.first_half_duration_seconds ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado')}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
 
-              <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
-                {displayAwayGoals}
-              </span>
-            </div>
+                <span className="text-5xl font-extrabold text-slate-800 tabular-nums leading-none">
+                  {displayAwayGoals}
+                </span>
+              </div>
+            )}
 
             {/* Away */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-4 flex-1 text-center md:text-right">

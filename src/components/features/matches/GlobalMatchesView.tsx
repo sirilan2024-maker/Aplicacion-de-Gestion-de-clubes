@@ -516,10 +516,18 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
     if (match.estado === 'En Curso') {
       return <span className="text-amber-500 font-bold text-xs uppercase tracking-wider animate-pulse">EN DIRECTO</span>
     }
+    if (match.estado === 'Suspendido') {
+      return <span className="text-amber-600 font-bold text-xs uppercase tracking-wider">SUSPENDIDO</span>
+    }
+    if (match.estado === 'Aplazado') {
+      return <span className="text-orange-500 font-bold text-xs uppercase tracking-wider">APLAZADO</span>
+    }
     return <span className="text-slate-400 font-bold text-xs uppercase tracking-wider">PROGRAMADO</span>
   }
 
   const renderScore = (match: any) => {
+    if (match.estado === 'Suspendido') return "SUSPENDIDO"
+    if (match.estado === 'Aplazado') return "APLAZADO"
     if (match.estado === 'Programado') return "- : -"
     return `${match.resultado_propio ?? 0} - ${match.resultado_rival ?? 0}`
   }
@@ -927,7 +935,11 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
               );
             }
 
-            const showScore = hasInternalScore || hasFfcvScore;
+            const isSuspendedMatch = match.estado === 'Suspendido' || ffcvMatch?.status === 'suspended';
+            const isPostponedMatch = match.estado === 'Aplazado' || ffcvMatch?.status === 'postponed';
+            const statusReason = ffcvMatch?.status_reason || (match as any).motivo_suspension || null;
+
+            const showScore = (hasInternalScore || hasFfcvScore) && !isSuspendedMatch && !isPostponedMatch;
 
             return (
             <div 
@@ -949,13 +961,17 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                       </span>
                     )}
                     <div className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider shrink-0 ${
-                      match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
+                      isSuspendedMatch
+                        ? "bg-amber-100 text-amber-800 border border-amber-300 font-black"
+                        : isPostponedMatch
+                        ? "bg-orange-100 text-orange-800 border border-orange-300 font-black"
+                        : match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
                         ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
                         : match.estado === 'En Curso'
                         ? "bg-amber-50 text-amber-600 border border-amber-200"
                         : "bg-slate-100 text-slate-500 border border-slate-200"
                     }`}>
-                      {(match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
+                      {isSuspendedMatch ? 'Suspendido' : isPostponedMatch ? 'Aplazado' : (match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
                     </div>
                     <MatchKitBadge
                       equipacionAsignada={match.equipacion_asignada}
@@ -996,7 +1012,29 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                   
                   {/* MARCADOR O VS */}
                   <div className="px-1.5 sm:px-4 flex flex-col items-center justify-center shrink-0">
-                    {!showScore ? (
+                    {isSuspendedMatch ? (
+                      <div className="flex flex-col items-center text-center max-w-[140px]">
+                        <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-amber-500 text-white shadow-xs">
+                          SUSPENDIDO
+                        </span>
+                        {statusReason && (
+                          <span className="text-[10px] text-amber-700 font-bold mt-1 line-clamp-2 leading-tight">
+                            {statusReason}
+                          </span>
+                        )}
+                      </div>
+                    ) : isPostponedMatch ? (
+                      <div className="flex flex-col items-center text-center max-w-[140px]">
+                        <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-orange-500 text-white shadow-xs">
+                          APLAZADO
+                        </span>
+                        {statusReason && (
+                          <span className="text-[10px] text-orange-700 font-bold mt-1 line-clamp-2 leading-tight">
+                            {statusReason}
+                          </span>
+                        )}
+                      </div>
+                    ) : !showScore ? (
                       <span className="text-slate-300 font-black text-xl italic">VS</span>
                     ) : (
                       <div className="flex flex-col items-center">

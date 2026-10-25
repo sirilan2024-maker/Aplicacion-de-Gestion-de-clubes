@@ -1102,8 +1102,14 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const possiblePoints = totalPlayedMatches * 3;
     const pointsPercentage = possiblePoints > 0 ? Math.round((points / possiblePoints) * 100) : 0;
 
-    // 8. Estadísticas individuales de jugadores y Líderes Deportivos
-    const unreportedMatchesCount = allMatches.filter(p => p.estado === 'Programado' && p.fecha_hora < new Date().toISOString()).length;
+    // 8. Estadísticas individuales de jugadores y Líderes Deportivos (excluyendo suspendidos, aplazados y descansos)
+    const unreportedMatchesCount = allMatches.filter(p => 
+      p.estado === 'Programado' && 
+      p.estado !== 'Suspendido' && 
+      p.estado !== 'Aplazado' && 
+      !p.rival_nombre?.toLowerCase().includes('descansa') &&
+      p.fecha_hora < new Date().toISOString()
+    ).length;
     
     // Calcular dinámicamente máximo goleador y más minutos a partir de convocatorias
     let topScorer: { playerId: string; playerName: string; goals: number; teamName: string } | null = null;

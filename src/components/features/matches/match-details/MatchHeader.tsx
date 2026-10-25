@@ -145,14 +145,29 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
 
           {/* Marcador Gigante */}
           {(() => {
+            const isSuspended = match?.estado === 'Suspendido';
+            const isPostponed = match?.estado === 'Aplazado';
             const isFinished = match?.estado === 'Finalizado';
-            const isDescanso = !isFinished && (match?.estado === 'Descanso' || 
+            const isDescanso = !isFinished && !isSuspended && !isPostponed && (match?.estado === 'Descanso' || 
               (match?.first_half_duration_seconds !== null && 
                match?.first_half_duration_seconds > 0 &&
                match?.live_timer_elapsed_seconds === match?.first_half_duration_seconds && 
                !match?.live_timer_started_at));
-            const isLive = !isFinished && !isDescanso && (match?.estado === 'En curso' || match?.estado === 'En Curso' || match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
+            const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && (match?.estado === 'En curso' || match?.estado === 'En Curso' || match?.live_timer_started_at !== null || (match?.live_timer_elapsed_seconds && match?.live_timer_elapsed_seconds > 0));
             const isSecondHalf = match?.first_half_duration_seconds !== null && match?.first_half_duration_seconds > 0;
+
+            if (isSuspended || isPostponed) {
+              return (
+                <div className="flex flex-col items-center justify-center p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-center my-2 md:my-0 min-w-[200px]">
+                  <span className="px-3 py-1.5 rounded-xl text-xs font-black tracking-widest uppercase bg-amber-500 text-white shadow-xs">
+                    {isSuspended ? 'SUSPENDIDO' : 'APLAZADO'}
+                  </span>
+                  <span className="text-[11px] text-amber-800 font-semibold mt-1.5">
+                    Pendiente de reprogramación por la FFCV
+                  </span>
+                </div>
+              );
+            }
 
             return (
               <div className="flex items-center gap-5 shrink-0 my-2 md:my-0">

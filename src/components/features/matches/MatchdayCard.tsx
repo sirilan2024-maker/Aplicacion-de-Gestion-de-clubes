@@ -44,13 +44,15 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   }, [match?.rival_nombre, match?.rival, match?.rival_escudo]);
 
 
+  const isSuspended = match.estado === 'Suspendido'
+  const isPostponed = match.estado === 'Aplazado'
   const isFinished = match.estado === 'Finalizado'
-  const isDescanso = !isFinished && (match.estado === 'Descanso' || 
+  const isDescanso = !isFinished && !isSuspended && !isPostponed && (match.estado === 'Descanso' || 
     (match.first_half_duration_seconds !== null && 
      match.first_half_duration_seconds > 0 &&
      match.live_timer_elapsed_seconds === match.first_half_duration_seconds && 
      !match.live_timer_started_at));
-  const isLive = !isFinished && !isDescanso && (match.estado === 'En curso' || match.estado === 'En Curso' || match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
+  const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && (match.estado === 'En curso' || match.estado === 'En Curso' || match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
   const isLocal = !/\b(fuera|visitante)\b/i.test(match.lugar || '');
 
   // Cronómetro en vivo
@@ -297,7 +299,25 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
 
           {/* Time / Score */}
           <div className="flex flex-col items-center justify-center w-1/3 shrink-0 text-center mx-auto">
-            {isLive || isDescanso || isFinished ? (
+            {isSuspended ? (
+              <div className="flex flex-col items-center text-center">
+                <span className="px-2.5 py-1 rounded-lg text-xs font-black tracking-wider bg-amber-500 text-white shadow-xs">
+                  SUSPENDIDO
+                </span>
+                <span className="text-[10px] text-amber-700 font-semibold mt-1">
+                  Sin disputar
+                </span>
+              </div>
+            ) : isPostponed ? (
+              <div className="flex flex-col items-center text-center">
+                <span className="px-2.5 py-1 rounded-lg text-xs font-black tracking-wider bg-orange-500 text-white shadow-xs">
+                  APLAZADO
+                </span>
+                <span className="text-[10px] text-orange-700 font-semibold mt-1">
+                  Nueva fecha
+                </span>
+              </div>
+            ) : isLive || isDescanso || isFinished ? (
               <div className="flex items-center justify-center gap-2.5 w-full text-center">
                 <span className={`text-3xl md:text-4xl font-black tabular-nums tracking-tighter ${isLive ? 'text-green-600' : isDescanso ? 'text-amber-600' : 'text-slate-800'}`}>
                   {liveLocalGoals}

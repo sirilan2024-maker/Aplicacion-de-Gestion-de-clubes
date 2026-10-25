@@ -1282,18 +1282,21 @@ export function LineupTab({
                         </div>
 
                         {/* Nombre completo / deportivo y demarcación */}
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-snug">
+                        <div className="min-w-0 flex-1 pr-2">
+                          <h4 
+                            className="text-xs sm:text-sm font-black text-slate-800 leading-snug truncate"
+                            title={player.displayNameShort || player.name}
+                          >
                             {player.displayNameShort || player.name}
                           </h4>
-                          <span className="text-[10px] text-slate-400 font-semibold block">
+                          <span className="text-[10px] text-slate-400 font-semibold block truncate">
                             {player.demarcation || 'Jugador'}
                           </span>
                         </div>
                       </button>
 
                       {/* Botones de acción: Editar apodo (✏️) y Añadir (+) */}
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <div className="flex items-center gap-1.5 shrink-0 ml-1">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1416,7 +1419,7 @@ export function LineupTab({
                         : 'border-slate-100 bg-slate-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:shadow-sm'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
                     {/* Dorsal destacado */}
                     <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                       {player.number != null && player.number !== '' ? player.number : '-'}
@@ -1428,13 +1431,18 @@ export function LineupTab({
                         <span>{player.avatar}</span>
                       )}
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900">{player.displayNameShort || player.name}</h4>
-                      <span className="text-[9px] text-slate-400 font-semibold">{player.demarcation}</span>
+                    <div className="min-w-0 flex-1">
+                      <h4 
+                        className="text-xs font-bold text-slate-900 truncate"
+                        title={player.displayNameShort || player.name}
+                      >
+                        {player.displayNameShort || player.name}
+                      </h4>
+                      <span className="text-[9px] text-slate-400 font-semibold block truncate">{player.demarcation}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1442,7 +1450,7 @@ export function LineupTab({
                         setEditingNicknamePlayer(player);
                         setNewNicknameInput(player.nickname || player.firstName || "");
                       }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors shrink-0"
                       title="Editar apodo o nombre deportivo"
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -1453,7 +1461,7 @@ export function LineupTab({
                         e.stopPropagation();
                         handleQuickAddPlayer(player.id);
                       }}
-                      className={`text-[9px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
+                      className={`text-[9px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded-md flex items-center gap-1 transition-all shrink-0 ${
                         selectedSlot 
                           ? 'text-cyan-700 bg-cyan-100 hover:bg-cyan-200 border border-cyan-300 animate-pulse' 
                           : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200'
@@ -1515,13 +1523,13 @@ export function LineupTab({
                       }}
                       className="w-full flex items-center justify-between p-3 border border-slate-150 rounded-xl bg-slate-50/60 hover:bg-blue-50/50 hover:border-blue-300 transition-all text-left active:scale-98"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
                         <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                           {player.number || player.avatar}
                         </div>
-                        <div>
-                          <h4 className="text-xs font-bold text-slate-900">{player.name}</h4>
-                          <span className="text-[10px] text-slate-500 font-semibold">{player.demarcation}</span>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-slate-900 truncate" title={player.name}>{player.name}</h4>
+                          <span className="text-[10px] text-slate-500 font-semibold block truncate">{player.demarcation}</span>
                         </div>
                       </div>
 

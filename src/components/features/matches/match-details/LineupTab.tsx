@@ -163,29 +163,49 @@ export function LineupTab({
   
   const buildMappedPlayers = (sourcePlayers: any[]): Player[] => {
     return sourcePlayers.map(p => {
-      const rawFirst = (p.first_name || '').trim();
-      const rawLast = (p.last_name || '').trim();
-      const customNickname = (p.nickname || '').trim();
-      const singleFirstName = customNickname ? formatToTitleCase(customNickname) : getSingleFirstName(rawFirst);
-      const firstSurname = getFirstSurname(rawLast);
+      const rawFirst = (p.first_name || p.nombre || '').trim();
+      const rawLast = (p.last_name || p.apellidos || '').trim();
+      const customNickname = (p.nickname || p.apodo || '').trim();
+      
+      let baseFirst = rawFirst;
+      let baseLast = rawLast;
+      if (!baseFirst && (p.name || p.full_name)) {
+        const full = (p.name || p.full_name || '').trim();
+        const parts = full.split(/\s+/);
+        baseFirst = parts[0] || '';
+        baseLast = parts.slice(1).join(' ') || '';
+      }
+
+      const singleFirstName = customNickname 
+        ? formatToTitleCase(customNickname) 
+        : (baseFirst ? getSingleFirstName(baseFirst) : 'Jugador');
+      const firstSurname = getFirstSurname(baseLast);
       const displayNameShort = customNickname 
         ? formatToTitleCase(customNickname) 
-        : (firstSurname ? `${singleFirstName} ${firstSurname}` : singleFirstName);
-      const fullName = `${formatToTitleCase(rawFirst)} ${formatToTitleCase(rawLast)}`.trim();
+        : (firstSurname ? `${singleFirstName} ${firstSurname}` : (baseFirst || p.name || 'Jugador'));
+      const fullName = `${formatToTitleCase(baseFirst)} ${formatToTitleCase(baseLast)}`.trim() || p.name || displayNameShort;
+
+      const dorsalNum = p.dorsal != null && p.dorsal !== '' 
+        ? p.dorsal 
+        : (p.number != null && p.number !== '' ? p.number : '-');
+
+      const init1 = (singleFirstName && singleFirstName[0]) || (p.name && p.name[0]) || 'J';
+      const init2 = (firstSurname && firstSurname[0]) || '';
+      const avatarInitials = `${init1}${init2}`.toUpperCase();
 
       return {
         id: p.id,
         name: displayNameShort,
         firstName: singleFirstName,
-        lastName: rawLast,
+        lastName: baseLast,
         fullName: fullName || singleFirstName,
         displayNameShort,
         nickname: customNickname || null,
         pos: p.posicion_principal || p.posicion || "N/A",
-        avatar: `${(singleFirstName && singleFirstName[0]) || ''}${(firstSurname && firstSurname[0]) || ''}`,
+        avatar: avatarInitials,
         demarcation: p.posicion || "Jugador",
-        number: p.dorsal,
-        avatarUrl: p.avatar_url
+        number: dorsalNum,
+        avatarUrl: p.avatar_url || p.foto_url || p.photo_url || p.foto || null
       };
     });
   };
@@ -222,30 +242,69 @@ export function LineupTab({
   const allFormations = { ...DEFAULT_FORMATIONS, ...customFormations }
 
   // Cargar desde base de datos usando tactical_x y tactical_y si existen
-  const initialPitchPlayers: Record<string, { x: number, y: number }> = {};
+  interface PitchPlayerPosition {
+    x: number;
+    y: number;
+    slotId?: string;
+    slotLabel?: string;
+  }
+
+  const initialPitchPlayers: Record<string, PitchPlayerPosition> = {};
   
   // Titulares
   const titularesDb = convocatorias.filter(c => c.titular);
+  const defaultSlots = DEFAULT_FORMATIONS["4-3-3"];
+
   if (titularesDb.length > 0 && playersList.length > 0) {
-    titularesDb.forEach(c => {
+    const assignedSlots = new Set<string>();
+
+    titularesDb.forEach((c, idx) => {
+      let matchedSlot: { id: string; label: string; x: number; y: number } | null = null;
+      if (c.tactical_x != null && c.tactical_y != null) {
+        let minDist = Infinity;
+        for (const s of defaultSlots) {
+          if (assignedSlots.has(s.id)) continue;
+          const dist = Math.hypot(c.tactical_x - s.x, c.tactical_y - s.y);
+          if (dist < minDist) {
+            minDist = dist;
+            matchedSlot = s;
+          }
+        }
+      }
+
+      if (!matchedSlot) {
+        matchedSlot = defaultSlots.find(s => !assignedSlots.has(s.id)) || defaultSlots[idx] || null;
+      }
+
+      if (matchedSlot) {
+        assignedSlots.add(matchedSlot.id);
+      }
+
       initialPitchPlayers[c.player_id] = { 
-        x: c.tactical_x != null ? c.tactical_x : 50, 
-        y: c.tactical_y != null ? c.tactical_y : 50 
+        x: c.tactical_x != null ? c.tactical_x : (matchedSlot ? matchedSlot.x : 50), 
+        y: c.tactical_y != null ? c.tactical_y : (matchedSlot ? matchedSlot.y : 50),
+        slotId: matchedSlot?.id,
+        slotLabel: matchedSlot?.label
       };
     });
   } else {
     // Si no hay datos, cargar la táctica inicial
     let i = 0;
     for (const p of initialPlayersList) {
-      if (i < 11 && DEFAULT_FORMATIONS["4-3-3"][i]) {
-        initialPitchPlayers[p.id] = { x: DEFAULT_FORMATIONS["4-3-3"][i].x, y: DEFAULT_FORMATIONS["4-3-3"][i].y };
+      if (i < 11 && defaultSlots[i]) {
+        initialPitchPlayers[p.id] = { 
+          x: defaultSlots[i].x, 
+          y: defaultSlots[i].y,
+          slotId: defaultSlots[i].id,
+          slotLabel: defaultSlots[i].label
+        };
         i++;
       }
     }
   }
 
   const [tactic, setTactic] = useState<string>("4-3-3")
-  const [pitchPlayers, setPitchPlayers] = useState<Record<string, { x: number, y: number }>>(initialPitchPlayers)
+  const [pitchPlayers, setPitchPlayers] = useState<Record<string, PitchPlayerPosition>>(initialPitchPlayers)
   const [savedAlert, setSavedAlert] = useState(false)
   const [limitWarning, setLimitWarning] = useState<string | null>(null)
   const [contextMenuPlayerId, setContextMenuPlayerId] = useState<string | null>(null);
@@ -271,29 +330,37 @@ export function LineupTab({
     return allFormations[tactic] || DEFAULT_FORMATIONS["4-3-3"] || [];
   }, [allFormations, tactic]);
 
-  // Slots tácticos vacíos en el campo de la formación actual
+  // Slots tácticos vacíos en el campo de la formación actual:
+  // Solo se muestran las posiciones que NO tengan ya un jugador asignado
   const emptySlots = useMemo(() => {
     const activePlayerCount = Object.keys(pitchPlayers).length;
     if (activePlayerCount >= 11) return [];
 
-    const playerCoords = Object.values(pitchPlayers);
     const occupiedSlotIds = new Set<string>();
 
-    for (const coords of playerCoords) {
-      let closestSlot: { id: string; dist: number } | null = null;
-      for (const slot of currentFormationSlots) {
-        if (occupiedSlotIds.has(slot.id)) continue;
-        const dist = Math.hypot(coords.x - slot.x, coords.y - slot.y);
-        if (dist < 8) {
+    // 1. Añadir slotIds explícitos asignados a los jugadores
+    Object.values(pitchPlayers).forEach(p => {
+      if (p.slotId) {
+        occupiedSlotIds.add(p.slotId);
+      }
+    });
+
+    // 2. Si hay algún jugador sin slotId explícito, asignarlo al slot libre más cercano
+    Object.values(pitchPlayers).forEach(p => {
+      if (!p.slotId) {
+        let closestSlot: { id: string; dist: number } | null = null;
+        for (const slot of currentFormationSlots) {
+          if (occupiedSlotIds.has(slot.id)) continue;
+          const dist = Math.hypot(p.x - slot.x, p.y - slot.y);
           if (!closestSlot || dist < closestSlot.dist) {
             closestSlot = { id: slot.id, dist };
           }
         }
+        if (closestSlot) {
+          occupiedSlotIds.add(closestSlot.id);
+        }
       }
-      if (closestSlot) {
-        occupiedSlotIds.add(closestSlot.id);
-      }
-    }
+    });
 
     return currentFormationSlots.filter(slot => !occupiedSlotIds.has(slot.id));
   }, [pitchPlayers, currentFormationSlots]);
@@ -434,7 +501,12 @@ export function LineupTab({
       if (targetSlot) {
         setPitchPlayers(prev => ({
           ...prev,
-          [playerId]: { x: targetSlot.x, y: targetSlot.y }
+          [playerId]: { 
+            x: targetSlot.x, 
+            y: targetSlot.y,
+            slotId: targetSlot.id,
+            slotLabel: targetSlot.label
+          }
         }));
         setSelectedSlotId(null);
         return;
@@ -442,38 +514,51 @@ export function LineupTab({
     }
 
     // 2. Si no hay posición seleccionada, buscar el primer slot libre de la formación táctica
-    const freeSlot = currentFormationSlots.find(slot => {
-      return !Object.values(pitchPlayers).some(
-        coords => Math.hypot(coords.x - slot.x, coords.y - slot.y) < 6
-      )
-    })
+    const occupiedSlotIds = new Set(
+      Object.values(pitchPlayers).map(p => p.slotId).filter(Boolean)
+    );
+    const freeSlot = currentFormationSlots.find(slot => !occupiedSlotIds.has(slot.id));
 
     if (freeSlot) {
       setPitchPlayers(prev => ({
         ...prev,
-        [playerId]: { x: freeSlot.x, y: freeSlot.y }
+        [playerId]: { 
+          x: freeSlot.x, 
+          y: freeSlot.y,
+          slotId: freeSlot.id,
+          slotLabel: freeSlot.label
+        }
       }))
     } else {
-      // Si todos los slots tácticos están ocupados pero hay menos de 11 jugadores
       const assignedCount = Object.keys(pitchPlayers).length
-      const fallbackSlot = currentFormationSlots[assignedCount] || { x: 50, y: 50 }
+      const fallbackSlot = currentFormationSlots[assignedCount] || { id: `slot-${assignedCount}`, label: "JUG", x: 50, y: 50 }
       setPitchPlayers(prev => ({
         ...prev,
-        [playerId]: { x: fallbackSlot.x, y: fallbackSlot.y }
+        [playerId]: { 
+          x: fallbackSlot.x, 
+          y: fallbackSlot.y,
+          slotId: fallbackSlot.id,
+          slotLabel: fallbackSlot.label
+        }
       }))
     }
   }
 
   const handleTacticChange = (newTactic: string) => {
     setTactic(newTactic);
-    const newPitchPlayers: Record<string, { x: number, y: number }> = {};
+    const newPitchPlayers: Record<string, PitchPlayerPosition> = {};
     const slots = allFormations[newTactic];
     if (!slots) return;
     
     let slotIdx = 0;
     for (const playerId of assignedPlayerIds) {
       if (slotIdx < 11 && slots[slotIdx]) {
-        newPitchPlayers[playerId] = { x: slots[slotIdx].x, y: slots[slotIdx].y };
+        newPitchPlayers[playerId] = { 
+          x: slots[slotIdx].x, 
+          y: slots[slotIdx].y,
+          slotId: slots[slotIdx].id,
+          slotLabel: slots[slotIdx].label
+        };
         slotIdx++;
       }
     }
@@ -581,10 +666,30 @@ export function LineupTab({
       return;
     }
 
-    setPitchPlayers(prev => ({
-      ...prev,
-      [playerId]: { x, y }
-    }));
+    setPitchPlayers(prev => {
+      const existing = prev[playerId];
+      let slotId = existing?.slotId;
+      let slotLabel = existing?.slotLabel;
+
+      if (!slotId) {
+        const occupied = new Set(Object.values(prev).map(p => p.slotId).filter(Boolean));
+        const freeSlot = currentFormationSlots.find(s => !occupied.has(s.id));
+        if (freeSlot) {
+          slotId = freeSlot.id;
+          slotLabel = freeSlot.label;
+        }
+      }
+
+      return {
+        ...prev,
+        [playerId]: {
+          x,
+          y,
+          slotId,
+          slotLabel
+        }
+      };
+    });
     setSelectedPlayerId(null);
     setSelectedSlotId(null);
   }
@@ -932,7 +1037,12 @@ export function LineupTab({
                       if (selectedPlayerId) {
                         setPitchPlayers(prev => ({
                           ...prev,
-                          [selectedPlayerId]: { x: slot.x, y: slot.y }
+                          [selectedPlayerId]: { 
+                            x: slot.x, 
+                            y: slot.y,
+                            slotId: slot.id,
+                            slotLabel: slot.label
+                          }
                         }));
                         setSelectedPlayerId(null);
                         setSelectedSlotId(null);
@@ -974,6 +1084,8 @@ export function LineupTab({
               const player = initialPlayersList.find(p => p.id === playerId);
               if (!player) return null;
               
+              const tacticalPositionLabel = coords.slotLabel || (coords.slotId ? currentFormationSlots.find(s => s.id === coords.slotId)?.label : null);
+
               return (
                 <div
                   key={playerId}
@@ -981,6 +1093,13 @@ export function LineupTab({
                   className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all duration-75 touch-none"
                 >
                   <div className="relative group flex flex-col items-center">
+                    {/* Badge de posición táctica que se mueve CON el jugador */}
+                    {tacticalPositionLabel && (
+                      <div className="absolute -top-2.5 -right-2.5 bg-blue-600 border border-white text-white text-[8px] font-black px-1.5 py-0.2 rounded-full shadow-md uppercase tracking-tight z-20 pointer-events-none select-none">
+                        {tacticalPositionLabel}
+                      </div>
+                    )}
+
                     <div
                       className={[
                         "w-10 h-10 rounded-full bg-slate-900 border-2 flex items-center justify-center text-sm font-black shadow-md transition-all duration-200 select-none",
@@ -1021,10 +1140,15 @@ export function LineupTab({
                          setDraggedPlayerId(null);
                       }}
                     >
-                      {player.number || "?"}
+                      {player.number != null && player.number !== '' ? player.number : (player.avatar || '?')}
                     </div>
-                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/80 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                      {pitchPlayerDisplayNames[player.id] || player.firstName || player.name.split(" ")[0]}
+                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/85 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap flex items-center gap-1">
+                      {tacticalPositionLabel && (
+                        <span className="text-blue-300 font-extrabold uppercase text-[8px] bg-blue-900/80 px-1 py-0.2 rounded">
+                          {tacticalPositionLabel}
+                        </span>
+                      )}
+                      <span>{pitchPlayerDisplayNames[player.id] || player.firstName || player.name.split(" ")[0]}</span>
                     </span>
                   </div>
                 </div>
@@ -1113,40 +1237,49 @@ export function LineupTab({
               )}
 
               {availablePlayers.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 max-h-[300px] overflow-y-auto">
+                <div className="space-y-2 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 max-h-[360px] overflow-y-auto">
                   {availablePlayers.map(player => (
                     <div
                       key={player.id}
                       className={`flex items-center justify-between p-2.5 rounded-xl shadow-xs transition-all text-left ${
                         selectedSlot 
-                          ? 'bg-cyan-50/50 border border-cyan-300 hover:bg-cyan-100/60' 
+                          ? 'bg-cyan-50/60 border border-cyan-300 hover:bg-cyan-100/70' 
                           : 'bg-white hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300'
                       }`}
                     >
-                      {/* Información y toque para añadir */}
+                      {/* Información y toque para añadir: Dorsal + Foto + Nombre + Demarcación */}
                       <button
                         type="button"
                         onClick={() => handleQuickAddPlayer(player.id)}
-                        className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-98 transition-transform"
+                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:scale-98 transition-transform"
                       >
                         {/* Dorsal destacado y visible */}
-                        <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                        <span className="w-8 h-8 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                           {player.number != null && player.number !== '' ? player.number : '-'}
                         </span>
 
-                        {/* Nombre y posición */}
+                        {/* Foto de perfil del jugador o avatar con iniciales */}
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-black text-blue-700 shrink-0 shadow-2xs">
+                          {player.avatarUrl ? (
+                            <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
+                          ) : (
+                            <span>{player.avatar || (player.name ? player.name[0] : 'J')}</span>
+                          )}
+                        </div>
+
+                        {/* Nombre completo / deportivo y demarcación */}
                         <div className="min-w-0 flex-1">
-                          <h4 className="text-xs font-black text-slate-800 truncate leading-tight">
+                          <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-snug">
                             {player.displayNameShort || player.name}
                           </h4>
-                          <span className="text-[10px] text-slate-400 font-semibold block truncate">
+                          <span className="text-[10px] text-slate-400 font-semibold block">
                             {player.demarcation || 'Jugador'}
                           </span>
                         </div>
                       </button>
 
                       {/* Botones de acción: Editar apodo (✏️) y Añadir (+) */}
-                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1154,7 +1287,7 @@ export function LineupTab({
                             setEditingNicknamePlayer(player);
                             setNewNicknameInput(player.nickname || player.firstName || "");
                           }}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-700 flex items-center justify-center transition-colors shadow-2xs"
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-500 hover:text-amber-700 flex items-center justify-center transition-colors shadow-2xs"
                           title="Editar apodo o nombre deportivo"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1163,14 +1296,15 @@ export function LineupTab({
                         <button
                           type="button"
                           onClick={() => handleQuickAddPlayer(player.id)}
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors shadow-2xs active:scale-95 ${
+                          className={`h-8 px-2.5 rounded-lg flex items-center gap-1 font-extrabold text-[11px] transition-colors shadow-2xs active:scale-95 ${
                             selectedSlot 
-                              ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-cyan-500/30 ring-2 ring-cyan-400/40' 
-                              : 'bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white'
+                              ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-cyan-500/30 ring-2 ring-cyan-400/40 animate-pulse' 
+                              : 'bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200'
                           }`}
                           title={selectedSlot ? `Colocar en ${selectedSlot.label}` : "Añadir al campo"}
                         >
                           <Plus className="w-4 h-4 stroke-[2.5]" />
+                          <span className="hidden xs:inline">{selectedSlot ? selectedSlot.label : 'Añadir'}</span>
                         </button>
                       </div>
                     </div>
@@ -1439,7 +1573,7 @@ export function LineupTab({
                         {currentFormSlots.map((slot) => {
                           const occupiedByPlayerId = Object.keys(pitchPlayers).find(pId => {
                             const pCoords = pitchPlayers[pId];
-                            return Math.abs(pCoords.x - slot.x) < 5 && Math.abs(pCoords.y - slot.y) < 5;
+                            return pCoords.slotId === slot.id || (Math.abs(pCoords.x - slot.x) < 5 && Math.abs(pCoords.y - slot.y) < 5);
                           });
                           const occupiedPlayer = occupiedByPlayerId ? initialPlayersList.find(p => p.id === occupiedByPlayerId) : null;
 
@@ -1453,7 +1587,12 @@ export function LineupTab({
                                   if (occupiedByPlayerId) {
                                     delete next[occupiedByPlayerId];
                                   }
-                                  next[benchPlayerModalId] = { x: slot.x, y: slot.y };
+                                  next[benchPlayerModalId] = { 
+                                    x: slot.x, 
+                                    y: slot.y,
+                                    slotId: slot.id,
+                                    slotLabel: slot.label
+                                  };
                                   return next;
                                 });
                                 setBenchPlayerModalId(null);

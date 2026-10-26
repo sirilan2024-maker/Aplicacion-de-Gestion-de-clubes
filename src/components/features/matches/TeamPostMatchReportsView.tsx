@@ -14,10 +14,14 @@ import {
   AlertCircle, 
   ExternalLink, 
   ChevronRight,
-  Shield,
-  Eye,
-  X,
-  Printer
+  Shield, 
+  Eye, 
+  X, 
+  Printer,
+  ArrowUpDown,
+  Clock,
+  User,
+  Users
 } from "lucide-react"
 
 interface TeamPostMatchReportsViewProps {
@@ -38,16 +42,18 @@ export function TeamPostMatchReportsView({
   const [selectedJornada, setSelectedJornada] = useState<string>("all")
   const [searchRival, setSearchRival] = useState<string>("")
   const [onlyWithReport, setOnlyWithReport] = useState<boolean>(false)
+  const [filterPlayedOnly, setFilterPlayedOnly] = useState<boolean>(false)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc') // Por defecto 'asc': Cronológico (Jornada 1 -> 30)
   const [activePreviewMatch, setActivePreviewMatch] = useState<any | null>(null)
 
-  // 1. Filtrar partidos válidos de la temporada activa (excluir temporada 25/26)
+  // 1. Filtrar partidos válidos de la temporada activa (excluir permanentemente temporada 25/26)
   const validMatches = useMemo(() => {
     return (matches || []).filter(m => 
       m.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c'
     )
   }, [matches])
 
-  // 2. Extraer lista de jornadas disponibles
+  // 2. Extraer lista de jornadas disponibles en orden ascendente
   const availableJornadas = useMemo(() => {
     const jSet = new Set<string>()
     validMatches.forEach(m => {
@@ -62,7 +68,57 @@ export function TeamPostMatchReportsView({
     })
   }, [validMatches])
 
-  // 3. Filtrar partidos según controles
+  // Función para parsear de forma segura coach_report
+  const getCoachReportData = (match: any) => {
+    if (!match?.coach_report) return {}
+    if (typeof match.coach_report === 'object') return match.coach_report
+    try {
+      return JSON.parse(match.coach_report)
+    } catch {
+      return {}
+    }
+  }
+
+  // Comprobar si un partido tiene algún informe o análisis registrado
+  const checkHasReport = (m: any) => {
+    if (m.coach_rating || m.coach_summary || m.positive_aspects || m.improvement_aspects || m.attitude_notes) {
+      return true
+    }
+    const rep = getCoachReportData(m)
+    if (rep.team_photo_url) return true
+    if (rep.rival_analysis && Object.values(rep.rival_analysis).some(v => Boolean(v && String(v).trim()))) {
+      return true
+    }
+    return false
+  }
+
+  // Extraer rendimiento de jugadores convocados
+  const getMatchPlayersPerformance = (match: any) => {
+    const matchConvs = convocatorias.filter(c => c.partido_id === match.id)
+    return matchConvs.map(c => {
+      const p = players.find(pl => pl.id === c.player_id)
+      return {
+        id: c.player_id || c.id,
+        number: p?.dorsal || c.dorsal || '-',
+        name: p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'Jugador',
+        pos: c.slotLabel || p?.posicion || 'JUG',
+        titular: Boolean(c.titular),
+        avatarUrl: p?.avatar_url || null,
+        avatar: p ? `${p.first_name?.[0] || ''}${p.last_name?.[0] || ''}`.toUpperCase() || 'J' : 'J',
+        minutes: c.minutes_played ?? c.minutos_jugados ?? 0,
+        rating: c.coach_rating || 0,
+        actitud: c.actitud || 0,
+        goals: c.goals || 0,
+        assists: c.assists || 0,
+        yellows: c.yellow_cards || 0,
+        reds: c.red_cards || 0,
+        status: c.estado_asistencia || (c.status === 'no_convocado' ? 'No Convocado' : 'Presente')
+      }
+    })
+  }
+
+  // 3. Filtrar y ordenar partidos según controles
+  // POR DEFECTO: Cronológico ascendente (Jornada 1 -> 30, o fechas tempranas primero)
   const filteredMatches = useMemo(() => {
     return validMatches.filter(m => {
       if (selectedJornada !== "all") {
@@ -76,53 +132,34 @@ export function TeamPostMatchReportsView({
       }
 
       if (onlyWithReport) {
-        const hasReport = m.coach_rating || m.coach_summary || m.positive_aspects || m.coach_report
-        if (!hasReport) return false
+        if (!checkHasReport(m)) return false
+      }
+
+      if (filterPlayedOnly) {
+        const isPlayed = m.estado === 'Finalizado' || (m.fecha_hora && new Date(m.fecha_hora).getTime() <= Date.now())
+        if (!isPlayed) return false
       }
 
       return true
     }).sort((a, b) => {
+      // 1. Priorizar orden numérico de jornada si existe
+      const numA = parseInt(String(a.jornada || '').replace(/\D/g, '')) || 0
+      const numB = parseInt(String(b.jornada || '').replace(/\D/g, '')) || 0
+      if (numA > 0 && numB > 0 && numA !== numB) {
+        return sortOrder === 'asc' ? numA - numB : numB - numA
+      }
+
+      // 2. Orden cronológico por fecha_hora
       const dateA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0
       const dateB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0
-      return dateB - dateA // Más recientes primero
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
     })
-  }, [validMatches, selectedJornada, searchRival, onlyWithReport])
-
-  // Función para parsear de forma segura coach_report
-  const getCoachReportData = (match: any) => {
-    if (!match?.coach_report) return {}
-    if (typeof match.coach_report === 'object') return match.coach_report
-    try {
-      return JSON.parse(match.coach_report)
-    } catch {
-      return {}
-    }
-  }
+  }, [validMatches, selectedJornada, searchRival, onlyWithReport, filterPlayedOnly, sortOrder])
 
   // Generación y descarga directa en PDF / Imprimir informe completo
   const handlePrintPdf = (match: any) => {
     const coachRep = getCoachReportData(match)
-    const matchConvs = convocatorias.filter(c => c.partido_id === match.id)
-    
-    // Titulares y suplentes
-    const matchPlayers = matchConvs.map(c => {
-      const p = players.find(pl => pl.id === c.player_id)
-      return {
-        number: p?.dorsal || c.dorsal || '-',
-        name: p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'Jugador',
-        pos: c.slotLabel || p?.posicion || 'JUG',
-        titular: c.titular || false,
-        minutes: c.minutes_played ?? c.minutos_jugados ?? 0,
-        rating: c.coach_rating || 0,
-        actitud: c.actitud || 0,
-        goals: c.goals || 0,
-        assists: c.assists || 0,
-        yellows: c.yellow_cards || 0,
-        reds: c.red_cards || 0,
-        status: c.estado_asistencia || (c.status === 'no_convocado' ? 'No Convocado' : 'Presente')
-      }
-    })
-
+    const matchPlayers = getMatchPlayersPerformance(match)
     const starters = matchPlayers.filter(p => p.titular)
     const bench = matchPlayers.filter(p => !p.titular)
 
@@ -160,72 +197,80 @@ export function TeamPostMatchReportsView({
             background: #fff;
             margin: 0;
             padding: 0;
-            font-size: 11px;
-            line-height: 1.4;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .header {
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
             border-bottom: 2px solid #2563eb;
             padding-bottom: 12px;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
           }
           .title-area h1 {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 900;
-            color: #0f172a;
-            margin: 0 0 2px 0;
+            margin: 0;
             text-transform: uppercase;
+            color: #1e3a8a;
             letter-spacing: 0.5px;
           }
           .title-area p {
-            margin: 0;
             font-size: 11px;
+            margin: 3px 0 0 0;
             color: #64748b;
             font-weight: 600;
           }
           .score-badge {
+            font-size: 22px;
+            font-weight: 900;
             background: #0f172a;
             color: #fff;
-            padding: 6px 14px;
+            padding: 6px 16px;
             border-radius: 8px;
-            font-size: 16px;
-            font-weight: 900;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
           }
           .match-details-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            background: #f8fafc;
+            display: flex;
+            background: #f1f5f9;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 8px 12px;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
+            font-size: 11px;
+            justify-content: space-between;
           }
           .match-details-bar div {
-            font-size: 10px;
+            display: flex;
+            flex-direction: column;
+          }
+          .match-details-bar span {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 700;
           }
           .match-details-bar strong {
-            display: block;
-            font-size: 11px;
+            font-size: 12px;
             color: #0f172a;
           }
           .photo-container {
             text-align: center;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px;
+            background: #fafafa;
           }
           .photo-container img {
             max-width: 100%;
-            max-height: 220px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
+            max-height: 240px;
+            border-radius: 6px;
             object-fit: cover;
           }
           .section {
-            margin-bottom: 14px;
-            page-break-inside: avoid;
+            margin-bottom: 16px;
           }
           .section-title {
             font-size: 12px;
@@ -350,70 +395,100 @@ export function TeamPostMatchReportsView({
           </div>
         </div>
 
-        ${coachRep.rival_analysis && Object.values(coachRep.rival_analysis).some(Boolean) ? `
+        ${coachRep.rival_analysis ? `
           <div class="section">
-            <div class="section-title">2. Análisis Táctico del Rival</div>
+            <div class="section-title">2. Informe del Rival (${match.rival_nombre || 'Rival'})</div>
             <div class="grid-2">
               <div class="card-box">
-                <h4>Sistema del Rival</h4>
-                <p>${coachRep.rival_analysis.system || 'No especificado'}</p>
+                <h4>Sistema Táctico</h4>
+                <p><strong>${coachRep.rival_analysis.system || 'No definido'}</strong></p>
               </div>
               <div class="card-box">
                 <h4>Jugadores Clave</h4>
-                <p>${coachRep.rival_analysis.key_players || 'No especificados'}</p>
+                <p>${coachRep.rival_analysis.key_players || 'Sin jugadores destacados señalados.'}</p>
               </div>
             </div>
             <div class="grid-2" style="margin-top: 8px;">
               <div class="card-box">
-                <h4>Goles y Acciones Clave</h4>
-                <p>${coachRep.rival_analysis.goals_description || 'Sin notas'}</p>
+                <h4>Análisis de Goles</h4>
+                <p>${coachRep.rival_analysis.goals_description || 'Sin notas de goles.'}</p>
               </div>
               <div class="card-box">
-                <h4>Datos Destacados</h4>
-                <p>${coachRep.rival_analysis.notable_data || 'Sin datos adicionales'}</p>
+                <h4>Puntos Fuertes / Datos Relevantes</h4>
+                <p>${coachRep.rival_analysis.notable_data || 'Sin datos adicionales.'}</p>
               </div>
             </div>
           </div>
         ` : ''}
 
         <div class="section">
-          <div class="section-title">3. Alineación y Rendimiento Individual</div>
+          <div class="section-title">3. Rendimiento de Jugadores (Once Titular y Convocatoria)</div>
           <table>
             <thead>
               <tr>
-                <th style="width: 25px;">#</th>
+                <th class="center" style="width: 25px;">#</th>
                 <th>Jugador</th>
-                <th class="center" style="width: 45px;">Rol</th>
-                <th class="center" style="width: 40px;">Min</th>
+                <th class="center" style="width: 45px;">Pos</th>
+                <th class="center" style="width: 50px;">Minutos</th>
                 <th class="center" style="width: 40px;">Nota</th>
-                <th class="center" style="width: 40px;">Actitud</th>
-                <th class="center" style="width: 35px;">Goles</th>
-                <th class="center" style="width: 35px;">Asist</th>
-                <th class="center" style="width: 35px;">🟨</th>
-                <th class="center" style="width: 35px;">🟥</th>
+                <th class="center" style="width: 45px;">Actitud</th>
+                <th class="center" style="width: 35px;">G</th>
+                <th class="center" style="width: 35px;">A</th>
+                <th class="center" style="width: 45px;">Tarjetas</th>
               </tr>
             </thead>
             <tbody>
-              ${matchPlayers.map(p => `
+              ${starters.length > 0 ? starters.map(p => `
                 <tr>
                   <td class="center"><strong>${p.number}</strong></td>
-                  <td>${p.name}</td>
-                  <td class="center">${p.titular ? 'TITULAR' : 'SUPLENTE'}</td>
+                  <td><strong>${p.name}</strong> <span style="font-size: 8px; color: #2563eb;">(Titular)</span></td>
+                  <td class="center">${p.pos}</td>
                   <td class="center">${p.minutes}'</td>
-                  <td class="center"><strong>${p.rating > 0 ? p.rating : '-'}</strong></td>
+                  <td class="center" style="font-weight: bold; color: ${p.rating >= 7 ? '#15803d' : p.rating >= 5 ? '#b45309' : '#b91c1c'}">${p.rating > 0 ? p.rating : '-'}</td>
                   <td class="center">${p.actitud > 0 ? p.actitud : '-'}</td>
-                  <td class="center">${p.goals || 0}</td>
-                  <td class="center">${p.assists || 0}</td>
-                  <td class="center">${p.yellows || 0}</td>
-                  <td class="center">${p.reds || 0}</td>
+                  <td class="center" style="font-weight: bold;">${p.goals > 0 ? p.goals : '-'}</td>
+                  <td class="center">${p.assists > 0 ? p.assists : '-'}</td>
+                  <td class="center">
+                    ${p.yellows > 0 ? `<span style="background: #fef08a; padding: 1px 4px; border-radius: 3px; font-weight: bold;">🟨 ${p.yellows}</span>` : ''}
+                    ${p.reds > 0 ? `<span style="background: #fecaca; padding: 1px 4px; border-radius: 3px; font-weight: bold;">🟥 ${p.reds}</span>` : ''}
+                    ${p.yellows === 0 && p.reds === 0 ? '-' : ''}
+                  </td>
                 </tr>
-              `).join('')}
+              `).join('') : `
+                <tr>
+                  <td colspan="9" class="center" style="color: #94a3b8; padding: 10px;">No se registraron titulares convocados en este encuentro.</td>
+                </tr>
+              `}
+              ${bench.length > 0 ? `
+                <tr style="background: #f8fafc;">
+                  <td colspan="9" style="font-weight: 800; font-size: 8.5px; text-transform: uppercase; color: #64748b; padding-left: 8px;">
+                    Banquillo de Suplentes (${bench.length})
+                  </td>
+                </tr>
+                ${bench.map(p => `
+                  <tr>
+                    <td class="center">${p.number}</td>
+                    <td>${p.name}</td>
+                    <td class="center">${p.pos}</td>
+                    <td class="center">${p.minutes}'</td>
+                    <td class="center" style="font-weight: bold; color: ${p.rating >= 7 ? '#15803d' : p.rating >= 5 ? '#b45309' : '#b91c1c'}">${p.rating > 0 ? p.rating : '-'}</td>
+                    <td class="center">${p.actitud > 0 ? p.actitud : '-'}</td>
+                    <td class="center" style="font-weight: bold;">${p.goals > 0 ? p.goals : '-'}</td>
+                    <td class="center">${p.assists > 0 ? p.assists : '-'}</td>
+                    <td class="center">
+                      ${p.yellows > 0 ? `🟨 ${p.yellows}` : ''}
+                      ${p.reds > 0 ? `🟥 ${p.reds}` : ''}
+                      ${p.yellows === 0 && p.reds === 0 ? '-' : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+              ` : ''}
             </tbody>
           </table>
         </div>
 
         <div class="footer-note">
-          Documento oficial generado por la Plataforma de Gestión Integral del Club Sporting Saladar &bull; ${new Date().toLocaleDateString('es-ES')}
+          Documento generado automáticamente por Gestión Integral Sporting Saladar &bull; Fecha de emisión: ${new Date().toLocaleDateString('es-ES')}
         </div>
 
         <script>
@@ -421,7 +496,7 @@ export function TeamPostMatchReportsView({
             setTimeout(function() {
               window.print();
             }, 300);
-          }
+          };
         </script>
       </body>
       </html>
@@ -431,6 +506,12 @@ export function TeamPostMatchReportsView({
     printWindow.document.write(html)
     printWindow.document.close()
   }
+
+  // Previsualización interactiva: datos del partido activo
+  const previewCoachRep = activePreviewMatch ? getCoachReportData(activePreviewMatch) : {}
+  const previewPlayers = activePreviewMatch ? getMatchPlayersPerformance(activePreviewMatch) : []
+  const previewStarters = previewPlayers.filter(p => p.titular)
+  const previewBench = previewPlayers.filter(p => !p.titular)
 
   return (
     <div className="space-y-6 pt-2">
@@ -443,15 +524,29 @@ export function TeamPostMatchReportsView({
               Informes Técnicos Post-Partido
             </h3>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">
-              Consulta las valoraciones del entrenador, análisis del rival y descarga el informe PDF por jornada.
+              Previsualiza las valoraciones del entrenador, análisis del rival y descarga el informe PDF por jornada.
             </p>
           </div>
-          <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl self-start sm:self-auto">
-            Total partidos: <span className="text-slate-800 font-black">{filteredMatches.length}</span>
+          
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Selector de orden cronológico */}
+            <button
+              type="button"
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition-colors"
+              title="Cambiar orden de partidos"
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
+              <span>{sortOrder === 'asc' ? 'Cronológico (J1 → J30)' : 'Inverso (J30 → J1)'}</span>
+            </button>
+
+            <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl">
+              Partidos: <span className="text-slate-800 font-black">{filteredMatches.length}</span>
+            </div>
           </div>
         </div>
 
-        {/* Filtros: Selector de Jornada + Buscador de Rival + Checkbox */}
+        {/* Filtros: Selector de Jornada + Buscador de Rival + Toggles */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
           {/* Selector de Jornada */}
           <div className="sm:col-span-4">
@@ -475,7 +570,7 @@ export function TeamPostMatchReportsView({
           </div>
 
           {/* Buscador de Rival */}
-          <div className="sm:col-span-5">
+          <div className="sm:col-span-4">
             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">
               Buscar Rival
             </label>
@@ -500,8 +595,8 @@ export function TeamPostMatchReportsView({
             </div>
           </div>
 
-          {/* Solo con informe completado */}
-          <div className="sm:col-span-3 sm:pt-4 flex items-center">
+          {/* Checkboxes de filtrado */}
+          <div className="sm:col-span-4 sm:pt-4 flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -513,6 +608,18 @@ export function TeamPostMatchReportsView({
                 Solo con informe
               </span>
             </label>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterPlayedOnly}
+                onChange={e => setFilterPlayedOnly(e.target.checked)}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+              />
+              <span className="text-xs font-bold text-slate-600">
+                Solo disputados
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -522,8 +629,8 @@ export function TeamPostMatchReportsView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredMatches.map(match => {
             const coachRep = getCoachReportData(match)
-            const hasReport = Boolean(match.coach_rating || match.coach_summary || match.positive_aspects)
-            const hasRivalData = Boolean(coachRep.rival_analysis && Object.values(coachRep.rival_analysis).some(Boolean))
+            const hasReport = checkHasReport(match)
+            const hasRivalData = Boolean(coachRep.rival_analysis && Object.values(coachRep.rival_analysis).some(v => Boolean(v && String(v).trim())))
             const dateStr = match.fecha_hora 
               ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
               : 'Fecha sin asignar'
@@ -531,10 +638,13 @@ export function TeamPostMatchReportsView({
             return (
               <div 
                 key={match.id}
-                className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
               >
                 {/* Cabecera de la Tarjeta */}
-                <div className="space-y-2">
+                <div 
+                  className="space-y-2 cursor-pointer"
+                  onClick={() => setActivePreviewMatch(match)}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
                       Jornada {match.jornada || 'N/A'}
@@ -548,7 +658,7 @@ export function TeamPostMatchReportsView({
                   {/* Rival y Resultado */}
                   <div className="flex items-center justify-between pt-1">
                     <div>
-                      <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">
+                      <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">
                         vs {match.rival_nombre || 'Rival no definido'}
                       </h4>
                       <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
@@ -571,7 +681,10 @@ export function TeamPostMatchReportsView({
                 </div>
 
                 {/* Resumen del Informe o Foto si existe */}
-                <div className="space-y-2.5 bg-slate-50/80 border border-slate-150 rounded-xl p-3">
+                <div 
+                  className="space-y-2.5 bg-slate-50/80 border border-slate-150 rounded-xl p-3 cursor-pointer"
+                  onClick={() => setActivePreviewMatch(match)}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Star className={`w-4 h-4 ${match.coach_rating ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
@@ -609,22 +722,34 @@ export function TeamPostMatchReportsView({
 
                 {/* Botones de Acción */}
                 <div className="flex items-center gap-2 pt-1">
+                  {/* Botón Principal: Ver Informe (Previsualizar sin descargar) */}
+                  <button
+                    type="button"
+                    onClick={() => setActivePreviewMatch(match)}
+                    className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-98"
+                    title="Previsualizar informe completo en pantalla"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Ver Informe</span>
+                  </button>
+
+                  {/* Botón Descargar PDF */}
                   <button
                     type="button"
                     onClick={() => handlePrintPdf(match)}
-                    className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-98"
-                    title="Descargar informe completo en formato PDF oficial"
+                    className="py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    title="Descargar informe en formato PDF oficial"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Descargar PDF</span>
+                    <span className="hidden sm:inline">PDF</span>
                   </button>
 
+                  {/* Enlace para editar en pestaña post-partido */}
                   <Link
                     href={`/dashboard/equipos/${teamId}/partidos/${match.id}?tab=post-partido`}
                     className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1"
-                    title="Ir a la pestaña post-partido para editar notas y datos"
+                    title="Editar notas del partido"
                   >
-                    <span>Editar</span>
                     <ExternalLink className="w-3 h-3 text-slate-400" />
                   </Link>
                 </div>
@@ -637,20 +762,406 @@ export function TeamPostMatchReportsView({
           <FileText className="w-10 h-10 text-slate-300 mx-auto" />
           <h4 className="text-sm font-bold text-slate-700">No se encontraron informes para este filtro</h4>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Prueba a seleccionar "Todas las Jornadas" o borra el término de búsqueda de rival.
+            Prueba a seleccionar "Todas las Jornadas", desactivar los filtros de informe o borrar la búsqueda de rival.
           </p>
-          {(selectedJornada !== "all" || searchRival || onlyWithReport) && (
+          {(selectedJornada !== "all" || searchRival || onlyWithReport || filterPlayedOnly) && (
             <button
               onClick={() => {
                 setSelectedJornada("all")
                 setSearchRival("")
                 setOnlyWithReport(false)
+                setFilterPlayedOnly(false)
               }}
               className="text-xs font-bold text-blue-600 hover:underline pt-1"
             >
               Restablecer filtros
             </button>
           )}
+        </div>
+      )}
+
+      {/* ── Modal de Previsualización Interactiva del Informe Completo ── */}
+      {activePreviewMatch && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+          onClick={() => setActivePreviewMatch(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Cabecera del Modal */}
+            <div className="bg-slate-900 text-white px-5 sm:px-7 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-md">
+                      Jornada {activePreviewMatch.jornada || 'N/A'}
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">
+                      {activePreviewMatch.competicion_nombre || 'Competición Oficial'}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">
+                    Informe vs {activePreviewMatch.rival_nombre || 'Rival'}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Acciones de Cabecera */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintPdf(activePreviewMatch)}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  title="Descargar informe oficial en PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Descargar PDF</span>
+                </button>
+
+                <Link
+                  href={`/dashboard/equipos/${teamId}/partidos/${activePreviewMatch.id}?tab=post-partido`}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+                  title="Editar notas del partido"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Editar</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewMatch(null)}
+                  className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido scrolleable del informe */}
+            <div className="overflow-y-auto p-5 sm:p-7 space-y-6 flex-1">
+              {/* Barra de Datos Clave del Encuentro */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Fecha y Hora</span>
+                  <p className="text-xs font-bold text-slate-800 mt-0.5">
+                    {activePreviewMatch.fecha_hora 
+                      ? new Date(activePreviewMatch.fecha_hora).toLocaleDateString('es-ES', { 
+                          weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+                        })
+                      : 'Pendiente'}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Condición</span>
+                  <p className="text-xs font-bold text-slate-800 mt-0.5">
+                    {activePreviewMatch.lugar || 'Campo Oficial'}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Resultado</span>
+                  <p className="text-xs font-black text-slate-900 mt-0.5">
+                    {activePreviewMatch.resultado_propio != null && activePreviewMatch.resultado_rival != null 
+                      ? `${activePreviewMatch.resultado_propio} - ${activePreviewMatch.resultado_rival}`
+                      : 'Pendiente'}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Nota Míster</span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <span className="text-xs font-black text-slate-800">
+                      {activePreviewMatch.coach_rating ? `${activePreviewMatch.coach_rating} / 10` : 'Sin nota'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Foto de Equipo si existe */}
+              {previewCoachRep.team_photo_url && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-blue-600" /> Foto Oficial del Encuentro
+                  </h4>
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm max-h-[360px]">
+                    <img 
+                      src={previewCoachRep.team_photo_url} 
+                      alt="Foto de equipo oficial" 
+                      className="w-full h-full max-h-[360px] object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Sección 1: Valoración del Cuerpo Técnico */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                  <FileText className="w-4 h-4 text-blue-600" /> 1. Valoración del Cuerpo Técnico
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Resumen General</span>
+                    <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                      {activePreviewMatch.coach_summary || 'Sin valoración redactada.'}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Actitud y Observaciones</span>
+                    <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                      {activePreviewMatch.attitude_notes || 'Sin observaciones de actitud.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Aspectos Positivos
+                    </span>
+                    <p className="text-xs text-emerald-950 font-medium whitespace-pre-wrap leading-relaxed">
+                      {activePreviewMatch.positive_aspects || 'No especificados.'}
+                    </p>
+                  </div>
+
+                  <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Aspectos a Mejorar
+                    </span>
+                    <p className="text-xs text-amber-950 font-medium whitespace-pre-wrap leading-relaxed">
+                      {activePreviewMatch.improvement_aspects || 'No especificados.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 2: Análisis del Rival */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                  <Shield className="w-4 h-4 text-blue-600" /> 2. Informe del Rival ({activePreviewMatch.rival_nombre || 'Rival'})
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Sistema Táctico</span>
+                    <p className="text-xs font-black text-blue-700">
+                      {previewCoachRep.rival_analysis?.system || 'No definido'}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Jugadores Clave</span>
+                    <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                      {previewCoachRep.rival_analysis?.key_players || 'Sin jugadores destacados señalados.'}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Análisis de Goles</span>
+                    <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                      {previewCoachRep.rival_analysis?.goals_description || 'Sin notas de goles.'}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Puntos Fuertes / Observaciones</span>
+                    <p className="text-xs text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                      {previewCoachRep.rival_analysis?.notable_data || 'Sin datos adicionales.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 3: Convocatoria y Rendimiento de Jugadores */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-blue-600" /> 3. Rendimiento de Jugadores ({previewPlayers.length})
+                  </h4>
+                  <span className="text-xs text-slate-400 font-semibold">
+                    Titulares: {previewStarters.length} &bull; Suplentes: {previewBench.length}
+                  </span>
+                </div>
+
+                {/* Tabla de Titulares */}
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 text-[10px] font-black text-slate-600 uppercase border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-3 text-center w-10">#</th>
+                        <th className="py-2.5 px-3">Jugador</th>
+                        <th className="py-2.5 px-3 text-center">Pos</th>
+                        <th className="py-2.5 px-3 text-center">Min</th>
+                        <th className="py-2.5 px-3 text-center">Nota</th>
+                        <th className="py-2.5 px-3 text-center">Actitud</th>
+                        <th className="py-2.5 px-3 text-center">Goles</th>
+                        <th className="py-2.5 px-3 text-center">Asist</th>
+                        <th className="py-2.5 px-3 text-center">Tarjetas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {previewStarters.length > 0 ? (
+                        previewStarters.map(p => (
+                          <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-2.5 px-3 text-center font-mono font-black text-amber-500">
+                              #{p.number}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center text-[9px] font-black text-blue-700 shrink-0">
+                                  {p.avatarUrl ? (
+                                    <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{p.avatar}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-800">{p.name}</span>
+                                  <span className="ml-1.5 text-[9px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded">Titular</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-semibold text-slate-600">
+                              {p.pos}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                              {p.minutes}'
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {p.rating > 0 ? (
+                                <span className={`font-black text-xs px-1.5 py-0.5 rounded ${
+                                  p.rating >= 7 ? 'text-emerald-700 bg-emerald-50' : p.rating >= 5 ? 'text-amber-700 bg-amber-50' : 'text-rose-700 bg-rose-50'
+                                }`}>
+                                  ★ {p.rating}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                              {p.actitud > 0 ? p.actitud : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-black text-slate-900">
+                              {p.goals > 0 ? `⚽ ${p.goals}` : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-semibold text-slate-700">
+                              {p.assists > 0 ? `🎯 ${p.assists}` : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {p.yellows > 0 && <span className="inline-block bg-amber-100 text-amber-800 text-[10px] font-black px-1.5 py-0.5 rounded mr-1">🟨 {p.yellows}</span>}
+                              {p.reds > 0 && <span className="inline-block bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.5 rounded">🟥 {p.reds}</span>}
+                              {p.yellows === 0 && p.reds === 0 && <span className="text-slate-300">-</span>}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={9} className="py-4 text-center text-xs text-slate-400 italic">
+                            No hay jugadores titulares registrados en este informe.
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Fila separadora del banquillo */}
+                      {previewBench.length > 0 && (
+                        <>
+                          <tr className="bg-slate-100/80">
+                            <td colSpan={9} className="py-2 px-3 font-black text-[10px] text-slate-600 uppercase tracking-wider">
+                              Banquillo de Suplentes ({previewBench.length})
+                            </td>
+                          </tr>
+                          {previewBench.map(p => (
+                            <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600">
+                                #{p.number}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[9px] font-black text-slate-600 shrink-0">
+                                    {p.avatarUrl ? (
+                                      <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{p.avatar}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-semibold text-slate-700">{p.name}</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-semibold text-slate-500">
+                                {p.pos}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                                {p.minutes}'
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {p.rating > 0 ? (
+                                  <span className={`font-black text-xs px-1.5 py-0.5 rounded ${
+                                    p.rating >= 7 ? 'text-emerald-700 bg-emerald-50' : p.rating >= 5 ? 'text-amber-700 bg-amber-50' : 'text-rose-700 bg-rose-50'
+                                  }`}>
+                                    ★ {p.rating}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                                {p.actitud > 0 ? p.actitud : '-'}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-black text-slate-900">
+                                {p.goals > 0 ? `⚽ ${p.goals}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-semibold text-slate-700">
+                                {p.assists > 0 ? `🎯 ${p.assists}` : '-'}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {p.yellows > 0 && <span className="inline-block bg-amber-100 text-amber-800 text-[10px] font-black px-1.5 py-0.5 rounded mr-1">🟨 {p.yellows}</span>}
+                                {p.reds > 0 && <span className="inline-block bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.5 rounded">🟥 {p.reds}</span>}
+                                {p.yellows === 0 && p.reds === 0 && <span className="text-slate-300">-</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="bg-slate-50 px-5 sm:px-7 py-3.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <span className="text-xs text-slate-400 font-medium text-center sm:text-left">
+                Puedes editar cualquier detalle o calificación accediendo a la pestaña de edición Post-Partido.
+              </span>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handlePrintPdf(activePreviewMatch)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewMatch(null)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

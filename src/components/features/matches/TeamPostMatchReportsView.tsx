@@ -47,10 +47,33 @@ export function TeamPostMatchReportsView({
   const [activePreviewMatch, setActivePreviewMatch] = useState<any | null>(null)
 
   // 1. Filtrar partidos válidos de la temporada activa (excluir permanentemente temporada 25/26)
+  // y garantizar que todos los partidos tengan su jornada asignada
   const validMatches = useMemo(() => {
-    return (matches || []).filter(m => 
+    const rawFiltered = (matches || []).filter(m => 
       m.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c'
     )
+
+    // Ordenar por fecha cronológica para fallback de jornadas
+    const sorted = [...rawFiltered].sort((a, b) => {
+      const dA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0
+      const dB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0
+      return dA - dB
+    })
+
+    return sorted.map((m, idx) => {
+      let j = m.jornada
+      if (!j && m.acta_oficial_url) {
+        const jMatch = m.acta_oficial_url.match(/jornada=(\d+)/i) || m.acta_oficial_url.match(/Jornada%20(\d+)/i)
+        if (jMatch) j = parseInt(jMatch[1], 10)
+      }
+      if (!j) {
+        j = idx + 1
+      }
+      return {
+        ...m,
+        jornada: j
+      }
+    })
   }, [matches])
 
   // 2. Extraer lista de jornadas disponibles en orden ascendente
@@ -646,33 +669,35 @@ export function TeamPostMatchReportsView({
                   onClick={() => setActivePreviewMatch(match)}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
-                      Jornada {match.jornada || 'N/A'}
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shrink-0">
+                      Jornada {match.jornada}
                     </span>
-                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 shrink-0">
                       <Calendar className="w-3.5 h-3.5" />
                       {dateStr}
                     </span>
                   </div>
 
                   {/* Rival y Resultado */}
-                  <div className="flex items-center justify-between pt-1">
-                    <div>
-                      <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug group-hover:text-blue-600 transition-colors truncate">
                         vs {match.rival_nombre || 'Rival no definido'}
                       </h4>
-                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5 truncate">
                         Condición: <strong className="text-slate-700">{match.lugar || 'Campo'}</strong>
                       </p>
                     </div>
 
-                    <div className="text-right">
+                    <div className="shrink-0 flex items-center justify-end pl-2">
                       {match.resultado_propio != null && match.resultado_rival != null ? (
-                        <span className="inline-block px-3 py-1 bg-slate-900 text-white font-black text-sm rounded-xl tracking-wider shadow-2xs">
-                          {match.resultado_propio} - {match.resultado_rival}
-                        </span>
+                        <div className="inline-flex items-center justify-center px-3 py-1 bg-slate-950 text-white font-mono font-black text-sm rounded-xl tracking-wider shadow-2xs whitespace-nowrap tabular-nums">
+                          <span>{match.resultado_propio}</span>
+                          <span className="text-slate-400 mx-1.5">-</span>
+                          <span>{match.resultado_rival}</span>
+                        </div>
                       ) : (
-                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-xl shrink-0 whitespace-nowrap">
                           Pendiente
                         </span>
                       )}
@@ -799,7 +824,7 @@ export function TeamPostMatchReportsView({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-md">
-                      Jornada {activePreviewMatch.jornada || 'N/A'}
+                      Jornada {activePreviewMatch.jornada || '1'}
                     </span>
                     <span className="text-xs text-slate-400 font-medium">
                       {activePreviewMatch.competicion_nombre || 'Competición Oficial'}
@@ -1040,7 +1065,7 @@ export function TeamPostMatchReportsView({
                               </span>
                               {p.actitud > 0 && (
                                 <span className="font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
-                                  🤝 Act: {p.actitud}
+                                  🤝 Actitud: {p.actitud}
                                 </span>
                               )}
                               {p.goals > 0 && (
@@ -1118,7 +1143,7 @@ export function TeamPostMatchReportsView({
                               </span>
                               {p.actitud > 0 && (
                                 <span className="font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
-                                  🤝 Act: {p.actitud}
+                                  🤝 Actitud: {p.actitud}
                                 </span>
                               )}
                               {p.goals > 0 && (

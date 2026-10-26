@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useRef } from "react"
+import { useState, useEffect, useTransition, useRef } from "react"
 import { LayoutGrid, List, Lock, Unlock, Camera, Upload, Eye, Loader2, Image as ImageIcon } from "lucide-react"
 import { uploadTeamPhotoAction } from "@/app/actions/match-actions"
 import { toast } from "react-hot-toast"
@@ -25,6 +25,7 @@ interface PlayerRow {
   yellowCards: number
   redCards: number
   avatar: string
+  avatarUrl?: string | null
   status: string | null
 }
 
@@ -144,14 +145,43 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
   const { teamId } = useParams()
   const isFamilyView = rol === "familia" || rol === "jugador"
   
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const getCoordsStyle = (x: number, y: number) => {
+    if (isDesktop) {
+      return {
+        left: `${y}%`,
+        top: `${100 - x}%`
+      };
+    }
+    return {
+      left: `${x}%`,
+      top: `${y}%`
+    };
+  };
+
   const mappedPlayers: PlayerRow[] = players.map(p => {
     const conv = convocatorias.find(c => c.player_id === p.id);
+    const rawFirst = (p.first_name || p.nombre || '').trim();
+    const rawLast = (p.last_name || p.apellidos || '').trim();
+    const customNickname = (p.nickname || p.apodo || '').trim();
+    const fullName = `${rawFirst} ${rawLast}`.trim() || p.name || 'Jugador';
+    const init1 = (customNickname && customNickname[0]) || (rawFirst && rawFirst[0]) || 'J';
+    const init2 = (rawLast && rawLast[0]) || '';
+
     return {
       id: p.id,
-      number: p.dorsal || 0,
-      name: `${p.first_name} ${p.last_name}`,
-      avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
-      pos: p.posicion_principal || "Jugador",
+      number: p.dorsal || conv?.dorsal || 0,
+      name: customNickname || fullName,
+      avatar: `${init1}${init2}`.toUpperCase(),
+      avatarUrl: p.avatar_url || p.foto_url || p.photo_url || p.foto || null,
+      pos: conv?.slotLabel || p.posicion_principal || p.posicion || "JUG",
       titular: conv?.titular || false,
       tactical_x: conv?.tactical_x,
       tactical_y: conv?.tactical_y,
@@ -185,8 +215,12 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [isPending, startTransition] = useTransition()
 
+  const parsedCoachReport = typeof match?.coach_report === 'string'
+    ? (() => { try { return JSON.parse(match.coach_report) } catch { return {} } })()
+    : (match?.coach_report || {});
+
   const [teamPhotoUrl, setTeamPhotoUrl] = useState<string | null>(
-    match?.coach_report?.team_photo_url || null
+    parsedCoachReport?.team_photo_url || match?.team_photo_url || null
   )
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
@@ -399,242 +433,170 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
         )}
       </div>
 
-      {/* ── Columna Derecha: Alineación Modo Lectura ── */}
+      {/* ── Columna Derecha: Alineación Idéntica con Fotos y Notas ── */}
       <div className="lg:col-span-5 space-y-4">
-        {isFamilyView ? (
-          <div className="bg-white rounded-xl border border-slate-150 p-5 shadow-sm space-y-5">
+        <div className="bg-white rounded-xl border border-slate-150 p-4 sm:p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2.5">
             <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alineación Inicial</h3>
-              <p className="text-[10px] text-slate-400 font-bold mt-0.5">VISTA DE FAMILIAR (LECTURA)</p>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alineación Táctica</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                {isFamilyView ? "VISTA PREVIA TÁCTICA (MODO LECTURA)" : "ESQUEMA GUARDADO DEL PARTIDO"}
+              </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              {/* Campo de Fútbol Verde */}
-              <div className="relative aspect-[3/4] md:aspect-auto md:w-full md:h-[260px] max-w-[260px] md:max-w-none mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all">
-                {/* Marcaje de campo */}
-                <div className="absolute inset-3 border border-white/20 pointer-events-none md:-rotate-90 md:origin-center md:scale-[1.3] md:w-[150%] md:-left-[25%]">
-                  {/* Línea media */}
-                  <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
-                  {/* Círculo central */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full border border-white/20" />
-                  {/* Área superior */}
-                  <div className="absolute top-0 left-1/4 right-1/4 h-8 border-b border-x border-white/20" />
-                  {/* Área inferior */}
-                  <div className="absolute bottom-0 left-1/4 right-1/4 h-8 border-t border-x border-white/20" />
-                </div>
-
-                {/* Renderizado de jugadores con notas en badges naranjas */}
-                {startersList.map((player, idx) => {
-                  const fallbackSlot = FORMATIONS["4-3-3"][idx];
-                  const posX = (player.tactical_x != null) ? player.tactical_x : (fallbackSlot?.x ?? 50);
-                  const posY = (player.tactical_y != null) ? player.tactical_y : (fallbackSlot?.y ?? 50);
-                  
-                  return (
-                    <div
-                      key={player.id}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none md:origin-center transition-all"
-                      ref={(el) => {
-                         if(el) {
-                           // Responsivo: x/y vertical -> y/x horizontal inverso en desktop
-                           if (window.innerWidth >= 768) {
-                             el.style.left = `${posY}%`;
-                             el.style.top = `${100 - posX}%`;
-                           } else {
-                             el.style.left = `${posX}%`;
-                             el.style.top = `${posY}%`;
-                           }
-                         }
-                      }}
-                    >
-                      {/* Node circle */}
-                      <div className="relative w-8 h-8 rounded-full bg-slate-900 border border-white flex items-center justify-center text-[10px] font-black text-white shadow-md">
-                        {player.number || player.avatar}
-                        
-                        {/* Orange Rating Badge */}
-                        <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[7px] font-extrabold px-1 rounded-full border border-white shadow-sm">
-                          {player.coachRating > 0 ? player.coachRating : "-"}
-                        </span>
-                      </div>
-                      {/* Name */}
-                      <div className="mt-1 bg-black/60 px-1.5 py-0.5 rounded text-[7px] font-bold text-white whitespace-nowrap backdrop-blur-sm border border-white/10">
-                        {player.name.split(" ")[0]}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Lista estática de titulares */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
-                  Jugadores Titulares
-                </h4>
-                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                  {playerList.slice(0, 11).map((player, idx) => {
-                    const number = player.number || (idx + 1);
-                    return (
-                      <div key={player.id} className="flex items-center justify-between p-2 border border-slate-50 rounded-lg bg-slate-50/30">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded bg-blue-100 flex items-center justify-center text-[9px] font-black text-blue-700">
-                            {number}
-                          </span>
-                          <span className="text-xs font-bold text-slate-700">{player.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[8px] font-black text-slate-450 uppercase tracking-widest">{player.pos}</span>
-                          <span className="text-[9px] font-extrabold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded">
-                            {player.coachRating.toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+            {/* View toggle (Grid / List) */}
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 transition-colors ${viewMode === "grid" ? "bg-slate-100 text-slate-800 font-bold" : "bg-white text-slate-400 hover:text-slate-600"}`}
+                title="Vista Campo Táctico"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`p-1.5 transition-colors ${viewMode === "list" ? "bg-slate-100 text-slate-800 font-bold" : "bg-white text-slate-400 hover:text-slate-600"}`}
+                title="Vista Lista"
+              >
+                <List className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-slate-150 p-4 shadow-sm space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alineación</h3>
-                <p className="text-[10px] text-slate-400 font-bold mt-0.5">VISTA PREVIA TÁCTICA</p>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {/* Tactic Select */}
-                <select
-                  value={tactic}
-                  onChange={e => setTactic(e.target.value)}
-                  className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none"
-                >
-                  <option value="4-3-3">Sistema: 4-3-3</option>
-                  <option value="4-4-2">Sistema: 4-4-2</option>
-                  <option value="3-5-2">Sistema: 3-5-2</option>
-                  <option value="4-2-3-1">Sistema: 4-2-3-1</option>
-                  <option value="3-4-3">Sistema: 3-4-3</option>
-                  <option value="4-1-4-1">Sistema: 4-1-4-1</option>
-                  <option value="5-3-2">Sistema: 5-3-2</option>
-                </select>
 
-                {/* Privacy Toggle */}
-                <button
-                  onClick={() => setIsPrivate(!isPrivate)}
-                  className={[
-                    "p-1.5 rounded-lg border flex items-center justify-center transition-colors",
-                    isPrivate
-                      ? "bg-amber-50 border-amber-200 text-amber-600"
-                      : "bg-slate-50 border-slate-200 text-slate-500"
-                  ].join(" ")}
-                  title={isPrivate ? "Alineación Privada" : "Alineación Pública"}
-                >
-                  {isPrivate ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                </button>
-
-                {/* View toggle */}
-                <div className="flex rounded-lg border border-slate-250 overflow-hidden">
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={[
-                      "p-1.5 transition-colors",
-                      viewMode === "grid" ? "bg-slate-100 text-slate-700" : "bg-white text-slate-400"
-                    ].join(" ")}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={[
-                      "p-1.5 transition-colors",
-                      viewMode === "list" ? "bg-slate-100 text-slate-700" : "bg-white text-slate-400"
-                    ].join(" ")}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Soccer Field or List depending on viewMode (always static) */}
-            {viewMode === "list" ? (
-              <div className="space-y-2 py-2">
-                {startersList.map((player, idx) => (
-                  <div key={player.id} className="flex items-center justify-between p-2.5 border border-slate-100 rounded-xl bg-slate-50/50">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[9px] font-black text-blue-700">
-                        {player.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <span className="text-xs font-bold text-slate-755">{player.name}</span>
+          {viewMode === "list" ? (
+            <div className="space-y-2 py-1 max-h-[460px] overflow-y-auto pr-1">
+              <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Titulares ({startersList.length})</h4>
+              {startersList.map((player) => (
+                <div key={player.id} className="flex items-center justify-between p-2.5 border border-slate-100 rounded-xl bg-slate-50/60">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                      {player.number || "-"}
+                    </span>
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-black text-blue-700 shrink-0 shadow-2xs">
+                      {player.avatarUrl ? (
+                        <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_20%]" />
+                      ) : (
+                        <span>{player.avatar}</span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black uppercase text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{player.pos}</span>
-                      <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
-                        {player.coachRating.toFixed(1)}
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-800">{player.name}</h5>
+                      <span className="text-[10px] text-slate-400 font-semibold">{player.pos}</span>
+                    </div>
+                  </div>
+                  {player.coachRating > 0 && (
+                    <span className="text-xs font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg shadow-2xs">
+                      ★ {player.coachRating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Pizarra idéntica a Alineación con fotos, dorsales, badges de posición y nota */
+            <div 
+              className="relative w-full aspect-[3/4.2] max-w-[360px] md:max-w-none md:aspect-auto md:w-full md:h-[480px] mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md transition-all select-none"
+            >
+              {/* Marcajes del campo */}
+              <div className="absolute inset-3 sm:inset-4 border border-white/20 pointer-events-none md:-rotate-90 md:origin-center md:scale-[1.3] md:w-[150%] md:-left-[25%]">
+                <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-white/20" />
+                <div className="absolute top-0 left-1/4 right-1/4 h-12 border-b border-x border-white/20" />
+                <div className="absolute bottom-0 left-1/4 right-1/4 h-12 border-t border-x border-white/20" />
+              </div>
+
+              {/* Titulares en el campo con coordenadas exactas guardadas */}
+              {startersList.map((player, idx) => {
+                const fallbackSlot = FORMATIONS["4-3-3"][idx] || { x: 50, y: 50, label: "JUG" };
+                const posX = (player.tactical_x != null) ? player.tactical_x : fallbackSlot.x;
+                const posY = (player.tactical_y != null) ? player.tactical_y : fallbackSlot.y;
+
+                return (
+                  <div
+                    key={player.id}
+                    style={getCoordsStyle(posX, posY)}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 transition-all select-none"
+                  >
+                    <div className="relative group flex flex-col items-center">
+                      {/* Badge superior de demarcación táctica */}
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-600 border border-white text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md uppercase tracking-tight z-20 pointer-events-none select-none whitespace-nowrap leading-none">
+                        {player.pos || fallbackSlot.label || "JUG"}
+                      </div>
+
+                      {/* Círculo idéntico a Alineación con foto */}
+                      <div className="relative w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-slate-900 border-2 border-white overflow-hidden flex items-center justify-center shadow-md select-none">
+                        {player.avatarUrl ? (
+                          <img 
+                            src={player.avatarUrl} 
+                            alt={player.name} 
+                            draggable={false}
+                            className="w-full h-full object-cover object-[center_20%] pointer-events-none select-none" 
+                          />
+                        ) : (
+                          <span className="text-sm font-black text-white tracking-wider pointer-events-none select-none">
+                            {player.avatar}
+                          </span>
+                        )}
+
+                        {/* Badge de nota del jugador si está calificado */}
+                        {player.coachRating > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full border border-white shadow-sm z-30">
+                            ★ {player.coachRating.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Pastilla inferior: Dorsal (#) y Nombre */}
+                      <span className="text-[9px] sm:text-[9.5px] font-black text-white mt-1 bg-slate-950/90 border border-white/20 px-2 py-0.5 rounded-md shadow-md whitespace-nowrap flex items-center gap-1.5 select-none leading-tight">
+                        {player.number != null && player.number !== 0 && (
+                          <span className="text-amber-400 font-mono font-black text-[9px] sm:text-[9.5px] shrink-0">
+                            #{player.number}
+                          </span>
+                        )}
+                        <span>{player.name.split(" ")[0]}</span>
                       </span>
                     </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Banquillo de suplentes */}
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
+              Banquillo de Suplentes ({benchList.length})
+            </p>
+            {benchList.length > 0 ? (
+              <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto pr-1">
+                {benchList.map(supl => (
+                  <div key={supl.id} className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl shadow-2xs">
+                    <span className="w-5 h-5 rounded-md bg-slate-800 text-white font-mono font-black text-[9px] flex items-center justify-center shrink-0">
+                      {supl.number || "-"}
+                    </span>
+                    <div className="w-6 h-6 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center text-[8px] font-black text-blue-700 shrink-0">
+                      {supl.avatarUrl ? (
+                        <img src={supl.avatarUrl} alt={supl.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{supl.avatar}</span>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-slate-700">{supl.name.split(" ")[0]}</span>
+                    {supl.coachRating > 0 && (
+                      <span className="text-[9px] font-extrabold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        ★ {supl.coachRating.toFixed(1)}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              /* Campo de Fútbol Verde */
-              <div className="relative aspect-[3/4] max-w-[340px] mx-auto bg-emerald-700 rounded-xl overflow-hidden border border-emerald-800 shadow-md">
-                {/* Marcaje de campo */}
-                <div className="absolute inset-4 border border-white/20 pointer-events-none">
-                  {/* Línea media */}
-                  <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
-                  {/* Círculo central */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border border-white/20" />
-                  {/* Área superior */}
-                  <div className="absolute top-0 left-1/4 right-1/4 h-10 border-b border-x border-white/20" />
-                  {/* Área inferior */}
-                  <div className="absolute bottom-0 left-1/4 right-1/4 h-10 border-t border-x border-white/20" />
-                </div>
-
-                {/* Renderizado de jugadores con sus posiciones tácticas */}
-                {startersList.map((player, idx) => {
-                  const fallbackNode = FORMATIONS[tactic] ? FORMATIONS[tactic][idx] : FORMATIONS["4-3-3"][idx];
-                  const posX = (player.tactical_x != null) ? player.tactical_x : (fallbackNode?.x ?? 50);
-                  const posY = (player.tactical_y != null) ? player.tactical_y : (fallbackNode?.y ?? 50);
-                  const number = player.number || (idx + 1);
-                  return (
-                  <div
-                    key={player.id}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none transition-all duration-500"
-                    style={{ left: `${posX}%`, top: `${posY}%` }}
-                  >
-                    {/* Node circle */}
-                    <div className="relative w-9 h-9 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-[11px] font-black text-white shadow-md">
-                      {number}
-                    </div>
-                    {/* Name */}
-                    <span className="text-[9px] font-black text-white mt-1 bg-slate-950/70 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                      {player.name.split(" ")[0]}
-                    </span>
-                  </div>
-                  )
-                })}
-              </div>
+              <p className="text-xs text-slate-400 italic">No hay suplentes convocados</p>
             )}
-
-            {/* Zona inferior de suplentes */}
-            <div className="border-t border-slate-100 pt-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Banquillo de suplentes ({benchList.length})</p>
-              <div className="flex flex-wrap gap-2">
-                {benchList.map(supl => (
-                  <div key={supl.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-lg">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
-                      {supl.avatar}
-                    </div>
-                    <span className="text-xs font-bold text-slate-700">{supl.name}</span>
-                    <span className="text-[9px] font-extrabold text-orange-500 bg-orange-50 px-1 rounded border border-orange-100">
-                      {supl.coachRating}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        )}
+        </div>
       </div>
 
 

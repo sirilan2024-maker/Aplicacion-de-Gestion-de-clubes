@@ -24,7 +24,10 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
   const [improvement, setImprovement] = useState(initialData?.improvement_aspects || "")
   const [attitude, setAttitude] = useState(initialData?.attitude_notes || "")
 
-  const initialRival = initialData?.coach_report?.rival_analysis || {}
+  const parsedCoachReport = typeof initialData?.coach_report === 'string'
+    ? (() => { try { return JSON.parse(initialData.coach_report) } catch { return {} } })()
+    : (initialData?.coach_report || {});
+  const initialRival = parsedCoachReport?.rival_analysis || {}
   const [rivalSystem, setRivalSystem] = useState(initialRival.system || "")
   const [rivalGoalsDesc, setRivalGoalsDesc] = useState(initialRival.goals_description || "")
   const [rivalKeyPlayers, setRivalKeyPlayers] = useState(initialRival.key_players || "")
@@ -92,7 +95,7 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
 
   const handleSave = () => {
     startTransition(async () => {
-      await saveMatchReport(matchId, {
+      const res = await saveMatchReport(matchId, {
         coach_rating: parseInt(rating),
         coach_summary: summary,
         positive_aspects: positive,
@@ -107,8 +110,13 @@ export function PostMatchTab({ matchId, initialData, players = [], convocatorias
           }
         }
       })
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      if (res?.success) {
+        setSuccess(true)
+        toast.success("¡Informe y datos del rival guardados con éxito!")
+        setTimeout(() => setSuccess(false), 3000)
+      } else {
+        toast.error(res?.error || "Error al guardar el informe post-partido")
+      }
     })
   }
 

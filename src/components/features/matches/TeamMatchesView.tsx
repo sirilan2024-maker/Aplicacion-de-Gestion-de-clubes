@@ -7,7 +7,8 @@ import { FFCVMatchesSection } from "@/components/features/matches/FFCVMatchesSec
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
 import { TeamDisciplineView } from "@/components/features/matches/TeamDisciplineView"
 import { ActasView } from "@/components/features/matches/ActasView"
-import { AlertCircle, FileText, Trophy, Calendar, RefreshCw } from "lucide-react"
+import { TeamPostMatchReportsView } from "@/components/features/matches/TeamPostMatchReportsView"
+import { AlertCircle, FileText, Trophy, Calendar, RefreshCw, ClipboardList } from "lucide-react"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
 import { useExport } from "@/components/providers/ExportContext"
 import { createClient } from "@/lib/supabase/client"
@@ -45,12 +46,12 @@ export function TeamMatchesView({
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialView = (searchParams.get('view') as any) || 'partidos'
-  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'actas'>(initialView)
+  const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'actas' | 'informes'>(initialView)
   const [matchesSubTab, setMatchesSubTab] = useState<'club' | 'ffcv'>(searchParams.get('sub') === 'ffcv' ? 'ffcv' : 'club')
 
   useEffect(() => {
     const v = searchParams.get('view')
-    if (v === 'actas' || v === 'clasificacion' || v === 'disciplina' || v === 'partidos') {
+    if (v === 'actas' || v === 'clasificacion' || v === 'disciplina' || v === 'informes' || v === 'partidos') {
       setViewMode(v)
     } else if (!v) {
       setViewMode('partidos')
@@ -63,7 +64,7 @@ export function TeamMatchesView({
     }
   }, [searchParams])
 
-  const handleViewChange = (newView: 'partidos' | 'clasificacion' | 'disciplina' | 'actas') => {
+  const handleViewChange = (newView: 'partidos' | 'clasificacion' | 'disciplina' | 'actas' | 'informes') => {
     setViewMode(newView)
     if (newView === 'partidos') {
       setMatchesSubTab('club')
@@ -249,6 +250,16 @@ export function TeamMatchesView({
             <FileText size={16} /> Actas
           </button>
           <button
+            onClick={() => handleViewChange('informes')}
+            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+              viewMode === 'informes'
+                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <ClipboardList size={16} /> Informes
+          </button>
+          <button
             onClick={() => handleViewChange('disciplina')}
             className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
               viewMode === 'disciplina'
@@ -298,6 +309,14 @@ export function TeamMatchesView({
           convocatorias={data.convocatorias}
           isReadOnly={false}
           userTeamIds={[teamId]}
+        />
+      ) : viewMode === 'informes' ? (
+        <TeamPostMatchReportsView
+          teamId={teamId}
+          teamName={teamName}
+          matches={data.matches}
+          players={data.players}
+          convocatorias={data.convocatorias}
         />
       ) : viewMode === 'clasificacion' ? (
         <FFCVStandings

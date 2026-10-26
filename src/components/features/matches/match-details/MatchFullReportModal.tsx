@@ -215,8 +215,104 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
           </button>
         </div>
 
-        {/* Content (Table) */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto p-0 custom-scrollbar">
+        {/* Content (Desktop Table & Mobile Cards) */}
+        {/* 1. Vista Móvil (Tarjetas individuales sin scroll horizontal) */}
+        <div className="md:hidden flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50/60 custom-scrollbar">
+          {playerList.map(player => {
+            const currentStatus = reports[player.id].status;
+            return (
+              <div key={player.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2.5">
+                {/* Cabecera del Jugador */}
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-black text-blue-700 shrink-0">
+                      {player.first_name[0] || ''}{player.last_name[0] || ''}
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 truncate">
+                      {player.first_name} {player.last_name}
+                    </p>
+                  </div>
+                  {/* Asistencia con botones píldora */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {ATTENDANCE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleUpdate(player.id, 'status', opt.value)}
+                        className={`text-[10px] font-extrabold px-2 py-1 rounded-lg border transition-all ${
+                          currentStatus === opt.value
+                            ? (opt.value === 'Presente' ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : opt.value === 'Ausente' ? 'bg-red-600 text-white border-red-600 shadow-xs' : 'bg-amber-500 text-white border-amber-500 shadow-xs')
+                            : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Controles de Rendimiento */}
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-0.5">
+                  {/* Minutos */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-1 text-center">
+                    <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Minutos</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="120"
+                      value={reports[player.id].minutes || ''}
+                      onChange={(e) => handleMinutesChange(player.id, e.target.value)}
+                      className="w-full h-6 text-center text-xs font-black text-slate-700 bg-white border border-slate-200 rounded outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  {/* Nota */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-1 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Nota</span>
+                    <NumberControl playerId={player.id} field="rating" icon="Nota" max={10} />
+                  </div>
+
+                  {/* Actitud */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-1 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Actitud</span>
+                    <NumberControl playerId={player.id} field="actitud" icon="Act" max={10} />
+                  </div>
+
+                  {/* Goles */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-1 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Goles</span>
+                    <NumberControl playerId={player.id} field="goals" icon="Gol" />
+                  </div>
+
+                  {/* Asistencias */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-1 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Asist.</span>
+                    <NumberControl playerId={player.id} field="assists" icon="Asis" />
+                  </div>
+
+                  {/* Tarjetas */}
+                  <div className="bg-slate-50 border border-slate-150 rounded-lg p-1 flex flex-col items-center">
+                    <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">Tarjetas</span>
+                    <div className="flex items-center gap-1">
+                      <NumberControl playerId={player.id} field="yellows" icon="🟨" max={2} />
+                      <NumberControl playerId={player.id} field="reds" icon="🟥" max={1} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {playerList.length === 0 && (
+            <div className="text-center py-8 text-sm font-medium text-slate-500">
+              No hay jugadores convocados.
+            </div>
+          )}
+        </div>
+
+        {/* 2. Vista Escritorio (Tabla completa con cabeceras fijas) */}
+        <div className="hidden md:block flex-1 overflow-x-auto overflow-y-auto p-0 custom-scrollbar">
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
               <tr className="border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">

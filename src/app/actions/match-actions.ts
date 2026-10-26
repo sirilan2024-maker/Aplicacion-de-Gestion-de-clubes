@@ -579,23 +579,64 @@ export async function saveMatchReport(
     return { success: false, error: access.reason || "No tienes acceso a este partido" };
   }
 
-  // Si se incluye coach_report, hacer merge con el existente si ya contiene campos (como la foto)
-  const updatePayload: any = { ...report };
-  if (report.coach_report) {
-    const { data: currentMatch } = await adminSupabase
-      .from('partidos')
-      .select('coach_report')
-      .eq('id', matchId)
-      .single();
-    const existingReport = (typeof currentMatch?.coach_report === 'object' && currentMatch?.coach_report) ? currentMatch.coach_report : {};
-    updatePayload.coach_report = {
-      ...existingReport,
-      ...report.coach_report
-    };
+  // 1. Obtener el coach_report existente y parsear de forma segura si viene como string
+  const { data: currentMatch } = await adminSupabase
+    .from('partidos')
+    .select('coach_report')
+    .eq('id', matchId)
+    .single();
+
+  let existingReport: any = {};
+  if (typeof currentMatch?.coach_report === 'string') {
+    try {
+      existingReport = JSON.parse(currentMatch.coach_report);
+    } catch {
+      existingReport = {};
+    }
+  } else if (typeof currentMatch?.coach_report === 'object' && currentMatch?.coach_report) {
+    existingReport = currentMatch.coach_report;
   }
 
-  await adminSupabase.from('partidos').update(updatePayload).eq('id', matchId);
-  revalidatePath(`/dashboard/e/[teamId]/partidos/${matchId}`, 'page');
+  const mergedCoachReport = {
+    ...existingReport,
+    ...(report.coach_report || {})
+  };
+
+  const updatePayload: any = {
+    coach_rating: report.coach_rating,
+    coach_summary: report.coach_summary,
+    positive_aspects: report.positive_aspects,
+    improvement_aspects: report.improvement_aspects,
+    attitude_notes: report.attitude_notes,
+    coach_report: mergedCoachReport
+  };
+
+  // 2. Intentar actualizar como objeto JSONB; si la columna en DB es TEXT, reintentar con JSON.stringify
+  let { error: updateError } = await adminSupabase
+    .from('partidos')
+    .update(updatePayload)
+    .eq('id', matchId);
+
+  if (updateError && (updateError.message?.toLowerCase().includes('text') || updateError.code === '42804')) {
+    updatePayload.coach_report = JSON.stringify(mergedCoachReport);
+    const retry = await adminSupabase
+      .from('partidos')
+      .update(updatePayload)
+      .eq('id', matchId);
+    updateError = retry.error;
+  }
+
+  if (updateError) {
+    console.error("Error saving match report:", updateError);
+    return { success: false, error: updateError.message || "Error al guardar el informe" };
+  }
+
+  const teamId = access.match.equipo_id;
+  if (teamId) {
+    revalidatePath(`/dashboard/equipos/${teamId}/partidos/${matchId}`, 'page');
+    revalidatePath(`/dashboard/equipos/${teamId}/partidos`, 'page');
+  }
+  revalidatePath(`/dashboard`, 'layout');
   return { success: true };
 }
 
@@ -627,6 +668,7 @@ export async function uploadTeamPhotoAction(matchId: string, formData: FormData)
     });
 
   if (uploadError) {
+    console.error("Error uploading team photo to storage:", uploadError);
     return { success: false, error: uploadError.message };
   }
 
@@ -643,17 +685,46 @@ export async function uploadTeamPhotoAction(matchId: string, formData: FormData)
     .eq('id', matchId)
     .single();
 
-  const existingReport = (typeof currentMatch?.coach_report === 'object' && currentMatch?.coach_report) ? currentMatch.coach_report : {};
+  let existingReport: any = {};
+  if (typeof currentMatch?.coach_report === 'string') {
+    try {
+      existingReport = JSON.parse(currentMatch.coach_report);
+    } catch {
+      existingReport = {};
+    }
+  } else if (typeof currentMatch?.coach_report === 'object' && currentMatch?.coach_report) {
+    existingReport = currentMatch.coach_report;
+  }
+
   const updatedReport = {
     ...existingReport,
     team_photo_url: teamPhotoUrl
   };
 
-  await adminSupabase
+  // Intentar actualizar con objeto o con string si la columna es TEXT
+  let { error: updateError } = await adminSupabase
     .from('partidos')
     .update({ coach_report: updatedReport })
     .eq('id', matchId);
 
+  if (updateError && (updateError.message?.toLowerCase().includes('text') || updateError.code === '42804')) {
+    const retry = await adminSupabase
+      .from('partidos')
+      .update({ coach_report: JSON.stringify(updatedReport) })
+      .eq('id', matchId);
+    updateError = retry.error;
+  }
+
+  if (updateError) {
+    console.error("Error updating match coach_report with team photo:", updateError);
+    return { success: false, error: updateError.message || "Error al vincular la foto con el partido" };
+  }
+
+  const teamId = access.match.equipo_id;
+  if (teamId) {
+    revalidatePath(`/dashboard/equipos/${teamId}/partidos/${matchId}`, 'page');
+    revalidatePath(`/dashboard/equipos/${teamId}/partidos`, 'page');
+  }
   revalidatePath(`/dashboard`, 'layout');
   return { success: true, teamPhotoUrl };
 }

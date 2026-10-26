@@ -791,7 +791,7 @@ export function TeamPostMatchReportsView({
             onClick={e => e.stopPropagation()}
           >
             {/* Cabecera del Modal */}
-            <div className="bg-slate-900 text-white px-5 sm:px-7 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+            <div className="bg-slate-900 text-white px-4 py-3.5 sm:px-7 sm:py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
                   <FileText className="w-5 h-5" />
@@ -843,7 +843,7 @@ export function TeamPostMatchReportsView({
             </div>
 
             {/* Contenido scrolleable del informe */}
-            <div className="overflow-y-auto p-5 sm:p-7 space-y-6 flex-1">
+            <div className="overflow-y-auto p-4 sm:p-7 space-y-6 flex-1">
               {/* Barra de Datos Clave del Encuentro */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
                 <div>
@@ -991,8 +991,166 @@ export function TeamPostMatchReportsView({
                   </span>
                 </div>
 
-                {/* Tabla de Titulares */}
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                {/* Vista Móvil: Tarjetas individuales sin scroll horizontal (md:hidden) */}
+                <div className="md:hidden space-y-4">
+                  {/* Titulares en móvil */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                        Once Titular ({previewStarters.length})
+                      </span>
+                    </div>
+
+                    {previewStarters.length > 0 ? (
+                      <div className="space-y-2">
+                        {previewStarters.map(p => (
+                          <div key={p.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono font-black text-amber-500 text-xs shrink-0">
+                                  #{p.number}
+                                </span>
+                                <div className="w-6 h-6 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center text-[9px] font-black text-blue-700 shrink-0">
+                                  {p.avatarUrl ? (
+                                    <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{p.avatar}</span>
+                                  )}
+                                </div>
+                                <span className="font-bold text-slate-800 text-xs truncate">{p.name}</span>
+                                <span className="text-[9px] font-bold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.2 rounded shrink-0">
+                                  {p.pos}
+                                </span>
+                              </div>
+
+                              {p.rating > 0 ? (
+                                <span className={`font-black text-xs px-2 py-0.5 rounded shrink-0 ${
+                                  p.rating >= 7 ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : p.rating >= 5 ? 'text-amber-700 bg-amber-50 border border-amber-200' : 'text-rose-700 bg-rose-50 border border-rose-200'
+                                }`}>
+                                  ★ {p.rating}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-bold shrink-0">-</span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] pt-1.5 border-t border-slate-200/60 text-slate-600">
+                              <span className="font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                ⏱️ {p.minutes}'
+                              </span>
+                              {p.actitud > 0 && (
+                                <span className="font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  🤝 Act: {p.actitud}
+                                </span>
+                              )}
+                              {p.goals > 0 && (
+                                <span className="font-black text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  ⚽ {p.goals} {p.goals > 1 ? 'goles' : 'gol'}
+                                </span>
+                              )}
+                              {p.assists > 0 && (
+                                <span className="font-semibold text-blue-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  🎯 {p.assists} {p.assists > 1 ? 'asists' : 'asist'}
+                                </span>
+                              )}
+                              {p.yellows > 0 && (
+                                <span className="font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                  🟨 {p.yellows}
+                                </span>
+                              )}
+                              {p.reds > 0 && (
+                                <span className="font-black text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded">
+                                  🟥 {p.reds}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-2">No hay titulares convocados registrados.</p>
+                    )}
+                  </div>
+
+                  {/* Suplentes en móvil */}
+                  {previewBench.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                          Banquillo de Suplentes ({previewBench.length})
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {previewBench.map(p => (
+                          <div key={p.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono font-bold text-slate-500 text-xs shrink-0">
+                                  #{p.number}
+                                </span>
+                                <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[9px] font-black text-slate-600 shrink-0">
+                                  {p.avatarUrl ? (
+                                    <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{p.avatar}</span>
+                                  )}
+                                </div>
+                                <span className="font-semibold text-slate-700 text-xs truncate">{p.name}</span>
+                                <span className="text-[9px] font-medium text-slate-400 bg-white border border-slate-200 px-1.5 py-0.2 rounded shrink-0">
+                                  {p.pos}
+                                </span>
+                              </div>
+
+                              {p.rating > 0 ? (
+                                <span className={`font-black text-xs px-2 py-0.5 rounded shrink-0 ${
+                                  p.rating >= 7 ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : p.rating >= 5 ? 'text-amber-700 bg-amber-50 border border-amber-200' : 'text-rose-700 bg-rose-50 border border-rose-200'
+                                }`}>
+                                  ★ {p.rating}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-bold shrink-0">-</span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] pt-1.5 border-t border-slate-200/60 text-slate-600">
+                              <span className="font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                ⏱️ {p.minutes}'
+                              </span>
+                              {p.actitud > 0 && (
+                                <span className="font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  🤝 Act: {p.actitud}
+                                </span>
+                              )}
+                              {p.goals > 0 && (
+                                <span className="font-black text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  ⚽ {p.goals}
+                                </span>
+                              )}
+                              {p.assists > 0 && (
+                                <span className="font-semibold text-blue-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  🎯 {p.assists}
+                                </span>
+                              )}
+                              {p.yellows > 0 && (
+                                <span className="font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                  🟨 {p.yellows}
+                                </span>
+                              )}
+                              {p.reds > 0 && (
+                                <span className="font-black text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded">
+                                  🟥 {p.reds}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Vista Escritorio: Tabla completa de 9 columnas (hidden md:block) */}
+                <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-xl">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-[10px] font-black text-slate-600 uppercase border-b border-slate-200">
                       <tr>

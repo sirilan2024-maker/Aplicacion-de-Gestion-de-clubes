@@ -4,7 +4,8 @@ import { getAuthenticatedContext } from '@/lib/auth-helpers';
 import { normalizeImageUrl } from '@/lib/ffcv/parser';
 import { getVerifiedHistoryForPlayer, getRegistryShield } from '@/lib/ffcv/player-history-registry';
 import { fetchFfcvRawUrl } from '@/lib/ffcv/client';
-import { isLigaBraveCompetition } from '@/lib/utils';
+import { isLigaBraveCompetition, getOfficialMatchDuration } from '@/lib/utils';
+import { fetchApuntameloJson, getApuntameloConfigForTeam } from '@/lib/apuntamelo/sync';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -230,7 +231,74 @@ export async function GET(req: Request) {
     });
 
     if (isLigaBrave) {
-      // 1. Consultar convocatorias y partidos de la temporada activa para este jugador
+      // 1. Obtener datos oficiales en tiempo real desde la API de Apúntamelo (Liga Brave)
+      const config = getApuntameloConfigForTeam(teamRel);
+      const teamApuntameloId = config?.teamApuntameloId || 
+        (teamName.toUpperCase().includes('INFANTIL B') ? 33431 : 
+         teamName.toUpperCase().includes('CADETE B') ? 33383 : null);
+
+      let apuntameloPlayer: any = null;
+      let apuntameloPichichi: any = null;
+      let apuntameloAmon: any = null;
+      let apuntameloPunt: any = null;
+      let apuntameloValor: any = null;
+
+      if (teamApuntameloId) {
+        try {
+          const infoArr = await fetchApuntameloJson<any[]>(
+            `https://apuntamelo.com/obtenerInfoEquipo?equipo=${teamApuntameloId}`
+          );
+          if (Array.isArray(infoArr) && infoArr.length > 0) {
+            const teamData = infoArr[0];
+            const plantilla = JSON.parse(teamData.Json_plantilla || '[]');
+            const pichichis = JSON.parse(teamData.Json_pichichi || '[]');
+            const amonestaciones = JSON.parse(teamData.Json_amonestaciones || '[]');
+            const puntuaciones = JSON.parse(teamData.Json_puntuacion || '[]');
+            const valores = JSON.parse(teamData.Json_valor || '[]');
+
+            const normFirst = normalizeStr(player.first_name);
+            const normLast = normalizeStr(player.last_name);
+            const playerDorsal = player.dorsal ? Number(player.dorsal) : null;
+            const tokens = [...normFirst.split(' '), ...normLast.split(' ')].filter(t => t.length > 2);
+
+            // 1ª prioridad: Dorsal exacto + coincidencia de nombre/apellido
+            apuntameloPlayer = plantilla.find((p: any) => {
+              const pDorsal = p.Dorsal ? Number(p.Dorsal) : null;
+              const pNorm = normalizeStr(p.Nombre);
+              if (playerDorsal && pDorsal === playerDorsal) {
+                if (tokens.some(t => pNorm.includes(t))) return true;
+              }
+              return false;
+            });
+
+            // 2ª prioridad: Coincidencia por tokens de nombre (mínimo 2 tokens o apellido)
+            if (!apuntameloPlayer) {
+              apuntameloPlayer = plantilla.find((p: any) => {
+                const pNorm = normalizeStr(p.Nombre);
+                const matches = tokens.filter(t => pNorm.includes(t)).length;
+                return matches >= 2;
+              });
+            }
+
+            // 3ª prioridad: Por dorsal si no hubo coincidencia anterior
+            if (!apuntameloPlayer && playerDorsal) {
+              apuntameloPlayer = plantilla.find((p: any) => Number(p.Dorsal) === playerDorsal);
+            }
+
+            if (apuntameloPlayer) {
+              const pId = apuntameloPlayer.Id;
+              apuntameloPichichi = pichichis.find((x: any) => x.Id === pId || (playerDorsal && Number(x.Dorsal) === playerDorsal));
+              apuntameloAmon = amonestaciones.find((x: any) => x.Id === pId || (playerDorsal && Number(x.Dorsal) === playerDorsal));
+              apuntameloPunt = puntuaciones.find((x: any) => x.Id === pId || (playerDorsal && Number(x.Dorsal) === playerDorsal));
+              apuntameloValor = valores.find((x: any) => x.Id === pId || (playerDorsal && Number(x.Dorsal) === playerDorsal));
+            }
+          }
+        } catch (apErr: any) {
+          console.warn('[ffcv-player-info] Non-blocking Apuntamelo fetch error:', apErr.message);
+        }
+      }
+
+      // 2. Consultar convocatorias y partidos de la temporada activa para este jugador
       const { data: convs } = await supabase
         .from('convocatorias')
         .select(`
@@ -277,13 +345,13 @@ export async function GET(req: Request) {
         c.partidos?.estado === 'Finalizado' || (c.minutes_played ?? c.minutos_jugados ?? 0) > 0
       );
 
-      let partidosJugados = 0;
-      let titulares = 0;
-      let suplentes = 0;
-      let convGoals = 0;
-      let convYellows = 0;
-      let convReds = 0;
-      let minutosTotales = 0;
+      let dbPartidosJugados = 0;
+      let dbTitulares = 0;
+      let dbSuplentes = 0;
+      let dbConvGoals = 0;
+      let dbConvYellows = 0;
+      let dbConvReds = 0;
+      let dbMinutosTotales = 0;
 
       finalizedConvs.forEach((c: any) => {
         const rawM = c.minutes_played ?? c.minutos_jugados;
@@ -291,25 +359,35 @@ export async function GET(req: Request) {
         const isTitular = Boolean(c.titular);
 
         if (mins > 0 || isTitular) {
-          partidosJugados++;
+          dbPartidosJugados++;
         }
         if (isTitular) {
-          titulares++;
+          dbTitulares++;
         } else if (mins > 0) {
-          suplentes++;
+          dbSuplentes++;
         }
 
-        minutosTotales += mins;
-        convGoals += Number(c.goals ?? c.goles ?? 0);
-        convYellows += Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
-        convReds += Number(c.red_cards ?? c.tarjetas_rojas ?? 0);
+        dbMinutosTotales += mins;
+        dbConvGoals += Number(c.goals ?? c.goles ?? 0);
+        dbConvYellows += Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
+        dbConvReds += Number(c.red_cards ?? c.tarjetas_rojas ?? 0);
       });
 
-      const totalGoles = Math.max(convGoals, eventGoals);
-      const totalYellows = Math.max(convYellows, eventYellows);
-      const totalReds = Math.max(convReds, eventReds);
+      // Consolidar datos de Apúntamelo con BD interna
+      const categoryMatchDuration = getOfficialMatchDuration(teamCategory || teamName, 'Liga Brave');
+      const apPresencias = Number(apuntameloPlayer?.Presencias) || 0;
+      const apGoles = Number(apuntameloPlayer?.Goles) || Number(apuntameloPichichi?.Total) || 0;
+      const apAmarillas = Number(apuntameloAmon?.Total) || 0;
 
-      const fullName = `${player.first_name || ''} ${player.last_name || ''}`.trim();
+      const partidosJugados = Math.max(dbPartidosJugados, apPresencias);
+      const totalGoles = Math.max(dbConvGoals, eventGoals, apGoles);
+      const totalYellows = Math.max(dbConvYellows, eventYellows, apAmarillas);
+      const totalReds = Math.max(dbConvReds, eventReds);
+      const minutosTotales = Math.max(dbMinutosTotales, apPresencias * categoryMatchDuration);
+      const titulares = Math.max(dbTitulares, partidosJugados);
+      const suplentes = dbSuplentes;
+
+      const fullName = apuntameloPlayer?.Nombre || `${player.first_name || ''} ${player.last_name || ''}`.trim();
       const verifiedHistory = getVerifiedHistoryForPlayer(fullName);
 
       const currentEntry = {
@@ -335,9 +413,17 @@ export async function GET(req: Request) {
         historialClubes = [currentEntry, ...pastVerified];
       }
 
-      const codFicha = (player as any).license_number || 
-                       (player as any).num_licencia_fed || 
-                       (player.dorsal ? `LB-${player.dorsal}` : `LB-${player.id.slice(0, 5).toUpperCase()}`);
+      const codFicha = apuntameloPlayer?.Id 
+        ? String(apuntameloPlayer.Id)
+        : (player as any).license_number || (player as any).num_licencia_fed || (player.dorsal ? `LB-${player.dorsal}` : `LB-${player.id.slice(0, 5).toUpperCase()}`);
+
+      const photoUrl = player.avatar_url || 
+        (apuntameloPlayer?.Imagen ? (apuntameloPlayer.Imagen.startsWith('http') ? apuntameloPlayer.Imagen : `https://apuntamelo.com/${apuntameloPlayer.Imagen}`) : null) ||
+        apuntameloPlayer?.Imagen_transparente || null;
+
+      const ultimosResultados = apuntameloPlayer?.Ultimos 
+        ? apuntameloPlayer.Ultimos.split('/').filter((x: string) => x && x !== 'null')
+        : [];
 
       return NextResponse.json({
         found: true,
@@ -346,14 +432,14 @@ export async function GET(req: Request) {
           codjugador: codFicha,
           nombre: fullName,
           email: player.email || player.parent1_email || null,
-          dorsal: player.dorsal || null,
+          dorsal: apuntameloPlayer?.Dorsal || player.dorsal || null,
           posicion: (player as any).posicion_principal || (player as any).posicion || 'Jugador',
           categoria: teamCategory || teamName || 'Liga Brave',
           temporada_actual: '2026-2027',
           minutos_totales: minutosTotales,
           media_minutos: partidosJugados > 0 ? (minutosTotales / partidosJugados).toFixed(1) : '0',
           es_portero: ((player as any).posicion_principal || (player as any).posicion || '').toLowerCase().includes('portero'),
-          foto_base64: player.avatar_url || null,
+          foto_base64: photoUrl,
           partidos: [
             { nombre: 'Jugados', valor: String(partidosJugados) },
             { nombre: 'Titular', valor: String(titulares) },
@@ -371,7 +457,15 @@ export async function GET(req: Request) {
               nombre_club: 'Sporting Saladar'
             }
           ],
-          historial_clubes: historialClubes
+          historial_clubes: historialClubes,
+          // Estadísticas específicas de la Liga Brave
+          asistencias: Number(apuntameloPlayer?.Asistencias) || 0,
+          puntos_totales: Number(apuntameloPlayer?.Puntuacion) || Number(apuntameloPunt?.Total) || null,
+          puntos_media: apuntameloPlayer?.Media != null ? Number(apuntameloPlayer.Media).toFixed(1) : null,
+          valor_mercado: apuntameloPlayer?.Valor_mercado 
+            ? `${(Number(apuntameloPlayer.Valor_mercado) / 1000000).toFixed(1)}M€` 
+            : null,
+          ultimos_resultados: ultimosResultados
         }
       });
     }

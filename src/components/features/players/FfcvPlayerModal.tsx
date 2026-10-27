@@ -167,6 +167,60 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose, isLigaB
                 </div>
               </div>
 
+              {/* Bloque especial de estadísticas Liga Brave */}
+              {isBrave && (data.puntos_totales != null || data.valor_mercado || data.asistencias != null) && (
+                <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 rounded-2xl p-4 sm:p-5 border border-emerald-500/30 text-white shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                      <Award size={14} className="text-emerald-400" /> Rendimiento Oficial Liga Brave
+                    </span>
+                    {data.valor_mercado && (
+                      <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/20">
+                        Valor: {data.valor_mercado}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                    <div className="bg-white/10 rounded-xl p-2.5 backdrop-blur-xs border border-white/10">
+                      <span className="text-xl sm:text-2xl font-black text-white block">
+                        {data.partidos?.find((p: any) => p.nombre === 'Total Goles')?.valor || 0}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-200 uppercase">Goles</span>
+                    </div>
+                    <div className="bg-white/10 rounded-xl p-2.5 backdrop-blur-xs border border-white/10">
+                      <span className="text-xl sm:text-2xl font-black text-white block">
+                        {data.asistencias ?? 0}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-200 uppercase">Asistencias</span>
+                    </div>
+                    <div className="bg-white/10 rounded-xl p-2.5 backdrop-blur-xs border border-white/10">
+                      <span className="text-xl sm:text-2xl font-black text-white block">
+                        {data.puntos_totales ?? "-"}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-200 uppercase">Punt. Total</span>
+                    </div>
+                    <div className="bg-white/10 rounded-xl p-2.5 backdrop-blur-xs border border-white/10">
+                      <span className="text-xl sm:text-2xl font-black text-white block">
+                        {data.puntos_media ?? "-"}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-200 uppercase">Punt. Media</span>
+                    </div>
+                  </div>
+                  {data.ultimos_resultados && data.ultimos_resultados.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                      <span className="text-emerald-300 font-bold">Últimos Resultados:</span>
+                      <div className="flex gap-1.5">
+                        {data.ultimos_resultados.map((res: string, i: number) => (
+                          <span key={i} className="px-2 py-0.5 rounded-md bg-white/15 text-white font-mono font-bold text-xs">
+                            {res}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Estadísticas de Temporada Actual */}
               <div>
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">

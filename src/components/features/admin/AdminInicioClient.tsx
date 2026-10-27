@@ -492,14 +492,28 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
         
         {/* AGENDA (2 columnas en desktop) */}
         <section className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4">
-          {/* Cálculo de partidos de la jornada próxima vs resto de partidos */}
+          {/* Cálculo de partidos de la jornada: Asegurar siempre los 7 partidos de los 7 equipos del club */}
           {(() => {
-            const firstMatchTime = upcomingMatches.length > 0 ? new Date(upcomingMatches[0].fechaHora).getTime() : 0;
-            // Ventana de la jornada: 36 horas desde el primer partido para cubrir sábado y domingo de jornada
-            const matchdayEndMs = firstMatchTime ? firstMatchTime + (36 * 60 * 60 * 1000) : 0;
-            const matchdayMatches = upcomingMatches.filter(m => new Date(m.fechaHora).getTime() <= matchdayEndMs);
-            const primaryMatches = matchdayMatches.length > 0 ? matchdayMatches : upcomingMatches.slice(0, 7);
-            const remainingMatches = upcomingMatches.slice(primaryMatches.length);
+            // 1. Obtener el próximo partido de cada uno de los equipos del club (los 7 equipos de la temporada activa)
+            const teamMatchMap = new Map<string, typeof upcomingMatches[0]>();
+            for (const m of upcomingMatches) {
+              const tKey = m.teamName?.toLowerCase().trim() || m.id;
+              if (tKey && !teamMatchMap.has(tKey)) {
+                teamMatchMap.set(tKey, m);
+              }
+            }
+
+            // Los partidos de la jornada (un partido por cada equipo del club), ordenados cronológicamente
+            const roundMatches = Array.from(teamMatchMap.values()).sort((a, b) => {
+              const dateA = a.fechaHora ? new Date(a.fechaHora).getTime() : 0;
+              const dateB = b.fechaHora ? new Date(b.fechaHora).getTime() : 0;
+              return dateA - dateB;
+            });
+
+            // Si hay partidos de la jornada, esos son los primarios (los 7 equipos del club)
+            const primaryMatches = roundMatches.length > 0 ? roundMatches : upcomingMatches.slice(0, 7);
+            const roundMatchIds = new Set(primaryMatches.map(m => m.id));
+            const remainingMatches = upcomingMatches.filter(m => !roundMatchIds.has(m.id));
             const displayedMatches = showAllAgendaMatches ? upcomingMatches : primaryMatches;
 
             return (
@@ -509,7 +523,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                     <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
                       <CalendarDays className="w-4 h-4" />
                     </div>
-                    <h2 className="font-bold text-slate-900 text-base">Agenda del Club</h2>
+                    <div>
+                      <h2 className="font-bold text-slate-900 text-base">Agenda del Club</h2>
+                      <p className="text-[11px] text-slate-400 font-medium">Jornada oficial con los 7 equipos del club</p>
+                    </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
@@ -517,7 +534,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                         onClick={() => setAgendaTab("partidos")}
                         className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all text-center cursor-pointer ${agendaTab === "partidos" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"}`}
                       >
-                        Partidos ({displayedMatches.length}{!showAllAgendaMatches && remainingMatches.length > 0 ? ` de ${upcomingMatches.length}` : ""})
+                        Partidos de la Jornada ({displayedMatches.length}{!showAllAgendaMatches && remainingMatches.length > 0 ? ` de ${upcomingMatches.length}` : ""})
                       </button>
                       <button
                         onClick={() => setAgendaTab("entrenamientos")}
@@ -550,6 +567,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                           const { dateStr, timeStr, dayName } = formatMadridMatchDate(m.fechaHora);
                           const isLive = m.estado === "En curso";
                           const isFinished = m.estado === "Finalizado";
+                          const isSuspended = m.estado === "Suspendido";
+                          const isPostponed = m.estado === "Aplazado";
+                          const homeScore = m.esLocal ? (m.resultadoPropio ?? 0) : (m.resultadoRival ?? 0);
+                          const awayScore = m.esLocal ? (m.resultadoRival ?? 0) : (m.resultadoPropio ?? 0);
 
                           return (
                             <React.Fragment key={m.id}>
@@ -574,11 +595,19 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   {isLive ? (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-pulse">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                      EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                                      EN DIRECTO {homeScore} - {awayScore}
                                     </span>
                                   ) : isFinished ? (
                                     <span className="text-[11px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-lg">
-                                      Finalizado {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                                      Finalizado {homeScore} - {awayScore}
+                                    </span>
+                                  ) : isSuspended ? (
+                                    <span className="text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg uppercase">
+                                      Suspendido
+                                    </span>
+                                  ) : isPostponed ? (
+                                    <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
+                                      Aplazado
                                     </span>
                                   ) : (
                                     <>
@@ -627,7 +656,15 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                     <div className="h-px bg-slate-200 w-10" />
                                     {isLive || isFinished ? (
                                       <span className="text-sm font-black px-3 py-0.5 bg-slate-900 text-white rounded-lg shadow-2xs tracking-wide">
-                                        {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                                        {homeScore} - {awayScore}
+                                      </span>
+                                    ) : isSuspended ? (
+                                      <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                        SUSPENDIDO
+                                      </span>
+                                    ) : isPostponed ? (
+                                      <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                        APLAZADO
                                       </span>
                                     ) : (
                                       <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
@@ -734,11 +771,19 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   {isLive ? (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-pulse">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                      EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                                      EN DIRECTO {homeScore} - {awayScore}
                                     </span>
                                   ) : isFinished ? (
                                     <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                                      {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                                      {homeScore} - {awayScore}
+                                    </span>
+                                  ) : isSuspended ? (
+                                    <span className="text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-lg uppercase">
+                                      Suspendido
+                                    </span>
+                                  ) : isPostponed ? (
+                                    <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
+                                      Aplazado
                                     </span>
                                   ) : (
                                     <div className="flex items-center gap-1.5">
@@ -760,7 +805,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                         conflictoEquipacion={m.conflictoEquipacion}
                                         rivalCamisetaColor={m.rivalCamisetaColor}
                                         esLocal={m.esLocal}
-                                        size="sm"
+                                        size="xs"
                                       />
                                     </div>
                                   )}

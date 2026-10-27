@@ -71,6 +71,23 @@ export function ClubAgendaCommsSection({
   }, []);
 
   const weekendMatches = useMemo(() => {
+    // Si selectedTeamId === 'all' o no está seleccionado, asegurar los 7 partidos de los 7 equipos del club para la jornada / fin de semana
+    if (!selectedTeamId || selectedTeamId === "all") {
+      const teamMatchMap = new Map<string, typeof filteredMatches[0]>();
+      for (const m of filteredMatches) {
+        const tKey = m.teamName?.toLowerCase().trim() || m.id;
+        if (tKey && !teamMatchMap.has(tKey)) {
+          teamMatchMap.set(tKey, m);
+        }
+      }
+      const roundMatches = Array.from(teamMatchMap.values()).sort((a, b) => {
+        const dateA = a.fechaHora ? new Date(a.fechaHora).getTime() : 0;
+        const dateB = b.fechaHora ? new Date(b.fechaHora).getTime() : 0;
+        return dateA - dateB;
+      });
+      if (roundMatches.length > 0) return roundMatches;
+    }
+
     // 1. Partidos del fin de semana inmediato
     const immediate = filteredMatches.filter((m) => {
       const d = new Date(m.fechaHora);
@@ -100,7 +117,7 @@ export function ClubAgendaCommsSection({
       const d = new Date(m.fechaHora);
       return d >= targetFri && d <= targetMon;
     });
-  }, [filteredMatches, thisWeekendStart, thisWeekendEnd]);
+  }, [filteredMatches, thisWeekendStart, thisWeekendEnd, selectedTeamId]);
 
   const displayedMatches = useMemo(() => {
     if (matchScope === "fin_de_semana") {
@@ -320,6 +337,10 @@ export function ClubAgendaCommsSection({
 
                   const isLive = m.estado === "En curso" || m.estado === "live";
                   const isFinished = m.estado === "Finalizado";
+                  const isSuspended = m.estado?.toLowerCase() === "suspendido";
+                  const isPostponed = m.estado?.toLowerCase() === "aplazado";
+                  const homeScore = m.esLocal ? (m.resultadoPropio ?? 0) : (m.resultadoRival ?? 0);
+                  const awayScore = m.esLocal ? (m.resultadoRival ?? 0) : (m.resultadoPropio ?? 0);
 
                   return (
                     <React.Fragment key={m.id}>
@@ -344,11 +365,19 @@ export function ClubAgendaCommsSection({
                           {isLive ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-pulse">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                              EN DIRECTO {homeScore} - {awayScore}
                             </span>
                           ) : isFinished ? (
                             <span className="text-[11px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-lg">
-                              Finalizado {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                              Finalizado {homeScore} - {awayScore}
+                            </span>
+                          ) : isSuspended ? (
+                            <span className="text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg uppercase">
+                              Suspendido
+                            </span>
+                          ) : isPostponed ? (
+                            <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
+                              Aplazado
                             </span>
                           ) : (
                             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
@@ -387,7 +416,15 @@ export function ClubAgendaCommsSection({
                             <div className="h-px bg-slate-200 w-10" />
                             {isLive || isFinished ? (
                               <span className="text-sm font-black px-3 py-0.5 bg-slate-900 text-white rounded-lg shadow-2xs tracking-wide">
-                                {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                                {homeScore} - {awayScore}
+                              </span>
+                            ) : isSuspended ? (
+                              <span className="text-xs font-black px-2.5 py-0.5 bg-rose-100 text-rose-800 rounded-lg border border-rose-200 uppercase">
+                                Suspendido
+                              </span>
+                            ) : isPostponed ? (
+                              <span className="text-xs font-black px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-lg border border-amber-200 uppercase">
+                                Aplazado
                               </span>
                             ) : (
                               <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
@@ -494,11 +531,19 @@ export function ClubAgendaCommsSection({
                           {isLive ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-pulse">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              EN DIRECTO {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                              EN DIRECTO {homeScore} - {awayScore}
                             </span>
                           ) : isFinished ? (
                             <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                              {m.resultadoPropio ?? 0} - {m.resultadoRival ?? 0}
+                              {homeScore} - {awayScore}
+                            </span>
+                          ) : isSuspended ? (
+                            <span className="text-[11px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg uppercase">
+                              Suspendido
+                            </span>
+                          ) : isPostponed ? (
+                            <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
+                              Aplazado
                             </span>
                           ) : (
                             <div className="flex items-center gap-1.5">

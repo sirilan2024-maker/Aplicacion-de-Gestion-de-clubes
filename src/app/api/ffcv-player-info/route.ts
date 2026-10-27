@@ -4,6 +4,7 @@ import { getAuthenticatedContext } from '@/lib/auth-helpers';
 import { normalizeImageUrl } from '@/lib/ffcv/parser';
 import { getVerifiedHistoryForPlayer, getRegistryShield } from '@/lib/ffcv/player-history-registry';
 import { fetchFfcvRawUrl } from '@/lib/ffcv/client';
+import { isLigaBraveCompetition } from '@/lib/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -186,7 +187,7 @@ export async function GET(req: Request) {
 
     const { data: player, error: pErr } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, email, parent1_email, club_id, team_id, avatar_url, teams(id, name, ffcv_team_id, ffcv_competition_id, ffcv_group_id, season_id)')
+      .select('id, first_name, last_name, dorsal, email, parent1_email, club_id, team_id, avatar_url, license_number, num_licencia_fed, posicion, posicion_principal, teams(id, name, category, ffcv_team_id, ffcv_competition_id, ffcv_group_id, ffcv_url, season_id)')
       .eq('id', playerId)
       .single();
 
@@ -200,13 +201,14 @@ export async function GET(req: Request) {
 
     const teamRel = player.teams as any;
     let teamName = teamRel?.name || '';
+    let teamCategory = teamRel?.category || '';
     let ffcvTeamId = teamRel?.ffcv_team_id;
 
     // Si el equipo no es de la temporada activa o no tiene código FFCV, buscar en el historial de la temporada 26/27
     if (!ffcvTeamId || teamRel?.season_id !== ACTIVE_SEASON_ID) {
       const { data: activePsh } = await supabase
         .from('player_season_history')
-        .select('team_id, teams(id, name, ffcv_team_id, season_id)')
+        .select('team_id, teams(id, name, category, ffcv_team_id, ffcv_group_id, ffcv_url, season_id)')
         .eq('player_id', playerId)
         .eq('season_id', ACTIVE_SEASON_ID)
         .maybeSingle();
@@ -214,8 +216,164 @@ export async function GET(req: Request) {
       if (activePsh && (activePsh as any).teams) {
         const activeTeam = (activePsh as any).teams;
         teamName = activeTeam.name || teamName;
+        teamCategory = activeTeam.category || teamCategory;
         ffcvTeamId = activeTeam.ffcv_team_id || ffcvTeamId;
       }
+    }
+
+    const isLigaBrave = isLigaBraveCompetition({
+      teamId: player.team_id || teamRel?.id,
+      teamName,
+      category: teamCategory,
+      ffcvGroupId: teamRel?.ffcv_group_id,
+      ffcvUrl: teamRel?.ffcv_url
+    });
+
+    if (isLigaBrave) {
+      // 1. Consultar convocatorias y partidos de la temporada activa para este jugador
+      const { data: convs } = await supabase
+        .from('convocatorias')
+        .select(`
+          partido_id,
+          status,
+          titular,
+          yellow_cards,
+          tarjetas_amarillas,
+          red_cards,
+          tarjetas_rojas,
+          goals,
+          goles,
+          minutes_played,
+          minutos_jugados,
+          partidos(id, fecha_hora, rival, jornada, estado, season_id)
+        `)
+        .eq('player_id', playerId);
+
+      // Regla de Oro: Filtrar exclusivamente por temporada activa 26/27 (excluir temporada 25/26)
+      const activeConvs = (convs || []).filter((c: any) => {
+        const p = c.partidos;
+        if (!p) return false;
+        if (p.season_id && p.season_id !== ACTIVE_SEASON_ID) return false;
+        return true;
+      });
+
+      // Consultar también eventos de partido en vivo registrados en el club
+      const { data: matchEvents } = await supabase
+        .from('match_events')
+        .select('tipo_evento, partido_id')
+        .eq('jugador_id', playerId);
+
+      const isLegitGoal = (e: any) => {
+        const ev = (e.tipo_evento || '').toLowerCase();
+        return ev.includes('gol') && !ev.includes('propia') && !ev.includes('pp');
+      };
+
+      const eventGoals = (matchEvents || []).filter(isLegitGoal).length;
+      const eventYellows = (matchEvents || []).filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('amarilla')).length;
+      const eventReds = (matchEvents || []).filter((e: any) => (e.tipo_evento || '').toLowerCase().includes('roja')).length;
+
+      // Partidos disputados
+      const finalizedConvs = activeConvs.filter((c: any) => 
+        c.partidos?.estado === 'Finalizado' || (c.minutes_played ?? c.minutos_jugados ?? 0) > 0
+      );
+
+      let partidosJugados = 0;
+      let titulares = 0;
+      let suplentes = 0;
+      let convGoals = 0;
+      let convYellows = 0;
+      let convReds = 0;
+      let minutosTotales = 0;
+
+      finalizedConvs.forEach((c: any) => {
+        const rawM = c.minutes_played ?? c.minutos_jugados;
+        const mins = (rawM !== null && rawM !== undefined) ? Number(rawM) : (c.titular ? 70 : 0);
+        const isTitular = Boolean(c.titular);
+
+        if (mins > 0 || isTitular) {
+          partidosJugados++;
+        }
+        if (isTitular) {
+          titulares++;
+        } else if (mins > 0) {
+          suplentes++;
+        }
+
+        minutosTotales += mins;
+        convGoals += Number(c.goals ?? c.goles ?? 0);
+        convYellows += Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
+        convReds += Number(c.red_cards ?? c.tarjetas_rojas ?? 0);
+      });
+
+      const totalGoles = Math.max(convGoals, eventGoals);
+      const totalYellows = Math.max(convYellows, eventYellows);
+      const totalReds = Math.max(convReds, eventReds);
+
+      const fullName = `${player.first_name || ''} ${player.last_name || ''}`.trim();
+      const verifiedHistory = getVerifiedHistoryForPlayer(fullName);
+
+      const currentEntry = {
+        temporada: '2026-2027',
+        codigo_temporada: '22',
+        club: 'Sporting Saladar',
+        equipo: teamName || 'Sporting Saladar',
+        escudo: getRegistryShield('sporting saladar'),
+        competicion: 'Liga Brave',
+        grupo: teamRel?.ffcv_group_id ? `Grupo ${teamRel.ffcv_group_id}` : 'Grupo Formativo',
+        partidos_jugados: partidosJugados,
+        titular: titulares,
+        suplente: suplentes,
+        goles: totalGoles,
+        minutos: minutosTotales,
+        posicion_equipo: '',
+        puntos_equipo: ''
+      };
+
+      let historialClubes: any[] = [currentEntry];
+      if (verifiedHistory && verifiedHistory.length > 0) {
+        const pastVerified = verifiedHistory.filter(h => h.temporada !== '2026-2027');
+        historialClubes = [currentEntry, ...pastVerified];
+      }
+
+      const codFicha = (player as any).license_number || 
+                       (player as any).num_licencia_fed || 
+                       (player.dorsal ? `LB-${player.dorsal}` : `LB-${player.id.slice(0, 5).toUpperCase()}`);
+
+      return NextResponse.json({
+        found: true,
+        is_liga_brave: true,
+        player: {
+          codjugador: codFicha,
+          nombre: fullName,
+          email: player.email || player.parent1_email || null,
+          dorsal: player.dorsal || null,
+          posicion: (player as any).posicion_principal || (player as any).posicion || 'Jugador',
+          categoria: teamCategory || teamName || 'Liga Brave',
+          temporada_actual: '2026-2027',
+          minutos_totales: minutosTotales,
+          media_minutos: partidosJugados > 0 ? (minutosTotales / partidosJugados).toFixed(1) : '0',
+          es_portero: ((player as any).posicion_principal || (player as any).posicion || '').toLowerCase().includes('portero'),
+          foto_base64: player.avatar_url || null,
+          partidos: [
+            { nombre: 'Jugados', valor: String(partidosJugados) },
+            { nombre: 'Titular', valor: String(titulares) },
+            { nombre: 'Suplente', valor: String(suplentes) },
+            { nombre: 'Total Goles', valor: String(totalGoles) }
+          ],
+          tarjetas: [
+            { nombre: 'Amarillas', valor: String(totalYellows) },
+            { nombre: 'Rojas', valor: String(totalReds) }
+          ],
+          competiciones: [
+            {
+              nombre_competicion: 'Liga Brave',
+              nombre_equipo: teamName,
+              nombre_club: 'Sporting Saladar'
+            }
+          ],
+          historial_clubes: historialClubes
+        }
+      });
     }
 
     // Equipos no federados en FFCV (Cadete B, Infantil B, etc.)

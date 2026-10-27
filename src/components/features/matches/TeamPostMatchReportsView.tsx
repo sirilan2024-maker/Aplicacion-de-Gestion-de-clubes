@@ -256,6 +256,12 @@ export function TeamPostMatchReportsView({
     const bench = matchPlayers.filter(p => !p.titular && !p.noJugo && p.minutes > 0)
     const unplayed = matchPlayers.filter(p => p.noJugo || p.minutes === 0)
 
+    const isPrintLocal = match.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match.lugar || '');
+    const printHomeTeam = isPrintLocal ? teamName : (match.rival_nombre || 'Rival');
+    const printAwayTeam = isPrintLocal ? (match.rival_nombre || 'Rival') : teamName;
+    const printHomeScore = isPrintLocal ? match.resultado_propio : match.resultado_rival;
+    const printAwayScore = isPrintLocal ? match.resultado_rival : match.resultado_propio;
+
     const dateFormatted = match.fecha_hora 
       ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { 
           weekday: 'long', 
@@ -316,7 +322,7 @@ export function TeamPostMatchReportsView({
             font-weight: 600;
           }
           .score-badge {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 900;
             background: #0f172a;
             color: #fff;
@@ -430,26 +436,31 @@ export function TeamPostMatchReportsView({
           <div class="title-area">
             <h1>Sporting Saladar - Informe Post-Partido</h1>
             <p>${teamName} &bull; ${match.tipo_partido === 'amistoso' ? 'Partido Amistoso' : `Jornada ${match.jornada || '-'}`} &bull; ${match.competicion_nombre || (match.tipo_partido === 'amistoso' ? 'Amistoso' : 'Competición Oficial')}</p>
+            <p style="font-size: 13px; font-weight: 800; color: #1e3a8a; margin-top: 4px;">
+              ${printHomeTeam} (Local) vs ${printAwayTeam} (Visitante)
+            </p>
           </div>
           <div class="score-badge">
-            ${match.resultado_propio != null && match.resultado_rival != null 
-              ? `${match.resultado_propio} - ${match.resultado_rival}` 
-              : 'FINALIZADO'}
+            ${match.estado === 'Suspendido' ? 'SUSPENDIDO' : match.estado === 'Aplazado' ? 'APLAZADO' : (printHomeScore != null && printAwayScore != null ? `${printHomeScore} - ${printAwayScore}` : 'FINALIZADO')}
           </div>
         </div>
 
         <div class="match-details-bar">
           <div>
+            <span>Tipo / Jornada</span>
+            <strong>${match.tipo_partido === 'amistoso' ? 'Amistoso' : `Jornada ${match.jornada || '-'}`}</strong>
+          </div>
+          <div>
             <span>Fecha y Hora</span>
             <strong>${dateFormatted}</strong>
           </div>
           <div>
-            <span>Rival</span>
-            <strong>${match.rival_nombre || 'Rival no definido'}</strong>
+            <span>Condición</span>
+            <strong>${isPrintLocal ? 'En Casa (Local)' : 'A Domicilio (Visitante)'}</strong>
           </div>
           <div>
-            <span>Condición</span>
-            <strong>${match.lugar || 'Campo'}</strong>
+            <span>Marcador Oficial</span>
+            <strong>${match.estado === 'Suspendido' ? 'Suspendido' : (printHomeScore != null && printAwayScore != null ? `${printHomeTeam} ${printHomeScore} - ${printAwayScore} ${printAwayTeam}` : 'Pendiente')}</strong>
           </div>
           <div>
             <span>Nota del Partido</span>
@@ -778,31 +789,64 @@ export function TeamPostMatchReportsView({
                     </span>
                   </div>
 
-                  {/* Rival y Resultado */}
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug group-hover:text-blue-600 transition-colors truncate">
-                        vs {match.rival_nombre || 'Rival no definido'}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 font-semibold mt-0.5 truncate">
-                        Condición: <strong className="text-slate-700">{match.lugar || 'Campo'}</strong>
-                      </p>
-                    </div>
+                  {/* Enfrentamiento y Marcador Oficial (Home vs Away) */}
+                  {(() => {
+                    const isLocal = match.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(match.lugar || '');
+                    const homeTeam = isLocal ? teamName : (match.rival_nombre || 'Rival');
+                    const awayTeam = isLocal ? (match.rival_nombre || 'Rival') : teamName;
+                    const homeScore = isLocal ? match.resultado_propio : match.resultado_rival;
+                    const awayScore = isLocal ? match.resultado_rival : match.resultado_propio;
 
-                    <div className="shrink-0 flex items-center justify-end pl-2">
-                      {match.resultado_propio != null && match.resultado_rival != null ? (
-                        <div className="inline-flex items-center justify-center px-3 py-1 bg-slate-950 text-white font-mono font-black text-sm rounded-xl tracking-wider shadow-2xs whitespace-nowrap tabular-nums">
-                          <span>{match.resultado_propio}</span>
-                          <span className="text-slate-400 mx-1.5">-</span>
-                          <span>{match.resultado_rival}</span>
+                    return (
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-sm sm:text-base font-black leading-snug transition-colors truncate ${isLocal ? 'text-blue-700' : 'text-slate-900'}`}>
+                              {homeTeam}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">vs</span>
+                            <span className={`text-sm sm:text-base font-black leading-snug transition-colors truncate ${!isLocal ? 'text-blue-700' : 'text-slate-900'}`}>
+                              {awayTeam}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                            <span className={`inline-block px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                              isLocal 
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {isLocal ? 'En Casa (Local)' : 'A Domicilio (Visitante)'}
+                            </span>
+                          </p>
                         </div>
-                      ) : (
-                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-xl shrink-0 whitespace-nowrap">
-                          Pendiente
-                        </span>
-                      )}
-                    </div>
-                  </div>
+
+                        <div className="shrink-0 flex items-center justify-end pl-2">
+                          {match.estado === 'Suspendido' ? (
+                            <span className="text-xs font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl uppercase">
+                              Suspendido
+                            </span>
+                          ) : match.estado === 'Aplazado' ? (
+                            <span className="text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl uppercase">
+                              Aplazado
+                            </span>
+                          ) : homeScore != null && awayScore != null ? (
+                            <div 
+                              className="inline-flex items-center justify-center px-3 py-1 bg-slate-950 text-white font-mono font-black text-sm rounded-xl tracking-wider shadow-2xs whitespace-nowrap tabular-nums"
+                              title={`Marcador Oficial: ${homeTeam} (${homeScore}) - ${awayTeam} (${awayScore})`}
+                            >
+                              <span className={isLocal ? "text-blue-400 font-black" : "text-white"}>{homeScore}</span>
+                              <span className="text-slate-400 mx-1.5">-</span>
+                              <span className={!isLocal ? "text-blue-400 font-black" : "text-white"}>{awayScore}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-xl shrink-0 whitespace-nowrap">
+                              Pendiente
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Resumen del Informe o Foto si existe */}
@@ -997,11 +1041,31 @@ export function TeamPostMatchReportsView({
 
                 <div>
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Resultado</span>
-                  <p className="text-xs font-black text-slate-900 mt-0.5">
-                    {activePreviewMatch.resultado_propio != null && activePreviewMatch.resultado_rival != null 
-                      ? `${activePreviewMatch.resultado_propio} - ${activePreviewMatch.resultado_rival}`
-                      : 'Pendiente'}
-                  </p>
+                  {activePreviewMatch.estado === 'Suspendido' ? (
+                    <p className="text-xs font-black text-rose-600 mt-0.5 uppercase">Suspendido</p>
+                  ) : activePreviewMatch.estado === 'Aplazado' ? (
+                    <p className="text-xs font-black text-amber-600 mt-0.5 uppercase">Aplazado</p>
+                  ) : (() => {
+                    const isPrevLocal = activePreviewMatch.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(activePreviewMatch.lugar || '');
+                    const hScore = isPrevLocal ? activePreviewMatch.resultado_propio : activePreviewMatch.resultado_rival;
+                    const aScore = isPrevLocal ? activePreviewMatch.resultado_rival : activePreviewMatch.resultado_propio;
+                    const hTeam = isPrevLocal ? teamName : (activePreviewMatch.rival_nombre || 'Rival');
+                    const aTeam = isPrevLocal ? (activePreviewMatch.rival_nombre || 'Rival') : teamName;
+                    return hScore != null && aScore != null ? (
+                      <div className="mt-0.5">
+                        <p className="text-xs font-black text-slate-900">
+                          <span className={isPrevLocal ? "text-blue-600 font-bold" : ""}>{hScore}</span>
+                          <span className="text-slate-400 mx-1">-</span>
+                          <span className={!isPrevLocal ? "text-blue-600 font-bold" : ""}>{aScore}</span>
+                        </p>
+                        <span className="text-[9.5px] font-bold text-slate-400 block font-sans truncate">
+                          {hTeam} vs {aTeam}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-bold text-slate-400 mt-0.5">Pendiente</p>
+                    );
+                  })()}
                 </div>
 
                 <div>

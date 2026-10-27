@@ -18,7 +18,7 @@ import Subscriptions from "@/components/features/treasury/Subscriptions";
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
-import { getOfficialMatchDuration } from "@/lib/utils";
+import { getOfficialMatchDuration, isLigaBraveCompetition } from "@/lib/utils";
 
 interface PlayerData {
   id: string;
@@ -1551,6 +1551,7 @@ export default function PlayerProfilePage() {
                 return hasRecord || isPast;
               });
 
+              const totalEvents = evaluatedEvents.length;
               const presents = filteredAttendance.filter(a => ['presente', 'present', 'justificado', 'excused', 'lesionado', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
               const absents = filteredAttendance.filter(a => a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent').length;
               const excused = filteredAttendance.filter(a => a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused').length;

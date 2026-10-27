@@ -19,7 +19,7 @@ import { PlayerInjuriesSection } from "@/components/features/players/PlayerInjur
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal";
 import { ManagePlayerPinModal } from "@/components/features/players/ManagePlayerPinModal";
 import { DeletePlayerModal } from "@/components/features/players/DeletePlayerModal";
-import { isFormativeCategory, getFirstNameAndFirstSurname } from "@/lib/utils";
+import { isFormativeCategory, getFirstNameAndFirstSurname, isLigaBraveCompetition } from "@/lib/utils";
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar";
 import { PlayerHeaderBadges } from "@/components/features/performance/PlayerHeaderBadges";
 import {
@@ -37,6 +37,7 @@ import {
 
 interface PlayerData {
   id: string;
+  team_id?: string | null;
   club_id: string;
   first_name: string;
   last_name: string;
@@ -201,6 +202,12 @@ export default function GlobalPlayerProfilePage() {
   };
 
   // Los jugadores Senior no pagan cuotas: se oculta toda la información financiera
+  const isLigaBrave = isLigaBraveCompetition({
+    teamId: player?.team_id,
+    teamName,
+    category: teamCategory
+  });
+
   const isSeniorPlayer = Boolean(
     (player as any)?.is_senior ||
     teamName.toUpperCase().includes('SENIOR') ||
@@ -1068,11 +1075,15 @@ export default function GlobalPlayerProfilePage() {
                 <button
                   type="button"
                   onClick={() => setShowFfcvModal(true)}
-                  className="flex items-center justify-center w-full sm:w-auto gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-lg font-bold transition-all shadow-sm text-xs sm:text-sm cursor-pointer"
-                  title="Consultar datos federativos oficiales en tiempo real de la FFCV"
+                  className={`flex items-center justify-center w-full sm:w-auto gap-2 text-white px-3.5 py-2 rounded-lg font-bold transition-all shadow-sm text-xs sm:text-sm cursor-pointer ${
+                    isLigaBrave
+                      ? "bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800"
+                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  }`}
+                  title={isLigaBrave ? "Consultar ficha y estadísticas oficiales en la Liga Brave" : "Consultar datos federativos oficiales en tiempo real de la FFCV"}
                 >
-                  <ShieldCheck size={16} className="text-blue-100" />
-                  <span>FICHA FFCV</span>
+                  <ShieldCheck size={16} className={isLigaBrave ? "text-emerald-100" : "text-blue-100"} />
+                  <span>{isLigaBrave ? "FICHA LIGA BRAVE" : "FICHA FFCV"}</span>
                 </button>
                 <button 
                   onClick={() => setIsEditing(true)}
@@ -2356,6 +2367,7 @@ export default function GlobalPlayerProfilePage() {
           playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
           isOpen={showFfcvModal}
           onClose={() => setShowFfcvModal(false)}
+          isLigaBrave={isLigaBrave}
         />
       )}
 

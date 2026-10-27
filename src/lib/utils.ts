@@ -236,3 +236,26 @@ export function getOfficialMatchDuration(categoryOrTeamName?: string | null, com
   }
   return 90;
 }
+
+
+/**
+ * Determina si un equipo, categoría o competición pertenece a la Liga Brave (o Apúntamelo)
+ */
+export function isLigaBraveCompetition(params?: {
+  teamId?: string | null;
+  teamName?: string | null;
+  category?: string | null;
+  competitionName?: string | null;
+  ffcvGroupId?: string | null;
+  ffcvUrl?: string | null;
+} | null): boolean {
+  if (!params) return false;
+  const { teamId, teamName, category, competitionName, ffcvGroupId, ffcvUrl } = params;
+  if (teamId === '7123c91a-69c1-4b94-9f85-0914dee8bbdc' || teamId === '5633f710-7707-40d7-b812-c51a44b90d9e') return true;
+  if (ffcvGroupId === '4624' || ffcvGroupId === '4623') return true;
+  if (ffcvUrl && typeof ffcvUrl === 'string' && ffcvUrl.includes('apuntamelo')) return true;
+  const combined = [teamName, category, competitionName].filter(Boolean).join(' ').toLowerCase();
+  if (combined.includes('brave')) return true;
+  if (combined.includes('infantil b') || combined.includes('cadete b')) return true;
+  return false;
+}

@@ -11,12 +11,14 @@ interface FfcvPlayerModalProps {
   playerName: string;
   isOpen: boolean;
   onClose: () => void;
+  isLigaBrave?: boolean;
 }
 
-export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvPlayerModalProps) {
+export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose, isLigaBrave = false }: FfcvPlayerModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
+  const isBrave = Boolean(isLigaBrave || data?.is_liga_brave);
 
   useEffect(() => {
     if (isOpen && playerId) {
@@ -51,7 +53,11 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
       <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 my-auto flex flex-col max-h-[92vh]">
         
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-5 sm:p-6 relative shrink-0">
+        <div className={`text-white p-5 sm:p-6 relative shrink-0 ${
+          isBrave
+            ? "bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900"
+            : "bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900"
+        }`}>
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"
@@ -60,17 +66,25 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
           </button>
           
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shrink-0">
-              <Shield className="w-6 h-6" />
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+              isBrave 
+                ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
+                : "bg-blue-500/20 border-blue-400/30 text-blue-300"
+            }`}>
+              {isBrave ? <Award className="w-6 h-6" /> : <Shield className="w-6 h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-blue-500/30 text-blue-200 border border-blue-400/20">
-                  Federació de Futbol Comunitat Valenciana
+                <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${
+                  isBrave
+                    ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/20"
+                    : "bg-blue-500/30 text-blue-200 border-blue-400/20"
+                }`}>
+                  {isBrave ? "Liga Brave · Asociación de Fútbol Base" : "Federació de Futbol Comunitat Valenciana"}
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
-                Ficha Federativa FFCV
+                {isBrave ? "Ficha Oficial Liga Brave" : "Ficha Federativa FFCV"}
               </h2>
             </div>
           </div>
@@ -80,20 +94,24 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
         <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/50">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">
-              <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-3" />
-              <p className="font-bold text-slate-700 text-base">Consultando base de datos oficial FFCV...</p>
-              <p className="text-xs text-slate-400 mt-1">Obteniendo ficha en tiempo real, estadísticas e historial de clubes.</p>
+              <Loader2 className={`w-10 h-10 animate-spin mb-3 ${isBrave ? "text-emerald-600" : "text-blue-600"}`} />
+              <p className="font-bold text-slate-700 text-base">
+                {isBrave ? "Consultando base de datos oficial Liga Brave..." : "Consultando base de datos oficial FFCV..."}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {isBrave ? "Obteniendo ficha en tiempo real, actas y estadísticas oficiales." : "Obteniendo ficha en tiempo real, estadísticas e historial de clubes."}
+              </p>
             </div>
           ) : error ? (
             <div className="py-12 px-4 text-center max-w-md mx-auto">
               <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-3">
                 <AlertCircle size={24} />
               </div>
-              <h3 className="text-base font-bold text-slate-800">Información Federativa</h3>
+              <h3 className="text-base font-bold text-slate-800">{isBrave ? "Información Liga Brave" : "Información Federativa"}</h3>
               <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">{error}</p>
               <div className="mt-4 p-3 bg-white rounded-xl border border-slate-200 text-left text-xs text-slate-500 space-y-1">
                 <p className="font-semibold text-slate-700">Nota informativa:</p>
-                <p>• Los datos provienen en vivo de la FFCV.</p>
+                <p>{isBrave ? "• Los datos provienen de los registros oficiales de la Liga Brave." : "• Los datos provienen en vivo de la FFCV."}</p>
                 <p>• Las categorías en trámite de validación aparecen una vez aprobada la ficha por la federación.</p>
               </div>
             </div>
@@ -127,22 +145,22 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 text-xs">
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                      <span className="text-slate-400 font-bold block text-[10px] uppercase">Cod. Ficha FFCV</span>
+                      <span className="text-slate-400 font-bold block text-[10px] uppercase">{isBrave ? "Cod. Ficha / Licencia" : "Cod. Ficha FFCV"}</span>
                       <span className="font-extrabold text-slate-800">{data.codjugador}</span>
                     </div>
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                      <span className="text-slate-400 font-bold block text-[10px] uppercase">Posición FFCV</span>
+                      <span className="text-slate-400 font-bold block text-[10px] uppercase">{isBrave ? "Posición" : "Posición FFCV"}</span>
                       <span className="font-extrabold text-slate-800 truncate block">{data.posicion || "Sin definir"}</span>
                     </div>
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 col-span-2 sm:col-span-1">
                       <span className="text-slate-400 font-bold block text-[10px] uppercase">Categoría</span>
-                      <span className="font-extrabold text-slate-800 truncate block">{data.categoria || "Federado"}</span>
+                      <span className="font-extrabold text-slate-800 truncate block">{data.categoria || (isBrave ? "Liga Brave" : "Federado")}</span>
                     </div>
                   </div>
 
                   {data.email && (
                     <div className="mt-2.5 text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5">
-                      <span className="font-semibold text-slate-700">Email federado:</span>
+                      <span className="font-semibold text-slate-700">{isBrave ? "Email de contacto:" : "Email federado:"}</span>
                       <span className="text-blue-600 font-mono">{data.email}</span>
                     </div>
                   )}
@@ -152,8 +170,8 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
               {/* Estadísticas de Temporada Actual */}
               <div>
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Activity size={14} className="text-blue-600" />
-                  Temporada Actual ({data.temporada_actual}) en FFCV
+                  <Activity size={14} className={isBrave ? "text-emerald-600" : "text-blue-600"} />
+                  Temporada Actual ({data.temporada_actual}) en {isBrave ? "Liga Brave" : "FFCV"}
                 </h4>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -175,7 +193,7 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
                     <span className="text-2xl sm:text-3xl font-black text-emerald-600 block">
                       {data.partidos?.find((p: any) => p.nombre === 'Total Goles')?.valor || "0"}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Goles FFCV</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{isBrave ? "Goles Liga Brave" : "Goles FFCV"}</span>
                   </div>
 
                   <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center shadow-xs">
@@ -203,7 +221,7 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
               <div>
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <Trophy size={14} className="text-amber-500" />
-                  Historial de Clubes y Temporadas en FFCV
+                  Historial de Clubes y Temporadas {isBrave ? "(Liga Brave / FFCV)" : "en FFCV"}
                 </h4>
 
                 {(!data.historial_clubes || data.historial_clubes.length === 0) ? (
@@ -267,7 +285,7 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
                           )}
                           {(!h.partidos_jugados || h.partidos_jugados === 0) && (!h.minutos || h.minutos === 0) && (
                             <span className="text-[11px] font-medium text-slate-400 bg-slate-50/80 px-2 py-0.5 rounded-md border border-slate-100">
-                              Historial FFCV
+                              {isBrave ? "Historial Oficial" : "Historial FFCV"}
                             </span>
                           )}
                         </div>
@@ -283,8 +301,8 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose }: FfcvP
         {/* Modal Footer */}
         <div className="p-4 bg-slate-100/80 border-t border-slate-200 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5 text-blue-600" />
-            Solo lectura • Datos oficiales en vivo FFCV
+            <Shield className={`w-3.5 h-3.5 ${isBrave ? "text-emerald-600" : "text-blue-600"}`} />
+            Solo lectura • {isBrave ? "Datos oficiales en vivo Liga Brave" : "Datos oficiales en vivo FFCV"}
           </span>
           <button
             onClick={onClose}

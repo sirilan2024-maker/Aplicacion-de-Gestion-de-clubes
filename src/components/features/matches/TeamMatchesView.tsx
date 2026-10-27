@@ -201,7 +201,11 @@ export function TeamMatchesView({
         Rival: m.rival_nombre || m.rival || 'Por definir',
         Lugar: m.lugar || 'Desconocido',
         Estado: m.estado || 'Pendiente',
-        Resultado: m.estado === 'Finalizado' ? `${m.resultado_propio} - ${m.resultado_rival}` : '-'
+        Resultado: m.estado === 'Finalizado' 
+          ? (m.lugar === 'Local' || !/\b(fuera|visitante)\b/i.test(m.lugar || '') 
+              ? `${m.resultado_propio} - ${m.resultado_rival}` 
+              : `${m.resultado_rival} - ${m.resultado_propio}`)
+          : (m.estado === 'Suspendido' ? 'Suspendido' : (m.estado === 'Aplazado' ? 'Aplazado' : '-'))
       }))
     setExportData(formattedMatches, `Partidos_Equipo_${teamId}`)
   }, [data.matches, setExportData, teamId])

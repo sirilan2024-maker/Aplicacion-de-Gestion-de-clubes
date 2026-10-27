@@ -17,7 +17,7 @@ import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal"
 import { getApparelForPlayerAction } from "@/app/actions/apparel-actions"
 import { Shirt, Shield } from "lucide-react"
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar"
-import { getOfficialMatchDuration } from "@/lib/utils"
+import { getOfficialMatchDuration, isLigaBraveCompetition } from "@/lib/utils"
 
 export default function PlayerDashboardPage() {
   const router = useRouter()
@@ -34,6 +34,12 @@ export default function PlayerDashboardPage() {
   // Foto oficial FFCV en vivo (efímera en memoria, sin almacenar en BD)
   const ephemeralAvatar = useEphemeralFfcvAvatar(player?.id, Boolean(player?.avatar_url))
   const effectiveAvatar = player?.avatar_url || ephemeralAvatar
+  const isLigaBrave = isLigaBraveCompetition({
+    teamId: player?.team_id || player?.teams?.id,
+    teamName: player?.teams?.name,
+    category: player?.teams?.category
+  });
+
   const [stats, setStats] = useState({
     asistencia: 0,
     faltas: 0,
@@ -648,11 +654,15 @@ export default function PlayerDashboardPage() {
           <button
             type="button"
             onClick={() => setShowFfcvModal(true)}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 hover:from-blue-800 hover:to-slate-950 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-sm text-sm border border-blue-500/30 group active:scale-95"
-            title="Consultar datos oficiales e historial en la FFCV"
+            className={`flex items-center justify-center gap-2 text-white px-5 py-3 rounded-xl font-bold transition-all shadow-sm text-sm group active:scale-95 ${
+              isLigaBrave
+                ? "bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 hover:from-emerald-800 hover:to-slate-950 border border-emerald-500/30"
+                : "bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 hover:from-blue-800 hover:to-slate-950 border border-blue-500/30"
+            }`}
+            title={isLigaBrave ? "Consultar ficha y estadísticas oficiales en la Liga Brave" : "Consultar datos oficiales e historial en la FFCV"}
           >
-            <Shield size={18} className="text-blue-300 group-hover:rotate-12 transition-transform" />
-            <span>FICHA FFCV</span>
+            <Shield size={18} className={`${isLigaBrave ? "text-emerald-300" : "text-blue-300"} group-hover:rotate-12 transition-transform`} />
+            <span>{isLigaBrave ? "FICHA LIGA BRAVE" : "FICHA FFCV"}</span>
           </button>
           <button 
             onClick={() => router.push(`/dashboard/family/e/${playerId}/ficha?tab=documentos`)}
@@ -1415,6 +1425,7 @@ export default function PlayerDashboardPage() {
           playerName={`${player.first_name || ''} ${player.last_name || ''}`.trim()}
           isOpen={showFfcvModal}
           onClose={() => setShowFfcvModal(false)}
+          isLigaBrave={isLigaBrave}
         />
       )}
     </div>

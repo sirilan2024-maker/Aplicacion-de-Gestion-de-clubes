@@ -47,7 +47,7 @@ export function TeamPostMatchReportsView({
   const [activePreviewMatch, setActivePreviewMatch] = useState<any | null>(null)
 
   // 1. Filtrar partidos válidos de la temporada activa (excluir permanentemente temporada 25/26)
-  // y garantizar que todos los partidos tengan su jornada asignada
+  // y garantizar que los partidos oficiales tengan su jornada asignada
   const validMatches = useMemo(() => {
     const rawFiltered = (matches || []).filter(m => 
       m.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c'
@@ -60,14 +60,24 @@ export function TeamPostMatchReportsView({
       return dA - dB
     })
 
-    return sorted.map((m, idx) => {
+    let leagueCounter = 0
+    return sorted.map((m) => {
+      const isAmistoso = m.tipo_partido === 'amistoso'
+      if (isAmistoso) {
+        return {
+          ...m,
+          jornada: null
+        }
+      }
+
+      leagueCounter++
       let j = m.jornada
       if (!j && m.acta_oficial_url) {
-        const jMatch = m.acta_oficial_url.match(/jornada=(\d+)/i) || m.acta_oficial_url.match(/Jornada%20(\d+)/i)
+        const jMatch = m.acta_oficial_url.match(/(?:jornada=|Jornada%20)(\d+)/i)
         if (jMatch) j = parseInt(jMatch[1], 10)
       }
       if (!j) {
-        j = idx + 1
+        j = leagueCounter
       }
       return {
         ...m,
@@ -76,11 +86,19 @@ export function TeamPostMatchReportsView({
     })
   }, [matches])
 
-  // 2. Extraer lista de jornadas disponibles en orden ascendente
+  // 2. Extraer lista de jornadas disponibles en orden ascendente y detectar amistosos
+  const hasAmistosos = useMemo(() => {
+    return validMatches.some(m => m.tipo_partido === 'amistoso')
+  }, [validMatches])
+
+  const amistososCount = useMemo(() => {
+    return validMatches.filter(m => m.tipo_partido === 'amistoso').length
+  }, [validMatches])
+
   const availableJornadas = useMemo(() => {
     const jSet = new Set<string>()
     validMatches.forEach(m => {
-      if (m.jornada != null && m.jornada !== '') {
+      if (m.tipo_partido !== 'amistoso' && m.jornada != null && m.jornada !== '') {
         jSet.add(m.jornada.toString())
       }
     })
@@ -186,8 +204,10 @@ export function TeamPostMatchReportsView({
   // POR DEFECTO: Cronológico ascendente (Jornada 1 -> 30, o fechas tempranas primero)
   const filteredMatches = useMemo(() => {
     return validMatches.filter(m => {
-      if (selectedJornada !== "all") {
-        if (m.jornada?.toString() !== selectedJornada) return false
+      if (selectedJornada === "amistoso") {
+        if (m.tipo_partido !== 'amistoso') return false
+      } else if (selectedJornada !== "all") {
+        if (m.tipo_partido === 'amistoso' || m.jornada?.toString() !== selectedJornada) return false
       }
 
       if (searchRival.trim()) {
@@ -207,16 +227,23 @@ export function TeamPostMatchReportsView({
 
       return true
     }).sort((a, b) => {
-      // 1. Priorizar orden numérico de jornada si existe
+      const isAmistosoA = a.tipo_partido === 'amistoso'
+      const isAmistosoB = b.tipo_partido === 'amistoso'
+      const dateA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0
+      const dateB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0
+
+      // Si ambos o uno es amistoso, ordenar por fecha
+      if (isAmistosoA || isAmistosoB) {
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
+      }
+
+      // Para partidos de liga, ordenar por número de jornada
       const numA = parseInt(String(a.jornada || '').replace(/\D/g, '')) || 0
       const numB = parseInt(String(b.jornada || '').replace(/\D/g, '')) || 0
       if (numA > 0 && numB > 0 && numA !== numB) {
         return sortOrder === 'asc' ? numA - numB : numB - numA
       }
 
-      // 2. Orden cronológico por fecha_hora
-      const dateA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0
-      const dateB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0
       return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
     })
   }, [validMatches, selectedJornada, searchRival, onlyWithReport, filterPlayedOnly, sortOrder])
@@ -402,7 +429,7 @@ export function TeamPostMatchReportsView({
         <div class="header">
           <div class="title-area">
             <h1>Sporting Saladar - Informe Post-Partido</h1>
-            <p>${teamName} &bull; Jornada ${match.jornada || '-'} &bull; ${match.competicion_nombre || 'Competición Oficial'}</p>
+            <p>${teamName} &bull; ${match.tipo_partido === 'amistoso' ? 'Partido Amistoso' : `Jornada ${match.jornada || '-'}`} &bull; ${match.competicion_nombre || (match.tipo_partido === 'amistoso' ? 'Amistoso' : 'Competición Oficial')}</p>
           </div>
           <div class="score-badge">
             ${match.resultado_propio != null && match.resultado_rival != null 
@@ -647,6 +674,9 @@ export function TeamPostMatchReportsView({
                 className="w-full bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">Todas las Jornadas ({validMatches.length})</option>
+                {hasAmistosos && (
+                  <option value="amistoso">Partidos Amistosos ({amistososCount})</option>
+                )}
                 {availableJornadas.map(j => (
                   <option key={j} value={j}>
                     Jornada {j}
@@ -733,9 +763,15 @@ export function TeamPostMatchReportsView({
                   onClick={() => setActivePreviewMatch(match)}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shrink-0">
-                      Jornada {match.jornada}
-                    </span>
+                    {match.tipo_partido === 'amistoso' ? (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg shrink-0">
+                        Amistoso
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shrink-0">
+                        Jornada {match.jornada}
+                      </span>
+                    )}
                     <span className="text-xs font-semibold text-slate-400 flex items-center gap-1 shrink-0">
                       <Calendar className="w-3.5 h-3.5" />
                       {dateStr}
@@ -887,11 +923,17 @@ export function TeamPostMatchReportsView({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-md">
-                      Jornada {activePreviewMatch.jornada || '1'}
-                    </span>
+                    {activePreviewMatch.tipo_partido === 'amistoso' ? (
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-purple-500/30 text-purple-300 border border-purple-400/30 px-2 py-0.5 rounded-md">
+                        Amistoso
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-md">
+                        Jornada {activePreviewMatch.jornada || '-'}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-400 font-medium">
-                      {activePreviewMatch.competicion_nombre || 'Competición Oficial'}
+                      {activePreviewMatch.tipo_partido === 'amistoso' ? 'Partido Amistoso' : (activePreviewMatch.competicion_nombre || 'Competición Oficial')}
                     </span>
                   </div>
                   <h3 className="text-base sm:text-lg font-black text-white mt-0.5 leading-tight">

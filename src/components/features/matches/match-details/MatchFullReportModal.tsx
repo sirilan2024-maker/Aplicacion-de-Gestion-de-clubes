@@ -118,6 +118,22 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
         if (field === 'minutes' && nextValue > 120) return prev;
       } else {
         nextValue = delta; // Para el estado de asistencia
+        if (field === 'status' && (nextValue === 'Ausente' || nextValue === 'Justificado')) {
+          return {
+            ...prev,
+            [playerId]: {
+              ...prev[playerId],
+              status: nextValue,
+              minutes: 0,
+              rating: 0,
+              actitud: 0,
+              goals: 0,
+              assists: 0,
+              yellows: 0,
+              reds: 0
+            }
+          };
+        }
       }
 
       return {

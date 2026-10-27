@@ -70,7 +70,7 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
   if (effectiveTeam?.ffcv_group_id) {
     ffcvMatchesQuery = adminClient
       .from('ffcv_matches')
-      .select('ffcv_match_id, matchday, match_date, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id')
+      .select('ffcv_match_id, codacta, matchday, match_date, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id')
       .eq('ffcv_group_id', effectiveTeam.ffcv_group_id)
       .neq('ffcv_season_id', '21')
       .eq('ffcv_season_id', '22')
@@ -90,47 +90,55 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
   const groupFfcvMatches = ffcvMatchesRes?.data || [];
 
   // Enriquecer partidos con su número oficial de Jornada
-  const enrichedMatches = (matches || []).map((m: any, idx: number) => {
+  let leagueMatchCounter = 0;
+  const enrichedMatches = (matches || []).map((m: any) => {
+    // Si es un partido amistoso, no pertenece a ninguna jornada oficial de liga
+    if (m.tipo_partido === 'amistoso') {
+      return {
+        ...m,
+        jornada: null
+      };
+    }
+
+    leagueMatchCounter++;
     let resolvedJornada: number | string | null = m.jornada || null;
 
     if (!resolvedJornada && groupFfcvMatches.length > 0) {
-      // 1. Coincidencia directa por CodPartido en acta_oficial_url
-      const codeMatch = m.acta_oficial_url?.match(/CodPartido=(\d+)/);
+      // 1. Coincidencia directa por CodPartido o ID apuntamelo en acta_oficial_url
+      const codeMatch = m.acta_oficial_url?.match(/(?:CodPartido=|partido\/)(\d+)/i);
       const code = codeMatch ? codeMatch[1] : (m.ffcv_match_id ? String(m.ffcv_match_id) : null);
       if (code) {
-        const found = groupFfcvMatches.find((f: any) => String(f.ffcv_match_id) === code);
+        const found = groupFfcvMatches.find((f: any) => String(f.ffcv_match_id) === code || String(f.codacta) === code);
         if (found && found.matchday) {
           resolvedJornada = found.matchday;
         }
       }
 
-      // 2. Coincidencia secundaria por nombre de rival y proximidad temporal (±7 días)
+      // 2. Coincidencia secundaria por nombre de rival y proximidad temporal estricta (±7 días)
       if (!resolvedJornada && m.rival_nombre) {
         const rNorm = m.rival_nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         const mDate = m.fecha_hora ? new Date(m.fecha_hora) : null;
         for (const f of groupFfcvMatches) {
-          const hNorm = (f.home_team_name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          const aNorm = (f.away_team_name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          if (hNorm.includes(rNorm) || aNorm.includes(rNorm) || rNorm.includes(hNorm) || rNorm.includes(aNorm)) {
-            if (mDate && f.match_date) {
-              const fDate = new Date(f.match_date);
-              const diffDays = Math.abs((mDate.getTime() - fDate.getTime()) / (1000 * 60 * 60 * 24));
-              if (diffDays <= 7) {
+          // Solo comparar si ambas fechas existen y están dentro de una semana
+          if (mDate && f.match_date) {
+            const fDate = new Date(f.match_date);
+            const diffDays = Math.abs((mDate.getTime() - fDate.getTime()) / (1000 * 60 * 60 * 24));
+            if (diffDays <= 7) {
+              const hNorm = (f.home_team_name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              const aNorm = (f.away_team_name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              if (hNorm.includes(rNorm) || aNorm.includes(rNorm) || rNorm.includes(hNorm) || rNorm.includes(aNorm)) {
                 resolvedJornada = f.matchday;
                 break;
               }
-            } else {
-              resolvedJornada = f.matchday;
-              break;
             }
           }
         }
       }
     }
 
-    // 3. Fallback: posición cronológica en la temporada si no tiene acta vinculada
+    // 3. Fallback: posición cronológica entre partidos oficiales de liga si no tiene acta vinculada
     if (!resolvedJornada) {
-      resolvedJornada = idx + 1;
+      resolvedJornada = leagueMatchCounter;
     }
 
     return {

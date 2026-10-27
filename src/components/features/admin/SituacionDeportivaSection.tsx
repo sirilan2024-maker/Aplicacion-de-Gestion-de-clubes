@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -85,7 +85,29 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
   const [showInjuriesModal, setShowInjuriesModal] = useState(false);
   const [selectedTeamDetail, setSelectedTeamDetail] = useState<any | null>(null);
 
-  const teamStats = sports?.teamStats || [];
+  // Equipos organizados por posición en su liga (1º, 2º, 3º...)
+  const teamStats = useMemo(() => {
+    const list = [...(sports?.teamStats || [])];
+    return list.sort((a, b) => {
+      const posA = a.currentPosition && a.currentPosition > 0 ? a.currentPosition : null;
+      const posB = b.currentPosition && b.currentPosition > 0 ? b.currentPosition : null;
+
+      // 1. Equipos con posición oficial en su liga primero (1º, 2º, 3º...)
+      if (posA !== null && posB !== null) {
+        if (posA !== posB) return posA - posB;
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+        return b.goalsFor - a.goalsFor;
+      }
+      if (posA !== null) return -1;
+      if (posB !== null) return 1;
+
+      // 2. Desempate secundario
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+      return b.goalsFor - a.goalsFor;
+    });
+  }, [sports?.teamStats]);
   const ffcvCount = teamStats.filter(
     (t) => t.competitionName && t.competitionName !== "No federado" && t.competitionName !== "Liga Brave"
   ).length;
@@ -413,7 +435,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Resumen consolidado y clasificación en competición oficial (FFCV y Liga Brave)
+                Resumen consolidado y clasificación oficial ordenado por posición en liga (1º → último)
               </p>
             </div>
 
@@ -464,7 +486,7 @@ export function SituacionDeportivaSection({ sports, kpis, injuries }: SituacionD
                     <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">
                       <th className="py-3 px-3 text-left">Equipo</th>
                       <th className="py-3 px-2 text-left">Competición / Grupo</th>
-                      <th className="py-3 px-1.5 text-center">Pos.</th>
+                      <th className="py-3 px-1.5 text-center bg-indigo-50/60 font-black text-indigo-950" title="Posición oficial en la liga (ordenado de 1º a último)">Pos. ↑</th>
                       <th className="py-3 px-1.5 text-center">PJ</th>
                       <th className="py-3 px-1.5 text-center text-emerald-800">V</th>
                       <th className="py-3 px-1.5 text-center">E</th>

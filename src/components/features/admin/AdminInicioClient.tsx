@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -130,6 +130,30 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   }
 
   const { club, kpis, alerts, sports, economy, agenda, communications, upcomingMatches } = data;
+
+  // Equipos organizados por posición en su liga (1º, 2º, 3º...)
+  const sortedTeamStats = useMemo(() => {
+    if (!sports?.teamStats) return [];
+    return [...sports.teamStats].sort((a, b) => {
+      const posA = a.currentPosition && a.currentPosition > 0 ? a.currentPosition : null;
+      const posB = b.currentPosition && b.currentPosition > 0 ? b.currentPosition : null;
+
+      // 1. Equipos con posición oficial en su liga primero (1º, 2º, 3º...)
+      if (posA !== null && posB !== null) {
+        if (posA !== posB) return posA - posB;
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+        return b.goalsFor - a.goalsFor;
+      }
+      if (posA !== null) return -1;
+      if (posB !== null) return 1;
+
+      // 2. Desempate secundario para formativos / pendientes
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+      return b.goalsFor - a.goalsFor;
+    });
+  }, [sports?.teamStats]);
 
   const quickLinks = [
     {
@@ -1158,7 +1182,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Resumen consolidado y clasificación en competición oficial (FFCV y Liga Brave)
+                  Resumen consolidado y clasificación oficial ordenado por posición en liga (1º → último)
                 </p>
               </div>
 
@@ -1212,9 +1236,9 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                       <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[10px] lg:text-[11px] font-bold uppercase tracking-wider">
                         <th className="py-3 px-2 sm:px-3 text-left">Equipo</th>
                         <th className="py-3 px-2 text-left">Competición / Grupo</th>
-                        <th className="py-3 px-1 text-center" title="Posición en la tabla">
-                          <span className="hidden xl:inline">Posición</span>
-                          <span className="xl:hidden">Pos.</span>
+                        <th className="py-3 px-1 text-center bg-indigo-50/60" title="Posición oficial en la liga (ordenado de 1º a último)">
+                          <span className="hidden xl:inline text-indigo-950 font-black">Posición ↑</span>
+                          <span className="xl:hidden text-indigo-950 font-black">Pos. ↑</span>
                         </th>
                         <th className="py-3 px-1 text-center" title="Partidos Jugados">
                           <span className="hidden xl:inline">Partidos</span>
@@ -1256,7 +1280,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {sports.teamStats.map((team) => {
+                      {sortedTeamStats.map((team) => {
                         const isPositiveGD = team.goalDiff > 0;
                         const isNeutralGD = team.goalDiff === 0;
 
@@ -1381,7 +1405,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-                  {sports.teamStats.map((team) => {
+                  {sortedTeamStats.map((team) => {
                     const isPositiveGD = team.goalDiff > 0;
                     const isNeutralGD = team.goalDiff === 0;
 
@@ -1472,7 +1496,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                 2. MÓVIL: PRESENTACIÓN ESPECÍFICA EN TARJETAS (Sin scroll horizontal)
                ══════════════════════════════════════════════════════════════════ */}
             <div className="block md:hidden space-y-4">
-              {sports.teamStats.map((team) => {
+              {sortedTeamStats.map((team) => {
                 const isPositiveGD = team.goalDiff > 0;
                 const isNeutralGD = team.goalDiff === 0;
 

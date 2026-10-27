@@ -1088,13 +1088,24 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     };
 
     teamStats.sort((a, b) => {
-      const isNonFedA = a.competitionName === 'No federado' || a.competitionName === 'Liga Brave' || a.teamCategory === 'Liga Brave' || a.teamCategory === 'No federado';
-      const isNonFedB = b.competitionName === 'No federado' || b.competitionName === 'Liga Brave' || b.teamCategory === 'Liga Brave' || b.teamCategory === 'No federado';
-      if (!isNonFedA && isNonFedB) return -1;
-      if (isNonFedA && !isNonFedB) return 1;
+      const posA = a.currentPosition && a.currentPosition > 0 ? a.currentPosition : null;
+      const posB = b.currentPosition && b.currentPosition > 0 ? b.currentPosition : null;
+
+      // 1. Equipos con posición oficial en su liga primero (1º, 2º, 3º...)
+      if (posA !== null && posB !== null) {
+        if (posA !== posB) return posA - posB;
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+        return b.goalsFor - a.goalsFor;
+      }
+      if (posA !== null) return -1;
+      if (posB !== null) return 1;
+
+      // 2. Equipos sin posición oficial fijada: ordenar por jerarquía y puntos
       const rankA = teamHierarchy[a.teamName.toLowerCase().trim()] || 99;
       const rankB = teamHierarchy[b.teamName.toLowerCase().trim()] || 99;
-      return rankA - rankB;
+      if (rankA !== rankB) return rankA - rankB;
+      return b.points - a.points;
     });
 
     const globalWinRate = totalPlayedMatches > 0 ? Math.round((wins / totalPlayedMatches) * 100) : 0;

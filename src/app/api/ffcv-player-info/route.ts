@@ -313,7 +313,7 @@ export async function GET(req: Request) {
           goles,
           minutes_played,
           minutos_jugados,
-          partidos(id, fecha_hora, rival, jornada, estado, season_id)
+          partidos(id, fecha_hora, estado, season_id, resultado_propio, resultado_rival)
         `)
         .eq('player_id', playerId);
 
@@ -342,7 +342,8 @@ export async function GET(req: Request) {
 
       // Partidos disputados
       const finalizedConvs = activeConvs.filter((c: any) => 
-        c.partidos?.estado === 'Finalizado' || (c.minutes_played ?? c.minutos_jugados ?? 0) > 0
+        c.status === 'convocado' &&
+        (c.partidos?.estado === 'Finalizado' || (c.minutes_played ?? c.minutos_jugados ?? 0) > 0)
       );
 
       let dbPartidosJugados = 0;
@@ -466,6 +467,10 @@ export async function GET(req: Request) {
             ? `${(Number(apuntameloPlayer.Valor_mercado) / 1000000).toFixed(1)}M€` 
             : null,
           ultimos_resultados: ultimosResultados
+        }
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
         }
       });
     }

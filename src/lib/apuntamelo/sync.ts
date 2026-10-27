@@ -15,7 +15,7 @@ const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 export function fetchApuntameloJson<T = any>(url: string): Promise<T> {
   return new Promise((resolve, reject) => {
-    https.get(
+    const req = https.get(
       url,
       {
         agent: httpsAgent,
@@ -37,7 +37,11 @@ export function fetchApuntameloJson<T = any>(url: string): Promise<T> {
           }
         });
       }
-    ).on('error', (err) => reject(err));
+    );
+    req.setTimeout(8000, () => {
+      req.destroy(new Error(`Timeout en petición Apúntamelo a ${url}`));
+    });
+    req.on('error', (err) => reject(err));
   });
 }
 

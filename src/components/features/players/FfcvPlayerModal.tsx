@@ -30,7 +30,7 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose, isLigaB
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/ffcv-player-info?playerId=${playerId}`);
+      const res = await fetch(`/api/ffcv-player-info?playerId=${playerId}&_t=${Date.now()}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok || json.error) {
         setError(json.error || "No se pudo consultar la federación.");

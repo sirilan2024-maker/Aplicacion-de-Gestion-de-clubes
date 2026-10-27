@@ -115,29 +115,71 @@ export function TeamPostMatchReportsView({
     return false
   }
 
-  // Extraer rendimiento de jugadores convocados
+  // Extraer rendimiento de jugadores convocados y no convocados
   const getMatchPlayersPerformance = (match: any) => {
     const matchConvs = convocatorias.filter(c => c.partido_id === match.id)
-    return matchConvs.map(c => {
+    
+    // 1. Jugadores en la convocatoria del partido
+    const convocados = matchConvs.map(c => {
       const p = players.find(pl => pl.id === c.player_id)
+      const rawMinutes = c.minutes_played ?? c.minutos_jugados ?? 0
+      const isAusente = c.estado_asistencia === 'Ausente' || c.estado_asistencia === 'Justificado' || c.status === 'no_convocado'
+      const minutes = isAusente ? 0 : rawMinutes
+      const noJugo = isAusente || minutes === 0
+
+      let statusLabel = 'Jugó'
+      if (c.status === 'no_convocado' || c.estado_asistencia === 'No Convocado') {
+        statusLabel = 'No Convocado'
+      } else if (c.estado_asistencia === 'Ausente' || c.estado_asistencia === 'Justificado') {
+        statusLabel = c.estado_asistencia === 'Justificado' ? 'Ausente (Justificado)' : 'Ausente'
+      } else if (noJugo) {
+        statusLabel = 'No jugó (Sin minutos)'
+      }
+
       return {
         id: c.player_id || c.id,
         number: p?.dorsal || c.dorsal || '-',
         name: p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'Jugador',
         pos: c.slotLabel || p?.posicion || 'JUG',
-        titular: Boolean(c.titular),
+        titular: Boolean(c.titular) && !noJugo,
         avatarUrl: p?.avatar_url || null,
         avatar: p ? `${p.first_name?.[0] || ''}${p.last_name?.[0] || ''}`.toUpperCase() || 'J' : 'J',
-        minutes: c.minutes_played ?? c.minutos_jugados ?? 0,
-        rating: c.coach_rating || 0,
-        actitud: c.actitud || 0,
+        minutes: minutes,
+        noJugo: noJugo,
+        rating: noJugo ? 0 : (c.coach_rating || 0),
+        actitud: noJugo ? 0 : (c.actitud || 0),
         goals: c.goals || 0,
         assists: c.assists || 0,
         yellows: c.yellow_cards || 0,
         reds: c.red_cards || 0,
-        status: c.estado_asistencia || (c.status === 'no_convocado' ? 'No Convocado' : 'Presente')
+        status: statusLabel
       }
     })
+
+    // 2. Jugadores del equipo no convocados para este partido
+    const convPlayerIds = new Set(matchConvs.map(c => c.player_id))
+    const noConvocados = (players || [])
+      .filter(p => !convPlayerIds.has(p.id) && !(p.posicion || '').toLowerCase().includes('entrenador') && !(p.posicion || '').toLowerCase().includes('delegado'))
+      .map(p => ({
+        id: p.id,
+        number: p.dorsal || '-',
+        name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        pos: p.posicion || 'JUG',
+        titular: false,
+        avatarUrl: p.avatar_url || null,
+        avatar: `${p.first_name?.[0] || ''}${p.last_name?.[0] || ''}`.toUpperCase() || 'J',
+        minutes: 0,
+        noJugo: true,
+        rating: 0,
+        actitud: 0,
+        goals: 0,
+        assists: 0,
+        yellows: 0,
+        reds: 0,
+        status: 'No Convocado'
+      }))
+
+    return [...convocados, ...noConvocados]
   }
 
   // 3. Filtrar y ordenar partidos según controles
@@ -183,8 +225,9 @@ export function TeamPostMatchReportsView({
   const handlePrintPdf = (match: any) => {
     const coachRep = getCoachReportData(match)
     const matchPlayers = getMatchPlayersPerformance(match)
-    const starters = matchPlayers.filter(p => p.titular)
-    const bench = matchPlayers.filter(p => !p.titular)
+    const starters = matchPlayers.filter(p => p.titular && !p.noJugo)
+    const bench = matchPlayers.filter(p => !p.titular && !p.noJugo && p.minutes > 0)
+    const unplayed = matchPlayers.filter(p => p.noJugo || p.minutes === 0)
 
     const dateFormatted = match.fecha_hora 
       ? new Date(match.fecha_hora).toLocaleDateString('es-ES', { 
@@ -506,6 +549,26 @@ export function TeamPostMatchReportsView({
                   </tr>
                 `).join('')}
               ` : ''}
+              ${unplayed.length > 0 ? `
+                <tr style="background: #fef2f2;">
+                  <td colspan="9" style="font-weight: 800; font-size: 8.5px; text-transform: uppercase; color: #b91c1c; padding-left: 8px;">
+                    Sin Minutos / No Convocados (${unplayed.length})
+                  </td>
+                </tr>
+                ${unplayed.map(p => `
+                  <tr style="opacity: 0.85;">
+                    <td class="center" style="color: #94a3b8;">${p.number}</td>
+                    <td><strong>${p.name}</strong> <span style="font-size: 8px; color: #dc2626; margin-left: 4px;">(${p.status})</span></td>
+                    <td class="center" style="color: #94a3b8;">${p.pos}</td>
+                    <td class="center" style="color: #94a3b8;">-</td>
+                    <td class="center" style="color: #94a3b8;">-</td>
+                    <td class="center" style="color: #94a3b8;">-</td>
+                    <td class="center" style="color: #94a3b8;">-</td>
+                    <td class="center" style="color: #94a3b8;">-</td>
+                    <td class="center" style="color: #94a3b8;">-</td>
+                  </tr>
+                `).join('')}
+              ` : ''}
             </tbody>
           </table>
         </div>
@@ -533,8 +596,9 @@ export function TeamPostMatchReportsView({
   // Previsualización interactiva: datos del partido activo
   const previewCoachRep = activePreviewMatch ? getCoachReportData(activePreviewMatch) : {}
   const previewPlayers = activePreviewMatch ? getMatchPlayersPerformance(activePreviewMatch) : []
-  const previewStarters = previewPlayers.filter(p => p.titular)
-  const previewBench = previewPlayers.filter(p => !p.titular)
+  const previewStarters = previewPlayers.filter(p => p.titular && !p.noJugo)
+  const previewBench = previewPlayers.filter(p => !p.titular && !p.noJugo && p.minutes > 0)
+  const previewUnplayed = previewPlayers.filter(p => p.noJugo || p.minutes === 0)
 
   return (
     <div className="space-y-6 pt-2">
@@ -1012,7 +1076,7 @@ export function TeamPostMatchReportsView({
                     <Users className="w-4 h-4 text-blue-600" /> 3. Rendimiento de Jugadores ({previewPlayers.length})
                   </h4>
                   <span className="text-xs text-slate-400 font-semibold">
-                    Titulares: {previewStarters.length} &bull; Suplentes: {previewBench.length}
+                    Titulares: {previewStarters.length} &bull; Suplentes: {previewBench.length} &bull; Sin Minutos / No Convocados: {previewUnplayed.length}
                   </span>
                 </div>
 
@@ -1172,6 +1236,55 @@ export function TeamPostMatchReportsView({
                       </div>
                     </div>
                   )}
+
+                  {/* Sin Minutos / No Convocados en móvil */}
+                  {previewUnplayed.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          Sin Minutos / No Convocados ({previewUnplayed.length})
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {previewUnplayed.map(p => (
+                          <div key={p.id} className="bg-slate-50/80 border border-slate-200 rounded-xl p-3 space-y-1.5 opacity-90">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono font-bold text-slate-400 text-xs shrink-0">
+                                  #{p.number}
+                                </span>
+                                <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0">
+                                  {p.avatarUrl ? (
+                                    <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{p.avatar}</span>
+                                  )}
+                                </div>
+                                <span className="font-bold text-slate-700 text-xs truncate">{p.name}</span>
+                                <span className="text-[9px] font-medium text-slate-400 bg-white border border-slate-200 px-1.5 py-0.2 rounded shrink-0">
+                                  {p.pos}
+                                </span>
+                              </div>
+
+                              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md shrink-0 ${
+                                p.status.includes('No Convocado') 
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                                  : p.status.includes('Ausente')
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}>
+                                {p.status}
+                              </span>
+                            </div>
+
+                            <div className="text-[10px] text-slate-500 font-semibold italic pt-1 border-t border-slate-200/50 flex items-center gap-1.5">
+                              <span>🚫 No disputó minutos en este encuentro</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Vista Escritorio: Tabla completa de 9 columnas (hidden md:block) */}
@@ -1309,6 +1422,50 @@ export function TeamPostMatchReportsView({
                                 {p.reds > 0 && <span className="inline-block bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.5 rounded">🟥 {p.reds}</span>}
                                 {p.yellows === 0 && p.reds === 0 && <span className="text-slate-300">-</span>}
                               </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Fila separadora para jugadores sin minutos / no convocados */}
+                      {previewUnplayed.length > 0 && (
+                        <>
+                          <tr className="bg-rose-50/60">
+                            <td colSpan={9} className="py-2 px-3 font-black text-[10px] text-rose-700 uppercase tracking-wider">
+                              Sin Minutos / No Convocados ({previewUnplayed.length})
+                            </td>
+                          </tr>
+                          {previewUnplayed.map(p => (
+                            <tr key={p.id} className="hover:bg-slate-50/80 transition-colors opacity-85">
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-400">
+                                #{p.number}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-[9px] font-black text-slate-500 shrink-0">
+                                    {p.avatarUrl ? (
+                                      <img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{p.avatar}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-semibold text-slate-700">{p.name}</span>
+                                  <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                    {p.status}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-semibold text-slate-400">
+                                {p.pos}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold text-slate-400">
+                                -
+                              </td>
+                              <td className="py-2.5 px-3 text-center text-slate-300">-</td>
+                              <td className="py-2.5 px-3 text-center text-slate-300">-</td>
+                              <td className="py-2.5 px-3 text-center text-slate-300">-</td>
+                              <td className="py-2.5 px-3 text-center text-slate-300">-</td>
+                              <td className="py-2.5 px-3 text-center text-slate-300">-</td>
                             </tr>
                           ))}
                         </>

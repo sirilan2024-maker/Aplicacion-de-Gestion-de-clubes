@@ -2029,6 +2029,108 @@ export async function getCoordinatorFullDashboardAction(params?: {
       latestAnnouncement,
     };
 
+    // 12. CONTROL DE CUOTAS Y PAGOS DE JUGADORES (SOLO LECTURA PARA COORDINADOR)
+    // Extraer cuotas únicamente para los jugadores activos de la temporada, sin exponer datos contables globales ni saldos del club
+    const playerIdsSet = new Set(players.map(p => p.id).filter(Boolean));
+    let feesByPlayerId = new Map<string, any[]>();
+    if (playerIdsSet.size > 0) {
+      const { data: feesRows, error: feesError } = await adminClient
+        .from('fees')
+        .select('id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en')
+        .eq('club_id', clubId);
+
+      if (feesError) {
+        console.error('[coordinator] Error fetching fees for players:', feesError);
+      } else if (feesRows) {
+        feesRows.forEach((f: any) => {
+          if (f.player_id && playerIdsSet.has(f.player_id)) {
+            const list = feesByPlayerId.get(f.player_id) || [];
+            list.push(f);
+            feesByPlayerId.set(f.player_id, list);
+          }
+        });
+      }
+    }
+
+    const playerPaymentsList = players.map(p => {
+      const pTeam = teamById.get(p.team_id);
+      const playerFees = feesByPlayerId.get(p.id) || [];
+
+      let paidCount = 0;
+      let pendingCount = 0;
+      let totalPendingCents = 0;
+      const pendingFeesList: any[] = [];
+
+      playerFees.forEach((f: any) => {
+        const amountCents = f.amount_cents || 0;
+        let paidCents = f.amount_paid_cents || 0;
+        if (f.estado === 'pagado' && paidCents === 0) {
+          paidCents = amountCents;
+        }
+
+        const isFullyPaid = f.estado === 'pagado' || (amountCents > 0 && paidCents >= amountCents);
+        const pendingForFee = Math.max(0, amountCents - paidCents);
+
+        if (isFullyPaid) {
+          paidCount++;
+        } else {
+          pendingCount++;
+          totalPendingCents += pendingForFee;
+          pendingFeesList.push({
+            id: f.id,
+            concept: f.concept || 'Cuota mensual',
+            amountCents,
+            amountPaidCents: paidCents,
+            pendingCents: pendingForFee,
+            status: f.estado || 'pendiente',
+            creadoEn: f.creado_en || null,
+          });
+        }
+      });
+
+      let status: 'al_dia' | 'con_deuda' | 'sin_cuotas' = 'al_dia';
+      if (playerFees.length === 0) {
+        status = 'sin_cuotas';
+      } else if (pendingCount > 0) {
+        status = 'con_deuda';
+      }
+
+      return {
+        playerId: p.id,
+        playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador',
+        playerDorsal: p.dorsal ?? null,
+        playerAvatar: p.avatar_url ?? null,
+        teamId: p.team_id,
+        teamName: pTeam?.name || 'Sin equipo',
+        teamCategory: pTeam?.category || '',
+        status,
+        totalFeesCount: playerFees.length,
+        paidFeesCount: paidCount,
+        pendingFeesCount: pendingCount,
+        totalPendingCents,
+        pendingFees: pendingFeesList,
+      };
+    });
+
+    const totalTrackedPlayers = playerPaymentsList.length;
+    const playersAlDia = playerPaymentsList.filter(p => p.status === 'al_dia').length;
+    const playersConDeuda = playerPaymentsList.filter(p => p.status === 'con_deuda').length;
+    const playersSinCuotas = playerPaymentsList.filter(p => p.status === 'sin_cuotas').length;
+    const regularityRate = (totalTrackedPlayers - playersSinCuotas) > 0
+      ? Math.round((playersAlDia / (totalTrackedPlayers - playersSinCuotas)) * 100)
+      : (totalTrackedPlayers > 0 ? 100 : 0);
+
+    const paymentsData = {
+      summary: {
+        totalPlayers: totalTrackedPlayers,
+        playersAlDia,
+        playersConDeuda,
+        playersSinCuotas,
+        regularityRate,
+      },
+      players: playerPaymentsList,
+    };
+
     const selectedDateStr = params?.date || todayDate;
 
     return {
@@ -2081,11 +2183,223 @@ export async function getCoordinatorFullDashboardAction(params?: {
           upcomingTrainings: upcomingTrainings.slice(0, 10),
         },
         communications: commsData,
+        payments: paymentsData,
       },
     };
   } catch (err: any) {
     console.error('[getCoordinatorFullDashboardAction] Error:', err);
     return { success: false, error: err.message || 'Error al obtener el panel de coordinador' };
+  }
+}
+
+/**
+ * Consulta de solo lectura de estado de cuotas y pagos de jugadores para la vista de coordinación.
+ * Aislamiento estricto de la temporada activa y sin exposición de contabilidad global del club.
+ */
+export async function getCoordinatorPlayerFeesStatusAction(params?: {
+  seasonId?: string;
+  teamId?: string;
+}) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (authError || !context) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const adminClient = createAdminClient();
+    const clubId = context.profile.club_id;
+    if (!clubId) {
+      return { success: false, error: 'Perfil sin club asignado' };
+    }
+
+    const effectiveSeason = await getEffectiveSelectedSeasonId(adminClient, clubId, params?.seasonId);
+    const targetSeasonId = effectiveSeason.seasonId;
+    const seasonName = effectiveSeason.seasonName || 'Temporada 26/27';
+
+    // 1. Equipos activos (excluyendo temporada cerrada 25/26)
+    const { data: rawTeams } = await adminClient
+      .from('teams')
+      .select('id, name, category, color')
+      .eq('club_id', clubId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .eq('season_id', targetSeasonId);
+
+    const CANONICAL_COORDINATOR_TEAMS = [
+      'senior',
+      'infantil a',
+      'infantil b',
+      'cadete a',
+      'cadete b',
+      'juvenil a',
+      'juvenil b'
+    ];
+
+    const allClubTeams = (rawTeams || [])
+      .filter(t => {
+        const norm = (t.name || '').trim().toLowerCase();
+        return CANONICAL_COORDINATOR_TEAMS.some(k => norm === k || norm.startsWith(k));
+      })
+      .sort((a, b) => {
+        const normA = (a.name || '').trim().toLowerCase();
+        const normB = (b.name || '').trim().toLowerCase();
+        const idxA = CANONICAL_COORDINATOR_TEAMS.findIndex(k => normA === k || normA.startsWith(k));
+        const idxB = CANONICAL_COORDINATOR_TEAMS.findIndex(k => normB === k || normB.startsWith(k));
+        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+      });
+
+    const teamIds = allClubTeams.map(t => t.id);
+    const teamById = new Map<string, any>(allClubTeams.map(t => [t.id, t]));
+
+    // 2. Jugadores de la temporada activa
+    let players: any[] = [];
+    if (teamIds.length > 0) {
+      const { data: pshRows } = await adminClient
+        .from('player_season_history')
+        .select('player_id, team_id')
+        .eq('season_id', targetSeasonId)
+        .in('team_id', teamIds);
+
+      const pshTeamByPlayer = new Map<string, string>();
+      (pshRows || []).forEach(r => {
+        if (r.player_id && r.team_id) pshTeamByPlayer.set(r.player_id, r.team_id);
+      });
+
+      const pshPlayerIds = Array.from(pshTeamByPlayer.keys());
+
+      const { data: playersData, error: plErr } = await adminClient
+        .from('players')
+        .select('id, team_id, first_name, last_name, dorsal, avatar_url, status')
+        .or(`team_id.in.(${teamIds.join(',')})${pshPlayerIds.length > 0 ? `,id.in.(${pshPlayerIds.join(',')})` : ''}`)
+        .neq('status', 'inactive');
+
+      if (plErr) console.error('[coordinator-fees] Error fetching players:', plErr);
+
+      const rawPlayers = playersData || [];
+      const seen = new Set<string>();
+      players = rawPlayers.map(p => ({
+        ...p,
+        team_id: pshTeamByPlayer.get(p.id) || p.team_id
+      })).filter(p => {
+        if (!teamIds.includes(p.team_id)) return false;
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
+    }
+
+    // 3. Cuotas del club
+    const playerIdsSet = new Set(players.map(p => p.id));
+    const feesByPlayerId = new Map<string, any[]>();
+
+    const { data: feesRows, error: feesError } = await adminClient
+      .from('fees')
+      .select('id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en')
+      .eq('club_id', clubId);
+
+    if (feesError) {
+      console.error('[coordinator-fees] Error fetching fees:', feesError);
+    } else if (feesRows) {
+      feesRows.forEach((f: any) => {
+        if (f.player_id && playerIdsSet.has(f.player_id)) {
+          const list = feesByPlayerId.get(f.player_id) || [];
+          list.push(f);
+          feesByPlayerId.set(f.player_id, list);
+        }
+      });
+    }
+
+    // 4. Mapeo a registros de pagos por jugador
+    const playerPaymentsList = players.map(p => {
+      const pTeam = teamById.get(p.team_id);
+      const playerFees = feesByPlayerId.get(p.id) || [];
+
+      let paidCount = 0;
+      let pendingCount = 0;
+      let totalPendingCents = 0;
+      const pendingFeesList: any[] = [];
+
+      playerFees.forEach((f: any) => {
+        const amountCents = f.amount_cents || 0;
+        let paidCents = f.amount_paid_cents || 0;
+        if (f.estado === 'pagado' && paidCents === 0) {
+          paidCents = amountCents;
+        }
+
+        const isFullyPaid = f.estado === 'pagado' || (amountCents > 0 && paidCents >= amountCents);
+        const pendingForFee = Math.max(0, amountCents - paidCents);
+
+        if (isFullyPaid) {
+          paidCount++;
+        } else {
+          pendingCount++;
+          totalPendingCents += pendingForFee;
+          pendingFeesList.push({
+            id: f.id,
+            concept: f.concept || 'Cuota mensual',
+            amountCents,
+            amountPaidCents: paidCents,
+            pendingCents: pendingForFee,
+            status: f.estado || 'pendiente',
+            creadoEn: f.creado_en || null,
+          });
+        }
+      });
+
+      let status: 'al_dia' | 'con_deuda' | 'sin_cuotas' = 'al_dia';
+      if (playerFees.length === 0) {
+        status = 'sin_cuotas';
+      } else if (pendingCount > 0) {
+        status = 'con_deuda';
+      }
+
+      return {
+        playerId: p.id,
+        playerName: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Jugador',
+        playerDorsal: p.dorsal ?? null,
+        playerAvatar: p.avatar_url ?? null,
+        teamId: p.team_id,
+        teamName: pTeam?.name || 'Sin equipo',
+        teamCategory: pTeam?.category || '',
+        status,
+        totalFeesCount: playerFees.length,
+        paidFeesCount: paidCount,
+        pendingFeesCount: pendingCount,
+        totalPendingCents,
+        pendingFees: pendingFeesList,
+      };
+    });
+
+    const totalTrackedPlayers = playerPaymentsList.length;
+    const playersAlDia = playerPaymentsList.filter(p => p.status === 'al_dia').length;
+    const playersConDeuda = playerPaymentsList.filter(p => p.status === 'con_deuda').length;
+    const playersSinCuotas = playerPaymentsList.filter(p => p.status === 'sin_cuotas').length;
+    const regularityRate = (totalTrackedPlayers - playersSinCuotas) > 0
+      ? Math.round((playersAlDia / (totalTrackedPlayers - playersSinCuotas)) * 100)
+      : (totalTrackedPlayers > 0 ? 100 : 0);
+
+    return {
+      success: true,
+      data: {
+        seasonName,
+        teams: allClubTeams.map(t => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          color: t.color
+        })),
+        summary: {
+          totalPlayers: totalTrackedPlayers,
+          playersAlDia,
+          playersConDeuda,
+          playersSinCuotas,
+          regularityRate,
+        },
+        players: playerPaymentsList,
+      }
+    };
+  } catch (err: any) {
+    console.error('[getCoordinatorPlayerFeesStatusAction] Error:', err);
+    return { success: false, error: err.message || 'Error al obtener estado de cuotas' };
   }
 }
 

@@ -661,24 +661,6 @@ export default function RendimientoGlobalPage() {
       {viewMode === 'bienestar' && (
         wellnessSummary ? (
         <section className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
-          {/* Banner de estado de persistencia */}
-          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 text-amber-700">
-                <AlertCircle size={18} />
-              </div>
-              <div className="text-xs">
-                <span className="font-extrabold uppercase tracking-wide block">Módulo de Bienestar — Pendiente de activar la persistencia</span>
-                <span className="text-amber-700">
-                  Las tablas y políticas RLS locales están estructuradas y probadas. La persistencia en base de datos se activará automáticamente al aplicar la migración en el entorno correspondiente.
-                </span>
-              </div>
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100/90 text-amber-800 border border-amber-300 self-start sm:self-auto shrink-0">
-              Persistencia no activa
-            </span>
-          </div>
-
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100 text-blue-600">

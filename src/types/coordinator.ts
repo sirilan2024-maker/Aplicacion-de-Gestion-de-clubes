@@ -290,6 +290,44 @@ export interface CoordinatorDashboardFullData {
     upcomingTrainings: UpcomingTrainingItem[];
   };
   communications?: CoordinatorCommunications;
+  payments?: CoordinatorPaymentsData;
+}
+
+export interface CoordinatorPlayerFeeItem {
+  id: string;
+  concept: string;
+  amountCents: number;
+  amountPaidCents: number;
+  pendingCents: number;
+  status: 'pendiente' | 'pagado' | 'pdte_verif' | 'otro';
+  creadoEn?: string | null;
+}
+
+export interface CoordinatorPlayerPaymentRecord {
+  playerId: string;
+  playerName: string;
+  playerDorsal?: number | null;
+  playerAvatar?: string | null;
+  teamId: string;
+  teamName: string;
+  teamCategory: string;
+  status: 'al_dia' | 'con_deuda' | 'sin_cuotas';
+  totalFeesCount: number;
+  paidFeesCount: number;
+  pendingFeesCount: number;
+  totalPendingCents: number;
+  pendingFees: CoordinatorPlayerFeeItem[];
+}
+
+export interface CoordinatorPaymentsData {
+  summary: {
+    totalPlayers: number;
+    playersAlDia: number;
+    playersConDeuda: number;
+    playersSinCuotas: number;
+    regularityRate: number;
+  };
+  players: CoordinatorPlayerPaymentRecord[];
 }
 
 export interface CoordinatorUpcomingMatch {

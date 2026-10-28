@@ -39,7 +39,10 @@ export default function MetodologiaJugadoresPage() {
       (attendanceRes.data || []).forEach((a: any) => {
         if (!attCountMap[a.player_id]) attCountMap[a.player_id] = { present: 0, total: 0 };
         attCountMap[a.player_id].total += 1;
-        if (a.status === 'present') attCountMap[a.player_id].present += 1;
+        const s = (a.status || '').toLowerCase().trim();
+        if (s === 'present' || s === 'presente' || s === 'retraso' || s === 'late') {
+          attCountMap[a.player_id].present += 1;
+        }
       });
 
       const objCountMap: Record<string, { completed: number; total: number }> = {};

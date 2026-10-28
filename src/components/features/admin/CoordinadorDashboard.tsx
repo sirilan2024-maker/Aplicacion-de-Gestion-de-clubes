@@ -6,7 +6,8 @@ import {
   Shield, Trophy, Users, AlertTriangle, Calendar, Activity,
   ChevronRight, RefreshCw, CheckCircle, Clock, Zap,
   TrendingUp, Heart, MessageSquare, ArrowRight, Compass,
-  Target, AlertCircle, Share2, ShieldAlert, ArrowLeft, ArrowUpRight
+  Target, AlertCircle, Share2, ShieldAlert, ArrowLeft, ArrowUpRight,
+  Wallet
 } from "lucide-react";
 import { useSeason } from "@/components/providers/SeasonProvider";
 import { MatchdayShareModal } from "./MatchdayShareModal";
@@ -17,6 +18,7 @@ import { DisciplineSection } from "@/components/coordinator/DisciplineSection";
 import { AttendanceOperationsSection } from "@/components/coordinator/AttendanceOperationsSection";
 import { SituacionDeportivaSection } from "@/components/features/admin/SituacionDeportivaSection";
 import { ClubAgendaCommsSection } from "@/components/coordinator/ClubAgendaCommsSection";
+import { CoordinatorFeesSection } from "@/components/coordinator/CoordinatorFeesSection";
 import { CoordinatorDashboardFullData, CoordinatorTeamItem } from "@/types/coordinator";
 
 type Props = {
@@ -175,6 +177,14 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
   const currentTeamSuspended = displayedDisciplineRecords.filter((r) => r.status === "Sancionado").length;
   const currentTeamApercibidos = displayedDisciplineRecords.filter((r) => r.status === "Apercibido").length;
 
+  const globalPendingPlayersCount = data.payments?.summary?.playersConDeuda ?? 0;
+  const currentTeamPendingPlayersCount = useMemo(() => {
+    if (isGlobalView) return globalPendingPlayersCount;
+    return (data.payments?.players || []).filter(
+      (p) => p.teamId === selectedTeamId && p.status === "con_deuda"
+    ).length;
+  }, [isGlobalView, globalPendingPlayersCount, data.payments?.players, selectedTeamId]);
+
   return (
     <div className="min-h-screen bg-slate-50 pb-16 overflow-x-hidden">
       {/* 1. Cabecera con Selector Desplegable Único (por defecto en Todos los equipos) */}
@@ -224,7 +234,7 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
         {/* 2. Métricas Rápidas de un Solo Vistazo (KPIs) - ENCIMA DE ALERTAS */}
         {isGlobalView ? (
           /* KPIs Globales (Todos los Equipos) */
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[10px] font-extrabold uppercase">Equipos</span>
@@ -286,10 +296,25 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
               </p>
               <p className="text-[10px] text-slate-400">Bajas médicas</p>
             </div>
+
+            <a
+              href="#seccion-cuotas"
+              className="bg-white hover:bg-amber-50/40 transition-all rounded-xl border border-slate-200/80 p-3.5 shadow-xs block cursor-pointer group"
+              title="Ver estado de cuotas y jugadores con pagos pendientes"
+            >
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-[10px] font-extrabold uppercase group-hover:text-amber-600 transition-colors">Cuotas</span>
+                <Wallet className="w-4 h-4 text-amber-500" />
+              </div>
+              <p className={`text-2xl font-black mt-1 ${globalPendingPlayersCount > 0 ? "text-amber-600" : "text-slate-900"}`}>
+                {globalPendingPlayersCount}
+              </p>
+              <p className="text-[10px] text-slate-400">Con deuda ↓</p>
+            </a>
           </div>
         ) : (
           /* KPIs Específicos del Equipo Seleccionado */
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[10px] font-extrabold uppercase">Plantilla</span>
@@ -355,6 +380,21 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
               </p>
               <p className="text-[10px] text-slate-400">{currentTeamSportsStats?.points ?? 0} puntos en liga</p>
             </div>
+
+            <a
+              href="#seccion-cuotas"
+              className="bg-white hover:bg-amber-50/40 transition-all rounded-xl border border-slate-200/80 p-3.5 shadow-xs block cursor-pointer group"
+              title="Ver cuotas pendientes en este equipo"
+            >
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="text-[10px] font-extrabold uppercase group-hover:text-amber-600 transition-colors">Cuotas</span>
+                <Wallet className="w-4 h-4 text-amber-500" />
+              </div>
+              <p className={`text-2xl font-black mt-1 ${currentTeamPendingPlayersCount > 0 ? "text-amber-600" : "text-slate-900"}`}>
+                {currentTeamPendingPlayersCount}
+              </p>
+              <p className="text-[10px] text-slate-400">Pendientes ↓</p>
+            </a>
           </div>
         )}
 
@@ -400,7 +440,14 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           onPlayerClick={(playerId) => router.push(`/dashboard/matches?view=disciplina`)}
         />
 
-        {/* 7. Agenda del Club y Comunicaciones (Partidos, Entrenamientos y Canales Oficiales) */}
+        {/* 7. Control de Cuotas y Pagos de Jugadores (Solo Lectura Coordinación) */}
+        <CoordinatorFeesSection
+          data={data.payments}
+          selectedTeamId={selectedTeamId}
+          selectedTeamName={currentTeam?.name}
+        />
+
+        {/* 8. Agenda del Club y Comunicaciones (Partidos, Entrenamientos y Canales Oficiales) */}
         <ClubAgendaCommsSection
           upcomingMatches={data.agendaClub?.upcomingMatches || []}
           upcomingTrainings={schedule.upcomingTrainings || []}

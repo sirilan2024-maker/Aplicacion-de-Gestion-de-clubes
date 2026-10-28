@@ -1107,27 +1107,51 @@ function GlobalMembersContent() {
         // Fetch players for selected season (via player_season_history)
         let activePlayerIds: string[] = []
         if (targetSeasonId) {
-          const { data: pshData } = await supabase
+          const { data: pshData, error: pshError } = await supabase
             .from("player_season_history")
             .select("player_id")
             .eq("season_id", targetSeasonId)
+            .limit(2000)
 
-          if (pshData) {
+          if (pshError) {
+            console.error("[Miembros] Error al consultar player_season_history:", pshError)
+          } else if (pshData) {
             activePlayerIds = pshData.map((p: any) => p.player_id).filter(Boolean)
           }
         }
 
         if (activePlayerIds.length > 0) {
-          const { data: rawPlayers } = await supabase
-            .from("players")
-            .select(`
-              id, first_name, last_name, parent1_email, email, posicion_principal, team_id, registration_status, status, avatar_url, user_auth_id,
-              teams (name, color, club_id)
-            `)
-            .in("id", activePlayerIds)
-            .in("status", ["active", "activo", "pending"])
-            
-          if (rawPlayers) {
+          // Consultar jugadores en lotes (chunks) de 50 para evitar HTTP 414 (Request-URI Too Long)
+          const CHUNK_SIZE = 50
+          const chunks: string[][] = []
+          for (let i = 0; i < activePlayerIds.length; i += CHUNK_SIZE) {
+            chunks.push(activePlayerIds.slice(i, i + CHUNK_SIZE))
+          }
+
+          const chunkResults = await Promise.all(
+            chunks.map((chunk) =>
+              supabase
+                .from("players")
+                .select(`
+                  id, first_name, last_name, parent1_email, email, posicion_principal, team_id, registration_status, status, avatar_url, user_auth_id,
+                  teams (name, color, club_id)
+                `)
+                .in("id", chunk)
+                .in("status", ["active", "activo", "pending"])
+            )
+          )
+
+          const rawPlayers: any[] = []
+          for (const res of chunkResults) {
+            if (res.error) {
+              console.error("[Miembros] Error en lote de jugadores:", res.error)
+            }
+            if (res.data) {
+              rawPlayers.push(...res.data)
+            }
+          }
+
+          if (rawPlayers.length > 0) {
             playersData = rawPlayers.map((p: any) => ({
               id: p.id,
               first_name: p.first_name,

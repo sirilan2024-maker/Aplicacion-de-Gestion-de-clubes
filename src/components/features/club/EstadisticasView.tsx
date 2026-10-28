@@ -323,7 +323,10 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
 
     let asisMedia = 0;
     if (filteredAttendance.length > 0) {
-      const presentes = filteredAttendance.filter(a => a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present').length;
+      const presentes = filteredAttendance.filter(a => {
+        const s = (a.status || '').toLowerCase().trim();
+        return s === 'presente' || s === 'present' || s === 'retraso' || s === 'late';
+      }).length;
       asisMedia = Math.round((presentes / filteredAttendance.length) * 100);
     }
 

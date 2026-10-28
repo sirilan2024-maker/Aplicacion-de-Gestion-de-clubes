@@ -29,7 +29,10 @@ export function PlayerStatsGrid({ rawData, teamId }: { rawData: RawData; teamId:
     return playersInTeam.map(player => {
       // Attendance
       const playerAttendance = rawData.attendance.filter(a => a.player_id === player.id);
-      const attendedCount = playerAttendance.filter(a => a.status === 'presente' || a.status === 'retraso' || a.status === 'present').length;
+      const attendedCount = playerAttendance.filter(a => {
+        const s = (a.status || '').toLowerCase().trim();
+        return s === 'presente' || s === 'present' || s === 'retraso' || s === 'late';
+      }).length;
       const attendance_percentage = playerAttendance.length > 0 
         ? Math.round((attendedCount / playerAttendance.length) * 100) 
         : (totalTeamEvents > 0 ? Math.round((attendedCount / totalTeamEvents) * 100) : 0);

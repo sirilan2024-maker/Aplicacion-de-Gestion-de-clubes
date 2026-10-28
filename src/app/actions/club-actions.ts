@@ -1231,7 +1231,10 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
 
       const totalAtt = attRows?.length || 0;
       if (totalAtt > 0) {
-        const presentes = attRows!.filter(r => (r.status || '').toLowerCase().trim() === 'presente' || (r.status || '').toLowerCase().trim() === 'present').length;
+        const presentes = attRows!.filter(r => {
+          const s = (r.status || '').toLowerCase().trim();
+          return s === 'presente' || s === 'present' || s === 'retraso' || s === 'late';
+        }).length;
         attendanceRate = Math.round((presentes / totalAtt) * 100);
       }
     }

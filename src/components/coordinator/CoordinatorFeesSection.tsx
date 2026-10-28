@@ -21,37 +21,25 @@ import {
 
 interface CoordinatorFeesSectionProps {
   data?: CoordinatorPaymentsData;
-  selectedTeamId?: string;
-  selectedTeamName?: string;
+  initialTeamId?: string;
   teams?: Array<{ id: string; name: string; category?: string }>;
-  onSelectTeamId?: (teamId: string) => void;
 }
 
 export function CoordinatorFeesSection({
   data,
-  selectedTeamId = "all",
-  selectedTeamName,
-  teams,
-  onSelectTeamId
+  initialTeamId = "all",
+  teams
 }: CoordinatorFeesSectionProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"TODOS" | "CON_DEUDA" | "AL_DIA">("TODOS");
-  const [internalTeamId, setInternalTeamId] = useState<string>(selectedTeamId || "all");
-
-  useEffect(() => {
-    if (selectedTeamId !== undefined) {
-      setInternalTeamId(selectedTeamId);
-    }
-  }, [selectedTeamId]);
-
-  const effectiveTeamId = internalTeamId;
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(initialTeamId || "all");
 
   const handleTeamChange = (teamId: string) => {
-    setInternalTeamId(teamId);
-    if (onSelectTeamId) {
-      onSelectTeamId(teamId);
-    }
+    // Aislamiento estricto: el filtro de equipo actúa única y exclusivamente sobre cuotas y pagos
+    setSelectedTeamId(teamId);
   };
+
+  const effectiveTeamId = selectedTeamId;
 
   const allPlayers = useMemo(() => data?.players || [], [data?.players]);
 
@@ -77,8 +65,8 @@ export function CoordinatorFeesSection({
   const activeTeamName = useMemo(() => {
     if (effectiveTeamId === "all") return "Todos los Equipos";
     const found = availableTeams.find((t) => t.id === effectiveTeamId);
-    return found?.name || selectedTeamName || "Equipo seleccionado";
-  }, [effectiveTeamId, availableTeams, selectedTeamName]);
+    return found?.name || "Equipo seleccionado";
+  }, [effectiveTeamId, availableTeams]);
 
   // Recálculo reactivo de métricas operativas
   const summary = useMemo(() => {

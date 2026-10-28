@@ -94,10 +94,7 @@ export default function CoordinatorTreasuryView() {
       ) : (
         <CoordinatorFeesSection
           data={data ? { summary: data.summary, players: data.players } : undefined}
-          selectedTeamId={selectedTeamId}
-          selectedTeamName={selectedTeam?.name}
           teams={data?.teams}
-          onSelectTeamId={setSelectedTeamId}
         />
       )}
     </div>

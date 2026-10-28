@@ -440,13 +440,10 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           onPlayerClick={(playerId) => router.push(`/dashboard/matches?view=disciplina`)}
         />
 
-        {/* 7. Control de Cuotas y Pagos de Jugadores (Solo Lectura Coordinación) */}
+        {/* 7. Control de Cuotas y Pagos de Jugadores (Solo Lectura Coordinación - Filtro independiente) */}
         <CoordinatorFeesSection
           data={data.payments}
-          selectedTeamId={selectedTeamId}
-          selectedTeamName={currentTeam?.name}
           teams={teamsList}
-          onSelectTeamId={handleSelectTeamId}
         />
 
         {/* 8. Agenda del Club y Comunicaciones (Partidos, Entrenamientos y Canales Oficiales) */}

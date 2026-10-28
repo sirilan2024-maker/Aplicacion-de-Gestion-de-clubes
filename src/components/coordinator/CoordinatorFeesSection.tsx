@@ -55,7 +55,7 @@ export function CoordinatorFeesSection({
 
   const allPlayers = useMemo(() => data?.players || [], [data?.players]);
 
-  // Lista canónica de equipos disponibles para el desplegable
+  // Lista de equipos disponibles para el desplegable
   const availableTeams = useMemo(() => {
     if (teams && teams.length > 0) return teams;
     const map = new Map<string, string>();
@@ -67,7 +67,7 @@ export function CoordinatorFeesSection({
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [teams, allPlayers]);
 
-  // Filtrado según equipo seleccionado en el desplegable
+  // Filtrado según equipo seleccionado
   const teamPlayers = useMemo(() => {
     if (!effectiveTeamId || effectiveTeamId === "all") return allPlayers;
     return allPlayers.filter((p) => p.teamId === effectiveTeamId);
@@ -80,7 +80,7 @@ export function CoordinatorFeesSection({
     return found?.name || selectedTeamName || "Equipo seleccionado";
   }, [effectiveTeamId, availableTeams, selectedTeamName]);
 
-  // Recálculo reactivo de métricas operativas (SIN exponer dinero global ni ingresos)
+  // Recálculo reactivo de métricas operativas
   const summary = useMemo(() => {
     const total = teamPlayers.length;
     const alDia = teamPlayers.filter((p) => p.status === "al_dia").length;
@@ -105,7 +105,7 @@ export function CoordinatorFeesSection({
     };
   }, [teamPlayers]);
 
-  // Filtrado interactivo por texto y selector de estado
+  // Filtrado por texto y selector de estado
   const displayedPlayers = useMemo(() => {
     return teamPlayers.filter((p) => {
       const matchSearch =
@@ -123,7 +123,7 @@ export function CoordinatorFeesSection({
     });
   }, [teamPlayers, search, statusFilter]);
 
-  // Exportación directa a CSV con formato UTF-8 compatible con Microsoft Excel
+  // Exportación directa a CSV con UTF-8 BOM
   const handleExportCSV = () => {
     if (displayedPlayers.length === 0) return;
 
@@ -137,7 +137,7 @@ export function CoordinatorFeesSection({
       "Cuotas Pendientes",
       "Estado General",
       "Total Adeudado (€)",
-      "Detalle de Cuotas Pendientes"
+      "Detalle de Cuotas"
     ];
 
     const rows = displayedPlayers.map((p) => {
@@ -193,28 +193,28 @@ export function CoordinatorFeesSection({
   return (
     <div id="seccion-cuotas" className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden scroll-mt-20">
       {/* 1. Cabecera de la Sección */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-slate-50/60 to-white">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
+      <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-50/60 to-white">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
             <Wallet className="w-5 h-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
                 Control de Cuotas y Pagos
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+              <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                 Solo Lectura
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Estado de pagos y regularidad de cuotas · <strong className="text-slate-700 font-extrabold">{activeTeamName}</strong>
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
+              Estado de regularidad · <span className="text-slate-700 font-extrabold">{activeTeamName}</span>
             </p>
           </div>
         </div>
 
         {/* Botón de exportar a Excel / CSV */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <button
             onClick={handleExportCSV}
             disabled={displayedPlayers.length === 0}
@@ -227,108 +227,111 @@ export function CoordinatorFeesSection({
         </div>
       </div>
 
-      {/* 2. Contadores Rápidos Operativos (KPIs de Jugadores, SIN importes globales) */}
+      {/* 2. Contadores Rápidos Operativos (KPIs adaptados para móvil sin descuadre) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/40">
-        <div className="p-3.5 text-center sm:text-left">
+        <div className="p-2.5 sm:p-3.5 text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-between text-slate-400">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider">Total Jugadores</span>
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider truncate">Jugadores</span>
             <Users className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
+          <p className="text-lg sm:text-2xl font-black text-slate-900 mt-0.5 leading-tight">
             {summary.total}
           </p>
-          <p className="text-[10px] text-slate-400">{summary.totalFeesCount} cuotas asignadas</p>
+          <p className="text-[9px] sm:text-[10px] text-slate-400 truncate">{summary.totalFeesCount} cuotas asignadas</p>
         </div>
 
-        <div className="p-3.5 text-center sm:text-left">
+        <div className="p-2.5 sm:p-3.5 text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-between text-emerald-600">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider">Jugadores Al Día</span>
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider truncate">Al Día</span>
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 hidden sm:block" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">
+          <p className="text-lg sm:text-2xl font-black text-emerald-600 mt-0.5 leading-tight">
             {summary.alDia}
           </p>
-          <p className="text-[10px] text-emerald-700 font-semibold">{summary.totalPaidFeesCount} cuotas pagadas</p>
+          <p className="text-[9px] sm:text-[10px] text-emerald-700 font-bold truncate">{summary.totalPaidFeesCount} cuotas pagadas</p>
         </div>
 
-        <div className="p-3.5 text-center sm:text-left">
+        <div className="p-2.5 sm:p-3.5 text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-between text-rose-600">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider">Con Pendientes</span>
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider truncate">Pendientes</span>
             <AlertTriangle className="w-3.5 h-3.5 text-rose-500 hidden sm:block" />
           </div>
-          <p className={`text-xl sm:text-2xl font-black mt-0.5 ${summary.conDeuda > 0 ? "text-rose-600" : "text-slate-900"}`}>
+          <p className={`text-lg sm:text-2xl font-black mt-0.5 leading-tight ${summary.conDeuda > 0 ? "text-rose-600" : "text-slate-900"}`}>
             {summary.conDeuda}
           </p>
-          <p className="text-[10px] text-rose-600 font-bold">{summary.totalPendingFeesCount} cuotas por regularizar</p>
+          <p className="text-[9px] sm:text-[10px] text-rose-600 font-bold truncate">{summary.totalPendingFeesCount} por regularizar</p>
         </div>
 
-        <div className="p-3.5 text-center sm:text-left">
+        <div className="p-2.5 sm:p-3.5 text-center sm:text-left">
           <div className="flex items-center justify-center sm:justify-between text-indigo-600">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider">Regularidad</span>
+            <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider truncate">Cumplimiento</span>
             <Shield className="w-3.5 h-3.5 text-indigo-600 hidden sm:block" />
           </div>
-          <p className="text-xl sm:text-2xl font-black text-indigo-600 mt-0.5">
+          <p className="text-lg sm:text-2xl font-black text-indigo-600 mt-0.5 leading-tight">
             {summary.rate}%
           </p>
-          <p className="text-[10px] text-slate-400">Ratio de cumplimiento</p>
+          <p className="text-[9px] sm:text-[10px] text-slate-400 truncate">Ratio regularidad</p>
         </div>
       </div>
 
-      {/* 3. Filtros, Desplegable de Equipos y Buscador */}
-      <div className="p-3.5 sm:p-4 bg-slate-50/70 border-b border-slate-100 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+      {/* 3. Filtros, Desplegable de Equipos y Buscador (Optimizados para pantallas móviles) */}
+      <div className="p-3 sm:p-4 bg-slate-50/70 border-b border-slate-100 flex flex-col gap-2.5">
         
-        {/* Desplegable de Selección por Equipos */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="team-select" className="text-xs font-black text-slate-700 whitespace-nowrap flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Equipo:</span>
-          </label>
-          <div className="relative flex-1 sm:w-60">
-            <select
-              id="team-select"
-              value={effectiveTeamId}
-              onChange={(e) => handleTeamChange(e.target.value)}
-              className="w-full appearance-none bg-white border border-slate-300 text-slate-900 text-xs font-extrabold rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-xs transition-all"
-            >
-              <option value="all">Todos los Equipos ({allPlayers.length})</option>
-              {availableTeams.map((t) => {
-                const count = allPlayers.filter((p) => p.teamId === t.id).length;
-                return (
-                  <option key={t.id} value={t.id}>
-                    {t.name} {count > 0 ? `(${count})` : ""}
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        {/* Fila superior: Selector de Equipo + Buscador */}
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+          {/* Desplegable de Selección por Equipos */}
+          <div className="flex items-center gap-2 flex-1 sm:max-w-xs">
+            <label htmlFor="team-select" className="text-xs font-black text-slate-700 whitespace-nowrap flex items-center gap-1 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Equipo:</span>
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="team-select"
+                value={effectiveTeamId}
+                onChange={(e) => handleTeamChange(e.target.value)}
+                className="w-full appearance-none bg-white border border-slate-300 text-slate-900 text-xs font-extrabold rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs truncate"
+              >
+                <option value="all">Todos los Equipos ({allPlayers.length})</option>
+                {availableTeams.map((t) => {
+                  const count = allPlayers.filter((p) => p.teamId === t.id).length;
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {count > 0 ? `(${count})` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Buscador de Jugadores */}
+          <div className="relative flex-1 sm:max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por jugador o dorsal..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-7 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-800"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Buscador de Jugadores */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por jugador o dorsal..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-800"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Selector de Estado */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+        {/* Fila inferior: Botones de filtro de estado (3 columnas exactas en móvil) */}
+        <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center">
           <button
             onClick={() => setStatusFilter("TODOS")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            className={`py-1.5 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center cursor-pointer truncate ${
               statusFilter === "TODOS"
                 ? "bg-slate-900 text-white shadow-xs"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
@@ -338,17 +341,17 @@ export function CoordinatorFeesSection({
           </button>
           <button
             onClick={() => setStatusFilter("CON_DEUDA")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            className={`py-1.5 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center cursor-pointer truncate ${
               statusFilter === "CON_DEUDA"
                 ? "bg-rose-600 text-white shadow-xs"
                 : "bg-white text-rose-700 hover:bg-rose-50 border border-rose-200"
             }`}
           >
-            Con Pendientes ({summary.conDeuda})
+            Pendientes ({summary.conDeuda})
           </button>
           <button
             onClick={() => setStatusFilter("AL_DIA")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            className={`py-1.5 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center cursor-pointer truncate ${
               statusFilter === "AL_DIA"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
@@ -359,8 +362,8 @@ export function CoordinatorFeesSection({
         </div>
       </div>
 
-      {/* 4. Lista Directa de Jugadores y Cuotas (Sin modales ni desplegables) */}
-      <div className="divide-y divide-slate-100 max-h-[580px] overflow-y-auto">
+      {/* 4. Lista de Jugadores y Cuotas (Totalmente adaptada a móvil sin desbordes) */}
+      <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
         {displayedPlayers.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
             <Users className="w-8 h-8 text-slate-300" />
@@ -380,15 +383,15 @@ export function CoordinatorFeesSection({
             return (
               <div
                 key={player.playerId}
-                className={`p-3.5 sm:p-4 transition-colors ${
+                className={`p-3 sm:p-4 transition-colors ${
                   hasDebt ? "bg-rose-50/20 hover:bg-rose-50/40" : "hover:bg-slate-50/70"
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  {/* Identificación del Jugador */}
-                  <div className="flex items-start gap-3 min-w-0">
+                {/* Cabecera del Jugador: Avatar + Nombre + Importe Total Adeudado */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
                         hasDebt
                           ? "bg-rose-100 text-rose-700 border border-rose-200"
                           : isAlDia
@@ -403,128 +406,114 @@ export function CoordinatorFeesSection({
                       )}
                     </div>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-extrabold text-slate-900 truncate">
-                          {player.playerName}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200/80">
-                          {player.teamName} {player.teamCategory ? `· ${player.teamCategory}` : ""}
-                        </span>
-                      </div>
-
-                      {/* Métricas Clarísimas: Cuotas X | Pagadas Y | Pendientes Z */}
-                      {player.status === "sin_cuotas" ? (
-                        <div className="mt-1.5">
-                          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                            Sin cuotas asignadas en la temporada
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 sm:gap-2 mt-2 flex-wrap">
-                          {/* Cuotas Totales */}
-                          <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold">
-                            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold">Cuotas:</span>
-                            <span className="text-xs font-black text-slate-900">{player.totalFeesCount}</span>
-                          </div>
-
-                          {/* Cuotas Pagadas */}
-                          <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-extrabold">Pagada{player.paidFeesCount === 1 ? "" : "s"}:</span>
-                            <span className="text-xs font-black text-emerald-900">{player.paidFeesCount}</span>
-                          </div>
-
-                          {/* Cuotas Pendientes */}
-                          <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold ${
-                            player.pendingFeesCount > 0
-                              ? "bg-rose-50 text-rose-800 border-rose-200"
-                              : "bg-emerald-50/60 text-emerald-700 border-emerald-200"
-                          }`}>
-                            {player.pendingFeesCount > 0 ? (
-                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                            ) : (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            )}
-                            <span className={`text-[10px] uppercase tracking-wider font-extrabold ${
-                              player.pendingFeesCount > 0 ? "text-rose-700" : "text-emerald-700"
-                            }`}>
-                              Pendiente{player.pendingFeesCount === 1 ? "" : "s"}:
-                            </span>
-                            <span className={`text-xs font-black ${
-                              player.pendingFeesCount > 0 ? "text-rose-900" : "text-emerald-800"
-                            }`}>
-                              {player.pendingFeesCount}
-                            </span>
-                          </div>
-
-                          {/* Badge de Estado Global */}
-                          {isAlDia && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              Al día
-                            </span>
-                          )}
-                          {hasDebt && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
-                              Pendiente de cobro
-                            </span>
-                          )}
-                        </div>
-                      )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-extrabold text-slate-900 truncate">
+                        {player.playerName}
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate">
+                        {player.teamName} {player.teamCategory ? `· ${player.teamCategory}` : ""}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Resumen de importe individual adeudado (para informar a familias) */}
-                  {hasDebt && (
-                    <div className="sm:text-right shrink-0 bg-white sm:bg-transparent p-2 sm:p-0 rounded-lg border sm:border-0 border-rose-100">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-500 block">
-                        Total Adeudado
+                  {/* Bloque Total Adeudado (compacto y fijo a la derecha) */}
+                  {hasDebt ? (
+                    <div className="text-right shrink-0 bg-rose-50/90 px-2 py-1 rounded-lg border border-rose-200/90 shadow-2xs">
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-500 block leading-none">
+                        Debe
                       </span>
-                      <span className="text-base font-black text-rose-600 tracking-tight">
+                      <span className="text-xs sm:text-sm font-black text-rose-600 leading-tight block mt-0.5">
                         {formatEuro(player.totalPendingCents)}
                       </span>
                     </div>
-                  )}
+                  ) : isAlDia ? (
+                    <div className="text-right shrink-0 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                      <span className="text-[10px] font-extrabold text-emerald-700 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        Al día
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
 
-                {/* Desglose visual directo de todas las cuotas (pagadas y pendientes) */}
-                {feesList && feesList.length > 0 && (
-                  <div className="mt-3 pl-0 sm:pl-13">
-                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 sm:p-3 shadow-2xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                          Desglose de cuotas del jugador:
-                        </p>
-                        {hasDebt && (
-                          <span className="text-[11px] font-black text-rose-600">
-                            Debe: {formatEuro(player.totalPendingCents)}
-                          </span>
-                        )}
-                      </div>
+                {/* Métricas Exactas: Cuotas 2 | Pagadas 1 | Pendientes 1 (3 Columnas en Móvil) */}
+                {player.status === "sin_cuotas" ? (
+                  <div className="mt-2">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                      Sin cuotas asignadas en la temporada
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2 mt-2.5 pt-2 border-t border-slate-100/90">
+                    {/* Cuotas Totales */}
+                    <div className="bg-slate-100/90 text-slate-700 px-2 py-1 rounded-lg border border-slate-200/90 text-center sm:text-left text-[11px] font-bold">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 block sm:inline font-extrabold sm:mr-1">
+                        Cuotas:
+                      </span>
+                      <span className="text-xs font-black text-slate-900">{player.totalFeesCount}</span>
+                    </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Cuotas Pagadas */}
+                    <div className="bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg border border-emerald-200 text-center sm:text-left text-[11px] font-bold">
+                      <span className="text-[9px] uppercase tracking-wider text-emerald-600 block sm:inline font-extrabold sm:mr-1">
+                        Pagadas:
+                      </span>
+                      <span className="text-xs font-black text-emerald-800">{player.paidFeesCount}</span>
+                    </div>
+
+                    {/* Cuotas Pendientes */}
+                    <div className={`px-2 py-1 rounded-lg border text-center sm:text-left text-[11px] font-bold ${
+                      player.pendingFeesCount > 0
+                        ? "bg-rose-50 text-rose-800 border-rose-200"
+                        : "bg-emerald-50/50 text-emerald-700 border-emerald-200"
+                    }`}>
+                      <span className={`text-[9px] uppercase tracking-wider block sm:inline font-extrabold sm:mr-1 ${
+                        player.pendingFeesCount > 0 ? "text-rose-600" : "text-emerald-600"
+                      }`}>
+                        Pendientes:
+                      </span>
+                      <span className={`text-xs font-black ${
+                        player.pendingFeesCount > 0 ? "text-rose-800" : "text-emerald-700"
+                      }`}>
+                        {player.pendingFeesCount}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Desglose de cuotas individuales (Totalmente blindado contra desbordes) */}
+                {feesList && feesList.length > 0 && (
+                  <div className="mt-2.5">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2 sm:p-2.5 shadow-2xs space-y-1.5">
+                      <p className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                        Detalle de cuotas del jugador:
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         {feesList.map((fee) => {
                           const isFeePaid = fee.status === "pagado";
 
                           return (
                             <div
                               key={fee.id}
-                              className={`flex items-center justify-between gap-2 p-2.5 rounded-lg border text-xs transition-colors ${
+                              className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs transition-colors overflow-hidden ${
                                 isFeePaid
-                                  ? "bg-emerald-50/40 border-emerald-200 text-emerald-900"
-                                  : "bg-rose-50/60 border-rose-200 text-rose-900"
+                                  ? "bg-emerald-50/30 border-emerald-200/80 text-emerald-900"
+                                  : "bg-rose-50/50 border-rose-200 text-rose-900"
                               }`}
                             >
-                              <div className="min-w-0 flex items-center gap-1.5">
+                              <div className="min-w-0 flex-1 flex items-center gap-1.5 overflow-hidden">
                                 {isFeePaid ? (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                 ) : (
                                   <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                                 )}
-                                <div className="truncate">
-                                  <p className="font-bold text-slate-900 truncate">{fee.concept}</p>
+                                <div className="min-w-0 flex-1 truncate">
+                                  <p className="font-bold text-slate-900 text-xs truncate leading-tight">
+                                    {fee.concept}
+                                  </p>
                                   {fee.creadoEn && (
-                                    <p className="text-[10px] text-slate-400">
+                                    <p className="text-[10px] text-slate-400 leading-none mt-0.5 truncate">
                                       {new Date(fee.creadoEn).toLocaleDateString("es-ES")}
                                     </p>
                                   )}
@@ -532,10 +521,14 @@ export function CoordinatorFeesSection({
                               </div>
 
                               <div className="text-right shrink-0">
-                                <span className={`font-black ${isFeePaid ? "text-emerald-700" : "text-rose-600"}`}>
+                                <span className={`font-black text-xs block leading-tight ${
+                                  isFeePaid ? "text-emerald-700" : "text-rose-600"
+                                }`}>
                                   {isFeePaid ? formatEuro(fee.amountCents) : formatEuro(fee.pendingCents)}
                                 </span>
-                                <span className={`block text-[10px] font-extrabold ${isFeePaid ? "text-emerald-600" : "text-rose-600"}`}>
+                                <span className={`text-[9px] font-extrabold uppercase leading-none block mt-0.5 ${
+                                  isFeePaid ? "text-emerald-600" : "text-rose-600"
+                                }`}>
                                   {isFeePaid ? "Pagada" : "Pendiente"}
                                 </span>
                               </div>
@@ -553,12 +546,12 @@ export function CoordinatorFeesSection({
       </div>
 
       {/* 5. Pie de Sección Informativo */}
-      <div className="p-3 bg-slate-50 border-t border-slate-100 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
-        <span>
-          Mostrando {displayedPlayers.length} de {teamPlayers.length} jugadores · Temporada activa 26/27
+      <div className="p-2.5 sm:p-3 bg-slate-50 border-t border-slate-100 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] text-slate-400 gap-1.5">
+        <span className="truncate">
+          Mostrando {displayedPlayers.length} de {teamPlayers.length} jugadores · Temporada 26/27
         </span>
-        <span className="text-slate-400 font-medium">
-          Acceso de coordinación en solo lectura
+        <span className="text-slate-400 font-medium shrink-0">
+          Coordinación · Solo lectura
         </span>
       </div>
     </div>

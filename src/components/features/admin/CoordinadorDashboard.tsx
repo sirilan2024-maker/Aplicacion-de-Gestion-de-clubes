@@ -445,6 +445,8 @@ export function CoordinadorDashboard({ initialResult, userFirstName }: Props) {
           data={data.payments}
           selectedTeamId={selectedTeamId}
           selectedTeamName={currentTeam?.name}
+          teams={teamsList}
+          onSelectTeamId={handleSelectTeamId}
         />
 
         {/* 8. Agenda del Club y Comunicaciones (Partidos, Entrenamientos y Canales Oficiales) */}

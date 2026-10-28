@@ -200,7 +200,7 @@ export default function AdminAsistenciaPage() {
     })
 
     const totalRecords = filteredRecords.length
-    const attendanceRate = totalRecords > 0 ? Math.round((presentes / totalRecords) * 100) : 0
+    const attendanceRate = totalRecords > 0 ? Math.round(((presentes + retrasos) / totalRecords) * 100) : 0
 
     return {
       totalRecords,

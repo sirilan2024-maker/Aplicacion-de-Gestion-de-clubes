@@ -973,7 +973,10 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         .in('player_id', activePlayerIds)
 
       if (attRows && attRows.length > 0) {
-        const presentes = attRows.filter((r: any) => (r.status || '').toLowerCase().trim() === 'presente' || (r.status || '').toLowerCase().trim() === 'present').length
+        const presentes = attRows.filter((r: any) => {
+          const s = (r.status || '').toLowerCase().trim();
+          return s === 'presente' || s === 'present' || s === 'retraso' || s === 'late';
+        }).length
         attendanceRate = Math.round((presentes / attRows.length) * 100)
       }
     }
@@ -1399,7 +1402,11 @@ export async function getCoordinatorFullDashboardAction(params?: {
     }
 
     const totalAttRecords = attList.length;
-    const presentRecords = attList.filter(a => a.status === 'present' || a.status === 'presente').length;
+    const isAttended = (status?: string | null) => {
+      const s = (status || '').toLowerCase().trim();
+      return s === 'present' || s === 'presente' || s === 'retraso' || s === 'late';
+    };
+    const presentRecords = attList.filter(a => isAttended(a.status)).length;
     const globalWeeklyRate = totalAttRecords > 0
       ? Math.round((presentRecords / totalAttRecords) * 100)
       : 89;
@@ -1420,7 +1427,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
       const catAtt = attList.filter(a => matchedPlayerIds.has(a.player_id));
 
       const count = catAtt.length;
-      const present = catAtt.filter(a => a.status === 'present' || a.status === 'presente').length;
+      const present = catAtt.filter(a => isAttended(a.status)).length;
       const rate = count > 0 ? Math.round((present / count) * 100) : 88;
 
       return {
@@ -1620,7 +1627,10 @@ export async function getCoordinatorFullDashboardAction(params?: {
       const tPlayers = players.filter(p => p.team_id === t.id);
       const tPlayerIds = new Set(tPlayers.map(p => p.id));
       const tAtt = attList.filter(a => tPlayerIds.has(a.player_id));
-      const presentCount = tAtt.filter(a => (a.status || '').toLowerCase().includes('present')).length;
+      const presentCount = tAtt.filter(a => {
+        const s = (a.status || '').toLowerCase().trim();
+        return s.includes('present') || s.includes('retras') || s.includes('late');
+      }).length;
       const rate = tAtt.length > 0 ? Math.round((presentCount / tAtt.length) * 100) : 89;
 
       const absentMap = new Map<string, { count: number; name: string; date?: string; status: string; notes?: string }>();
@@ -2060,6 +2070,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
       let pendingCount = 0;
       let totalPendingCents = 0;
       const pendingFeesList: any[] = [];
+      const allFeesList: any[] = [];
 
       playerFees.forEach((f: any) => {
         const amountCents = f.amount_cents || 0;
@@ -2071,20 +2082,24 @@ export async function getCoordinatorFullDashboardAction(params?: {
         const isFullyPaid = f.estado === 'pagado' || (amountCents > 0 && paidCents >= amountCents);
         const pendingForFee = Math.max(0, amountCents - paidCents);
 
+        const feeItem = {
+          id: f.id,
+          concept: f.concept || 'Cuota mensual',
+          amountCents,
+          amountPaidCents: paidCents,
+          pendingCents: pendingForFee,
+          status: isFullyPaid ? 'pagado' : (f.estado || 'pendiente'),
+          creadoEn: f.creado_en || null,
+        };
+
+        allFeesList.push(feeItem);
+
         if (isFullyPaid) {
           paidCount++;
         } else {
           pendingCount++;
           totalPendingCents += pendingForFee;
-          pendingFeesList.push({
-            id: f.id,
-            concept: f.concept || 'Cuota mensual',
-            amountCents,
-            amountPaidCents: paidCents,
-            pendingCents: pendingForFee,
-            status: f.estado || 'pendiente',
-            creadoEn: f.creado_en || null,
-          });
+          pendingFeesList.push(feeItem);
         }
       });
 
@@ -2109,6 +2124,7 @@ export async function getCoordinatorFullDashboardAction(params?: {
         pendingFeesCount: pendingCount,
         totalPendingCents,
         pendingFees: pendingFeesList,
+        allFees: allFeesList,
       };
     });
 
@@ -2317,6 +2333,7 @@ export async function getCoordinatorPlayerFeesStatusAction(params?: {
       let pendingCount = 0;
       let totalPendingCents = 0;
       const pendingFeesList: any[] = [];
+      const allFeesList: any[] = [];
 
       playerFees.forEach((f: any) => {
         const amountCents = f.amount_cents || 0;
@@ -2328,20 +2345,24 @@ export async function getCoordinatorPlayerFeesStatusAction(params?: {
         const isFullyPaid = f.estado === 'pagado' || (amountCents > 0 && paidCents >= amountCents);
         const pendingForFee = Math.max(0, amountCents - paidCents);
 
+        const feeItem = {
+          id: f.id,
+          concept: f.concept || 'Cuota mensual',
+          amountCents,
+          amountPaidCents: paidCents,
+          pendingCents: pendingForFee,
+          status: isFullyPaid ? 'pagado' : (f.estado || 'pendiente'),
+          creadoEn: f.creado_en || null,
+        };
+
+        allFeesList.push(feeItem);
+
         if (isFullyPaid) {
           paidCount++;
         } else {
           pendingCount++;
           totalPendingCents += pendingForFee;
-          pendingFeesList.push({
-            id: f.id,
-            concept: f.concept || 'Cuota mensual',
-            amountCents,
-            amountPaidCents: paidCents,
-            pendingCents: pendingForFee,
-            status: f.estado || 'pendiente',
-            creadoEn: f.creado_en || null,
-          });
+          pendingFeesList.push(feeItem);
         }
       });
 
@@ -2366,6 +2387,7 @@ export async function getCoordinatorPlayerFeesStatusAction(params?: {
         pendingFeesCount: pendingCount,
         totalPendingCents,
         pendingFees: pendingFeesList,
+        allFees: allFeesList,
       };
     });
 

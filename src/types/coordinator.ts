@@ -317,6 +317,7 @@ export interface CoordinatorPlayerPaymentRecord {
   pendingFeesCount: number;
   totalPendingCents: number;
   pendingFees: CoordinatorPlayerFeeItem[];
+  allFees?: CoordinatorPlayerFeeItem[];
 }
 
 export interface CoordinatorPaymentsData {

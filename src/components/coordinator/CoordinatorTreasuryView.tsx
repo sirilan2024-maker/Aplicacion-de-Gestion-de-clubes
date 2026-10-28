@@ -85,35 +85,6 @@ export default function CoordinatorTreasuryView() {
         </div>
       </div>
 
-      {/* Selector de Equipo para Coordinador */}
-      {data?.teams && data.teams.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          <button
-            onClick={() => setSelectedTeamId("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              selectedTeamId === "all"
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            Todos los Equipos
-          </button>
-          {data.teams.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedTeamId(t.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                selectedTeamId === t.id
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-              }`}
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Componente Central de Cuotas y Pagos */}
       {loading && !data ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-3">
@@ -125,6 +96,8 @@ export default function CoordinatorTreasuryView() {
           data={data ? { summary: data.summary, players: data.players } : undefined}
           selectedTeamId={selectedTeamId}
           selectedTeamName={selectedTeam?.name}
+          teams={data?.teams}
+          onSelectTeamId={setSelectedTeamId}
         />
       )}
     </div>

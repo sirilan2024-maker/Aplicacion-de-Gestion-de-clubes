@@ -415,7 +415,7 @@ export async function getGlobalAttendanceAction(
     }
 
     const totalRecords = records.length
-    const attendanceRate = totalRecords > 0 ? Math.round((presentes / totalRecords) * 100) : 0
+    const attendanceRate = totalRecords > 0 ? Math.round(((presentes + retrasos) / totalRecords) * 100) : 0
 
     const kpis: AttendanceKPIs = {
       totalRecords,

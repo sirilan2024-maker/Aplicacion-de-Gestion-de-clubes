@@ -2,7 +2,7 @@
  * Sporting Saladar - Service Worker Oficial para PWA y Web Push
  */
 
-const CACHE_NAME = 'sporting-saladar-v3';
+const CACHE_NAME = 'sporting-saladar-v4';
 
 // ==============================================================================
 // 1. INSTALACIÓN INMEDIATA (0 ms, sin bloqueos de red ni precache fallido)

@@ -232,7 +232,7 @@ export default function PlayerDashboardPage() {
         // Fetch Discipline and Match Stats from convocatorias and match_events (from federative actas)
         const { data: convData } = await supabase
           .from("convocatorias")
-          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, estado_asistencia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado, season_id, equipo_id, equipo:teams(id, name, category))')
+          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, estado_asistencia, partidos(id, rival_nombre, fecha_hora, hora_citacion, lugar, resultado_propio, resultado_rival, estado, season_id, equipo_id, equipo:teams(id, name, category))')
           .eq("player_id", playerId);
 
         const allAttRecords: any[] = [...(attendanceData || [])];

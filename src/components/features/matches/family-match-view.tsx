@@ -160,6 +160,24 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
     ? matchDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
     : '';
 
+  const citacionAdvanceText = (() => {
+    if (!citacionDate || isNaN(citacionDate.getTime()) || isNaN(matchDate.getTime())) {
+      return `1 hora antes del inicio oficial a las ${matchTimeStr} h`;
+    }
+    const matchMins = matchDate.getHours() * 60 + matchDate.getMinutes();
+    const citMins = citacionDate.getHours() * 60 + citacionDate.getMinutes();
+    const diffMins = matchMins - citMins;
+    if (diffMins <= 0) return `inicio oficial a las ${matchTimeStr} h`;
+    if (diffMins === 60) return `1 hora antes del inicio oficial a las ${matchTimeStr} h`;
+    if (diffMins < 60) return `${diffMins} minutos antes del inicio oficial a las ${matchTimeStr} h`;
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    const hLabel = hours === 1 ? '1 hora' : `${hours} horas`;
+    return mins === 0
+      ? `${hLabel} antes del inicio oficial a las ${matchTimeStr} h`
+      : `${hLabel} y ${mins} minutos antes del inicio oficial a las ${matchTimeStr} h`;
+  })();
+
   // Player specific
   const playerConv = convocatoriasList.find(c => c.player_id === playerId);
   const playerEvents = matchEvents.filter(e => e.player_id === playerId);
@@ -328,7 +346,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
               <p className="text-blue-700 text-sm">
                 El entrenador ha convocado al jugador para este partido.
                 {citacionTimeStr && (
-                  <> Hora de llegada al campo: <strong>{citacionTimeStr} h</strong> (1 hora antes del inicio oficial a las {matchTimeStr} h).</>
+                  <> Hora de llegada al campo: <strong>{citacionTimeStr} h</strong> ({citacionAdvanceText}).</>
                 )}
                 {playerConv.estado_asistencia === 'Confirmado'
                   ? " Has confirmado que ASISTIRÁ al encuentro."

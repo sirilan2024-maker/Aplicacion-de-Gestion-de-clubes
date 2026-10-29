@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X } from "lucide-react";
+import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X, ChevronDown, ChevronUp, UserCheck, Clock } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO, differenceInDays, addDays, getDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -49,6 +49,10 @@ export default function EntrenamientosListPage() {
   const [rsvpDaysBefore, setRsvpDaysBefore] = useState<number>(1);
   const [rsvpDate, setRsvpDate] = useState("");
   const [rsvpTime, setRsvpTime] = useState("19:00");
+
+  // Collapsible History & Filter states
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<string>("current_month");
 
   useEffect(() => {
     fetchData();
@@ -154,7 +158,6 @@ export default function EntrenamientosListPage() {
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
-    const supabase = createClient();
     
     if (isRecurring && (!recurringEndDate || recurringDays.length === 0)) {
       toast.error("Selecciona días y fecha fin para la recurrencia.");
@@ -265,79 +268,331 @@ export default function EntrenamientosListPage() {
     return { text: "Peligro / Sobrecarga", color: "bg-red-100 text-red-700" };
   };
 
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const currentMonthKey = useMemo(() => format(new Date(), 'yyyy-MM'), []);
+
+  // Determinar sesión destacada superior (Hoy -> Próxima -> Última pasada)
+  const featuredData = useMemo(() => {
+    if (sessions.length === 0) return null;
+    const todaySessions = sessions.filter(s => s.date === todayStr);
+    if (todaySessions.length > 0) {
+      return { session: todaySessions[0], kind: 'today' as const, extraToday: todaySessions.slice(1) };
+    }
+    const nextUpcoming = sessions.find(s => s.date > todayStr);
+    if (nextUpcoming) {
+      return { session: nextUpcoming, kind: 'upcoming' as const, extraToday: [] };
+    }
+    return { session: sessions[sessions.length - 1], kind: 'latest' as const, extraToday: [] };
+  }, [sessions, todayStr]);
+
+  // Meses disponibles en la temporada para el selector desplegable
+  const availableMonths = useMemo(() => {
+    const map = new Map<string, string>();
+    // Asegurar que el mes actual esté siempre disponible
+    const nowLabel = format(new Date(), "MMMM yyyy", { locale: es });
+    map.set(currentMonthKey, nowLabel.charAt(0).toUpperCase() + nowLabel.slice(1));
+
+    sessions.forEach(s => {
+      const mKey = s.date.substring(0, 7);
+      if (!map.has(mKey)) {
+        const label = format(parseISO(`${mKey}-01`), "MMMM yyyy", { locale: es });
+        map.set(mKey, label.charAt(0).toUpperCase() + label.slice(1));
+      }
+    });
+
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [sessions, currentMonthKey]);
+
+  // Sesiones filtradas para el desplegable de historial
+  const filteredHistorySessions = useMemo(() => {
+    if (historyFilter === 'all_season') {
+      return sessions;
+    }
+    const targetMonth = historyFilter === 'current_month' ? currentMonthKey : historyFilter;
+    return sessions.filter(s => s.date.startsWith(targetMonth));
+  }, [sessions, historyFilter, currentMonthKey]);
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <Toaster position="bottom-right" />
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
-            <Target size={28} />
+          <div className="p-3 bg-blue-100 text-blue-600 rounded-xl shrink-0">
+            <Target size={26} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Módulo de Entrenamientos</h1>
-            <p className="text-gray-500">Planifica las sesiones y evalúa la carga física y formativa.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">Módulo de Entrenamientos</h1>
+            <p className="text-sm text-gray-500">Planifica las sesiones, pasa lista y evalúa la carga.</p>
           </div>
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-70"
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold transition-colors disabled:opacity-70 shadow-sm shrink-0"
         >
           <Plus size={18} />
           Nueva Sesión
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* LEFT COLUMN: SESSIONS LIST */}
-        <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <CalendarDays className="text-blue-500" />
-            Historial de Sesiones
-          </h2>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            {loading ? (
-              <div className="p-12 text-center text-gray-500 flex flex-col items-center">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-3" />
-                Cargando sesiones...
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                No hay sesiones de entrenamiento registradas aún.
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {sessions.map(session => (
-                  <div key={session.id} className="p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div className="flex flex-col gap-1">
-                      <h3 className="font-bold text-gray-900 text-lg">{session.title}</h3>
-                      <div className="text-sm text-gray-500 font-medium">
-                        {format(parseISO(session.date), "EEEE d 'de' MMMM, yyyy", { locale: es })} • {session.start_time.substring(0,5)}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+        {/* LEFT COLUMN: TODAY'S / NEXT SESSION + COLLAPSIBLE HISTORY */}
+        <div className="lg:col-span-2 space-y-5">
+          {loading ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center text-gray-500 flex flex-col items-center">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-3" />
+              Cargando sesiones...
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 text-center text-gray-500">
+              No hay sesiones de entrenamiento registradas aún.
+            </div>
+          ) : (
+            <>
+              {/* TARJETA DESTACADA: ENTRENAMIENTO DEL DÍA O PRÓXIMA SESIÓN */}
+              {featuredData && (
+                <div className={`rounded-2xl shadow-sm border-2 overflow-hidden transition-all ${
+                  featuredData.kind === 'today' 
+                    ? 'bg-gradient-to-br from-blue-50/90 via-white to-emerald-50/40 border-blue-500/80' 
+                    : 'bg-white border-blue-200'
+                }`}>
+                  <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {featuredData.kind === 'today' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Entrenamiento de Hoy
+                          </span>
+                        ) : featuredData.kind === 'upcoming' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide bg-blue-100 text-blue-800 border border-blue-200">
+                            <Clock size={12} />
+                            Próxima Sesión (Hoy sin entreno)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide bg-gray-100 text-gray-700">
+                            Última Sesión Registrada
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-black text-gray-900">
+                        {featuredData.session.title}
+                      </h2>
+                      <div className="text-sm sm:text-base text-gray-600 font-semibold flex items-center gap-2 flex-wrap">
+                        <CalendarDays size={16} className="text-blue-600 shrink-0" />
+                        <span className="capitalize">
+                          {format(parseISO(featuredData.session.date), "EEEE d 'de' MMMM, yyyy", { locale: es })}
+                        </span>
+                        <span>•</span>
+                        <span className="text-blue-700 font-bold">
+                          {featuredData.session.start_time.substring(0, 5)} h
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                       <button 
-                        onClick={() => handleDeleteSession(session.id)}
-                        className="flex items-center justify-center p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
+                        onClick={() => handleDeleteSession(featuredData.session.id)}
+                        className="flex items-center justify-center p-2.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-xl transition-colors border border-transparent hover:border-red-100 shrink-0"
                         title="Eliminar sesión"
                       >
                         <Trash2 size={18} />
                       </button>
                       <button 
-                        onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${session.id}`)}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-blue-50 text-gray-700 hover:text-blue-700 font-semibold rounded-lg transition-colors"
+                        onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${featuredData.session.id}`)}
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95"
                       >
-                        Evaluar
+                        <UserCheck size={18} />
+                        <span>Pasar Lista</span>
                         <ArrowRight size={16} />
                       </button>
                     </div>
                   </div>
-                ))}
+
+                  {/* Si hubiera más de una sesión en el mismo día de hoy */}
+                  {featuredData.extraToday.length > 0 && (
+                    <div className="border-t border-blue-100 bg-white/80 divide-y divide-gray-100">
+                      {featuredData.extraToday.map(extra => (
+                        <div key={extra.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[11px] font-bold uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                              Otra sesión hoy
+                            </span>
+                            <h3 className="font-bold text-gray-900 mt-0.5">{extra.title}</h3>
+                            <p className="text-xs text-gray-500 font-medium">
+                              Hoy • {extra.start_time.substring(0, 5)} h
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleDeleteSession(extra.id)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                              title="Eliminar sesión"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${extra.id}`)}
+                              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors"
+                            >
+                              <UserCheck size={16} />
+                              <span>Pasar Lista</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PESTAÑA DESPLEGABLE: HISTORIAL DE SESIONES (MES O TODA LA TEMPORADA) */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryOpen(prev => !prev)}
+                  className="w-full p-4 sm:p-5 flex items-center justify-between gap-3 bg-gray-50/70 hover:bg-gray-100/80 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 bg-blue-100/80 text-blue-600 rounded-xl shrink-0">
+                      <CalendarDays size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">
+                        Historial de Sesiones
+                      </h2>
+                      <p className="text-xs text-gray-500 font-medium truncate">
+                        {isHistoryOpen 
+                          ? "Toca para ocultar el listado de sesiones" 
+                          : `Toca para desplegar las sesiones del mes o de toda la temporada (${sessions.length})`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                      {sessions.length}
+                    </span>
+                    <div className="p-1.5 rounded-lg bg-white border border-gray-200 text-gray-600">
+                      {isHistoryOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
+                  </div>
+                </button>
+
+                {isHistoryOpen && (
+                  <div className="border-t border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {/* FILTROS DE MES / TODA LA TEMPORADA */}
+                    <div className="p-3 sm:p-4 bg-slate-50 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                      <div className="grid grid-cols-2 sm:flex gap-1.5 bg-gray-200/70 p-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilter("current_month")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            historyFilter === "current_month"
+                              ? "bg-white text-blue-700 shadow-xs"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          Este Mes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilter("all_season")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            historyFilter === "all_season"
+                              ? "bg-white text-blue-700 shadow-xs"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          Toda la Temporada ({sessions.length})
+                        </button>
+                      </div>
+
+                      {/* Selector de cualquier mes específico */}
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={
+                            historyFilter === "current_month"
+                              ? currentMonthKey
+                              : historyFilter === "all_season"
+                              ? "all_season"
+                              : historyFilter
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === currentMonthKey) setHistoryFilter("current_month");
+                            else setHistoryFilter(val);
+                          }}
+                          className="w-full sm:w-auto bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all_season">📅 Ver toda la temporada</option>
+                          {availableMonths.map(([mKey, mLabel]) => (
+                            <option key={mKey} value={mKey}>
+                              🗓️ {mLabel} {mKey === currentMonthKey ? "(Mes actual)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* LISTA DE SESIONES FILTRADAS */}
+                    {filteredHistorySessions.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-gray-500">
+                        No hay sesiones registradas en este mes. Prueba cambiando a &ldquo;Toda la Temporada&rdquo;.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 max-h-[520px] overflow-y-auto">
+                        {filteredHistorySessions.map(session => {
+                          const isToday = session.date === todayStr;
+                          return (
+                            <div 
+                              key={session.id} 
+                              className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50 transition-colors ${
+                                isToday ? "bg-blue-50/40" : ""
+                              }`}
+                            >
+                              <div className="flex flex-col gap-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="font-bold text-gray-900 text-base sm:text-lg truncate">
+                                    {session.title}
+                                  </h3>
+                                  {isToday && (
+                                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                      Hoy
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs sm:text-sm text-gray-500 font-medium capitalize">
+                                  {format(parseISO(session.date), "EEEE d 'de' MMMM, yyyy", { locale: es })} • {session.start_time.substring(0,5)} h
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-end gap-2 shrink-0">
+                                <button 
+                                  onClick={() => handleDeleteSession(session.id)}
+                                  className="flex items-center justify-center p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
+                                  title="Eliminar sesión"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${session.id}`)}
+                                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-blue-50 text-gray-800 hover:text-blue-700 font-bold text-sm rounded-xl transition-colors"
+                                >
+                                  <UserCheck size={16} />
+                                  <span>Pasar Lista</span>
+                                  <ArrowRight size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         {/* RIGHT COLUMN: ACWR DASHBOARD */}

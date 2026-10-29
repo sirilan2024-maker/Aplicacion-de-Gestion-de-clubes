@@ -238,7 +238,7 @@ export default function PlayerDashboardPage() {
           setAttendanceRecords(attendanceData);
           asisteCount = attendanceData.filter(a => ['presente', 'present'].includes(a.status?.toLowerCase())).length;
           faltasCount = attendanceData.filter(a => ['ausente', 'absent', 'falta'].includes(a.status?.toLowerCase())).length;
-          justificadasCount = attendanceData.filter(a => ['justificada', 'excused', 'lesionado'].includes(a.status?.toLowerCase())).length;
+          justificadasCount = attendanceData.filter(a => ['justificado', 'justificada', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(a.status?.toLowerCase() || '')).length;
           retrasosCount = attendanceData.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
         }
 
@@ -320,9 +320,9 @@ export default function PlayerDashboardPage() {
         }
 
         let ratio = 0;
-        const totalAttendance = asisteCount + retrasosCount + faltasCount;
+        const totalAttendance = asisteCount + retrasosCount + faltasCount + justificadasCount;
         if (totalAttendance > 0) {
-          ratio = Math.round(((asisteCount + retrasosCount) / (asisteCount + retrasosCount + faltasCount + justificadasCount)) * 100);
+          ratio = Math.round(((asisteCount + retrasosCount + justificadasCount) / totalAttendance) * 100);
         }
 
         setStats({

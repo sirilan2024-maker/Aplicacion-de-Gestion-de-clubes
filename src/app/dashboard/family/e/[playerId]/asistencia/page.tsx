@@ -68,7 +68,7 @@ export default function FamilyAttendancePage() {
     );
   }
 
-  const attendanceRate = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0;
+  const attendanceRate = stats.total > 0 ? Math.round(((stats.present + stats.excused) / stats.total) * 100) : 0;
 
   return (
     <div className="p-6 max-w-6xl mx-auto animate-in fade-in duration-500">

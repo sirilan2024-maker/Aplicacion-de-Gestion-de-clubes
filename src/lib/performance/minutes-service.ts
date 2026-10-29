@@ -262,7 +262,14 @@ const CONFIRMED_ATTENDANCE_STATUS_SET = new Set([
   'confirmed',
   'retraso',
   'late',
-  'asiste'
+  'asiste',
+  'justificado',
+  'justificada',
+  'justified',
+  'excused',
+  'lesionado',
+  'permiso',
+  'enfermedad'
 ]);
 
 const UNDECIDED_ATTENDANCE_STATUS_SET = new Set([

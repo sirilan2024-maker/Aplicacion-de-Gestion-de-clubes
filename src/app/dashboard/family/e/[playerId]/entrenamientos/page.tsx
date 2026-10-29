@@ -475,7 +475,7 @@ export default function FamilyTrainingsPage() {
                             </span>
                           );
                         }
-                        if (statusLower.includes('justific') || statusLower.includes('lesion')) {
+                        if (statusLower.includes('justific') || statusLower.includes('lesion') || statusLower.includes('excused') || statusLower.includes('permiso') || statusLower.includes('enfermedad')) {
                           return (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               <AlertCircle size={14} />

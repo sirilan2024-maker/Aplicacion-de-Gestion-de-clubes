@@ -61,10 +61,11 @@ export function AttendanceModal({ player, attendanceRecords, stats, onClose }: A
                 const eventDate = new Date(record.team_events?.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
                 let statusColor = "bg-slate-100 text-slate-600";
                 let StatusIcon = Clock;
-                if (record.status === 'Presente' || record.status === 'present') { statusColor = "bg-emerald-100 text-emerald-700"; StatusIcon = CheckCircle2; }
-                else if (record.status === 'Retraso' || record.status === 'late') { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
-                else if (record.status === 'Justificada' || record.status === 'excused') { statusColor = "bg-amber-100 text-amber-700"; StatusIcon = Clock; }
-                else if (record.status === 'Ausente' || record.status === 'Falta' || record.status === 'absent') { statusColor = "bg-red-100 text-red-700"; StatusIcon = XCircle; }
+                const sLow = (record.status || '').toLowerCase();
+                if (sLow === 'presente' || sLow === 'present') { statusColor = "bg-emerald-100 text-emerald-700"; StatusIcon = CheckCircle2; }
+                else if (sLow === 'retraso' || sLow === 'late') { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
+                else if (['justificada', 'justificado', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(sLow)) { statusColor = "bg-amber-100 text-amber-700"; StatusIcon = Clock; }
+                else if (['ausente', 'falta', 'absent'].includes(sLow)) { statusColor = "bg-red-100 text-red-700"; StatusIcon = XCircle; }
 
                 return (
                   <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">

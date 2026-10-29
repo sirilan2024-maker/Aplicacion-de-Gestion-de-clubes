@@ -577,6 +577,7 @@ export async function GET(req: Request) {
         found: true,
         is_liga_brave: true,
         player: {
+          is_liga_brave: true,
           codjugador: codFicha,
           nombre: fullName,
           email: player.email || player.parent1_email || null,

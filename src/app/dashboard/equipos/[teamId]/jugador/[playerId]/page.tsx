@@ -183,9 +183,9 @@ export default function GlobalPlayerProfilePage() {
 
   // Los jugadores Senior no pagan cuotas: se oculta toda la información financiera
   const isLigaBrave = isLigaBraveCompetition({
-    teamId: teamId || player?.team_id,
-    teamName,
-    category: teamCategory
+    teamId: teamId || player?.team_id || (player as any)?.teams?.id,
+    teamName: teamName || (player as any)?.teams?.name,
+    category: teamCategory || (player as any)?.teams?.category
   });
 
   const isSeniorPlayer = Boolean(

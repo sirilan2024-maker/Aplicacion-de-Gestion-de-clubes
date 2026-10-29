@@ -38,7 +38,10 @@ export function FfcvPlayerModal({ playerId, playerName, isOpen, onClose, isLigaB
       } else if (!json.found) {
         setError(json.message || "El jugador no figura en la plantilla oficial publicada en la FFCV.");
       } else {
-        setData(json.player);
+        setData({
+          ...json.player,
+          is_liga_brave: Boolean(json.is_liga_brave || json.player?.is_liga_brave)
+        });
       }
     } catch (err: any) {
       setError("Error de conexión al consultar los datos oficiales de la FFCV.");

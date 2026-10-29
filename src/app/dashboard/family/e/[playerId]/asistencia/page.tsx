@@ -41,7 +41,63 @@ export default function FamilyAttendancePage() {
 
       if (attError) throw attError;
 
-      const records = attData || [];
+      // Fetch match callups / attendance (convocatorias)
+      const { data: convData } = await supabase
+        .from('convocatorias')
+        .select('id, partido_id, titular, minutes_played, minutos_jugados, estado_asistencia, status, partidos(id, rival_nombre, fecha_hora, lugar, tipo_partido, estado, season_id)')
+        .eq('player_id', playerId);
+
+      const records: any[] = [...(attData || [])];
+      const nowIso = new Date().toISOString();
+
+      if (convData) {
+        convData.forEach((conv: any) => {
+          const match = Array.isArray(conv.partidos) ? conv.partidos[0] : conv.partidos;
+          if (!match || match.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return;
+          // Solo partidos pasados o disputados
+          if (match.fecha_hora > nowIso && match.estado !== 'Finalizado') return;
+
+          const isNotCalled = conv.status === 'no_convocado' || conv.status === 'desconvocado';
+          if (isNotCalled) return;
+
+          const matchDate = match.fecha_hora;
+          const matchDateStr = matchDate ? matchDate.split('T')[0] : '';
+          
+          // Si ya existe un registro manual de attendance para este evento en esa fecha, no duplicar
+          const alreadyLogged = records.some(r => r.team_events?.date?.startsWith(matchDateStr));
+          if (alreadyLogged) return;
+
+          const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'ausente';
+          const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado' || conv.estado_asistencia === 'Justificada';
+          const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
+          const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
+
+          let matchStatus: string | null = null;
+          if (isAbsent) {
+            matchStatus = 'Ausente';
+          } else if (isInjured) {
+            matchStatus = 'Justificada';
+          } else if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
+            matchStatus = 'Presente';
+          }
+
+          if (matchStatus) {
+            records.push({
+              status: matchStatus,
+              notes: match.tipo_partido === 'amistoso' ? 'Partido Amistoso' : 'Partido Oficial',
+              team_events: {
+                title: `Partido vs ${match.rival_nombre || 'Rival'}`,
+                date: match.fecha_hora,
+                event_type: 'Partido'
+              }
+            });
+          }
+        });
+      }
+
+      // Ordenar por fecha descendente
+      records.sort((a, b) => new Date(b.team_events?.date || 0).getTime() - new Date(a.team_events?.date || 0).getTime());
+
       setAttendanceRecords(records);
 
       let present = 0, absent = 0, excused = 0;

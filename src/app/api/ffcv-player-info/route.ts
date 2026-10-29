@@ -236,18 +236,41 @@ export async function GET(req: Request) {
       const teamApuntameloId = config?.teamApuntameloId || 
         (teamName.toUpperCase().includes('INFANTIL B') ? 33431 : 
          teamName.toUpperCase().includes('CADETE B') ? 33383 : null);
+      const grupoId = config?.grupoId || 
+        (teamName.toUpperCase().includes('INFANTIL B') ? 4624 : 
+         teamName.toUpperCase().includes('CADETE B') ? 4623 : null);
+      const orgId = config?.orgId || 29;
 
       let apuntameloPlayer: any = null;
       let apuntameloPichichi: any = null;
       let apuntameloAmon: any = null;
       let apuntameloPunt: any = null;
       let apuntameloValor: any = null;
+      let rawMatches: any[] = [];
+      let mvpJornadas: any[] = [];
+      let logrosObj: any = null;
 
       if (teamApuntameloId) {
         try {
-          const infoArr = await fetchApuntameloJson<any[]>(
-            `https://apuntamelo.com/obtenerInfoEquipo?equipo=${teamApuntameloId}`
-          );
+          const [infoArr, matchesData] = await Promise.all([
+            fetchApuntameloJson<any[]>(
+              `https://apuntamelo.com/obtenerInfoEquipo?equipo=${teamApuntameloId}`
+            ).catch(e => {
+              console.warn('[ffcv-player-info] Error fetching team info:', e.message);
+              return null;
+            }),
+            grupoId ? fetchApuntameloJson<any[]>(
+              `https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=${orgId}&grupo=${grupoId}`
+            ).catch(e => {
+              console.warn('[ffcv-player-info] Error fetching group matches:', e.message);
+              return null;
+            }) : Promise.resolve(null)
+          ]);
+
+          if (Array.isArray(matchesData)) {
+            rawMatches = matchesData;
+          }
+
           if (Array.isArray(infoArr) && infoArr.length > 0) {
             const teamData = infoArr[0];
             const plantilla = JSON.parse(teamData.Json_plantilla || '[]');
@@ -255,6 +278,8 @@ export async function GET(req: Request) {
             const amonestaciones = JSON.parse(teamData.Json_amonestaciones || '[]');
             const puntuaciones = JSON.parse(teamData.Json_puntuacion || '[]');
             const valores = JSON.parse(teamData.Json_valor || '[]');
+            mvpJornadas = JSON.parse(teamData.Json_mvpjornada || '[]');
+            logrosObj = typeof teamData.Json_logros === 'string' ? JSON.parse(teamData.Json_logros || '{}') : (teamData.Json_logros || {});
 
             const normFirst = normalizeStr(player.first_name);
             const normLast = normalizeStr(player.last_name);
@@ -426,6 +451,128 @@ export async function GET(req: Request) {
         ? apuntameloPlayer.Ultimos.split('/').filter((x: string) => x && x !== 'null')
         : [];
 
+      // Construir partidos puntuados y distinciones Fantasy Liga Brave
+      const rawScores = apuntameloPlayer?.Ultimos 
+        ? apuntameloPlayer.Ultimos.split('/').map((s: string) => s.trim())
+        : [];
+
+      const clubMatches = rawMatches.filter((m: any) => 
+        Number(m.FK_EquipoLiga_A) === teamApuntameloId || 
+        Number(m.FK_EquipoLiga_B) === teamApuntameloId
+      ).sort((a: any, b: any) => Number(a.Jornada || 0) - Number(b.Jornada || 0));
+
+      const pId = apuntameloPlayer?.Id;
+      const playerDorsalNumber = player.dorsal ? Number(player.dorsal) : (apuntameloPlayer?.Dorsal ? Number(apuntameloPlayer.Dorsal) : null);
+
+      const partidosPuntuados: any[] = [];
+      let playedMatchIndex = 0;
+
+      for (const m of clubMatches) {
+        const isHome = Number(m.FK_EquipoLiga_A) === teamApuntameloId;
+        const rivalName = isHome ? m.Nombre_B : m.Nombre_A;
+        const isPlayed = (m.Goles_A !== null && m.Goles_B !== null && m.Goles_A !== undefined);
+
+        if (isPlayed) {
+          const rawScoreStr = rawScores[playedMatchIndex];
+          const hasScore = rawScoreStr && rawScoreStr !== 'null';
+          const scoreNum = hasScore ? Number(rawScoreStr) : null;
+          playedMatchIndex++;
+
+          const jNum = Number(m.Jornada);
+          const isMvpJornada = mvpJornadas.some((mvp: any) => 
+            Number(mvp.Jornada) === jNum && 
+            (mvp.Id === pId || (playerDorsalNumber && Number(mvp.Dorsal) === playerDorsalNumber))
+          );
+
+          if (scoreNum !== null) {
+            const isOnceIdeal = isMvpJornada || scoreNum >= 7;
+            partidosPuntuados.push({
+              jornada: jNum,
+              rival: rivalName || `Rival J${jNum}`,
+              fecha: m.Fecha ? m.Fecha.split(' ')[0] : '',
+              puntos: scoreNum,
+              resultado: isHome ? `${m.Goles_A} - ${m.Goles_B}` : `${m.Goles_B} - ${m.Goles_A}`,
+              es_mvp: isMvpJornada,
+              once_ideal: isOnceIdeal,
+              calificacion: scoreNum >= 7 ? 'top' : scoreNum >= 5 ? 'bueno' : 'regular'
+            });
+          }
+        }
+      }
+
+      // Galardones y distinciones de honor
+      const logros: any[] = [];
+
+      // 1. Once Ideal
+      const hasOnceIdeal = partidosPuntuados.some(p => p.once_ideal);
+      const topScore = partidosPuntuados.length > 0 ? Math.max(...partidosPuntuados.map(p => p.puntos)) : 0;
+      if (hasOnceIdeal || topScore >= 7) {
+        logros.push({
+          id: 'once_ideal',
+          titulo: 'Once Ideal Liga Brave',
+          subtitulo: `Rendimiento top en la jornada (${topScore} pts)`,
+          icono: 'star',
+          color: 'amber'
+        });
+      }
+
+      // 2. MVP de la Jornada
+      const vecesMvp = Number(apuntameloPlayer?.Veces_mvp) || partidosPuntuados.filter(p => p.es_mvp).length;
+      if (vecesMvp > 0) {
+        logros.push({
+          id: 'mvp',
+          titulo: 'Jugador MVP',
+          subtitulo: `${vecesMvp} ${vecesMvp === 1 ? 'premio MVP oficial' : 'premios MVP oficiales'} de partido`,
+          icono: 'crown',
+          color: 'purple'
+        });
+      }
+
+      // 3. Asistente Clave
+      const totalAsistencias = Number(apuntameloPlayer?.Asistencias) || 0;
+      if (totalAsistencias > 0) {
+        logros.push({
+          id: 'asistente',
+          titulo: 'Asistente Destacado',
+          subtitulo: `${totalAsistencias} ${totalAsistencias === 1 ? 'asistencia oficial' : 'asistencias oficiales'}`,
+          icono: 'crosshair',
+          color: 'blue'
+        });
+      }
+
+      // 4. Goleador Oficial
+      if (totalGoles > 0) {
+        logros.push({
+          id: 'goleador',
+          titulo: 'Goleador Oficial',
+          subtitulo: `${totalGoles} ${totalGoles === 1 ? 'gol anotado' : 'goles anotados'}`,
+          icono: 'trophy',
+          color: 'emerald'
+        });
+      }
+
+      // 5. Récords oficiales desde Json_logros
+      if (pId && logrosObj?.por_partido) {
+        const porPartido = logrosObj.por_partido;
+        for (const mId of Object.keys(porPartido)) {
+          const porJugador = porPartido[mId]?.por_jugador || {};
+          const jLogros = porJugador[String(pId)] || [];
+          for (const jl of jLogros) {
+            logros.push({
+              id: `rec_${jl.Id || Math.random()}`,
+              titulo: 'Récord Oficial Liga Brave',
+              subtitulo: jl.Descripcion2 || jl.Descripcion || 'Marca oficial destacada',
+              icono: 'medal',
+              color: 'cyan'
+            });
+          }
+        }
+      }
+
+      const valorMercadoFormatted = apuntameloPlayer?.Valor_mercado 
+        ? `${(Number(apuntameloPlayer.Valor_mercado) / 1000000).toFixed(1)}M€` 
+        : null;
+
       return NextResponse.json({
         found: true,
         is_liga_brave: true,
@@ -460,13 +607,27 @@ export async function GET(req: Request) {
           ],
           historial_clubes: historialClubes,
           // Estadísticas específicas de la Liga Brave
-          asistencias: Number(apuntameloPlayer?.Asistencias) || 0,
+          asistencias: totalAsistencias,
           puntos_totales: Number(apuntameloPlayer?.Puntuacion) || Number(apuntameloPunt?.Total) || null,
           puntos_media: apuntameloPlayer?.Media != null ? Number(apuntameloPlayer.Media).toFixed(1) : null,
-          valor_mercado: apuntameloPlayer?.Valor_mercado 
-            ? `${(Number(apuntameloPlayer.Valor_mercado) / 1000000).toFixed(1)}M€` 
-            : null,
-          ultimos_resultados: ultimosResultados
+          valor_mercado: valorMercadoFormatted,
+          ultimos_resultados: ultimosResultados,
+          partidos_puntuados: partidosPuntuados,
+          logros: logros,
+          brave_fantasy: {
+            valor_mercado: valorMercadoFormatted,
+            valor_mercado_raw: Number(apuntameloPlayer?.Valor_mercado) || 0,
+            puntos_totales: Number(apuntameloPlayer?.Puntuacion) || Number(apuntameloPunt?.Total) || 0,
+            puntos_media: apuntameloPlayer?.Media != null ? Number(apuntameloPlayer.Media).toFixed(1) : '0.0',
+            presencias: apPresencias,
+            goles: totalGoles,
+            asistencias: totalAsistencias,
+            veces_mvp: vecesMvp,
+            partidos_puntuados: partidosPuntuados,
+            logros: logros,
+            escudo_transparente: apuntameloPlayer?.Escudo_transparente || null,
+            imagen_transparente: apuntameloPlayer?.Imagen_transparente || null
+          }
         }
       }, {
         headers: {

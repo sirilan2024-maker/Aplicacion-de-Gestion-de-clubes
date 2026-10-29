@@ -224,19 +224,19 @@ export default function AsistenciaEquipoPage() {
             // - Si su status es 'convocado' y no 'lesionado'/'ausente'/'no_convocado'
             const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
             const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
-            const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado';
+            const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado' || conv.estado_asistencia === 'Justificada';
             const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'ausente';
             const isNotCalled = conv.status === 'no_convocado' || conv.status === 'desconvocado';
 
             let deducedStatus: string | null = null;
-            if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
-              deducedStatus = 'present';
-            } else if (isInjured) {
-              deducedStatus = 'excused';
+            if (isNotCalled) {
+              deducedStatus = 'not_called';
             } else if (isAbsent) {
               deducedStatus = 'absent';
-            } else if (isNotCalled) {
-              deducedStatus = 'not_called';
+            } else if (isInjured) {
+              deducedStatus = 'excused';
+            } else if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
+              deducedStatus = 'present';
             }
 
             if (deducedStatus) {
@@ -1030,15 +1030,15 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
   });
 
   const totalEvents = applicableEvents.length;
-  const isPresentsStatus = (s?: string) => ['presente', 'present', 'retraso', 'late', 'justificado', 'justificada', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(s?.toLowerCase() || '');
+  const isActualPresentStatus = (s?: string) => ['presente', 'present', 'retraso', 'late'].includes(s?.toLowerCase() || '');
   const isAbsentsStatus = (s?: string) => ['ausente', 'absent'].includes(s?.toLowerCase() || '');
   const isExcusedStatus = (s?: string) => ['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(s?.toLowerCase() || '');
 
-  const presents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isPresentsStatus(a.status)).length;
+  const presents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isActualPresentStatus(a.status)).length;
   const absents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isAbsentsStatus(a.status)).length;
   const excused = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isExcusedStatus(a.status)).length;
 
-  const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 100;
+  const pct = totalEvents > 0 ? Math.round(((presents + excused) / totalEvents) * 100) : 100;
 
   const absencesList = events.filter(ev => {
     const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));

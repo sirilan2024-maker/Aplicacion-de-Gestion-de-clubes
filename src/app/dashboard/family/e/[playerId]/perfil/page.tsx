@@ -228,25 +228,64 @@ export default function PlayerDashboardPage() {
           .select('status, notes, team_events(title, date, event_type)')
           .eq("player_id", playerId)
           .order('created_at', { ascending: false });
-          
-        let asisteCount = 0;
-        let faltasCount = 0;
-        let justificadasCount = 0;
-        let retrasosCount = 0;
-        
-        if (attendanceData) {
-          setAttendanceRecords(attendanceData);
-          asisteCount = attendanceData.filter(a => ['presente', 'present'].includes(a.status?.toLowerCase())).length;
-          faltasCount = attendanceData.filter(a => ['ausente', 'absent', 'falta'].includes(a.status?.toLowerCase())).length;
-          justificadasCount = attendanceData.filter(a => ['justificado', 'justificada', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(a.status?.toLowerCase() || '')).length;
-          retrasosCount = attendanceData.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
-        }
 
         // Fetch Discipline and Match Stats from convocatorias and match_events (from federative actas)
         const { data: convData } = await supabase
           .from("convocatorias")
-          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado, equipo_id, equipo:teams(id, name, category))')
+          .select('id, partido_id, titular, minutes_played, minutos_jugados, goals, goles, yellow_cards, tarjetas_amarillas, red_cards, tarjetas_rojas, status, asistencia_confirmada_familia, estado_asistencia, partidos(id, rival_nombre, fecha_hora, lugar, resultado_propio, resultado_rival, estado, season_id, equipo_id, equipo:teams(id, name, category))')
           .eq("player_id", playerId);
+
+        const allAttRecords: any[] = [...(attendanceData || [])];
+        const nowIso = new Date().toISOString();
+
+        if (convData) {
+          convData.forEach((conv: any) => {
+            if (!conv.partidos || conv.partidos.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return;
+            if (conv.partidos.fecha_hora > nowIso && conv.partidos.estado !== 'Finalizado') return;
+
+            const isNotCalled = conv.status === 'no_convocado' || conv.status === 'desconvocado';
+            if (isNotCalled) return;
+
+            const matchDate = conv.partidos.fecha_hora;
+            const matchDateStr = matchDate ? matchDate.split('T')[0] : '';
+            const alreadyLogged = allAttRecords.some(r => r.team_events?.date?.startsWith(matchDateStr));
+            if (alreadyLogged) return;
+
+            const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'ausente';
+            const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado' || conv.estado_asistencia === 'Justificada';
+            const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
+            const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
+
+            let matchStatus: string | null = null;
+            if (isAbsent) {
+              matchStatus = 'Ausente';
+            } else if (isInjured) {
+              matchStatus = 'Justificada';
+            } else if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
+              matchStatus = 'Presente';
+            }
+
+            if (matchStatus) {
+              allAttRecords.push({
+                status: matchStatus,
+                notes: 'Partido Oficial',
+                team_events: {
+                  title: `Partido vs ${conv.partidos.rival_nombre || 'Rival'}`,
+                  date: conv.partidos.fecha_hora,
+                  event_type: 'Partido'
+                }
+              });
+            }
+          });
+        }
+
+        allAttRecords.sort((a, b) => new Date(b.team_events?.date || 0).getTime() - new Date(a.team_events?.date || 0).getTime());
+        setAttendanceRecords(allAttRecords);
+
+        let asisteCount = allAttRecords.filter(a => ['presente', 'present'].includes(a.status?.toLowerCase())).length;
+        let faltasCount = allAttRecords.filter(a => ['ausente', 'absent', 'falta'].includes(a.status?.toLowerCase())).length;
+        let justificadasCount = allAttRecords.filter(a => ['justificado', 'justificada', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(a.status?.toLowerCase() || '')).length;
+        let retrasosCount = allAttRecords.filter(a => ['retraso', 'late'].includes(a.status?.toLowerCase())).length;
 
         const { data: matchEventsData } = await supabase
           .from("match_events")
@@ -342,7 +381,6 @@ export default function PlayerDashboardPage() {
         // Fetch Next Match & Match History
         // Prioritize upcoming matches where player is specifically convened (e.g. Senior or Juvenil)
         // or next match of player's base team
-        const nowIso = new Date().toISOString();
         
         // 1. Check if convened to ANY upcoming match (including Senior)
         const upcomingConv = (convData || [])

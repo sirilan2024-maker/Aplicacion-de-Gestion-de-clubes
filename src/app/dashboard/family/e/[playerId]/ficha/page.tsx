@@ -372,8 +372,8 @@ export default function PlayerProfilePage() {
         .from('attendance')
         .select('*, events:event_id(*)')
         .eq('player_id', playerId);
-        
-      setPlayerAttendance(atts || []);
+
+      const allAtts: any[] = [...(atts || [])];
 
       if (atts) {
         atts.forEach(a => {
@@ -382,6 +382,67 @@ export default function PlayerProfilePage() {
           }
         });
       }
+
+      // Convocatorias y Partidos (excluyendo temporada cerrada 25/26)
+      const { data: convData } = await supabase
+        .from('convocatorias')
+        .select('id, partido_id, titular, minutes_played, minutos_jugados, estado_asistencia, status, partidos(id, rival_nombre, fecha_hora, lugar, tipo_partido, estado, season_id)')
+        .eq('player_id', playerId);
+
+      const nowIso = new Date().toISOString();
+
+      if (convData) {
+        convData.forEach((conv: any) => {
+          if (!conv.partidos || conv.partidos.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return;
+
+          const evId = conv.partido_id;
+          const pDate = conv.partidos.fecha_hora;
+          const dateStr = pDate ? pDate.split('T')[0] : '';
+          const timeStr = pDate && pDate.includes('T') ? pDate.split('T')[1].slice(0, 5) : '';
+
+          if (!allEvents.some(e => e.id === evId || (e.event_type === 'Partido' && e.date === dateStr))) {
+            allEvents.push({
+              id: evId,
+              title: `Partido vs ${conv.partidos.rival_nombre || 'Rival'}`,
+              date: dateStr,
+              start_time: timeStr,
+              event_type: 'Partido'
+            });
+          }
+
+          // Registrar estado de asistencia para partidos celebrados
+          if (conv.partidos.fecha_hora <= nowIso || conv.partidos.estado === 'Finalizado') {
+            const isNotCalled = conv.status === 'no_convocado' || conv.status === 'desconvocado';
+            if (!isNotCalled) {
+              const isAbsent = conv.estado_asistencia === 'Ausente' || conv.status === 'ausente';
+              const isInjured = conv.status === 'lesionado' || conv.estado_asistencia === 'Justificado' || conv.estado_asistencia === 'Justificada';
+              const minPlayed = Number(conv.minutes_played || conv.minutos_jugados || 0);
+              const isConfirmed = conv.estado_asistencia === 'Confirmado' || conv.estado_asistencia === 'Presente';
+
+              let matchStatus: string | null = null;
+              if (isAbsent) {
+                matchStatus = 'ausente';
+              } else if (isInjured) {
+                matchStatus = 'justificada';
+              } else if (minPlayed > 0 || conv.titular || isConfirmed || conv.status === 'convocado') {
+                matchStatus = 'presente';
+              }
+
+              if (matchStatus && !allAtts.some(a => a.event_id === evId || a.date === dateStr)) {
+                allAtts.push({
+                  id: `conv-${conv.id}`,
+                  event_id: evId,
+                  player_id: playerId,
+                  date: dateStr,
+                  status: matchStatus
+                });
+              }
+            }
+          }
+        });
+      }
+
+      setPlayerAttendance(allAtts);
       
       const todayDateStr = new Date().toISOString().slice(0, 10);
       const upcomingEvents = allEvents.filter(e => (e.date || '') >= todayDateStr).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());

@@ -259,6 +259,11 @@ export async function syncApuntameloTeam(
         const finalHomeScore = hasScore ? (realScore ? realScore.homeScore : Number(m.Goles_A)) : null;
         const finalAwayScore = hasScore ? (realScore ? realScore.awayScore : Number(m.Goles_B)) : null;
 
+        const isPostponed = !hasScore && (
+          String(m.Id) === '302768' ||
+          (Number(m.Jornada) === 1 && (String(m.FK_EquipoLiga_A) === '33383' || String(m.FK_EquipoLiga_B) === '33383'))
+        );
+
         return {
           ffcv_match_id: String(m.Id),
           ffcv_group_id: groupIdStr,
@@ -276,7 +281,7 @@ export async function syncApuntameloTeam(
           away_shield_url: m.Escudo_B || null,
           home_score: finalHomeScore,
           away_score: finalAwayScore,
-          status: hasScore ? 'played' : 'scheduled',
+          status: hasScore ? 'played' : (isPostponed ? 'postponed' : 'scheduled'),
           pitch_name: m.Nombre_campo || null,
           codacta: String(m.Id),
           is_closed: hasScore,
@@ -351,7 +356,7 @@ export async function syncApuntameloTeam(
     // Obtener los partidos existentes de este equipo en la temporada activa
     const { data: existingPartidos } = await supabase
       .from('partidos')
-      .select('id, rival_nombre, fecha_hora, acta_oficial_url, lugar, highlight_jornada')
+      .select('id, rival_nombre, fecha_hora, acta_oficial_url, lugar, highlight_jornada, estado, coach_summary')
       .eq('equipo_id', teamId)
       .eq('season_id', activeAppSeasonId);
 
@@ -370,7 +375,12 @@ export async function syncApuntameloTeam(
       const effectiveAwayScore = realScore ? realScore.awayScore : (hasScore ? Number(sm.Goles_B) : null);
       const scorePropio = hasScore ? (isHome ? effectiveHomeScore : effectiveAwayScore) : null;
       const scoreRival = hasScore ? (isHome ? effectiveAwayScore : effectiveHomeScore) : null;
-      const estado = hasScore ? 'Finalizado' : 'Programado';
+      
+      const isPostponed = !hasScore && (
+        String(sm.Id) === '302768' ||
+        (Number(sm.Jornada) === 1 && config.teamApuntameloId === 33383)
+      );
+
       const lugar = isHome ? 'Local' : 'Visitante';
 
       // Buscar si ya existe este partido en 'partidos'
@@ -388,6 +398,12 @@ export async function syncApuntameloTeam(
         return false;
       });
 
+      const estado = hasScore
+        ? 'Finalizado'
+        : (isPostponed || (matchExact && (matchExact.estado === 'Aplazado' || matchExact.estado === 'Suspendido' || matchExact.coach_summary?.includes('APLAZADO')))
+          ? 'Aplazado'
+          : 'Programado');
+
       let resolvedMatchId = matchExact ? matchExact.id : null;
 
       if (matchExact) {
@@ -404,6 +420,11 @@ export async function syncApuntameloTeam(
             acta_oficial_url: matchUrl
           })
           .eq('id', matchExact.id);
+
+        // Si el partido no tiene resultado (ej. aplazado que tenía datos residuales), limpiar convocatorias
+        if (!hasScore) {
+          await supabase.from('convocatorias').delete().eq('partido_id', matchExact.id);
+        }
       } else {
         // Insertar nuevo partido
         const { data: insertedMatch } = await supabase
@@ -579,7 +600,7 @@ export async function syncApuntameloTeam(
 
         const pitchLocation = isHome
           ? 'Polideportivo Municipal del Saladar'
-          : (sm.Campo || 'Visitante');
+          : (sm.Nombre_campo || sm.Campo || 'Visitante');
 
         // Buscar si ya existe un evento para esta jornada o con este rival en la misma ventana temporal
         const { data: teamMatchEvents } = await supabase
@@ -592,13 +613,17 @@ export async function syncApuntameloTeam(
         const jornadaStr = `Jornada ${sm.Jornada} Liga Brave`;
         const matchedEvent = (teamMatchEvents || []).find((ev: any) => {
           if (ev.notes && ev.notes.includes(jornadaStr)) return true;
-          if (ev.date === sm.Fecha && ev.title && (ev.title.includes(rivalName) || rivalName.includes(ev.title))) return true;
-          if (ev.date && ev.title && (ev.title.includes(rivalName) || rivalName.includes(ev.title))) {
+          // Fallback por rival SOLO si no tiene otra jornada asignada y la fecha es cercana (<= 7 días)
+          if (!ev.notes?.includes('Jornada') && ev.title && (ev.title.toLowerCase().includes(rivalName.toLowerCase()) || rivalName.toLowerCase().includes(ev.title.toLowerCase()))) {
             const diffDays = Math.abs((new Date(ev.date).getTime() - new Date(sm.Fecha).getTime()) / (1000 * 60 * 60 * 24));
             if (diffDays <= 7) return true;
           }
           return false;
         });
+
+        const eventNotes = isPostponed
+          ? `${jornadaStr} (Aplazado - ${isHome ? 'Local' : 'Visitante'})`
+          : `${jornadaStr} (${isHome ? 'Local' : 'Visitante'})`;
 
         if (matchedEvent) {
           // Actualizar evento existente
@@ -610,16 +635,13 @@ export async function syncApuntameloTeam(
               start_time: sTime,
               end_time: eTime,
               location: pitchLocation,
-              notes: `${jornadaStr} (${isHome ? 'Local' : 'Visitante'})`
+              notes: eventNotes
             })
             .eq('id', matchedEvent.id);
 
-          // Si hubiera eventos duplicados huérfanos con el mismo rival o jornada, eliminarlos
+          // Si hubiera eventos duplicados huérfanos con la misma jornada, eliminarlos
           const duplicateEvents = (teamMatchEvents || []).filter(
-            (ev: any) => ev.id !== matchedEvent.id && (
-              (ev.notes && ev.notes.includes(jornadaStr)) ||
-              (ev.date === sm.Fecha && ev.title && (ev.title.includes(rivalName) || rivalName.includes(ev.title)))
-            )
+            (ev: any) => ev.id !== matchedEvent.id && ev.notes && ev.notes.includes(jornadaStr)
           );
           for (const dup of duplicateEvents) {
             await supabase.from('team_events').delete().eq('id', dup.id);
@@ -634,7 +656,7 @@ export async function syncApuntameloTeam(
             start_time: sTime,
             end_time: eTime,
             location: pitchLocation,
-            notes: `${jornadaStr} (${isHome ? 'Local' : 'Visitante'})`,
+            notes: eventNotes,
             season_id: activeAppSeasonId
           });
         }

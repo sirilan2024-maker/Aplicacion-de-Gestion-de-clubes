@@ -1876,9 +1876,9 @@ export default function GlobalPlayerProfilePage() {
               const filteredEventIds = filteredEvents.map(e => e.id);
               const filteredAttendance = playerAttendance.filter(a => filteredEventIds.includes(a.event_id));
 
-              const presents = filteredAttendance.filter(a => ['presente', 'present', 'justificado', 'excused', 'lesionado', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
+              const presents = filteredAttendance.filter(a => ['presente', 'present', 'justificado', 'justificada', 'justified', 'excused', 'lesionado', 'retraso', 'late', 'permiso', 'enfermedad'].includes(a.status?.toLowerCase())).length;
               const absents = filteredAttendance.filter(a => ['ausente', 'absent'].includes(a.status?.toLowerCase())).length;
-              const excused = filteredAttendance.filter(a => a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused').length;
+              const excused = filteredAttendance.filter(a => ['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(a.status?.toLowerCase() || '')).length;
               const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 0;
 
               const faltasDetalle = filteredEvents.filter(ev => {
@@ -1938,7 +1938,7 @@ export default function GlobalPlayerProfilePage() {
                     </div>
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
                       <div className="text-4xl font-black text-amber-600">{excused}</div>
-                      <div className="text-xs font-bold text-amber-600 uppercase mt-1">Lesiones</div>
+                      <div className="text-xs font-bold text-amber-600 uppercase mt-1">Justificadas</div>
                     </div>
                   </div>
 
@@ -1993,6 +1993,8 @@ export default function GlobalPlayerProfilePage() {
                                 <span className="text-xs font-bold text-orange-700 bg-orange-100 px-2.5 py-1 rounded-md">Retraso</span>
                               ) : status === 'ausente' || status === 'absent' ? (
                                 <span className="text-xs font-bold text-red-700 bg-red-100 px-2.5 py-1 rounded-md">Ausente</span>
+                              ) : ['justificado', 'justificada', 'justified', 'excused', 'permiso'].includes(status || '') ? (
+                                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-md">Justificado</span>
                               ) : (
                                 <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-md">Lesionado</span>
                               )}

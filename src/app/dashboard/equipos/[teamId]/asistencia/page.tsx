@@ -361,7 +361,18 @@ export default function AsistenciaEquipoPage() {
       // La tabla attendance explícita sobrescribe los datos deducidos
       if (atts) {
         atts.forEach(a => {
-          attMap[a.player_id] = a.status;
+          let s = a.status;
+          const low = (s || '').toLowerCase();
+          if (['justificado', 'justificada', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(low)) {
+            s = 'excused';
+          } else if (['presente', 'present'].includes(low)) {
+            s = 'present';
+          } else if (['ausente', 'absent'].includes(low)) {
+            s = 'absent';
+          } else if (['retraso', 'late'].includes(low)) {
+            s = 'late';
+          }
+          attMap[a.player_id] = s;
           if (a.notes) notesMap[a.player_id] = a.notes;
         });
       }
@@ -439,7 +450,7 @@ export default function AsistenciaEquipoPage() {
   };
 
   const getPlayerPercentage = (playerId: string, eventsToUse: PastEvent[]) => {
-    if (eventsToUse.length === 0) return { pct: 0, faltas: 0 };
+    if (eventsToUse.length === 0) return { pct: 0, faltas: 0, justificadas: 0 };
     
     // Filtrar los eventos computables para este jugador:
     // - Los entrenamientos aplican a todos los jugadores activos del equipo.
@@ -452,12 +463,24 @@ export default function AsistenciaEquipoPage() {
       return true;
     });
 
-    if (applicableEvents.length === 0) return { pct: 100, faltas: 0 };
+    if (applicableEvents.length === 0) return { pct: 100, faltas: 0, justificadas: 0 };
 
     const presents = summaryData.filter(a => 
       a.player_id === playerId && 
       (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
-      (a.status?.toLowerCase() === 'presente' || a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'retraso' || a.status?.toLowerCase() === 'late')
+      (
+        a.status?.toLowerCase() === 'presente' || 
+        a.status?.toLowerCase() === 'present' || 
+        a.status?.toLowerCase() === 'retraso' || 
+        a.status?.toLowerCase() === 'late' ||
+        a.status?.toLowerCase() === 'justificado' ||
+        a.status?.toLowerCase() === 'justificada' ||
+        a.status?.toLowerCase() === 'justified' ||
+        a.status?.toLowerCase() === 'excused' ||
+        a.status?.toLowerCase() === 'lesionado' ||
+        a.status?.toLowerCase() === 'permiso' ||
+        a.status?.toLowerCase() === 'enfermedad'
+      )
     ).length;
     
     const absents = summaryData.filter(a => 
@@ -465,10 +488,17 @@ export default function AsistenciaEquipoPage() {
       (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
       (a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent')
     ).length;
+
+    const justificadas = summaryData.filter(a => 
+      a.player_id === playerId && 
+      (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) &&
+      ['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(a.status?.toLowerCase() || '')
+    ).length;
     
     return {
       pct: Math.round((presents / applicableEvents.length) * 100),
-      faltas: absents
+      faltas: absents,
+      justificadas
     };
   };
 
@@ -478,7 +508,7 @@ export default function AsistenciaEquipoPage() {
     if (s === 'presente' || s === 'present') return 'bg-emerald-500 text-white shadow-sm';
     if (s === 'retraso' || s === 'late') return 'bg-orange-500 text-white shadow-sm';
     if (s === 'ausente' || s === 'absent') return 'bg-red-500 text-white shadow-sm';
-    if (s === 'lesionado' || s === 'excused') return 'bg-amber-500 text-white shadow-sm';
+    if (['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(s)) return 'bg-amber-500 text-white shadow-sm';
     if (s === 'not_called' || s === 'no_convocado') return 'bg-slate-100 text-slate-400 border border-slate-200';
     return 'bg-gray-100 text-gray-400';
   };
@@ -633,32 +663,32 @@ export default function AsistenciaEquipoPage() {
                         onClick={() => handleStatusChange(player.id, 'absent')}
                         disabled={isSaving}
                         className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all disabled:opacity-50 ${
-                          currentStatus === 'absent'
+                          currentStatus === 'absent' || currentStatus === 'ausente'
                             ? 'bg-red-500 text-white shadow-sm shadow-red-100'
                             : 'text-gray-600 hover:bg-gray-200/60'
                         }`}
                       >
-                        {isSaving && currentStatus === 'absent' ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <X className="w-3.5 h-3.5 shrink-0" />}
+                        {isSaving && (currentStatus === 'absent' || currentStatus === 'ausente') ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <X className="w-3.5 h-3.5 shrink-0" />}
                         <span className="truncate">Ausente</span>
                       </button>
                       <button
                         onClick={() => handleOpenJustifyModal(player)}
                         disabled={isSaving}
                         className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-3.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all disabled:opacity-50 cursor-pointer ${
-                          currentStatus === 'excused'
+                          ['excused', 'justificado', 'justificada', 'justified', 'lesionado'].includes(currentStatus?.toLowerCase() || '')
                             ? 'bg-amber-500 text-white shadow-sm shadow-amber-100'
                             : 'text-gray-600 hover:bg-gray-200/60'
                         }`}
                         title="Marcar como justificado e indicar motivo"
                       >
-                        {isSaving && currentStatus === 'excused' ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <Stethoscope className="w-3.5 h-3.5 shrink-0" />}
+                        {isSaving && ['excused', 'justificado', 'justificada', 'justified', 'lesionado'].includes(currentStatus?.toLowerCase() || '') ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0"/> : <Stethoscope className="w-3.5 h-3.5 shrink-0" />}
                         <span className="sm:hidden truncate">Justif.</span>
                         <span className="hidden sm:inline truncate">Justificado</span>
                       </button>
                     </div>
 
                     {/* Badge de motivo si está justificado */}
-                    {currentStatus === 'excused' && singleEventNotes[player.id] && (
+                    {['excused', 'justificado', 'justificada', 'justified', 'lesionado'].includes(currentStatus?.toLowerCase() || '') && singleEventNotes[player.id] && (
                       <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
                         <span>💬 Motivo: {singleEventNotes[player.id]}</span>
                       </div>
@@ -869,10 +899,13 @@ export default function AsistenciaEquipoPage() {
                   <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 sticky left-0 z-20 font-bold text-gray-700 min-w-[210px] sm:min-w-[270px] w-[210px] sm:w-[270px] shadow-[1px_0_0_0_#e5e7eb]">
                     Jugador
                   </th>
-                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-20 sm:w-24 border-l border-gray-200">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-16 sm:w-20 border-l border-gray-200">
                     Faltas
                   </th>
-                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-24 sm:w-32 border-l border-gray-200">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-16 sm:w-20 border-l border-gray-200" title="Faltas Justificadas">
+                    Justif.
+                  </th>
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-20 sm:w-28 border-l border-gray-200">
                     % Total
                   </th>
                   {filteredPastEvents.map((ev, i) => (
@@ -933,6 +966,10 @@ export default function AsistenciaEquipoPage() {
                       <td className="p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-red-600 bg-red-50/30">
                         {faltas > 0 ? faltas : '-'}
                       </td>
+
+                      <td className="p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-amber-600 bg-amber-50/30">
+                        {stats.justificadas > 0 ? stats.justificadas : '-'}
+                      </td>
                       
                       <td className="p-3 sm:p-4 text-center font-black text-gray-900 border-l border-gray-200 bg-gray-50/50">
                         {pct}%
@@ -951,7 +988,7 @@ export default function AsistenciaEquipoPage() {
                               {(stat?.toLowerCase() === 'presente' || stat?.toLowerCase() === 'present') && <Check className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'retraso' || stat?.toLowerCase() === 'late') && <Clock className="w-4 h-4" />}
                               {(stat?.toLowerCase() === 'ausente' || stat?.toLowerCase() === 'absent') && <X className="w-4 h-4" />}
-                              {(stat?.toLowerCase() === 'lesionado' || stat?.toLowerCase() === 'excused') && <Stethoscope className="w-4 h-4" />}
+                              {['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(stat?.toLowerCase() || '') && <Stethoscope className="w-4 h-4" />}
                             </div>
                           </td>
                         );
@@ -959,7 +996,7 @@ export default function AsistenciaEquipoPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={filteredPastEvents.length + 3} className="p-0 border-b border-blue-100 bg-slate-50/90 shadow-inner">
+                        <td colSpan={filteredPastEvents.length + 4} className="p-0 border-b border-blue-100 bg-slate-50/90 shadow-inner">
                           <PlayerAttendanceSummary 
                             playerId={player.id} 
                             events={filteredPastEvents} 
@@ -993,15 +1030,19 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
   });
 
   const totalEvents = applicableEvents.length;
-  const presents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && ['presente', 'present', 'retraso', 'late'].includes(a.status?.toLowerCase())).length;
-  const absents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'ausente' || a.status?.toLowerCase() === 'absent')).length;
-  const excused = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && (a.status?.toLowerCase() === 'lesionado' || a.status?.toLowerCase() === 'excused')).length;
+  const isPresentsStatus = (s?: string) => ['presente', 'present', 'retraso', 'late', 'justificado', 'justificada', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(s?.toLowerCase() || '');
+  const isAbsentsStatus = (s?: string) => ['ausente', 'absent'].includes(s?.toLowerCase() || '');
+  const isExcusedStatus = (s?: string) => ['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(s?.toLowerCase() || '');
+
+  const presents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isPresentsStatus(a.status)).length;
+  const absents = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isAbsentsStatus(a.status)).length;
+  const excused = summaryData.filter(a => a.player_id === playerId && (applicableEvents.some(ev => ev.id === a.event_id || ev.date === a.date)) && isExcusedStatus(a.status)).length;
 
   const pct = totalEvents > 0 ? Math.round((presents / totalEvents) * 100) : 100;
 
   const absencesList = events.filter(ev => {
     const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
-    return att && ['ausente', 'absent', 'lesionado', 'excused'].includes(att.status?.toLowerCase() || '');
+    return att && (isAbsentsStatus(att.status) || isExcusedStatus(att.status));
   });
 
   return (
@@ -1039,7 +1080,7 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
         ) : (
           absencesList.slice(-3).reverse().map(ev => {
             const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
-            const isExcused = ['lesionado', 'excused'].includes(att?.status?.toLowerCase() || '');
+            const isExcused = isExcusedStatus(att?.status);
             let noteTag = '';
             let noteText = '';
             if (att?.notes) {

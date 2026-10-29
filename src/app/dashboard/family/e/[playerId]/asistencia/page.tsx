@@ -46,9 +46,10 @@ export default function FamilyAttendancePage() {
 
       let present = 0, absent = 0, excused = 0;
       records.forEach(r => {
-        if (r.status === 'Presente') present++;
-        else if (r.status === 'Justificada') excused++;
-        else if (r.status === 'Ausente' || r.status === 'Falta') absent++;
+        const s = (r.status || '').toLowerCase();
+        if (s === 'presente' || s === 'present') present++;
+        else if (['justificada', 'justificado', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(s)) excused++;
+        else if (['ausente', 'falta', 'absent'].includes(s)) absent++;
       });
       setStats({ present, absent, excused, total: records.length });
 
@@ -114,9 +115,10 @@ export default function FamilyAttendancePage() {
               const eventDate = new Date(record.team_events?.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
               let statusColor = "bg-gray-100 text-gray-600";
               let StatusIcon = Clock;
-              if (record.status === 'Presente') { statusColor = "bg-green-100 text-green-700"; StatusIcon = CheckCircle2; }
-              else if (record.status === 'Justificada') { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
-              else if (record.status === 'Ausente' || record.status === 'Falta') { statusColor = "bg-red-100 text-red-700"; StatusIcon = XCircle; }
+              const sLow = (record.status || '').toLowerCase();
+              if (sLow === 'presente' || sLow === 'present') { statusColor = "bg-green-100 text-green-700"; StatusIcon = CheckCircle2; }
+              else if (['justificada', 'justificado', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(sLow)) { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
+              else if (['ausente', 'falta', 'absent'].includes(sLow)) { statusColor = "bg-red-100 text-red-700"; StatusIcon = XCircle; }
 
               return (
                 <div key={i} className="p-4 px-6 flex items-center justify-between hover:bg-gray-50 transition-colors">

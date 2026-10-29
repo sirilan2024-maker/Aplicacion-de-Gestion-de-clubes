@@ -56,7 +56,7 @@ function normalizeStatus(status: string): 'presente' | 'ausente' | 'justificado'
   const s = (status || '').toLowerCase().trim()
   if (s === 'presente' || s === 'present') return 'presente'
   if (s === 'ausente' || s === 'absent') return 'ausente'
-  if (s === 'justificado' || s === 'justified') return 'justificado'
+  if (s === 'justificado' || s === 'justified' || s === 'justificada' || s === 'excused' || s === 'permiso' || s === 'enfermedad') return 'justificado'
   if (s === 'lesionado' || s === 'injured') return 'lesionado'
   if (s === 'retraso' || s === 'late') return 'retraso'
   return 'otro'

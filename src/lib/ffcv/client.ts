@@ -83,7 +83,19 @@ interface RequestOptions {
   timeoutMs?: number;
   retries?: number;
   retryDelayMs?: number;
+  cacheTtlMs?: number;
+  bypassCache?: boolean;
 }
+
+interface FfcvCacheEntry {
+  data: any;
+  expiresAt: number;
+  staleUntil: number;
+}
+
+const ffcvResponseCache = new Map<string, FfcvCacheEntry>();
+const ffcvInFlight = new Map<string, Promise<any>>();
+const ffcvErrorCooldown = new Map<string, number>();
 
 async function singleFfcvGet<T>(endpoint: string, params: Record<string, string | number | undefined> = {}, options: RequestOptions = {}): Promise<T> {
   const query = new URLSearchParams();
@@ -97,7 +109,7 @@ async function singleFfcvGet<T>(endpoint: string, params: Record<string, string 
   const url = endpoint.startsWith('http') 
     ? (queryString ? `${endpoint}?${queryString}` : endpoint)
     : `${FFCV_BASE_URL}/${endpoint}${queryString ? `?${queryString}` : ''}`;
-  const timeoutMs = options.timeoutMs || 15000;
+  const timeoutMs = options.timeoutMs || 7000;
 
   const { token, cookie } = await getFfcvPageToken();
 
@@ -135,21 +147,39 @@ async function singleFfcvGet<T>(endpoint: string, params: Record<string, string 
         }
 
         if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
-          return reject(new FFCVApiError(`HTTP Status ${res.statusCode}`, url, res.statusCode, rawData));
+          return reject(new FFCVApiError(`HTTP Status ${res.statusCode}`, url, res.statusCode, rawData.slice(0, 300)));
         }
 
-        if (!rawData || rawData.trim() === '') {
+        const trimmed = (rawData || '').trim();
+        if (!trimmed) {
           return reject(new FFCVApiError('Empty response from FFCV server', url, res.statusCode));
         }
 
+        const contentType = String(res.headers['content-type'] || '').toLowerCase();
+        if (
+          contentType.includes('text/html') ||
+          trimmed.startsWith('<!DOCTYPE') ||
+          trimmed.startsWith('<html') ||
+          trimmed.startsWith('<')
+        ) {
+          return reject(
+            new FFCVApiError(
+              `Expected JSON response from FFCV, received HTML (${contentType || 'no content-type'})`,
+              url,
+              res.statusCode,
+              trimmed.slice(0, 200)
+            )
+          );
+        }
+
         try {
-          const parsed = JSON.parse(rawData);
+          const parsed = JSON.parse(trimmed);
           if (parsed && typeof parsed === 'object' && 'error' in parsed && parsed.error) {
-            return reject(new FFCVApiError(`FFCV error: ${parsed.error}`, url, res.statusCode, rawData));
+            return reject(new FFCVApiError(`FFCV error: ${parsed.error}`, url, res.statusCode, trimmed.slice(0, 300)));
           }
           resolve(parsed as T);
         } catch (err: any) {
-          reject(new FFCVApiError(`Failed to parse JSON response: ${err.message}`, url, res.statusCode, rawData.slice(0, 300)));
+          reject(new FFCVApiError(`Failed to parse JSON response: ${err.message}`, url, res.statusCode, trimmed.slice(0, 300)));
         }
       });
     });
@@ -166,8 +196,8 @@ async function singleFfcvGet<T>(endpoint: string, params: Record<string, string 
 }
 
 async function ffcvGet<T>(endpoint: string, params: Record<string, string | number | undefined> = {}, options: RequestOptions = {}): Promise<T> {
-  const maxRetries = options.retries ?? 3;
-  let delay = options.retryDelayMs ?? 400;
+  const maxRetries = options.retries ?? 1;
+  let delay = options.retryDelayMs ?? 350;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -189,7 +219,7 @@ async function ffcvGet<T>(endpoint: string, params: Record<string, string | numb
           await getFfcvPageToken(true); // Force refresh fresh token
         }
         await new Promise(res => setTimeout(res, delay));
-        delay = Math.min(delay * 2, 3000);
+        delay = Math.min(delay * 2, 2000);
         continue;
       }
       throw err;
@@ -199,15 +229,64 @@ async function ffcvGet<T>(endpoint: string, params: Record<string, string | numb
 }
 
 /**
- * Fetch arbitrary raw JSON from FFCV with full token injection and retry support
+ * Fetch arbitrary raw JSON from FFCV with full token injection, retry support, in-memory cache and in-flight deduplication
  */
 export async function fetchFfcvRawUrl<T = any>(fullUrl: string, options: RequestOptions = {}): Promise<T | null> {
-  try {
-    return await ffcvGet<T>(fullUrl, {}, options);
-  } catch (err) {
-    console.warn('[FFCV Client] fetchFfcvRawUrl failed for:', fullUrl, err);
-    return null;
+  const now = Date.now();
+  const isHistoricalSeason =
+    fullUrl.includes('cod_temporada=') &&
+    !fullUrl.includes('cod_temporada=auto') &&
+    !fullUrl.includes('cod_temporada=22');
+  const defaultTtlMs = isHistoricalSeason ? 2 * 60 * 60 * 1000 : 15 * 60 * 1000;
+  const cacheTtlMs = options.cacheTtlMs ?? defaultTtlMs;
+
+  if (!options.bypassCache) {
+    const cached = ffcvResponseCache.get(fullUrl);
+    if (cached && now < cached.expiresAt) {
+      return cached.data as T;
+    }
+
+    const cooldownUntil = ffcvErrorCooldown.get(fullUrl);
+    if (cooldownUntil && now < cooldownUntil) {
+      if (cached && now < cached.staleUntil) {
+        return cached.data as T;
+      }
+      return null;
+    }
+
+    const existingPromise = ffcvInFlight.get(fullUrl);
+    if (existingPromise) {
+      return existingPromise as Promise<T | null>;
+    }
   }
+
+  const requestPromise = (async (): Promise<T | null> => {
+    try {
+      const result = await ffcvGet<T>(fullUrl, {}, options);
+      if (result !== null && result !== undefined) {
+        ffcvResponseCache.set(fullUrl, {
+          data: result,
+          expiresAt: Date.now() + cacheTtlMs,
+          staleUntil: Date.now() + Math.max(cacheTtlMs * 4, 60 * 60 * 1000)
+        });
+        ffcvErrorCooldown.delete(fullUrl);
+      }
+      return result;
+    } catch (err: any) {
+      console.warn('[FFCV Client] fetchFfcvRawUrl failed for:', fullUrl, err?.message || err);
+      ffcvErrorCooldown.set(fullUrl, Date.now() + 60 * 1000);
+      const stale = ffcvResponseCache.get(fullUrl);
+      if (stale && Date.now() < stale.staleUntil) {
+        return stale.data as T;
+      }
+      return null;
+    } finally {
+      ffcvInFlight.delete(fullUrl);
+    }
+  })();
+
+  ffcvInFlight.set(fullUrl, requestPromise);
+  return requestPromise;
 }
 
 /**

@@ -11,38 +11,211 @@ import { matchPlayer } from '../ffcv/acta-sync';
 import { getOfficialMatchDuration } from '../utils';
 
 // Agent configured to bypass intermediate SSL certificate issue on apuntamelo.com
-const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+// with keepAlive: false in serverless environment to prevent stale/dead socket errors
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+  keepAlive: false,
+  timeout: 10000
+});
 
-export function fetchApuntameloJson<T = any>(url: string): Promise<T> {
+export interface FetchApuntameloOptions {
+  timeoutMs?: number;
+  ttlMs?: number;
+  bypassCache?: boolean;
+}
+
+interface CacheEntry<T = any> {
+  data: T;
+  expiresAt: number;
+  staleUntil: number;
+}
+
+const DEFAULT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes fresh cache
+const STALE_FALLBACK_TTL_MS = 60 * 60 * 1000; // 60 minutes stale-while-error fallback
+const ERROR_COOLDOWN_MS = 15 * 1000; // 15 seconds cooldown on HTML/WAF/timeout errors
+
+const apuntameloCache = new Map<string, CacheEntry>();
+const apuntameloErrorCooldown = new Map<string, { message: string; expiresAt: number }>();
+const apuntameloInFlight = new Map<string, Promise<any>>();
+
+export function safeJsonParse<T = any>(raw: unknown, fallback: T): T {
+  if (raw === null || raw === undefined || raw === '') return fallback;
+  if (typeof raw !== 'string') return (raw as T) ?? fallback;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.startsWith('<')) return fallback;
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function performApuntameloRequest<T = any>(
+  url: string,
+  timeoutMs: number,
+  redirectCount = 0
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
       {
         agent: httpsAgent,
+        timeout: timeoutMs,
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept: 'application/json, text/plain, */*'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          Accept: 'application/json, text/javascript, text/plain, */*; q=0.01',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          'X-Requested-With': 'XMLHttpRequest',
+          Connection: 'close',
+          Referer: 'https://apuntamelo.com/',
+          Origin: 'https://apuntamelo.com'
         }
       },
       (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => {
+        const statusCode = res.statusCode || 0;
+        const location = res.headers['location'];
+
+        // Follow HTTP redirects up to 2 hops
+        if ([301, 302, 303, 307, 308].includes(statusCode) && location) {
+          res.resume(); // Drain socket
+          if (redirectCount >= 2) {
+            return reject(new Error(`Demasiadas redirecciones HTTP (${statusCode}) en ${url}`));
+          }
           try {
-            const json = JSON.parse(data);
-            resolve(json);
+            const redirectUrl = new URL(location, url).toString();
+            return performApuntameloRequest<T>(redirectUrl, timeoutMs, redirectCount + 1).then(
+              resolve,
+              reject
+            );
+          } catch (urlErr: any) {
+            return reject(new Error(`Redirección inválida desde ${url}: ${urlErr.message}`));
+          }
+        }
+
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          // Guard against huge unexpected HTML responses (> 2MB)
+          if (data.length < 2 * 1024 * 1024) {
+            data += chunk;
+          }
+        });
+
+        res.on('end', () => {
+          // 1. Validate HTTP status code before attempting JSON parse
+          if (statusCode < 200 || statusCode >= 300) {
+            return reject(
+              new Error(`Respuesta HTTP ${statusCode} no válida desde Apúntamelo (${url})`)
+            );
+          }
+
+          const trimmed = (data || '').trim();
+          if (!trimmed) {
+            return reject(new Error(`Respuesta vacía desde Apúntamelo (${url})`));
+          }
+
+          // 2. Check Content-Type header and HTML prefix before calling JSON.parse
+          const contentType = String(res.headers['content-type'] || '').toLowerCase();
+          const looksLikeHtml =
+            trimmed.startsWith('<!DOCTYPE') ||
+            trimmed.startsWith('<!doctype') ||
+            trimmed.startsWith('<html') ||
+            trimmed.startsWith('<');
+
+          if (looksLikeHtml || (contentType.includes('text/html') && !trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+            return reject(
+              new Error(
+                `Apúntamelo devolvió HTML en lugar de JSON en ${url} (HTTP ${statusCode}, Content-Type: ${contentType || 'desconocido'})`
+              )
+            );
+          }
+
+          // 3. Parse JSON safely
+          try {
+            const json = JSON.parse(trimmed);
+            resolve(json as T);
           } catch (e: any) {
             reject(new Error(`Error al parsear JSON de ${url}: ${e.message}`));
           }
         });
       }
     );
-    req.setTimeout(8000, () => {
-      req.destroy(new Error(`Timeout en petición Apúntamelo a ${url}`));
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Timeout (${timeoutMs}ms) en petición Apúntamelo a ${url}`));
     });
+
     req.on('error', (err) => reject(err));
   });
+}
+
+export async function fetchApuntameloJson<T = any>(
+  url: string,
+  options: FetchApuntameloOptions = {}
+): Promise<T> {
+  const now = Date.now();
+  const timeoutMs = options.timeoutMs ?? 8000;
+  const ttlMs = options.ttlMs ?? DEFAULT_CACHE_TTL_MS;
+
+  // 1. Serve fresh cached response if available
+  if (!options.bypassCache) {
+    const cached = apuntameloCache.get(url);
+    if (cached && now < cached.expiresAt) {
+      return cached.data as T;
+    }
+
+    // 2. Check negative cache cooldown to avoid hammering Apúntamelo during an outage
+    const cooldown = apuntameloErrorCooldown.get(url);
+    if (cooldown && now < cooldown.expiresAt) {
+      if (cached && now < cached.staleUntil) {
+        return cached.data as T;
+      }
+      throw new Error(cooldown.message);
+    }
+  }
+
+  // 3. Deduplicate concurrent in-flight requests to the exact same URL
+  const existingFlight = apuntameloInFlight.get(url);
+  if (existingFlight) {
+    return existingFlight as Promise<T>;
+  }
+
+  const requestPromise = (async () => {
+    try {
+      const result = await performApuntameloRequest<T>(url, timeoutMs);
+      const completedAt = Date.now();
+      apuntameloCache.set(url, {
+        data: result,
+        expiresAt: completedAt + ttlMs,
+        staleUntil: completedAt + STALE_FALLBACK_TTL_MS
+      });
+      apuntameloErrorCooldown.delete(url);
+      return result;
+    } catch (err: any) {
+      const failedAt = Date.now();
+      apuntameloErrorCooldown.set(url, {
+        message: err?.message || `Error consultando Apúntamelo (${url})`,
+        expiresAt: failedAt + ERROR_COOLDOWN_MS
+      });
+
+      // Fallback to stale cached data if available so temporary HTML/WAF responses don't break features
+      const stale = apuntameloCache.get(url);
+      if (stale && failedAt < stale.staleUntil) {
+        console.warn(
+          `[Apuntamelo] Usando datos en caché para ${url} tras fallo temporal: ${err?.message}`
+        );
+        return stale.data as T;
+      }
+
+      throw err;
+    } finally {
+      apuntameloInFlight.delete(url);
+    }
+  })();
+
+  apuntameloInFlight.set(url, requestPromise);
+  return requestPromise;
 }
 
 export interface ApuntameloConfig {
@@ -157,7 +330,7 @@ export async function syncApuntameloTeam(
     );
 
     if (Array.isArray(clasData) && clasData.length > 0 && clasData[0].Json_clasificacion) {
-      const parsedStandings = JSON.parse(clasData[0].Json_clasificacion);
+      const parsedStandings = safeJsonParse<any[]>(clasData[0].Json_clasificacion, []);
       totalTeams = parsedStandings.length;
 
       const standingRecords: FFCVStandingRecord[] = parsedStandings.map((t: any, idx: number) => ({
@@ -200,6 +373,28 @@ export async function syncApuntameloTeam(
       } else {
         standingsUpdated = standingRecords.length;
       }
+
+      // 2b. Sincronizar Ficha Completa del Equipo (Plantilla, Pichichi, Puntuación Fantasy, Valores, Logros)
+      try {
+        const infoArr = await fetchApuntameloJson<any[]>(
+          `https://apuntamelo.com/obtenerInfoEquipo?equipo=${config.teamApuntameloId}`
+        );
+        if (Array.isArray(infoArr) && infoArr.length > 0) {
+          const teamData = infoArr[0];
+          await supabase
+            .from('ffcv_standings')
+            .update({
+              raw_data: {
+                teamData,
+                updated_at: new Date().toISOString()
+              }
+            })
+            .eq('team_ffcv_id', String(config.teamApuntameloId))
+            .eq('ffcv_season_id', seasonId);
+        }
+      } catch (infoErr: any) {
+        console.warn(`[syncApuntameloTeam] Error no bloqueante al obtenerInfoEquipo para ${team.name}:`, infoErr.message);
+      }
     }
   } catch (err: any) {
     errors.push(`Error al consultar clasificación en Apúntamelo: ${err.message}`);
@@ -218,35 +413,84 @@ export async function syncApuntameloTeam(
       const matchdayNumbers = rawMatches.map((m: any) => Number(m.Jornada)).filter(Boolean);
       totalMatchdays = matchdayNumbers.length > 0 ? Math.max(...matchdayNumbers) : 0;
 
+      // Consultar partidos del grupo ya existentes en BD para no volver a pedir detalles de partidos antiguos ya cerrados
+      const { data: existingGroupMatches } = await supabase
+        .from('ffcv_matches')
+        .select('ffcv_match_id, home_score, away_score, status, is_closed')
+        .eq('ffcv_group_id', groupIdStr)
+        .neq('ffcv_season_id', '21')
+        .eq('ffcv_season_id', seasonId);
+
+      const existingGroupMap = new Map<string, any>(
+        (existingGroupMatches || []).map((m: any) => [String(m.ffcv_match_id), m])
+      );
+
       // Obtener resultados reales de los partidos jugados para evitar truncamiento por regla de 5 goles en formativo
       const playedMatchesInGroup = rawMatches.filter(
         (m: any) => m.Goles_A !== null && m.Goles_B !== null && m.Goles_A !== undefined && m.Goles_B !== undefined
       );
 
-      await Promise.all(
-        playedMatchesInGroup.map(async (pm: any) => {
-          try {
-            const mDetail = await fetchApuntameloJson<any[]>(`https://apuntamelo.com/obtenerInfoPartido?id=${pm.Id}`);
-            if (Array.isArray(mDetail) && mDetail.length > 0 && mDetail[0].Json_goles) {
-              const gList = JSON.parse(mDetail[0].Json_goles || '[]');
-              let cA = 0;
-              let cB = 0;
-              gList.forEach((g: any) => {
-                if (Number(g.FK_EquipoLiga) === Number(pm.FK_EquipoLiga_A)) cA++;
-                if (Number(g.FK_EquipoLiga) === Number(pm.FK_EquipoLiga_B)) cB++;
-              });
-              if (cA + cB > 0) {
-                realScoresMap.set(String(pm.Id), {
-                  homeScore: Math.max(Number(pm.Goles_A) || 0, cA),
-                  awayScore: Math.max(Number(pm.Goles_B) || 0, cB)
+      const nowMs = Date.now();
+      const matchesNeedingDetailFetch: any[] = [];
+
+      for (const pm of playedMatchesInGroup) {
+        const matchIdStr = String(pm.Id);
+        const existing = existingGroupMap.get(matchIdStr);
+        const isOurMatch =
+          Number(pm.FK_EquipoLiga_A) === config.teamApuntameloId ||
+          Number(pm.FK_EquipoLiga_B) === config.teamApuntameloId;
+        const matchDateMs = pm.Fecha ? new Date(pm.Fecha).getTime() : 0;
+        const isRecent = matchDateMs > 0 && nowMs - matchDateMs <= 7 * 24 * 60 * 60 * 1000;
+
+        if (
+          existing &&
+          existing.is_closed &&
+          existing.home_score !== null &&
+          existing.away_score !== null &&
+          !isRecent &&
+          !isOurMatch
+        ) {
+          realScoresMap.set(matchIdStr, {
+            homeScore: Math.max(Number(pm.Goles_A) || 0, Number(existing.home_score) || 0),
+            awayScore: Math.max(Number(pm.Goles_B) || 0, Number(existing.away_score) || 0)
+          });
+        } else {
+          matchesNeedingDetailFetch.push(pm);
+        }
+      }
+
+      // Ejecutar peticiones de detalle en lotes pequeños (máx. 4 simultáneas) para evitar bloqueos WAF y picos de CPU
+      const BATCH_SIZE = 4;
+      for (let i = 0; i < matchesNeedingDetailFetch.length; i += BATCH_SIZE) {
+        const batch = matchesNeedingDetailFetch.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(async (pm: any) => {
+            try {
+              const mDetail = await fetchApuntameloJson<any[]>(
+                `https://apuntamelo.com/obtenerInfoPartido?id=${pm.Id}`,
+                { ttlMs: 30 * 60 * 1000 }
+              );
+              if (Array.isArray(mDetail) && mDetail.length > 0 && mDetail[0].Json_goles) {
+                const gList = safeJsonParse<any[]>(mDetail[0].Json_goles, []);
+                let cA = 0;
+                let cB = 0;
+                gList.forEach((g: any) => {
+                  if (Number(g.FK_EquipoLiga) === Number(pm.FK_EquipoLiga_A)) cA++;
+                  if (Number(g.FK_EquipoLiga) === Number(pm.FK_EquipoLiga_B)) cB++;
                 });
+                if (cA + cB > 0) {
+                  realScoresMap.set(String(pm.Id), {
+                    homeScore: Math.max(Number(pm.Goles_A) || 0, cA),
+                    awayScore: Math.max(Number(pm.Goles_B) || 0, cB)
+                  });
+                }
               }
+            } catch {
+              // Mantener goles de cabecera si falla la petición individual
             }
-          } catch (err) {
-            // Mantener goles de cabecera si falla la petición individual
-          }
-        })
-      );
+          })
+        );
+      }
 
       const matchRecords: FFCVMatchRecord[] = rawMatches.map((m: any) => {
         const hasScore = m.Goles_A !== null && m.Goles_B !== null && m.Goles_A !== undefined && m.Goles_B !== undefined;
@@ -301,13 +545,7 @@ export async function syncApuntameloTeam(
         matchesUpdated = matchRecords.length;
 
         // Limpiar registros huérfanos obsoletos en ffcv_matches para este grupo
-        // (ocurre cuando Apúntamelo sustituye el ID provisional de calendario por un ID nuevo de acta disputada)
         const currentMatchIds = new Set(matchRecords.map((m: any) => m.ffcv_match_id));
-        const { data: existingGroupMatches } = await supabase
-          .from('ffcv_matches')
-          .select('ffcv_match_id')
-          .eq('ffcv_group_id', groupIdStr);
-
         const orphanIds = (existingGroupMatches || [])
           .map((m: any) => m.ffcv_match_id)
           .filter((id: string) => !currentMatchIds.has(id));
@@ -353,12 +591,46 @@ export async function syncApuntameloTeam(
         Number(m.FK_EquipoLiga_B) === config.teamApuntameloId
     );
 
-    // Obtener los partidos existentes de este equipo en la temporada activa
-    const { data: existingPartidos } = await supabase
-      .from('partidos')
-      .select('id, rival_nombre, fecha_hora, acta_oficial_url, lugar, highlight_jornada, estado, coach_summary')
-      .eq('equipo_id', teamId)
-      .eq('season_id', activeAppSeasonId);
+    // Obtener los partidos existentes, jugadores y eventos del equipo en paralelo (evita N+1 consultas dentro del bucle)
+    const [
+      { data: existingPartidos },
+      { data: teamPlayers },
+      { data: initialTeamMatchEvents }
+    ] = await Promise.all([
+      supabase
+        .from('partidos')
+        .select('id, rival_nombre, fecha_hora, acta_oficial_url, lugar, highlight_jornada, estado, coach_summary')
+        .eq('equipo_id', teamId)
+        .eq('season_id', activeAppSeasonId),
+      supabase
+        .from('players')
+        .select('id, first_name, last_name, dorsal, team_id')
+        .eq('team_id', teamId),
+      supabase
+        .from('team_events')
+        .select('id, date, title, notes')
+        .eq('team_id', teamId)
+        .eq('event_type', 'Partido')
+        .eq('season_id', activeAppSeasonId)
+    ]);
+
+    const teamMatchEvents = initialTeamMatchEvents ? [...initialTeamMatchEvents] : [];
+    const existingPartidoIds = (existingPartidos || []).map((ep: any) => ep.id);
+    const { data: allExistingConvs } = existingPartidoIds.length > 0
+      ? await supabase
+          .from('convocatorias')
+          .select('partido_id, player_id, minutos_jugados, minutes_played')
+          .in('partido_id', existingPartidoIds)
+      : { data: [] as any[] };
+
+    const convsByPartidoMap = new Map<string, any[]>();
+    for (const conv of allExistingConvs || []) {
+      const list = convsByPartidoMap.get(conv.partido_id) || [];
+      list.push(conv);
+      convsByPartidoMap.set(conv.partido_id, list);
+    }
+
+    const nowMs = Date.now();
 
     for (const sm of saladarMatches) {
       const isHome = Number(sm.FK_EquipoLiga_A) === config.teamApuntameloId;
@@ -452,138 +724,138 @@ export async function syncApuntameloTeam(
 
       // Si el partido está disputado, sincronizar goles y tarjetas a la tabla convocatorias
       if (hasScore && resolvedMatchId) {
-        try {
-          const matchInfoArr = await fetchApuntameloJson<any[]>(
-            `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`
-          );
+        const existingConvs = convsByPartidoMap.get(resolvedMatchId) || [];
+        const matchDateMs = sm.Fecha ? new Date(sm.Fecha).getTime() : nowMs;
+        const isOlderThan7Days = !isNaN(matchDateMs) && (nowMs - matchDateMs) > 7 * 24 * 60 * 60 * 1000;
+        const alreadyFullySynced =
+          matchExact?.estado === 'Finalizado' &&
+          existingConvs.length > 0 &&
+          isOlderThan7Days;
 
-          if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
-            const mInfo = matchInfoArr[0];
+        if (!alreadyFullySynced) {
+          try {
+            const matchInfoArr = await fetchApuntameloJson<any[]>(
+              `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`
+            );
 
-            // Reconciliar goles reales de los jugadores si difieren del marcador truncado por regla formativa de 5 goles
-            try {
-              const gList = JSON.parse(mInfo.Json_goles || '[]');
-              let cA = 0;
-              let cB = 0;
-              gList.forEach((g: any) => {
-                if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_A)) cA++;
-                if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_B)) cB++;
-              });
-              if (cA + cB > 0) {
-                const finalA = Math.max(Number(sm.Goles_A) || 0, cA);
-                const finalB = Math.max(Number(sm.Goles_B) || 0, cB);
-                const finalPropio = isHome ? finalA : finalB;
-                const finalRival = isHome ? finalB : finalA;
+            if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
+              const mInfo = matchInfoArr[0];
 
-                await supabase
-                  .from('partidos')
-                  .update({
-                    resultado_propio: finalPropio,
-                    resultado_rival: finalRival,
-                    estado: 'Finalizado'
-                  })
-                  .eq('id', resolvedMatchId);
+              // Reconciliar goles reales de los jugadores si difieren del marcador truncado por regla formativa de 5 goles
+              try {
+                const gList = safeJsonParse<any[]>(mInfo.Json_goles, []);
+                let cA = 0;
+                let cB = 0;
+                gList.forEach((g: any) => {
+                  if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_A)) cA++;
+                  if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_B)) cB++;
+                });
+                if (cA + cB > 0) {
+                  const finalA = Math.max(Number(sm.Goles_A) || 0, cA);
+                  const finalB = Math.max(Number(sm.Goles_B) || 0, cB);
+                  const finalPropio = isHome ? finalA : finalB;
+                  const finalRival = isHome ? finalB : finalA;
 
-                await supabase
-                  .from('ffcv_matches')
-                  .update({
-                    home_score: finalA,
-                    away_score: finalB,
-                    status: 'played',
-                    is_closed: true
-                  })
-                  .eq('ffcv_match_id', String(sm.Id));
+                  await supabase
+                    .from('partidos')
+                    .update({
+                      resultado_propio: finalPropio,
+                      resultado_rival: finalRival,
+                      estado: 'Finalizado'
+                    })
+                    .eq('id', resolvedMatchId);
+
+                  await supabase
+                    .from('ffcv_matches')
+                    .update({
+                      home_score: finalA,
+                      away_score: finalB,
+                      status: 'played',
+                      is_closed: true
+                    })
+                    .eq('ffcv_match_id', String(sm.Id));
+                }
+              } catch (errGoles) {
+                console.warn('[syncApuntameloTeam] Error reconciliando Json_goles:', errGoles);
               }
-            } catch (errGoles) {
-              console.warn('[syncApuntameloTeam] Error reconciliando Json_goles:', errGoles);
-            }
 
-            const { data: teamPlayers } = await supabase
-              .from('players')
-              .select('id, first_name, last_name, dorsal, team_id')
-              .eq('team_id', teamId);
+              if (teamPlayers && teamPlayers.length > 0) {
+                const puntuaciones = safeJsonParse<any[]>(mInfo.Json_puntuaciones, []);
+                const noticias = safeJsonParse<any[]>(mInfo.Json_noticias, []);
 
-            if (teamPlayers && teamPlayers.length > 0) {
-              const puntuaciones = JSON.parse(mInfo.Json_puntuaciones || '[]');
-              const noticias = JSON.parse(mInfo.Json_noticias || '[]');
-
-              const teamPuntuaciones = puntuaciones.filter(
-                (p: any) =>
-                  Number(p.FK_EquipoLiga) === config.teamApuntameloId ||
-                  Number(p.EquipoLiga) === config.teamApuntameloId
-              );
-
-              // Cargar convocatorias existentes para preservar minutos manuales si los hay
-              const { data: existingConvs } = await supabase
-                .from('convocatorias')
-                .select('player_id, minutos_jugados, minutes_played')
-                .eq('partido_id', resolvedMatchId);
-              const existingConvMap = new Map((existingConvs || []).map((c: any) => [c.player_id, c.minutos_jugados ?? c.minutes_played]));
-
-              // Duración reglamentaria exacta: Infantil 70 mins (2x35'), Cadete 80 mins (2x40'), Juvenil 90 mins (2x45')
-              const categoryDuration = getOfficialMatchDuration(config.category || team.name, 'Liga Brave');
-
-              const convocatoriasToUpsert: any[] = [];
-              for (const pStats of teamPuntuaciones) {
-                const matched = matchPlayer(pStats.Nombre || '', pStats.Dorsal, teamPlayers, teamPlayers);
-                if (!matched) continue;
-
-                let playerGoals = Number(pStats.Goles) || 0;
-                let playerYellows = Number(pStats.Amarillas) || 0;
-                let playerReds = Number(pStats.Rojas) || 0;
-
-                // Verificar también en la crónica en vivo (Json_noticias)
-                const cardNoticias = noticias.filter(
-                  (n: any) =>
-                    Number(n.FK_EquipoLiga) === config.teamApuntameloId &&
-                    (String(n.FK_JugadorLiga) === String(pStats.FK_JugadorLiga) ||
-                      (n.Nombre_Jugador &&
-                        matched.first_name &&
-                        matched.last_name &&
-                        n.Nombre_Jugador.toLowerCase().includes(matched.last_name.toLowerCase().trim())))
+                const teamPuntuaciones = puntuaciones.filter(
+                  (p: any) =>
+                    Number(p.FK_EquipoLiga) === config.teamApuntameloId ||
+                    Number(p.EquipoLiga) === config.teamApuntameloId
                 );
 
-                for (const cn of cardNoticias) {
-                  if (cn.Icono === 5 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.amarilla')) {
-                    playerYellows = Math.max(playerYellows, 1);
+                const existingConvMap = new Map(existingConvs.map((c: any) => [c.player_id, c.minutos_jugados ?? c.minutes_played]));
+
+                // Duración reglamentaria exacta: Infantil 70 mins (2x35'), Cadete 80 mins (2x40'), Juvenil 90 mins (2x45')
+                const categoryDuration = getOfficialMatchDuration(config.category || team.name, 'Liga Brave');
+
+                const convocatoriasToUpsert: any[] = [];
+                for (const pStats of teamPuntuaciones) {
+                  const matched = matchPlayer(pStats.Nombre || '', pStats.Dorsal, teamPlayers, teamPlayers);
+                  if (!matched) continue;
+
+                  let playerGoals = Number(pStats.Goles) || 0;
+                  let playerYellows = Number(pStats.Amarillas) || 0;
+                  let playerReds = Number(pStats.Rojas) || 0;
+
+                  // Verificar también en la crónica en vivo (Json_noticias)
+                  const cardNoticias = noticias.filter(
+                    (n: any) =>
+                      Number(n.FK_EquipoLiga) === config.teamApuntameloId &&
+                      (String(n.FK_JugadorLiga) === String(pStats.FK_JugadorLiga) ||
+                        (n.Nombre_Jugador &&
+                          matched.first_name &&
+                          matched.last_name &&
+                          n.Nombre_Jugador.toLowerCase().includes(matched.last_name.toLowerCase().trim())))
+                  );
+
+                  for (const cn of cardNoticias) {
+                    if (cn.Icono === 5 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.amarilla')) {
+                      playerYellows = Math.max(playerYellows, 1);
+                    }
+                    if (cn.Icono === 6 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.roja')) {
+                      playerReds = Math.max(playerReds, 1);
+                    }
                   }
-                  if (cn.Icono === 6 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.roja')) {
-                    playerReds = Math.max(playerReds, 1);
-                  }
+
+                  const prevMins = existingConvMap.get(matched.id);
+                  const hasManualMins = typeof prevMins === 'number' && prevMins > 0 && prevMins <= categoryDuration;
+
+                  const calculatedMins = hasManualMins
+                    ? prevMins
+                    : (pStats.Suplente ? Math.round(categoryDuration / 2) : categoryDuration);
+
+                  convocatoriasToUpsert.push({
+                    partido_id: resolvedMatchId,
+                    player_id: matched.id,
+                    status: 'convocado',
+                    titular: !Boolean(pStats.Suplente),
+                    yellow_cards: playerYellows,
+                    tarjetas_amarillas: playerYellows,
+                    red_cards: playerReds,
+                    tarjetas_rojas: playerReds,
+                    goals: playerGoals,
+                    goles: playerGoals,
+                    minutes_played: calculatedMins,
+                    minutos_jugados: calculatedMins
+                  });
                 }
 
-                const prevMins = existingConvMap.get(matched.id);
-                const hasManualMins = typeof prevMins === 'number' && prevMins > 0 && prevMins <= categoryDuration;
-
-                const calculatedMins = hasManualMins
-                  ? prevMins
-                  : (pStats.Suplente ? Math.round(categoryDuration / 2) : categoryDuration);
-
-                convocatoriasToUpsert.push({
-                  partido_id: resolvedMatchId,
-                  player_id: matched.id,
-                  status: 'convocado',
-                  titular: !Boolean(pStats.Suplente),
-                  yellow_cards: playerYellows,
-                  tarjetas_amarillas: playerYellows,
-                  red_cards: playerReds,
-                  tarjetas_rojas: playerReds,
-                  goals: playerGoals,
-                  goles: playerGoals,
-                  minutes_played: calculatedMins,
-                  minutos_jugados: calculatedMins
-                });
-              }
-
-              if (convocatoriasToUpsert.length > 0) {
-                await supabase
-                  .from('convocatorias')
-                  .upsert(convocatoriasToUpsert, { onConflict: 'partido_id,player_id' });
+                if (convocatoriasToUpsert.length > 0) {
+                  await supabase
+                    .from('convocatorias')
+                    .upsert(convocatoriasToUpsert, { onConflict: 'partido_id,player_id' });
+                }
               }
             }
+          } catch (detailErr: any) {
+            console.warn(`[syncApuntameloTeam] Error extrayendo estadísticas del partido ${sm.Id}:`, detailErr.message);
           }
-        } catch (detailErr: any) {
-          console.warn(`[syncApuntameloTeam] Error extrayendo estadísticas del partido ${sm.Id}:`, detailErr.message);
         }
       }
 
@@ -601,14 +873,6 @@ export async function syncApuntameloTeam(
         const pitchLocation = isHome
           ? 'Polideportivo Municipal del Saladar'
           : (sm.Nombre_campo || sm.Campo || 'Visitante');
-
-        // Buscar si ya existe un evento para esta jornada o con este rival en la misma ventana temporal
-        const { data: teamMatchEvents } = await supabase
-          .from('team_events')
-          .select('id, date, title, notes')
-          .eq('team_id', teamId)
-          .eq('event_type', 'Partido')
-          .eq('season_id', activeAppSeasonId);
 
         const jornadaStr = `Jornada ${sm.Jornada} Liga Brave`;
         const matchedEvent = (teamMatchEvents || []).find((ev: any) => {
@@ -648,17 +912,24 @@ export async function syncApuntameloTeam(
           }
         } else {
           // Insertar nuevo evento
-          await supabase.from('team_events').insert({
-            team_id: teamId,
-            title: eventTitle,
-            event_type: 'Partido',
-            date: sm.Fecha,
-            start_time: sTime,
-            end_time: eTime,
-            location: pitchLocation,
-            notes: eventNotes,
-            season_id: activeAppSeasonId
-          });
+          const { data: insertedEvt } = await supabase
+            .from('team_events')
+            .insert({
+              team_id: teamId,
+              title: eventTitle,
+              event_type: 'Partido',
+              date: sm.Fecha,
+              start_time: sTime,
+              end_time: eTime,
+              location: pitchLocation,
+              notes: eventNotes,
+              season_id: activeAppSeasonId
+            })
+            .select('id, date, title, notes')
+            .single();
+          if (insertedEvt) {
+            teamMatchEvents.push(insertedEvt);
+          }
         }
       } catch (evtErr: any) {
         console.warn(`[syncApuntameloTeam] Error propagando evento para jornada ${sm.Jornada}:`, evtErr.message);

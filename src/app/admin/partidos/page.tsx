@@ -407,8 +407,8 @@ export default function AdminPartidosPage() {
               
               const resPropio = propStr ? parseInt(propStr) : null;
               const resRival = rivStr ? parseInt(rivStr) : null;
-              const finalizadoCheck = (resPropio !== null && resRival !== null) || new Date(`${dateStr}T${timeStr}`) < new Date();
-              const newEstado = finalizadoCheck ? 'Finalizado' : 'Programado';
+              const hasScores = resPropio !== null && resRival !== null;
+              const newEstado = hasScores ? 'Finalizado' : (editingMatch.estado === 'Suspendido' || editingMatch.estado === 'Aplazado' ? editingMatch.estado : 'Programado');
 
               if (dateStr && timeStr) {
                 const combinedISO = new Date(`${dateStr}T${timeStr}`).toISOString();

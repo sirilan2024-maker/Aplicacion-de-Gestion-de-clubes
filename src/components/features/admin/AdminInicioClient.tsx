@@ -590,7 +590,8 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                         {displayedMatches.map((m) => {
                           const { dateStr, timeStr, dayName } = formatMadridMatchDate(m.fechaHora);
                           const isLive = m.estado === "En curso";
-                          const isFinished = m.estado === "Finalizado";
+                          const hasScores = m.resultadoPropio !== null && m.resultadoRival !== null;
+                          const isFinished = m.estado === "Finalizado" && hasScores;
                           const isSuspended = m.estado === "Suspendido";
                           const isPostponed = m.estado === "Aplazado";
                           const homeScore = m.esLocal ? (m.resultadoPropio ?? 0) : (m.resultadoRival ?? 0);

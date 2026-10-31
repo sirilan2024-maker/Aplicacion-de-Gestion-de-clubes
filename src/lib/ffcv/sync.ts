@@ -256,7 +256,7 @@ export async function syncGroupFFCV(
  */
 export async function syncTeamFFCV(
   teamId: string,
-  options: { syncAllMatchdays?: boolean; specificMatchday?: number } = {},
+  options: { syncAllMatchdays?: boolean; specificMatchday?: number; skipPropagation?: boolean } = {},
   customSupabaseClient?: any
 ): Promise<FFCVSyncResult> {
   const supabase = customSupabaseClient || createAdminClient();
@@ -299,10 +299,13 @@ export async function syncTeamFFCV(
       .update({ ffcv_last_synced_at: new Date().toISOString() })
       .eq('id', teamId);
 
-    try {
-      await propagateFfcvMatchesToClubPartidos(supabase);
-    } catch (e: any) {
-      console.warn('[syncTeamFFCV] Error propagating to club partidos:', e);
+    // Propagar solo si no se ha solicitado posponerla al final del lote
+    if (!options.skipPropagation) {
+      try {
+        await propagateFfcvMatchesToClubPartidos(supabase);
+      } catch (e: any) {
+        console.warn('[syncTeamFFCV] Error propagating to club partidos:', e);
+      }
     }
   }
 
@@ -612,11 +615,18 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
         updates.resultado_rival = null;
       }
     } 
-    // 4. Caso PARTIDO REPROGRAMADO (si antes estaba suspendido o aplazado y la FFCV lo vuelve a programar)
-    else if (!isPlayed && !isSuspended && !isPostponed && (pm.estado === 'Suspendido' || pm.estado === 'Aplazado')) {
-      updates.estado = 'Programado';
-      updates.resultado_propio = null;
-      updates.resultado_rival = null;
+    // 4. Caso PARTIDO NO DISPUTADO / PROGRAMADO (si en FFCV está programado o no se ha jugado aún)
+    else if (!isPlayed && !isSuspended && !isPostponed) {
+      const matchDateMs = pm.fecha_hora ? new Date(pm.fecha_hora).getTime() : 0;
+      const isFutureMatch = matchDateMs > Date.now();
+      const hasNoScores = pm.resultado_propio === null && pm.resultado_rival === null;
+
+      // Si el partido estaba erróneamente en Finalizado (sin resultados o con fecha futura), o reprogramado tras suspensión/aplazamiento
+      if (pm.estado === 'Suspendido' || pm.estado === 'Aplazado' || (pm.estado === 'Finalizado' && (isFutureMatch || hasNoScores))) {
+        updates.estado = 'Programado';
+        updates.resultado_propio = null;
+        updates.resultado_rival = null;
+      }
     }
 
     // Check date and time updates if published by FFCV
@@ -747,7 +757,8 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
  * player minutes, and events.
  */
 export async function syncRecentlyFinishedMatches(
-  customSupabaseClient?: any
+  customSupabaseClient?: any,
+  options?: { skipPropagation?: boolean }
 ): Promise<{
   success: boolean;
   checkedCount: number;
@@ -841,7 +852,7 @@ export async function syncRecentlyFinishedMatches(
       if (isApuntameloTeam(team)) {
         await syncApuntameloTeam(teamId, supabase);
       } else {
-        await syncTeamFFCV(teamId, { syncAllMatchdays: false }, supabase);
+        await syncTeamFFCV(teamId, { syncAllMatchdays: false, skipPropagation: true }, supabase);
       }
       teamsSynced.push(team.name);
     } catch (err: any) {
@@ -849,7 +860,8 @@ export async function syncRecentlyFinishedMatches(
     }
   }
 
-  if (teamsSynced.length > 0) {
+  // Si no se especificó skipPropagation, propagar a 'partidos' los cambios detectados
+  if (teamsSynced.length > 0 && !options?.skipPropagation) {
     try {
       await propagateFfcvMatchesToClubPartidos(supabase);
     } catch (e: any) {

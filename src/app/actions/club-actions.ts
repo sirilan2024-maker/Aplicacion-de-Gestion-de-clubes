@@ -880,7 +880,9 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
     const allMatches = rawPartidos || [];
     // REGLA: Los partidos amistosos no computan para los registros, estadísticas ni clasificaciones de liga
     const playedMatches = allMatches.filter(p => 
-      (p.estado === 'Finalizado' || (p.resultado_propio !== null && p.resultado_rival !== null)) && 
+      p.estado === 'Finalizado' &&
+      p.resultado_propio !== null && 
+      p.resultado_rival !== null && 
       p.tipo_partido !== 'amistoso'
     );
 

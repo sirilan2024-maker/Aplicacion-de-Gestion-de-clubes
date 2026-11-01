@@ -2,10 +2,10 @@ name: Sincronizacion Horaria FFCV y Liga Brave Sporting Saladar
 
 on:
   schedule:
-    # Fines de semana (sábados y domingos de 07:00 a 21:00 UTC / 09:00 a 23:00 España): cada 20 min para captar actas y resultados ~1h post-partido
-    - cron: '*/20 7-21 * * 6,0'
-    # Días laborables: cada hora en punto
-    - cron: '0 * * * 1-5'
+    # Fines de semana (sábados y domingos de 08:00 a 20:00 UTC): cada hora en punto para captar resultados y actas en jornada
+    - cron: '0 8-20 * * 6,0'
+    # Días laborables (lunes a viernes): 2 veces al día (08:00 y 20:00 UTC) para sincronización de mantenimiento
+    - cron: '0 8,20 * * 1-5'
   workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub Actions
 
 jobs:

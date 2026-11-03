@@ -7,6 +7,7 @@ import { NotificationService } from "@/lib/notifications/notification-service"
 import { getConvocationEmailHtml, getUnconvocationEmailHtml } from "@/lib/email-service"
 import { isSeasonEditable, assertSeasonEditable } from "@/lib/season-utils"
 import { detectLowerCategoryTarget } from "@/lib/matches/category-promotion"
+import { findRivalShield } from "@/lib/ffcv/rival-shields"
 
 export async function updateConvocatoria(matchId: string, playerId: string, status: "convocado" | "lesionado" | "duda" | "no_convocado" | null) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -1347,6 +1348,142 @@ export async function reconcileMatchStatsAction(matchId: string, stats: any[]) {
   } catch (err: any) {
     console.error("[reconcileMatchStatsAction] Exception:", err);
     return { success: false, error: err.message || "Error interno" };
+  }
+}
+
+export async function getClubMatchdayMatchesAction(teamId?: string) {
+  try {
+    const supabase = await createAdminClient();
+    const activeSeasonId = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+    // 1. Fetch club matches for season 26/27 (excluding closed season 25/26)
+    const { data: rawMatches, error } = await supabase
+      .from('partidos')
+      .select(`
+        id, fecha_hora, rival_nombre, lugar, estado, resultado_propio, resultado_rival,
+        live_timer_started_at, live_timer_elapsed_seconds, first_half_duration_seconds,
+        second_half_duration_seconds, highlight_jornada, tipo_partido, acta_oficial_url,
+        equipo_id,
+        equipo:teams (id, name, category, color, ffcv_group_id, ffcv_team_id)
+      `)
+      .eq('season_id', activeSeasonId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .order('fecha_hora', { ascending: true });
+
+    if (error || !rawMatches) {
+      if (error) console.error('[getClubMatchdayMatchesAction] Error querying partidos:', error);
+      return [];
+    }
+
+    // 2. Filter matches for the active matchday (exactly 1 match per club team in the matchday window, 7 matches total like in /live)
+    const now = Date.now();
+    const h84 = 84 * 60 * 60 * 1000;
+    const windowStart = now - h84;
+    const windowEnd = now + h84;
+
+    const candidates = rawMatches.filter(m => {
+      const isLive = m.estado === 'En curso' || m.estado === 'En Curso' || m.estado === 'Descanso' ||
+                     m.live_timer_started_at !== null || (m.live_timer_elapsed_seconds && m.live_timer_elapsed_seconds > 0);
+      if (isLive || m.highlight_jornada) return true;
+      const t = new Date(m.fecha_hora).getTime();
+      return t >= windowStart && t <= windowEnd;
+    });
+
+    // Fallback: If no matches in window, find the closest matchday cluster
+    let matchPool = candidates;
+    if (matchPool.length === 0 && rawMatches.length > 0) {
+      const sortedByProximity = [...rawMatches].sort((a, b) => 
+        Math.abs(new Date(a.fecha_hora).getTime() - now) - Math.abs(new Date(b.fecha_hora).getTime() - now)
+      );
+      const closestTime = new Date(sortedByProximity[0].fecha_hora).getTime();
+      const flexWindowStart = closestTime - 60 * 60 * 60 * 1000;
+      const flexWindowEnd = closestTime + 60 * 60 * 60 * 1000;
+      matchPool = rawMatches.filter(m => {
+        const t = new Date(m.fecha_hora).getTime();
+        return t >= flexWindowStart && t <= flexWindowEnd;
+      });
+    }
+
+    // Group by equipo_id: take exactly 1 match per team (closest to now or live) to match the 7 official club teams
+    const matchByTeam = new Map<string, any>();
+    matchPool.forEach(m => {
+      const existing = matchByTeam.get(m.equipo_id);
+      if (!existing) {
+        matchByTeam.set(m.equipo_id, m);
+      } else {
+        const existingIsLive = existing.estado === 'En curso' || existing.live_timer_started_at !== null;
+        const mIsLive = m.estado === 'En curso' || m.live_timer_started_at !== null;
+        if (mIsLive && !existingIsLive) {
+          matchByTeam.set(m.equipo_id, m);
+        } else if (!existingIsLive) {
+          const diffExisting = Math.abs(new Date(existing.fecha_hora).getTime() - now);
+          const diffNew = Math.abs(new Date(m.fecha_hora).getTime() - now);
+          if (diffNew < diffExisting) {
+            matchByTeam.set(m.equipo_id, m);
+          }
+        }
+      }
+    });
+
+    let matchdayMatches = Array.from(matchByTeam.values());
+
+    // Sort: estrictamente en sentido ascendente cronológico (de más antiguo a más reciente)
+    matchdayMatches.sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+
+    // 3. Pre-attach rival shields and matchday from FFCV collections (Season 26/27, ffcv_season_id = '22')
+    const [standingsRes, ffcvMatchesRes] = await Promise.all([
+      supabase.from('ffcv_standings').select('team_name, shield_url, raw_data').neq('ffcv_season_id', '21').eq('ffcv_season_id', '22').limit(1500),
+      supabase.from('ffcv_matches').select('home_team_name, home_shield_url, away_team_name, away_shield_url, ffcv_match_id, matchday').neq('ffcv_season_id', '21').eq('ffcv_season_id', '22').limit(1500)
+    ]);
+    const sData = standingsRes.data || [];
+    const mData = ffcvMatchesRes.data || [];
+
+    const matchdayByCod = new Map<string, any>();
+    mData.forEach((fm: any) => {
+      if (fm.ffcv_match_id && fm.matchday) {
+        matchdayByCod.set(String(fm.ffcv_match_id), fm.matchday);
+      }
+    });
+
+    const enrichedMatches = matchdayMatches.map(m => {
+      const shield = findRivalShield(m.rival_nombre, mData, sData);
+      const codPartido = m.acta_oficial_url?.match(/CodPartido=(\d+)/)?.[1];
+      const jornada = codPartido ? matchdayByCod.get(String(codPartido)) : null;
+      return {
+        ...m,
+        jornada,
+        rival_escudo: shield
+      };
+    });
+
+    return enrichedMatches;
+  } catch (err: any) {
+    console.error('[getClubMatchdayMatchesAction] Error:', err);
+    return [];
+  }
+}
+
+export async function getMatchCallupAction(matchId: string) {
+  try {
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+      .from('convocatorias')
+      .select(`
+        id, player_id, status, titular, dorsal,
+        player:players (id, first_name, last_name, dorsal, posicion_principal, avatar_url)
+      `)
+      .eq('partido_id', matchId)
+      .eq('status', 'convocado')
+      .order('titular', { ascending: false });
+
+    if (error) {
+      console.error('[getMatchCallupAction] Error:', error);
+      return [];
+    }
+    return data || [];
+  } catch (err: any) {
+    console.error('[getMatchCallupAction] Error:', err);
+    return [];
   }
 }
 

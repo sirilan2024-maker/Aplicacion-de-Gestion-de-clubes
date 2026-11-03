@@ -1183,7 +1183,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                       </div>
 
                       {/* Botonera de acciones (iconos encuadrados y proporcionales) */}
-                      <div className="flex items-center gap-1.5 w-full justify-end flex-wrap">
+                      <div className="flex items-center gap-1.5 w-full justify-end">
                         {/* Botón Ver Acta Oficial FFCV */}
                         {(() => {
                           let cardCodacta = ffcvMatch?.codacta || null;
@@ -1208,11 +1208,11 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                                   awayTeamName: ffcvMatch?.away_team_name || (isLocal ? awayTeamName : homeTeamName)
                                 });
                               }}
-                              className="h-8 px-2 sm:px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
+                              className="h-8 w-8 sm:w-auto px-0 sm:px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
                               title="Ver Acta Oficial FFCV"
                             >
-                              <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                              <span className="text-[11px] font-bold">Acta FFCV</span>
+                              <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                              <span className="hidden sm:inline">Acta FFCV</span>
                             </button>
                           );
                         })()}
@@ -1224,21 +1224,21 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="h-8 px-2 sm:px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
+                            className="h-8 w-8 sm:w-auto px-0 sm:px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
                             title="Ver Ficha oficial en Apúntamelo (Liga Brave)"
                           >
-                            <ExternalLink className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span className="text-[11px] font-bold">Apúntamelo</span>
+                            <ExternalLink className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span className="hidden sm:inline">Apúntamelo</span>
                           </a>
                         )}
 
                         <button 
                           onClick={(e) => { e.stopPropagation(); setConciliatingMatch(match) }}
-                          className="h-8 px-2 sm:px-2.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg transition-colors border border-slate-200 shadow-2xs flex items-center justify-center gap-1.5 shrink-0"
+                          className="h-8 w-8 sm:w-auto px-0 sm:px-2.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg transition-colors border border-slate-200 shadow-2xs flex items-center justify-center gap-1.5 shrink-0"
                           title="Ver / Conciliar Acta Interna"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span className="text-xs font-semibold">Conciliar</span>
+                          <Edit3 className="w-4 h-4 text-slate-500 shrink-0" />
+                          <span className="hidden sm:inline text-xs font-semibold">Conciliar</span>
                           {match.acta_oficial_url && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Acta Oficial adjuntada" />}
                         </button>
                         <button 

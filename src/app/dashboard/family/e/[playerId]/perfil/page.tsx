@@ -3,17 +3,24 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Loader2, Activity, Calendar, FileText, AlertTriangle, Target, Trophy, Clock, Flame, CreditCard, ShieldAlert, CheckCircle, MapPin, CheckCircle2, XCircle, History, Plus, Goal, Zap, UserX } from "lucide-react"
+import { Loader2, Activity, Calendar, FileText, AlertTriangle, Target, Trophy, Clock, Flame, CreditCard, ShieldAlert, CheckCircle, MapPin, CheckCircle2, XCircle, History, Plus, Goal, Zap, UserX, ChevronRight } from "lucide-react"
+import dynamic from "next/dynamic"
 import { differenceInDays, parseISO } from "date-fns"
 import Subscriptions from "@/components/features/treasury/Subscriptions"
 import { AddPlayerRequestModal } from "@/components/features/family/AddPlayerRequestModal"
 import { PlayerPerformanceDrawer } from "@/components/features/performance/PlayerPerformanceDrawer"
-import { PlayerStatsModal, type PlayerStatsData } from "@/components/features/estadisticas/PlayerStatsModal"
+import type { PlayerStatsData } from "@/components/features/estadisticas/PlayerStatsModal"
+
+const PlayerStatsModal = dynamic(
+  () => import("@/components/features/estadisticas/PlayerStatsModal").then(mod => mod.PlayerStatsModal),
+  { ssr: false }
+)
 import { DisciplineModal } from "@/components/features/matches/DisciplineModal"
 import { AttendanceModal } from "@/components/features/events/AttendanceModal"
 import { ApparelModal } from "@/components/features/club/ApparelModal"
 import { GoalsModal } from "@/components/features/matches/GoalsModal"
 import { FfcvPlayerModal } from "@/components/features/players/FfcvPlayerModal"
+import { FamilyMatchdayList } from "@/components/features/family/FamilyMatchdayList"
 import { getApparelForPlayerAction } from "@/app/actions/apparel-actions"
 import { Shirt, Shield } from "lucide-react"
 import { useEphemeralFfcvAvatar } from "@/hooks/useEphemeralFfcvAvatar"
@@ -157,9 +164,9 @@ export default function PlayerDashboardPage() {
         tarjetas_amarillas: h.yellow_cards ?? h.tarjetas_amarillas ?? 0,
         tarjetas_rojas: h.red_cards ?? h.tarjetas_rojas ?? 0
       }))
-      // Orden del más cercano en fecha al más lejano
+      // Orden ascendente: del más antiguo al más reciente
       .sort((a, b) => new Date((a.partidos as any).fecha_hora).getTime() - new Date((b.partidos as any).fecha_hora).getTime())
-      .slice(0, 10);
+      .slice(-10);
     setMatchHistory(finalizedHistory);
   }, [selectedTeamFilter, rawConvData, rawMatchEvents]);
 
@@ -298,8 +305,43 @@ export default function PlayerDashboardPage() {
         let minutes = 0;
         let matchesPlayed = 0;
 
-        if (convData) {
-          setRawConvData(convData);
+        let mergedConvData: any[] = [...(convData || [])];
+        if (playerData.team_id) {
+          const { data: teamFinalizedMatches } = await supabase
+            .from("partidos")
+            .select('id, rival_nombre, fecha_hora, hora_citacion, lugar, resultado_propio, resultado_rival, estado, season_id, equipo_id, equipo:teams(id, name, category)')
+            .eq("equipo_id", playerData.team_id)
+            .eq("estado", "Finalizado")
+            .neq("season_id", "584f508a-fc1a-4339-b5b2-4296ffde2f4c");
+
+          if (teamFinalizedMatches && teamFinalizedMatches.length > 0) {
+            const existingMatchIds = new Set(mergedConvData.map((c: any) => c.partido_id));
+            teamFinalizedMatches.forEach((tm: any) => {
+              if (!existingMatchIds.has(tm.id)) {
+                mergedConvData.push({
+                  id: `team-${tm.id}`,
+                  partido_id: tm.id,
+                  titular: false,
+                  minutes_played: 0,
+                  minutos_jugados: 0,
+                  goals: 0,
+                  goles: 0,
+                  yellow_cards: 0,
+                  tarjetas_amarillas: 0,
+                  red_cards: 0,
+                  tarjetas_rojas: 0,
+                  status: 'no_convocado',
+                  asistencia_confirmada_familia: null,
+                  estado_asistencia: null,
+                  partidos: tm
+                });
+              }
+            });
+          }
+        }
+
+        if (mergedConvData.length > 0) {
+          setRawConvData(mergedConvData);
         }
         if (matchEventsData) {
           setRawMatchEvents(matchEventsData);
@@ -438,8 +480,8 @@ export default function PlayerDashboardPage() {
             setNextEventAttendance(attData)
           }
 
-          if (convData) {
-            const allCardEvents = convData
+          if (mergedConvData) {
+            const allCardEvents = mergedConvData
               .filter((h: any) => ((h.yellow_cards ?? h.tarjetas_amarillas) || 0) > 0 || ((h.red_cards ?? h.tarjetas_rojas) || 0) > 0)
               .map((h: any) => ({
                 match: h.partidos,
@@ -448,7 +490,7 @@ export default function PlayerDashboardPage() {
               }));
             setDisciplineCardEvents(allCardEvents);
 
-            const finalizedHistory = convData
+            const finalizedHistory = mergedConvData
               .filter(h => h.partidos && (h.partidos as any).estado === 'Finalizado')
               .map((h: any) => ({
                 ...h,
@@ -457,9 +499,9 @@ export default function PlayerDashboardPage() {
                 tarjetas_amarillas: h.yellow_cards ?? h.tarjetas_amarillas ?? 0,
                 tarjetas_rojas: h.red_cards ?? h.tarjetas_rojas ?? 0
               }))
-              // Orden del más cercano en fecha al más lejano
+              // Orden ascendente: del más antiguo al más reciente
               .sort((a, b) => new Date((a.partidos as any).fecha_hora).getTime() - new Date((b.partidos as any).fecha_hora).getTime())
-              .slice(0, 10);
+              .slice(-10);
             setMatchHistory(finalizedHistory);
           }
 
@@ -995,6 +1037,12 @@ export default function PlayerDashboardPage() {
         )}
       </div>
 
+      {/* LISTADO DE RESULTADOS Y PARTIDOS DE LA JORNADA DEL CLUB (EN DIRECTO, HORARIOS & FICHA DE PARTIDO) */}
+      <FamilyMatchdayList 
+        playerTeamId={player?.team_id || player?.teams?.id} 
+        clubLogoUrl="/logo.png" 
+      />
+
       {/* SELECTOR DE EQUIPO / CATEGORÍA (Para ver estadísticas globales o de categoría superior Senior) */}
       {availableTeams.length > 1 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -1297,7 +1345,90 @@ export default function PlayerDashboardPage() {
               Últimos Partidos
             </h2>
           </div>
-          <div className="overflow-x-auto">
+          {/* VISTA MÓVIL (Sin scroll lateral: tarjetas apiladas 100% responsivas) */}
+          <div className="block md:hidden p-3.5 space-y-2.5">
+            {matchHistory.map((h, i) => {
+              const p = h.partidos;
+              const isLocal = p.lugar === 'Local';
+              const teamName = isLocal ? (p.equipo?.name || player.teams?.name) : p.rival_nombre;
+              const rivalName = isLocal ? p.rival_nombre : (p.equipo?.name || player.teams?.name);
+              const homeScore = isLocal ? p.resultado_propio : p.resultado_rival;
+              const awayScore = isLocal ? p.resultado_rival : p.resultado_propio;
+              const formattedDate = new Date(p.fecha_hora).toLocaleDateString('es-ES', { 
+                weekday: 'short', 
+                day: '2-digit', 
+                month: 'short' 
+              });
+
+              return (
+                <div 
+                  key={i} 
+                  onClick={() => router.push(`/dashboard/family/e/${playerId}/partidos/${p.id}`)}
+                  className="p-3.5 bg-slate-50/70 hover:bg-slate-100/80 active:bg-slate-200/60 border border-slate-200/80 rounded-2xl transition-all cursor-pointer flex flex-col gap-2 shadow-2xs"
+                >
+                  {/* Fila 1: Fecha, condición y marcador oficial Local - Visitante */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      <span className="text-xs font-semibold text-slate-500 capitalize">
+                        {formattedDate}
+                      </span>
+                      {p.equipo_id && p.equipo_id !== player.team_id && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-black rounded border border-amber-200 uppercase">
+                          {p.equipo?.name || 'Senior'}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                        isLocal ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+                      }`}>
+                        {isLocal ? 'Local' : 'Visitante'}
+                      </span>
+                    </div>
+
+                    {/* Marcador del partido (Local - Visitante coincidiendo con el orden de los equipos) */}
+                    <span className="px-2.5 py-1 bg-slate-900 text-white font-black text-xs rounded-xl shadow-2xs tabular-nums shrink-0">
+                      {homeScore ?? 0} - {awayScore ?? 0}
+                    </span>
+                  </div>
+
+                  {/* Fila 2: Enfrentamiento */}
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                      {teamName}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      vs {rivalName}
+                    </p>
+                  </div>
+
+                  {/* Fila 3: Minutos jugados, Goles y enlace */}
+                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} className="text-slate-400" />
+                        <span className="text-slate-500 font-medium">Minutos:</span>
+                        <strong className="text-slate-800 font-bold">{h.minutos_jugados > 0 ? `${h.minutos_jugados}'` : '-'}</strong>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-xs">⚽</span>
+                        <span className="text-slate-500 font-medium">Goles:</span>
+                        <strong className={h.goles > 0 ? "text-emerald-600 font-black" : "text-slate-700 font-bold"}>
+                          {h.goles > 0 ? h.goles : '-'}
+                        </strong>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 text-blue-600 font-bold text-[11px] shrink-0">
+                      <span>Ver</span>
+                      <ChevronRight size={13} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* VISTA ESCRITORIO (Tabla completa en pantallas medianas y grandes) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -1311,6 +1442,9 @@ export default function PlayerDashboardPage() {
               <tbody className="divide-y divide-gray-200">
                 {matchHistory.map((h, i) => {
                   const p = h.partidos;
+                  const isLocal = p.lugar === 'Local';
+                  const homeScore = isLocal ? p.resultado_propio : p.resultado_rival;
+                  const awayScore = isLocal ? p.resultado_rival : p.resultado_propio;
                   return (
                     <tr 
                       key={i} 
@@ -1323,7 +1457,7 @@ export default function PlayerDashboardPage() {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-gray-900">
-                            {p.lugar === 'Local' ? (p.equipo?.name || player.teams?.name) : p.rival_nombre}
+                            {isLocal ? (p.equipo?.name || player.teams?.name) : p.rival_nombre}
                           </span>
                           {p.equipo_id && p.equipo_id !== player.team_id && (
                             <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-black rounded border border-amber-200 uppercase">
@@ -1331,11 +1465,11 @@ export default function PlayerDashboardPage() {
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-500">vs {p.lugar === 'Local' ? p.rival_nombre : (p.equipo?.name || player.teams?.name)}</div>
+                        <div className="text-sm text-gray-500">vs {isLocal ? p.rival_nombre : (p.equipo?.name || player.teams?.name)}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-center">
                         <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full font-bold text-sm">
-                          {p.resultado_propio} - {p.resultado_rival}
+                          {homeScore ?? 0} - {awayScore ?? 0}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900">

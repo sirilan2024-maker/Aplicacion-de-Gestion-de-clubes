@@ -14,6 +14,7 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  serverExternalPackages: ['@supabase/ssr', '@supabase/supabase-js'],
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -26,6 +27,15 @@ const nextConfig: NextConfig = {
     ],
   },
   turbopack: {},
+  async redirects() {
+    return [
+      {
+        source: '/auth/login',
+        destination: '/login',
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -71,9 +71,16 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
           // Determine status based on explicit choice or scores
           let estado = 'Programado';
           if (manualEstado === 'Suspendido' || manualEstado === 'Aplazado') {
-            estado = manualEstado;
-            golesPropios = null;
-            golesRival = null;
+            // Si la fecha ha cambiado respecto a la fecha original del partido suspendido/aplazado,
+            // pero el usuario no ha cambiado manualmente el selector (se quedó el valor por defecto),
+            // lo reprogramamos automáticamente a "Programado".
+            if (dateStr && defaultDate && dateStr !== defaultDate && manualEstado === match.estado) {
+              estado = 'Programado';
+            } else {
+              estado = manualEstado;
+              golesPropios = null;
+              golesRival = null;
+            }
           } else if (golesPropios !== null && golesRival !== null) {
             estado = 'Finalizado';
           } else if (manualEstado === 'Finalizado') {

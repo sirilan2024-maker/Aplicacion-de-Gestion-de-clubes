@@ -120,9 +120,10 @@ export async function syncGroupFFCV(
     targetMatchdays = allMatchdays;
   } else {
     // Smart routine sync: only process the active matchdays around current date
+    // PLUS any matchdays with suspended or postponed matches to detect rescheduling
     const { data: existingGroupMatches } = await supabase
       .from('ffcv_matches')
-      .select('matchday, match_date')
+      .select('matchday, match_date, status')
       .eq('ffcv_group_id', groupId);
 
     if (!existingGroupMatches || existingGroupMatches.length === 0) {
@@ -135,17 +136,26 @@ export async function syncGroupFFCV(
       let minDiff = Infinity;
 
       for (const m of existingGroupMatches) {
-        if (!m.match_date || !m.matchday) continue;
-        const mDate = new Date(m.match_date);
-        const diffMs = Math.abs(mDate.getTime() - today.getTime());
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (!m.matchday) continue;
 
-        if (diffDays <= 7) {
+        // Si el partido está suspendido o aplazado, incluir SIEMPRE su jornada
+        // para capturar en cuanto la FFCV publique la nueva fecha oficial
+        if (m.status === 'suspended' || m.status === 'postponed') {
           relevantMatchdaySet.add(Number(m.matchday));
         }
-        if (diffMs < minDiff) {
-          minDiff = diffMs;
-          closestMatchday = Number(m.matchday);
+
+        if (m.match_date) {
+          const mDate = new Date(m.match_date);
+          const diffMs = Math.abs(mDate.getTime() - today.getTime());
+          const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+          if (diffDays <= 7) {
+            relevantMatchdaySet.add(Number(m.matchday));
+          }
+          if (diffMs < minDiff) {
+            minDiff = diffMs;
+            closestMatchday = Number(m.matchday);
+          }
         }
       }
 
@@ -589,6 +599,10 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
     const sportingScore = isSaladarHome ? fm.home_score : fm.away_score;
     const rivalScore = isSaladarHome ? fm.away_score : fm.home_score;
 
+    const clubDateStr = pm.fecha_hora ? new Date(pm.fecha_hora).toISOString().split('T')[0] : '';
+    const ffcvDateStr = fm.match_date ? new Date(fm.match_date).toISOString().split('T')[0] : '';
+    const isRescheduledByClub = Boolean(clubDateStr && ffcvDateStr && clubDateStr !== ffcvDateStr);
+
     const updates: Record<string, any> = {};
 
     // 1. Caso PARTIDO JUGADO / FINALIZADO
@@ -601,18 +615,33 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
     } 
     // 2. Caso PARTIDO SUSPENDIDO
     else if (isSuspended) {
-      if (pm.estado !== 'Suspendido' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
-        updates.estado = 'Suspendido';
-        updates.resultado_propio = null;
-        updates.resultado_rival = null;
+      if (isRescheduledByClub) {
+        // El club ya ha reprogramado el partido a una fecha distinta (ej. suspendido que se juega hoy).
+        // No forzamos 'Suspendido' en la nueva fecha programada.
+        if (pm.estado === 'Suspendido') {
+          updates.estado = 'Programado';
+        }
+      } else {
+        if (pm.estado !== 'Suspendido' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
+          updates.estado = 'Suspendido';
+          updates.resultado_propio = null;
+          updates.resultado_rival = null;
+        }
       }
     } 
     // 3. Caso PARTIDO APLAZADO
     else if (isPostponed) {
-      if (pm.estado !== 'Aplazado' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
-        updates.estado = 'Aplazado';
-        updates.resultado_propio = null;
-        updates.resultado_rival = null;
+      if (isRescheduledByClub) {
+        // El club ya ha reprogramado el partido a una fecha distinta.
+        if (pm.estado === 'Aplazado') {
+          updates.estado = 'Programado';
+        }
+      } else {
+        if (pm.estado !== 'Aplazado' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
+          updates.estado = 'Aplazado';
+          updates.resultado_propio = null;
+          updates.resultado_rival = null;
+        }
       }
     } 
     // 4. Caso PARTIDO NO DISPUTADO / PROGRAMADO (si en FFCV está programado o no se ha jugado aún)
@@ -631,14 +660,18 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
     // Check date and time updates if published by FFCV
     if (fm.match_date && fm.match_time) {
-      const ffcvIso = formatSpainDateTimeToIso(fm.match_date, fm.match_time);
-      if (ffcvIso) {
-        const currentMs = new Date(pm.fecha_hora).getTime();
-        const ffcvMs = new Date(ffcvIso).getTime();
-        if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
-          updates.fecha_hora = ffcvIso;
-          // Recalcular hora de citación automáticamente (60 minutos antes del inicio oficial)
-          updates.hora_citacion = new Date(ffcvMs - 60 * 60 * 1000).toISOString();
+      // Si el partido está suspendido o aplazado en FFCV y el club ya lo reprogramó a una fecha diferente,
+      // no sobreescribir la nueva fecha con la fecha antigua de la suspensión federativa.
+      if (!isRescheduledByClub || (!isSuspended && !isPostponed)) {
+        const ffcvIso = formatSpainDateTimeToIso(fm.match_date, fm.match_time);
+        if (ffcvIso) {
+          const currentMs = new Date(pm.fecha_hora).getTime();
+          const ffcvMs = new Date(ffcvIso).getTime();
+          if (!isNaN(ffcvMs) && Math.abs(currentMs - ffcvMs) > 60000) {
+            updates.fecha_hora = ffcvIso;
+            // Recalcular hora de citación automáticamente (60 minutos antes del inicio oficial)
+            updates.hora_citacion = new Date(ffcvMs - 60 * 60 * 1000).toISOString();
+          }
         }
       }
     }

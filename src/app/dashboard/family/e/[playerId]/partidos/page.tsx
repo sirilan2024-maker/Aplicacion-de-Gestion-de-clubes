@@ -383,8 +383,24 @@ export default function FamilyMatchesPage() {
               );
             }
 
-            const isSuspendedMatch = match.estado === 'Suspendido' || ffcvMatch?.status === 'suspended';
-            const isPostponedMatch = match.estado === 'Aplazado' || ffcvMatch?.status === 'postponed';
+            const isDifferentDayFromFfcv = Boolean(
+              match.fecha_hora &&
+              ffcvMatch?.match_date &&
+              new Date(match.fecha_hora).toDateString() !== new Date(ffcvMatch.match_date).toDateString()
+            );
+
+            const isSuspendedMatch = match.estado === 'Suspendido' || (
+              ffcvMatch?.status === 'suspended' &&
+              !isDifferentDayFromFfcv &&
+              match.estado !== 'En Curso' &&
+              match.estado !== 'Finalizado'
+            );
+            const isPostponedMatch = match.estado === 'Aplazado' || (
+              ffcvMatch?.status === 'postponed' &&
+              !isDifferentDayFromFfcv &&
+              match.estado !== 'En Curso' &&
+              match.estado !== 'Finalizado'
+            );
             const statusReason = ffcvMatch?.status_reason || (match as any).motivo_suspension || null;
 
             const showScore = (hasInternalScore || hasFfcvScore) && !isSuspendedMatch && !isPostponedMatch;

@@ -316,10 +316,10 @@ export async function syncFFCVActaToConvocatorias(
     const teamPlayers = allPlayers.filter((p: any) => p.team_id === partido.equipo_id);
     const maxMatchMinutes = getOfficialMatchDuration(teamCategory, details.nombre_competicion);
 
-    // Load existing convocatorias for manual minute preservation in base football
+    // Load existing convocatorias for manual minute preservation in base football and card overrides
     const { data: existingConvocatorias } = await supabase
       .from('convocatorias')
-      .select('player_id, minutos_jugados, minutes_played')
+      .select('player_id, minutos_jugados, minutes_played, tarjetas_amarillas, yellow_cards, tarjetas_rojas, red_cards')
       .eq('partido_id', partido.id);
 
     // 3. Build convocatorias payload
@@ -408,15 +408,30 @@ export async function syncFFCVActaToConvocatorias(
 
       minutes = Math.max(0, Math.min(minutes, maxMatchMinutes));
 
+      // Preservar correcciones manuales de tarjetas si el club ya ajustó expresamente los datos
+      // (por ejemplo, actas de Novanet donde el árbitro anotó 2ª amarilla erróneamente en vez de roja directa)
+      let finalYellows = yellows;
+      let finalReds = reds;
+      if (existingConv) {
+        const prevY = existingConv.tarjetas_amarillas ?? existingConv.yellow_cards;
+        const prevR = existingConv.tarjetas_rojas ?? existingConv.red_cards;
+        if (typeof prevY === 'number' && typeof prevR === 'number') {
+          if (yellows === 2 && reds >= 1 && prevY === 1 && prevR === 1) {
+            finalYellows = 1;
+            finalReds = 1;
+          }
+        }
+      }
+
       rowsToUpsert.push({
         partido_id: partido.id,
         player_id: matched.id,
         status: 'convocado',
         titular: isTitular,
-        yellow_cards: yellows,
-        tarjetas_amarillas: yellows,
-        red_cards: reds,
-        tarjetas_rojas: reds,
+        yellow_cards: finalYellows,
+        tarjetas_amarillas: finalYellows,
+        red_cards: finalReds,
+        tarjetas_rojas: finalReds,
         minutes_played: minutes,
         minutos_jugados: minutes,
         goals: goals,

@@ -20,6 +20,13 @@ export interface AuthenticatedContext {
   impersonatedRole?: string;
 }
 
+export const SUPER_ADMIN_ROLES = [
+  "admin",
+  "superadmin",
+  "administrador",
+  "admin_club",
+];
+
 export const ADMIN_ROLES = [
   "admin",
   "administrador",
@@ -37,11 +44,18 @@ export const ADMIN_ROLES = [
   "director",
   "directiva",
   "staff",
-  "utillero"
 ];
+export const UTILLERO_ROLES = ["utillero"];
 export const COACH_ROLES = ["coach", "entrenador", "delegado", "preparador_fisico"];
-export const STAFF_ROLES = [...ADMIN_ROLES, ...COACH_ROLES];
-export const TREASURY_ADMIN_ROLES = ["admin", "coordinador", "tesorero", "superadmin", "secretario"];
+export const STAFF_ROLES = [...ADMIN_ROLES, ...COACH_ROLES, ...UTILLERO_ROLES];
+export const TREASURY_ADMIN_ROLES = [
+  "admin",
+  "superadmin",
+  "administrador",
+  "admin_club",
+  "tesorero",
+  "tesoreria",
+];
 
 /**
  * Obtiene el usuario autenticado y su perfil con club_id desde la sesión activa.
@@ -307,7 +321,8 @@ export async function canUserAccessFamily(
   familyId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
   // 1. Admin/Tesorero del club
-  if (TREASURY_ADMIN_ROLES.includes(ctx.profile.role)) {
+  const allRoles = Array.from(new Set([ctx.profile.role, ...(ctx.profile.roles || [])])).filter(Boolean);
+  if (allRoles.some((r) => TREASURY_ADMIN_ROLES.includes(r))) {
     const { data: targetProfile } = await adminClient
       .from("profiles")
       .select("club_id")
@@ -411,7 +426,8 @@ export async function canUserAccessFee(
     return { allowed: false, reason: "La cuota no pertenece a tu club" };
   }
 
-  if (TREASURY_ADMIN_ROLES.includes(ctx.profile.role)) {
+  const allRoles = Array.from(new Set([ctx.profile.role, ...(ctx.profile.roles || [])])).filter(Boolean);
+  if (allRoles.some((r) => TREASURY_ADMIN_ROLES.includes(r))) {
     return { allowed: true, fee };
   }
 

@@ -1019,6 +1019,7 @@ function GlobalMembersContent() {
   const [managingMember, setManagingMember] = useState<Member | null>(null)
   const [selectedPlayerForDeletion, setSelectedPlayerForDeletion] = useState<Member | null>(null)
   const [exportingRgpd, setExportingRgpd] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const handleExportRgpd = async () => {
     if (!clubId) return
@@ -1049,13 +1050,17 @@ function GlobalMembersContent() {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("club_id, role")
+          .select("club_id, role, roles")
           .eq("id", user.id)
           .single()
 
         if (!profile?.club_id) throw new Error("Usuario sin club asignado")
         
         const role = profile?.role?.toLowerCase() || '';
+        const allRoles = Array.from(new Set([role, ...((profile?.roles || []).map((r: string) => r.toLowerCase()))])).filter(Boolean);
+        const isSuperAdmin = allRoles.some((r: string) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+        setIsAdmin(isSuperAdmin);
+
         if (role === 'jugador' || role === 'tutor' || role === 'familiar' || role === 'family' || role === 'familia') {
           toast.error("No tienes permisos para ver el directorio del club");
           router.push("/dashboard/mi-perfil");
@@ -1579,25 +1584,29 @@ function GlobalMembersContent() {
         </div>
         
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
-          <button
-            onClick={handleExportRgpd}
-            disabled={exportingRgpd}
-            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-red-600 border border-transparent px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-red-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
-          >
-            <Shield size={16} className="sm:w-[18px] sm:h-[18px]" />
-            <span className="truncate">{exportingRgpd ? "Exportando..." : "Auditoría RGPD"}</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleExportRgpd}
+              disabled={exportingRgpd}
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-red-600 border border-transparent px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-red-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
+            >
+              <Shield size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <span className="truncate">{exportingRgpd ? "Exportando..." : "Auditoría RGPD"}</span>
+            </button>
+          )}
           <Link href="/dashboard/club/miembros/archivo" className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-yellow-500 border border-transparent px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-yellow-600 transition-colors shadow-sm text-[11px] sm:text-sm font-medium">
             <Archive size={16} className="sm:w-[18px] sm:h-[18px]" />
             <span className="truncate">Archivo Histórico</span>
           </Link>
-          <button 
-            onClick={() => setShowAltaAsistida(true)}
-            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-orange-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-orange-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
-          >
-            <Edit3 size={16} className="sm:w-[18px] sm:h-[18px]" />
-            <span className="truncate">Alta Manual</span>
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => setShowAltaAsistida(true)}
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-orange-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-orange-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
+            >
+              <Edit3 size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <span className="truncate">Alta Manual</span>
+            </button>
+          )}
           <button 
             onClick={() => setShowAddPlayer(true)}
             className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-emerald-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-emerald-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
@@ -1612,13 +1621,15 @@ function GlobalMembersContent() {
             <LinkIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
             <span className="truncate">Invitar Miembro</span>
           </button>
-          <button 
-            onClick={() => setShowInviteStaff(true)}
-            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-blue-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-blue-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
-          >
-            <Mail size={16} className="sm:w-[18px] sm:h-[18px]" />
-            <span className="truncate">Invitar Staff</span>
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => setShowInviteStaff(true)}
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-md bg-blue-600 px-2 py-2 sm:px-4 sm:py-2.5 text-white hover:bg-blue-700 transition-colors shadow-sm text-[11px] sm:text-sm font-medium"
+            >
+              <Mail size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <span className="truncate">Invitar Staff</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1763,12 +1774,14 @@ function GlobalMembersContent() {
                         </button>
                       ) : member.type === 'staff' ? (
                         <div className="flex items-center gap-1.5">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
-                            className="text-blue-600 font-medium text-xs px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200"
-                          >
-                            Rol
-                          </button>
+                          {isAdmin && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                              className="text-blue-600 font-medium text-xs px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200"
+                            >
+                              Rol
+                            </button>
+                          )}
                           {member.player_id && (
                             <button 
                               onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.player_id}`); }}
@@ -1780,12 +1793,14 @@ function GlobalMembersContent() {
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
-                            className="text-indigo-600 font-medium text-xs px-2 py-1 rounded-md bg-indigo-50 border border-indigo-200"
-                          >
-                            Rol
-                          </button>
+                          {isAdmin && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                              className="text-indigo-600 font-medium text-xs px-2 py-1 rounded-md bg-indigo-50 border border-indigo-200"
+                            >
+                              Rol
+                            </button>
+                          )}
                           <button 
                             onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.id}`); }}
                             className="text-blue-600 font-medium text-xs px-2 py-1 rounded-md hover:bg-blue-50"
@@ -1923,12 +1938,14 @@ function GlobalMembersContent() {
                           </button>
                         ) : member.type === 'staff' ? (
                           <div className="flex items-center gap-1.5">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
-                            >
-                              Gestionar Rol
-                            </button>
+                            {isAdmin && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                                className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
+                              >
+                                Gestionar Rol
+                              </button>
+                            )}
                             {member.player_id && (
                               <button 
                                 onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.player_id}`); }}
@@ -1940,13 +1957,15 @@ function GlobalMembersContent() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
-                              className="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-2.5 py-1 rounded-md hover:bg-indigo-50 transition-colors border border-indigo-200"
-                              title="Cambiar rol o convertir a Entrenador/Staff"
-                            >
-                              Cambiar Rol
-                            </button>
+                            {isAdmin && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setManagingMember(member); }}
+                                className="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-2.5 py-1 rounded-md hover:bg-indigo-50 transition-colors border border-indigo-200"
+                                title="Cambiar rol o convertir a Entrenador/Staff"
+                              >
+                                Cambiar Rol
+                              </button>
+                            )}
                             <button 
                               onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/club/jugador/${member.player_id || member.id}`); }}
                               className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2.5 py-1 rounded-md hover:bg-blue-50 transition-colors"

@@ -3,14 +3,30 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { SYSTEM_MODULES, BASE_SYSTEM_ROLES, AppNavModule, BaseSystemRole } from "@/lib/roles-config"
+import { getAuthenticatedContext, SUPER_ADMIN_ROLES } from "@/lib/auth-helpers"
 
+async function requireSuperAdminContext() {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+  const isAuthorized = allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r));
+  if (!isAuthorized) {
+    throw new Error("No tienes permisos de administrador para gestionar roles y permisos");
+  }
+
+  const adminSupabase = await createAdminClient();
+  return { context, adminSupabase, clubId: context.profile.club_id };
+}
 
 /**
  * Sincroniza todos los módulos del sistema en la tabla app_navigation si faltan.
  */
 export async function syncAppNavigationAction() {
   try {
-    const adminSupabase = await createAdminClient()
+    const { adminSupabase } = await requireSuperAdminContext()
     const inserts = SYSTEM_MODULES.map(m => ({
       id: m.id,
       label: m.label,
@@ -41,7 +57,7 @@ export async function syncAppNavigationAction() {
  */
 export async function getRolesConfigDataAction() {
   try {
-    const adminSupabase = await createAdminClient()
+    const { adminSupabase } = await requireSuperAdminContext()
 
     // 1. Sincronizar módulos base
     const inserts = SYSTEM_MODULES.map(m => ({

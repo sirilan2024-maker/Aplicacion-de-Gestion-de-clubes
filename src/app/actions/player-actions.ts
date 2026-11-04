@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
 import { headers } from "next/headers"
-import { getAuthenticatedContext, ADMIN_ROLES, COACH_ROLES, canUserAccessPlayer } from "@/lib/auth-helpers"
+import { getAuthenticatedContext, ADMIN_ROLES, SUPER_ADMIN_ROLES, COACH_ROLES, canUserAccessPlayer } from "@/lib/auth-helpers"
 
 
 export async function createFamilyAndPlayerAction(playerData: any, familyAuthData: any) {
@@ -192,7 +192,8 @@ export async function exportRgpdAction(clubId: string) {
       return { success: false, error: authError || "No autenticado" };
     }
 
-    if (!ADMIN_ROLES.includes(context.profile.role) || context.profile.club_id !== clubId) {
+    const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+    if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r)) || context.profile.club_id !== clubId) {
       return { success: false, error: "No tienes permisos para exportar datos RGPD de este club" };
     }
 

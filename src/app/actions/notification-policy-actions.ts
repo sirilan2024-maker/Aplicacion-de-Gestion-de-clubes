@@ -1,14 +1,15 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAuthenticatedContext, ADMIN_ROLES, AuthenticatedContext } from '@/lib/auth-helpers';
+import { getAuthenticatedContext, ADMIN_ROLES, SUPER_ADMIN_ROLES, AuthenticatedContext } from '@/lib/auth-helpers';
 import { ClubNotificationPolicy, NotificationType } from '@/lib/notifications/types';
 import { NOTIFICATION_TYPE_REGISTRY } from '@/lib/notifications/registry';
 import type { NotificationPolicyMetadata } from '@/lib/notifications/registry';
 
 function checkAdminPermission(ctx: AuthenticatedContext): boolean {
   if (!ctx || !ctx.profile) return false;
-  return true;
+  const allRoles = Array.from(new Set([ctx.profile.role, ...(ctx.profile.roles || [])])).filter(Boolean);
+  return allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r));
 }
 
 /**
@@ -261,6 +262,9 @@ export async function getClubUsersForNotificationControlAction(searchQuery?: str
 }> {
   try {
     const { context: ctx } = await getAuthenticatedContext();
+    if (!ctx || !checkAdminPermission(ctx)) {
+      return { success: false, error: "No autorizado", users: [] };
+    }
     let clubId = ctx?.profile?.club_id;
     const adminClient = createAdminClient();
 

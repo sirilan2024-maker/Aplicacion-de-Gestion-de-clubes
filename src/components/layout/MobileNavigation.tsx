@@ -327,12 +327,20 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         !bottomHrefs.includes(item.href) && 
         !bottomNames.includes(item.name.toLowerCase())
       );
-      // Seguridad: Filtrar tesorería y admin para familias, tutores, jugadores y entrenadores sin rol admin
+      // Seguridad: Filtrado estricto por privilegios para tesorería, admin y directorio
+      const allRoles = Array.from(new Set([userRole, ...(availableRoles || [])])).filter(Boolean);
+      const isTreasuryAuthorized = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club', 'tesorero', 'tesoreria'].includes(r));
+      const isSuperAdmin = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+      const isAdminAreaAuthorized = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club', 'coordinador', 'metodologo', 'secretario', 'secretaria'].includes(r));
       const isFamilyOrPlayer = ['tutor', 'family', 'familia', 'jugador'].includes(userRole || '');
-      const isCoachOnly = ['coach', 'entrenador', 'delegado', 'preparador_fisico'].includes(userRole || '') && !['admin', 'superadmin', 'coordinador'].includes(userRole || '');
-      if (isFamilyOrPlayer || isCoachOnly) {
-        secondaryLinks = secondaryLinks.filter(item => !item.href.includes('/treasury') && !item.href.startsWith('/admin/'));
-      }
+
+      secondaryLinks = secondaryLinks.filter(item => {
+        if ((item.href.includes('/treasury') || item.name.toLowerCase() === 'tesorería') && !isTreasuryAuthorized) return false;
+        if ((item.href.includes('/admin/configuracion') || item.href.includes('/admin/temporadas')) && !isSuperAdmin) return false;
+        if (item.href.startsWith('/admin/') && !isAdminAreaAuthorized) return false;
+        if (isFamilyOrPlayer && (item.href.includes('/club/miembros') || item.name.toLowerCase() === 'miembros' || item.name.toLowerCase() === 'directorio')) return false;
+        return true;
+      });
     }
     
     // Asegurar que En directo siempre esté disponible si no está en el bottom bar

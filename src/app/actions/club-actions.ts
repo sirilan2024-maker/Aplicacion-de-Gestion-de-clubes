@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { getAuthenticatedContext, ADMIN_ROLES, canUserManageClubStaff, canUserUpdateStaffProfile, getEffectiveSelectedSeasonId } from "@/lib/auth-helpers"
+import { getAuthenticatedContext, ADMIN_ROLES, SUPER_ADMIN_ROLES, canUserManageClubStaff, canUserUpdateStaffProfile, getEffectiveSelectedSeasonId } from "@/lib/auth-helpers"
 import { fetchLatestStandingsForGroups, getMatchPositions } from "@/lib/ffcv/standings-helper"
 
 export async function updateUserRoleAction(userId: string, newRole: string) {
@@ -11,8 +11,9 @@ export async function updateUserRoleAction(userId: string, newRole: string) {
     return { success: false, error: authError || 'No autenticado' }
   }
 
-  if (!ADMIN_ROLES.includes(context.profile.role)) {
-    return { success: false, error: 'No tienes permisos para realizar esta acción' }
+  const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+  if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r))) {
+    return { success: false, error: 'Solo los administradores generales pueden cambiar roles' }
   }
 
   const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -45,8 +46,9 @@ export async function generateStaffInviteAction(role: string) {
     return { success: false, error: authError || 'No autenticado' }
   }
 
-  if (!ADMIN_ROLES.includes(context.profile.role)) {
-    return { success: false, error: 'No tienes permisos para realizar esta acción' }
+  const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+  if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r))) {
+    return { success: false, error: 'Solo los administradores generales pueden generar invitaciones de staff' }
   }
 
   const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -506,7 +508,8 @@ export async function getClubSepaAction(clubId?: string) {
   }
 
   const targetClubId = clubId || context.profile.club_id;
-  if (!ADMIN_ROLES.includes(context.profile.role) || context.profile.club_id !== targetClubId) {
+  const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+  if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r)) || context.profile.club_id !== targetClubId) {
     return { success: false, error: 'No tienes permisos para consultar los datos SEPA de este club' };
   }
 
@@ -546,7 +549,8 @@ export async function updateClubSepaAction({
   }
 
   const targetClubId = clubId || context.profile.club_id;
-  if (!ADMIN_ROLES.includes(context.profile.role) || context.profile.club_id !== targetClubId) {
+  const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+  if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r)) || context.profile.club_id !== targetClubId) {
     return { success: false, error: 'No tienes permisos para modificar la configuración SEPA de este club' };
   }
 

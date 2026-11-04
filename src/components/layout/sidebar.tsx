@@ -449,11 +449,27 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
       n.href === "/dashboard/mis-equipos"
     );
     
-    const isStaff = userRole === 'admin' || userRole === 'coordinador';
+    const allRoles = Array.from(new Set([userRole, ...(availableRoles || [])])).filter(Boolean);
+    const isTreasuryAuthorized = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club', 'tesorero', 'tesoreria'].includes(r));
+    const isSuperAdmin = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+    const isAdminAreaAuthorized = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club', 'coordinador', 'metodologo', 'secretario', 'secretaria'].includes(r));
     const isPlayerOrFamily = userRole === 'jugador' || userRole === 'tutor' || userRole === 'familiar' || userRole === 'family' || userRole === 'familia';
 
     const filteredNavItems = globalNavItems.filter(n => {
-      if (isPlayerOrFamily && (n.name.toLowerCase() === "directorio" || n.href.includes("/club/miembros") || n.href.includes("/treasury") || n.href.startsWith("/admin/"))) {
+      // 1. Tesorería: SÓLO para administradores y tesoreros
+      if ((n.name.toLowerCase() === "tesorería" || n.href.includes("/treasury")) && !isTreasuryAuthorized) {
+        return false;
+      }
+      // 2. Configuración del Club, Roles y Temporadas: SÓLO para administradores generales
+      if ((n.href.includes("/admin/configuracion") || n.href.includes("/admin/temporadas")) && !isSuperAdmin) {
+        return false;
+      }
+      // 3. Rutas /admin/* generales: SÓLO para staff directivo/técnico autorizado
+      if (n.href.startsWith("/admin/") && !isAdminAreaAuthorized) {
+        return false;
+      }
+      // 4. Directorio y miembros: restringido para jugadores y familias
+      if (isPlayerOrFamily && (n.name.toLowerCase() === "directorio" || n.href.includes("/club/miembros"))) {
         return false;
       }
       return true;

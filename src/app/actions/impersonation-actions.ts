@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAuthenticatedContext, ADMIN_ROLES } from '@/lib/auth-helpers';
+import { getAuthenticatedContext, SUPER_ADMIN_ROLES } from '@/lib/auth-helpers';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
@@ -12,8 +12,9 @@ export async function startImpersonationAction(targetUserId: string) {
     if (!ctx) return { success: false, error: authErr || 'No autenticado' };
 
     const adminClient = createAdminClient();
-    const realRole = ctx.realAdminRole || ctx.profile.role || 'admin';
-    if (!ADMIN_ROLES.includes(realRole)) {
+    const realRole = ctx.realAdminRole || ctx.profile.role || '';
+    const allRoles = Array.from(new Set([realRole, ...(ctx.profile.roles || [])])).filter(Boolean);
+    if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r))) {
       return { success: false, error: 'Solo los administradores pueden usar la función de simulación.' };
     }
 
@@ -195,13 +196,14 @@ export async function getClubUsersForImpersonationAction() {
     // 2. Verificar que el usuario es admin con maybeSingle
     const { data: adminProfile } = await adminClient
       .from('profiles')
-      .select('id, role, club_id')
+      .select('id, role, roles, club_id')
       .eq('id', user.id)
       .maybeSingle();
 
     const realRole = adminProfile?.role || '';
-    if (!ADMIN_ROLES.includes(realRole)) {
-      console.log('[getClubUsers] Usuario sin rol admin:', realRole);
+    const allRoles = Array.from(new Set([realRole, ...(adminProfile?.roles || [])])).filter(Boolean);
+    if (!allRoles.some((r) => SUPER_ADMIN_ROLES.includes(r))) {
+      console.log('[getClubUsers] Usuario sin rol superadmin:', realRole);
       return { success: false, data: [] };
     }
 
@@ -210,7 +212,7 @@ export async function getClubUsersForImpersonationAction() {
     // 3. Obtener perfiles de usuarios registrados del club
     let profilesQuery = adminClient
       .from('profiles')
-      .select('id, first_name, last_name, role, avatar_url, club_id')
+      .select('id, first_name, last_name, role, avatar_url, club_id, linked_player_id')
       .order('first_name', { ascending: true });
 
     if (clubId) {

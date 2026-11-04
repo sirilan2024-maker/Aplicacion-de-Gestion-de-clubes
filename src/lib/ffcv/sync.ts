@@ -557,6 +557,48 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       );
     });
 
+    // A2. DETECCIÓN DE PARTIDO REPROGRAMADO / NUEVO ACTA:
+    // Si el partido emparejado por URL está suspendido o aplazado en FFCV, o si no se encontró por URL,
+    // buscar si la FFCV ha generado un nuevo registro de partido (nuevo CodPartido) para este encuentro reprogramado.
+    // (Novanet genera un nuevo CodPartido cuando un partido suspendido se disputa oficialmente).
+    const isOldSuspendedFfcvMatch = fm && (fm.status === 'suspended' || fm.status === 'postponed');
+    if (!fm || isOldSuspendedFfcvMatch) {
+      const pRivalNorm = normalizeMatchRivalName(pm.rival_nombre || '');
+      const pDate = pm.fecha_hora ? new Date(pm.fecha_hora) : null;
+
+      const replacementFm = ffcvMatches.find((f: any) => {
+        if (!isOurMatch(f)) return false;
+        if (teamGroupId && f.ffcv_group_id && f.ffcv_group_id !== teamGroupId) return false;
+        if (fm && String(f.ffcv_match_id) === String(fm.ffcv_match_id)) return false;
+
+        const isSaladarHome = (teamFfcvId && String(f.home_team_ffcv_id) === String(teamFfcvId)) || (f.home_team_name || '').toLowerCase().includes('saladar');
+        const fRival = isSaladarHome ? f.away_team_name : f.home_team_name;
+        const fRivalNorm = normalizeMatchRivalName(fRival || '');
+        if (!pRivalNorm || !fRivalNorm) return false;
+
+        const rivalsMatch = pRivalNorm === fRivalNorm || pRivalNorm.includes(fRivalNorm) || fRivalNorm.includes(pRivalNorm);
+        if (!rivalsMatch) return false;
+
+        // Condición 1: Fecha coincide estrechamente con la fecha programada en el club (+/- 2 días)
+        if (pDate && f.match_date) {
+          const fDate = new Date(f.match_date);
+          const diffDays = Math.abs((pDate.getTime() - fDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays <= 2) return true;
+        }
+
+        // Condición 2: Misma jornada oficial y el partido sustituto ya ha sido disputado (played)
+        if (fm && fm.matchday && f.matchday && Number(fm.matchday) === Number(f.matchday) && f.status === 'played') {
+          return true;
+        }
+
+        return false;
+      });
+
+      if (replacementFm) {
+        fm = replacementFm;
+      }
+    }
+
     // B. Fallback: match by team group and rival name similarity with strict date proximity
     if (!fm && team?.name) {
       const pRivalNorm = normalizeMatchRivalName(pm.rival_nombre || '');
@@ -685,8 +727,9 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       }
     }
 
-    // Set acta_oficial_url if missing
-    if (!pm.acta_oficial_url && fm.ffcv_match_id) {
+    // Set or update acta_oficial_url if missing OR if a replacement match has a newer ffcv_match_id
+    const isNewCodPartido = Boolean(fm.ffcv_match_id && pm.acta_oficial_url && !pm.acta_oficial_url.includes(String(fm.ffcv_match_id)));
+    if ((!pm.acta_oficial_url || isNewCodPartido) && fm.ffcv_match_id) {
       updates.acta_oficial_url = `https://ffcv.es/dep/actas?CodPartido=${fm.ffcv_match_id}`;
     }
 

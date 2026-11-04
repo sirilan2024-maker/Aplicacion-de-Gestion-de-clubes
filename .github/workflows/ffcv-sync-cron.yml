@@ -4,8 +4,8 @@ on:
   schedule:
     # Fines de semana (sábados y domingos de 08:00 a 20:00 UTC): cada hora en punto para captar resultados y actas en jornada
     - cron: '0 8-20 * * 6,0'
-    # Días laborables (lunes a viernes): 2 veces al día (08:00 y 20:00 UTC) para sincronización de mantenimiento
-    - cron: '0 8,20 * * 1-5'
+    # Días laborables (lunes a viernes): mantenimiento matutino, mediodía y noche (20:00 y 22:00 UTC) para partidos entre semana
+    - cron: '0 8,14,20,22 * * 1-5'
   workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub Actions
 
 jobs:

@@ -244,10 +244,13 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
         { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
       ];
-    } else if (userRole === 'tutor' || userRole === 'family') {
+    } else if (userRole === 'tutor' || userRole === 'family' || userRole === 'familia' || userRole === 'jugador') {
+      const familyTarget = activeFamilyPlayerId
+        ? `/dashboard/family/e/${activeFamilyPlayerId}/perfil`
+        : `/dashboard`;
       bottomLinks = [
         { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },
-        { name: "Pagos", href: "/dashboard/treasury", icon: Wallet },
+        { name: "Mis Cuotas", href: familyTarget, icon: Wallet },
         { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
       ]
     } else {
@@ -324,6 +327,12 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         !bottomHrefs.includes(item.href) && 
         !bottomNames.includes(item.name.toLowerCase())
       );
+      // Seguridad: Filtrar tesorería y admin para familias, tutores, jugadores y entrenadores sin rol admin
+      const isFamilyOrPlayer = ['tutor', 'family', 'familia', 'jugador'].includes(userRole || '');
+      const isCoachOnly = ['coach', 'entrenador', 'delegado', 'preparador_fisico'].includes(userRole || '') && !['admin', 'superadmin', 'coordinador'].includes(userRole || '');
+      if (isFamilyOrPlayer || isCoachOnly) {
+        secondaryLinks = secondaryLinks.filter(item => !item.href.includes('/treasury') && !item.href.startsWith('/admin/'));
+      }
     }
     
     // Asegurar que En directo siempre esté disponible si no está en el bottom bar

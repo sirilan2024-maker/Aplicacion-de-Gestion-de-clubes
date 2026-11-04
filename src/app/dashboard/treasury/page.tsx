@@ -1,54 +1,31 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
+import { getAuthenticatedContext, TREASURY_ADMIN_ROLES } from "@/lib/auth-helpers";
 import TreasuryDashboard from "@/components/features/treasury/TreasuryDashboard";
 import CoordinatorTreasuryView from "@/components/coordinator/CoordinatorTreasuryView";
-import { createClient } from "@/lib/supabase/client";
 
-export default function TreasuryPage() {
-  const router = useRouter();
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
-  const [isCoordinator, setIsCoordinator] = useState(false);
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data, error }) => {
-      if (error || !data.user) {
-        setAuthorized(false);
-        return;
-      }
-
-      const roleFromJwt = (data.user as any)?.app_metadata?.role;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, roles")
-        .eq("id", data.user.id)
-        .single();
-
-      const role = profile?.role || roleFromJwt;
-      const roles: string[] = profile?.roles || [];
-
-      const isAdmin = role === "admin" || role === "superadmin" || roles.includes("admin");
-      const isCoach = role === "entrenador" || role === "coach";
-      const isCoord = role === "coordinador" || role === "coordinador_general" || roles.includes("coordinador") || roles.includes("coordinador_general");
-
-      if (isAdmin || isCoach || isCoord) {
-        setAuthorized(true);
-        setIsCoordinator(isCoord && !isAdmin);
-      } else {
-        setAuthorized(false);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (authorized === false) router.replace("/dashboard");
-  }, [authorized, router]);
-
-  if (authorized === null) {
-    return <div className="p-6 text-center text-xs text-slate-500 font-semibold">Cargando tesorería...</div>;
+export default async function TreasuryPage() {
+  const { context, error } = await getAuthenticatedContext();
+  if (!context || error) {
+    redirect("/dashboard");
   }
+
+  const role = context.profile.role || "";
+  const roles: string[] = context.profile.roles || [];
+  const allUserRoles = Array.from(new Set([role, ...roles])).filter(Boolean);
+
+  // Verificación estricta en servidor: solo roles autorizados de tesorería/administración
+  const isAuthorized = allUserRoles.some((r) => TREASURY_ADMIN_ROLES.includes(r));
+  if (!isAuthorized) {
+    redirect("/dashboard");
+  }
+
+  const isAdmin = allUserRoles.some((r) =>
+    ["admin", "superadmin", "administrador", "admin_club", "tesorero", "secretario"].includes(r)
+  );
+  const isCoordinator =
+    allUserRoles.some((r) => ["coordinador", "coordinador_general"].includes(r)) && !isAdmin;
 
   // Vista exclusiva para Coordinadores: Solo lectura de cuotas de jugadores sin contabilidad global
   if (isCoordinator) {

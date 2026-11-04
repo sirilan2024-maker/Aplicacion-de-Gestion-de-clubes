@@ -16,32 +16,31 @@ export function useUserRole() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
-          // Si no hay sesión, ponemos un rol por defecto de 'entrenador' para la maquetación/demo
-          setRol("entrenador")
+          setRol(null)
           setLoading(false)
           return
         }
 
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("rol, team_id, linked_player_id")
+          .select("role, rol, team_id, linked_player_id")
           .eq("id", user.id)
           .single()
 
         if (!error && profile) {
-          let roleStr = profile.rol || "entrenador";
+          // Priorizar siempre el campo oficial 'role' sobre el campo legado 'rol'
+          let roleStr = profile.role || profile.rol || "familia";
           if (roleStr === "tutor") roleStr = "familia";
           
           setRol(roleStr as UserRole)
           setTeamId(profile.team_id)
           setLinkedPlayerId(profile.linked_player_id)
         } else {
-          // Fallback por defecto
-          setRol("entrenador")
+          setRol(null)
         }
       } catch (err) {
         console.error("Error in useUserRole hook:", err)
-        setRol("entrenador")
+        setRol(null)
       } finally {
         setLoading(false)
       }

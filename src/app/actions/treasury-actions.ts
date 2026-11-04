@@ -11,6 +11,22 @@ import {
   TREASURY_ADMIN_ROLES,
 } from "@/lib/auth-helpers";
 
+async function requireTreasuryContext() {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
+  }
+
+  const allRoles = Array.from(new Set([context.profile.role, ...(context.profile.roles || [])])).filter(Boolean);
+  const isAuthorized = allRoles.some((r) => TREASURY_ADMIN_ROLES.includes(r));
+  if (!isAuthorized) {
+    throw new Error("No tienes permisos para acceder a los datos de tesorería del club");
+  }
+
+  const adminSupabase = await createAdminClient();
+  return { context, adminSupabase, clubId: context.profile.club_id, allRoles };
+}
+
 
 export async function getFamilyFeesAction(familyId: string) {
   const { context, error: authError } = await getAuthenticatedContext();
@@ -94,14 +110,9 @@ export async function getPlayerFeesAction(playerId: string) {
 
 
 export async function getClubFeesAction() {
-  const supabase = await createClient();
-  const adminSupabase = await createAdminClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-
-  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  if (!profile?.club_id) throw new Error("Club no encontrado");
+  const { adminSupabase, clubId } = await requireTreasuryContext();
+  if (!clubId) throw new Error("Club no encontrado");
+  const profile = { club_id: clubId };
 
   // Include players to get player_name, amount_paid_cents and fee_payments
   const { data, error } = await adminSupabase
@@ -153,14 +164,9 @@ export async function getClubFeesAction() {
 }
 
 export async function getClubPlayersAction() {
-  const supabase = await createClient();
-  const adminSupabase = await createAdminClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-
-  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  if (!profile?.club_id) throw new Error("Club no encontrado");
+  const { adminSupabase, clubId } = await requireTreasuryContext();
+  if (!clubId) throw new Error("Club no encontrado");
+  const profile = { club_id: clubId };
 
   const { data, error } = await adminSupabase
     .from("players")
@@ -176,14 +182,9 @@ export async function getClubPlayersAction() {
 }
 
 export async function getClubFamiliesAction() {
-  const supabase = await createClient();
-  const adminSupabase = await createAdminClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-
-  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  if (!profile?.club_id) throw new Error("Club no encontrado");
+  const { adminSupabase, clubId } = await requireTreasuryContext();
+  if (!clubId) throw new Error("Club no encontrado");
+  const profile = { club_id: clubId };
 
   const { data, error } = await adminSupabase
     .from("profiles")
@@ -810,26 +811,21 @@ export async function getRegistrationPaymentsAction() {
 
 
 export async function getTreasuryBalanceAction() {
-  const supabase = await createClient();
-  const adminSupabase = await createAdminClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ingresos: 0, gastos: 0 };
-
-  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  if (!profile?.club_id) return { ingresos: 0, gastos: 0 };
+  const { adminSupabase, clubId } = await requireTreasuryContext();
+  if (!clubId) return { ingresos: 0, gastos: 0 };
 
   // Sum fees where estado = 'pagado'
   const { data: feesData } = await adminSupabase
     .from("fees")
     .select("amount_cents, amount_paid_cents, estado")
-    .eq("club_id", profile.club_id)
+    .eq("club_id", clubId)
     .in("estado", ['pagado', 'paid']);
 
   // Sum expenses
   const { data: expensesData } = await adminSupabase
     .from("expenses")
-    .select("amount_cents");
+    .select("amount_cents")
+    .eq("club_id", clubId);
 
   const ingresos = (feesData || []).reduce((sum: number, f: any) => sum + (((f.amount_paid_cents || f.amount_cents) || 0) / 100), 0);
   const gastos = (expensesData || []).reduce((sum: number, e: any) => sum + ((e.amount_cents || 0) / 100), 0);
@@ -838,15 +834,12 @@ export async function getTreasuryBalanceAction() {
 }
 
 export async function getClubExpensesAction() {
-  const adminSupabase = await createAdminClient();
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+  const { adminSupabase, clubId } = await requireTreasuryContext();
 
   const { data, error } = await adminSupabase
     .from("expenses")
     .select("id, concept, amount_cents, date, category, created_at")
+    .eq("club_id", clubId)
     .order("date", { ascending: false });
 
   if (error) {
@@ -863,18 +856,15 @@ export async function createClubExpenseAction(expenseData: {
   category: string;
   date: string;
 }) {
-  const adminSupabase = await createAdminClient();
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
+  const { adminSupabase, clubId, context } = await requireTreasuryContext();
 
   const { error } = await adminSupabase.from("expenses").insert({
     concept: expenseData.concept,
     amount_cents: expenseData.amount_cents,
     category: expenseData.category,
     date: expenseData.date,
-    created_by: user.id,
+    club_id: clubId,
+    created_by: context.user.id,
   });
 
   if (error) throw new Error(error.message);
@@ -886,7 +876,7 @@ export async function updateClubExpenseAction(id: string, expenseData: {
   category: string;
   date: string;
 }) {
-  const adminSupabase = await createAdminClient();
+  const { adminSupabase, clubId } = await requireTreasuryContext();
   const { error } = await adminSupabase.from("expenses").update({
     concept: expenseData.concept,
     amount_cents: expenseData.amount_cents,
@@ -899,7 +889,7 @@ export async function updateClubExpenseAction(id: string, expenseData: {
 }
 
 export async function deleteClubExpenseAction(id: string) {
-  const adminSupabase = await createAdminClient();
+  const { adminSupabase } = await requireTreasuryContext();
   const { error } = await adminSupabase.from("expenses").delete().eq("id", id);
   if (error) throw new Error(error.message);
   return { success: true };
@@ -1480,14 +1470,9 @@ export async function downloadFeeReceiptAction(feeId: string) {
 
 
 export async function getMemberBalancesAction() {
-  const supabase = await createClient();
-  const adminSupabase = await createAdminClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-
-  const { data: profile } = await adminSupabase.from("profiles").select("club_id").eq("id", user.id).single();
-  if (!profile?.club_id) throw new Error("Club no encontrado");
+  const { adminSupabase, clubId } = await requireTreasuryContext();
+  if (!clubId) throw new Error("Club no encontrado");
+  const profile = { club_id: clubId };
 
   // Obtener temporada activa
   const { data: activeSeasonRow } = await adminSupabase

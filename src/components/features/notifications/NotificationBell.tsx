@@ -103,8 +103,8 @@ export function NotificationBell() {
         return '/dashboard/matches'
 
       case 'tesoreria':
-        if (isFamilyRole && linkedPlayerId) {
-          return `/dashboard/family/e/${linkedPlayerId}/perfil`
+        if (isFamilyRole) {
+          return linkedPlayerId ? `/dashboard/family/e/${linkedPlayerId}/perfil` : '/dashboard'
         }
         return '/dashboard/treasury'
 

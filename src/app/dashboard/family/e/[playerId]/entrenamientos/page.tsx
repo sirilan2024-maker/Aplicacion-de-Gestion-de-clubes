@@ -352,9 +352,9 @@ export default function FamilyTrainingsPage() {
       </div>
 
       {/* Listado de Entrenamientos */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+      <div>
         {currentList.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3 shadow-xs">
             <div className="w-14 h-14 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center mx-auto">
               <CalendarIcon size={28} />
             </div>
@@ -382,7 +382,7 @@ export default function FamilyTrainingsPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="space-y-3">
             {currentList.map((t, idx) => {
               const localDate = parseLocalDate(t.date);
               const isPast = t.date < todayStr;
@@ -393,8 +393,8 @@ export default function FamilyTrainingsPage() {
               return (
                 <div 
                   key={t.id} 
-                  className={`p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
-                    isToday ? 'bg-emerald-50/40 hover:bg-emerald-50/70' : 'hover:bg-gray-50/80'
+                  className={`bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-slate-300 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                    isToday ? 'ring-2 ring-emerald-300 bg-emerald-50/20' : ''
                   }`}
                 >
                   <div className="flex items-start gap-4">

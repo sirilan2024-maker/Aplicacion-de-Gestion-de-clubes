@@ -159,35 +159,38 @@ export default function FamilyAttendancePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900">Historial Reciente</h2>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="font-bold text-gray-900 text-lg">Historial Reciente de Asistencia</h2>
+          <span className="text-xs font-semibold text-gray-500">{attendanceRecords.length} registros</span>
         </div>
         {!attendanceRecords.length ? (
-          <div className="p-8 text-center text-gray-500">No hay registros de asistencia todavía.</div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-gray-500 shadow-xs">
+            No hay registros de asistencia todavía.
+          </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="space-y-3">
             {attendanceRecords.map((record, i) => {
               const eventDate = new Date(record.team_events?.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
-              let statusColor = "bg-gray-100 text-gray-600";
+              let statusColor = "bg-gray-100 text-gray-600 border-gray-200";
               let StatusIcon = Clock;
               const sLow = (record.status || '').toLowerCase();
-              if (sLow === 'presente' || sLow === 'present') { statusColor = "bg-green-100 text-green-700"; StatusIcon = CheckCircle2; }
-              else if (['justificada', 'justificado', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(sLow)) { statusColor = "bg-orange-100 text-orange-700"; StatusIcon = Clock; }
-              else if (['ausente', 'falta', 'absent'].includes(sLow)) { statusColor = "bg-red-100 text-red-700"; StatusIcon = XCircle; }
+              if (sLow === 'presente' || sLow === 'present') { statusColor = "bg-emerald-50 text-emerald-700 border-emerald-200"; StatusIcon = CheckCircle2; }
+              else if (['justificada', 'justificado', 'justified', 'excused', 'lesionado', 'permiso', 'enfermedad'].includes(sLow)) { statusColor = "bg-amber-50 text-amber-700 border-amber-200"; StatusIcon = Clock; }
+              else if (['ausente', 'falta', 'absent'].includes(sLow)) { statusColor = "bg-rose-50 text-rose-700 border-rose-200"; StatusIcon = XCircle; }
 
               return (
-                <div key={i} className="p-4 px-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                  <div>
-                    <p className="font-bold text-gray-900 capitalize">{eventDate}</p>
-                    <p className="text-sm text-gray-500">{record.team_events?.title || record.team_events?.event_type || 'Evento'}</p>
+                <div key={i} className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 flex items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition-all">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 capitalize text-sm sm:text-base">{eventDate}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{record.team_events?.title || record.team_events?.event_type || 'Evento'}</p>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase ${statusColor}`}>
+                  <div className="flex flex-col items-end shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border ${statusColor}`}>
                       <StatusIcon size={14} />
                       {record.status}
                     </span>
-                    {record.notes && <span className="text-xs text-gray-400 mt-1">{record.notes}</span>}
+                    {record.notes && <span className="text-[11px] text-gray-400 mt-1 italic max-w-[200px] truncate">{record.notes}</span>}
                   </div>
                 </div>
               );

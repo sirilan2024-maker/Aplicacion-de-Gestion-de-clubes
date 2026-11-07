@@ -943,17 +943,27 @@ export default function PlayerDashboardPage() {
         {/* WIDGET: PRÓXIMO EVENTO DEL CALENDARIO (Entrenamiento / Reunión / Actividad) */}
         {nextEvent && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-            <div className="bg-gradient-to-r from-teal-700 to-emerald-900 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div 
+              onClick={() => router.push(`/dashboard/family/e/${playerId}/eventos`)}
+              className="bg-gradient-to-r from-teal-700 to-emerald-900 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group hover:from-teal-800 hover:to-emerald-950 transition-all"
+              title="Haz clic para ver el calendario completo de entrenamientos y eventos"
+            >
               <div>
-                <h2 className="text-white font-bold text-xl flex items-center gap-2">
-                  <Calendar className="text-teal-200" />
-                  Próximo Evento: {nextEvent.event_type || 'Evento'}
-                </h2>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-white font-bold text-xl flex items-center gap-2 group-hover:text-teal-200 transition-colors">
+                    <Calendar className="text-teal-200 shrink-0" />
+                    Próximo Evento: {nextEvent.event_type || 'Evento'}
+                  </h2>
+                  <span className="inline-flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white font-bold text-xs px-2.5 py-1 rounded-full backdrop-blur-xs transition-colors shadow-2xs">
+                    <span>Ver calendario completo</span>
+                    <ChevronRight size={14} />
+                  </span>
+                </div>
                 <p className="text-teal-100 text-sm mt-1">
                   {new Date(nextEvent.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} {nextEvent.start_time ? `• ${nextEvent.start_time} hs` : ''}
                 </p>
               </div>
-              <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
+              <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20 group-hover:bg-white/20 transition-colors">
                 <p className="text-white font-bold text-lg">{nextEvent.title}</p>
                 {nextEvent.location && (
                   <p className="text-teal-200 text-sm flex items-center gap-1 mt-0.5">
@@ -963,14 +973,18 @@ export default function PlayerDashboardPage() {
               </div>
             </div>
             <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
+              <div 
+                onClick={() => router.push(`/dashboard/family/e/${playerId}/eventos`)}
+                className="flex items-center gap-3 cursor-pointer group"
+                title="Ver calendario completo"
+              >
                 {nextEventAttendance?.status === 'Presente' || nextEventAttendance?.status === 'Asistirá' ? (
                   <>
                     <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
                       <CheckCircle2 size={24} />
                     </div>
                     <div>
-                      <p className="font-bold text-emerald-700 text-lg">Asistencia Confirmada</p>
+                      <p className="font-bold text-emerald-700 text-lg group-hover:underline">Asistencia Confirmada</p>
                       <p className="text-sm text-gray-500">Has confirmado asistencia a este evento.</p>
                     </div>
                   </>
@@ -980,7 +994,7 @@ export default function PlayerDashboardPage() {
                       <span className="text-xl">❌</span>
                     </div>
                     <div>
-                      <p className="font-bold text-rose-700 text-lg">No Asistiré</p>
+                      <p className="font-bold text-rose-700 text-lg group-hover:underline">No Asistiré</p>
                       <p className="text-sm text-gray-500">Has notificado que no podrás acudir.</p>
                     </div>
                   </>
@@ -990,7 +1004,7 @@ export default function PlayerDashboardPage() {
                       <Clock size={24} />
                     </div>
                     <div>
-                      <p className="font-bold text-amber-700 text-lg">Asistencia Pendiente</p>
+                      <p className="font-bold text-amber-700 text-lg group-hover:underline">Asistencia Pendiente</p>
                       <p className="text-sm text-gray-500">Por favor, confirma tu asistencia para el cuerpo técnico.</p>
                     </div>
                   </>
@@ -998,7 +1012,8 @@ export default function PlayerDashboardPage() {
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.stopPropagation();
                     const res = await fetch(`/api/events/${nextEvent.id}/attendance`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -1009,13 +1024,14 @@ export default function PlayerDashboardPage() {
                   className={`flex-1 sm:flex-none font-bold py-2.5 px-5 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2 ${
                     nextEventAttendance?.status === 'Presente' || nextEventAttendance?.status === 'Asistirá'
                       ? 'bg-emerald-600 text-white cursor-default'
-                      : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+                      : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50 cursor-pointer'
                   }`}
                 >
                   Sí, asistiré
                 </button>
                 <button
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.stopPropagation();
                     const res = await fetch(`/api/events/${nextEvent.id}/attendance`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -1026,12 +1042,38 @@ export default function PlayerDashboardPage() {
                   className={`flex-1 sm:flex-none font-bold py-2.5 px-5 rounded-xl shadow-sm transition-colors text-sm flex items-center justify-center gap-2 ${
                     nextEventAttendance?.status === 'Ausente' || nextEventAttendance?.status === 'No Asistirá'
                       ? 'bg-rose-600 text-white cursor-default'
-                      : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+                      : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 cursor-pointer'
                   }`}
                 >
                   No podré
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Acceso directo al calendario cuando no hay evento próximo inmediato */}
+        {!nextEvent && (
+          <div 
+            onClick={() => router.push(`/dashboard/family/e/${playerId}/eventos`)}
+            className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 flex items-center justify-between gap-4 cursor-pointer hover:border-teal-400 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100 text-teal-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Calendar size={24} />
+              </div>
+              <div>
+                <h3 className="text-slate-900 font-bold text-base group-hover:text-teal-700 transition-colors">
+                  Calendario de Entrenamientos y Eventos
+                </h3>
+                <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+                  Consulta todas las sesiones programadas y la agenda completa de tu equipo.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-bold text-teal-700 bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200 group-hover:bg-teal-100 transition-colors shrink-0">
+              <span>Abrir calendario</span>
+              <ChevronRight size={16} />
             </div>
           </div>
         )}

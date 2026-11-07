@@ -13,7 +13,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import toast, { Toaster } from "react-hot-toast";
-import { createTeamEventAction, updateTeamEventAction } from "@/app/actions/event-actions";
+import { createTeamEventAction, updateTeamEventAction, deleteTeamEventAction } from "@/app/actions/event-actions";
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal";
 
 interface TeamEvent {
@@ -183,15 +183,13 @@ export default function CalendarioEquipoPage() {
     if (!confirm("¿Estás seguro de que quieres eliminar este evento? Todo el registro de asistencias asociado también se borrará.")) return;
     
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.from('team_events').delete().eq('id', eventId);
-    
-    if (error) {
-      toast.error("Error al eliminar el evento");
-      setLoading(false);
-    } else {
+    try {
+      await deleteTeamEventAction(eventId, teamId);
       toast.success("Evento eliminado");
       fetchEvents();
+    } catch (error: any) {
+      toast.error("Error al eliminar el evento: " + (error?.message || "Error inesperado"));
+      setLoading(false);
     }
   };
 
@@ -348,26 +346,53 @@ export default function CalendarioEquipoPage() {
       <Toaster position="bottom-right" />
       
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
         <div className="flex items-center gap-4">
-          <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-white border border-transparent hover:border-gray-200 transition-colors">
+          <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-white border border-transparent hover:border-gray-200 transition-colors cursor-pointer">
             <ChevronLeft size={20} className="text-gray-600" />
           </button>
           <h2 className="text-2xl font-bold text-slate-900 capitalize min-w-[180px] text-center">
             {format(currentMonth, "MMMM yyyy", { locale: es })}
           </h2>
-          <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-white border border-transparent hover:border-gray-200 transition-colors">
+          <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-white border border-transparent hover:border-gray-200 transition-colors cursor-pointer">
             <ChevronRight size={20} className="text-gray-600" />
           </button>
         </div>
         
         <button 
           onClick={() => { setSelectedDate(new Date()); setShowModal(true); }}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition-colors cursor-pointer shadow-xs"
         >
           <Plus size={18} />
           Nuevo Evento
         </button>
+      </div>
+
+      {/* LEYENDA VISUAL DE EVENTOS */}
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4 px-1">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs font-bold">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 shadow-2xs">
+            <span className="w-4 h-4 rounded-md bg-blue-600 text-amber-300 flex items-center justify-center shadow-2xs">
+              <Trophy className="w-2.5 h-2.5" />
+            </span>
+            <span>Partidos Oficiales</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-2xs">
+            <span className="w-4 h-4 rounded-md bg-emerald-600 text-white flex items-center justify-center shadow-2xs">
+              <Shield className="w-2.5 h-2.5" />
+            </span>
+            <span>Entrenamientos</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 shadow-2xs">
+            <span className="w-4 h-4 rounded-md bg-amber-500 text-white flex items-center justify-center shadow-2xs">
+              <CalendarIcon className="w-2.5 h-2.5" />
+            </span>
+            <span>Reuniones / Otros</span>
+          </span>
+        </div>
+        <div className="text-xs text-slate-500 font-bold bg-white border border-slate-200 px-3 py-1 rounded-lg shadow-2xs">
+          📅 {events.length} actividades en {format(currentMonth, "MMMM", { locale: es })}
+        </div>
       </div>
 
       {/* CALENDAR GRID */}
@@ -383,51 +408,114 @@ export default function CalendarioEquipoPage() {
         </div>
         
         {/* Days grid */}
-        <div className="grid grid-cols-7 auto-rows-[minmax(120px,auto)] bg-gray-200 gap-px">
+        <div className="grid grid-cols-7 auto-rows-[minmax(64px,auto)] sm:auto-rows-[minmax(84px,auto)] bg-gray-200 gap-px">
           {emptyDays.map((_, i) => (
-            <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[120px]"></div>
+            <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[64px] sm:min-h-[84px]"></div>
           ))}
           
           {daysInMonth.map((day, i) => {
             const dayEvents = getEventsForDay(day);
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const isTodayDate = isToday(day);
+            const hasMatch = dayEvents.some(e => e.event_type === 'Partido');
+            const hasTraining = dayEvents.some(e => e.event_type === 'Entrenamiento');
             
             return (
               <div 
                 key={day.toString()} 
                 onClick={() => handleDayClick(day)}
-                className={`bg-white min-h-[120px] p-2 hover:bg-blue-50/30 transition-colors cursor-pointer group relative ${!isCurrentMonth ? 'opacity-50' : ''}`}
+                className={`bg-white min-h-[64px] sm:min-h-[84px] p-1 sm:p-1.5 hover:bg-blue-50/30 transition-colors cursor-pointer group relative ${!isCurrentMonth ? 'opacity-40 bg-slate-50/50' : ''}`}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium ${isTodayDate ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 group-hover:text-blue-600'}`}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className={`w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-xs sm:text-sm font-black transition-all ${
+                    isTodayDate 
+                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300' 
+                      : hasMatch
+                      ? 'bg-blue-600 text-white font-black shadow-2xs'
+                      : hasTraining
+                      ? 'bg-emerald-600 text-white font-black shadow-2xs'
+                      : 'text-gray-700 group-hover:text-blue-600'
+                  }`}>
                     {format(day, "d")}
                   </span>
-                  {dayEvents.length > 0 && (
-                    <span className="text-[10px] font-bold text-gray-400">{dayEvents.length} eventos</span>
-                  )}
+                  
+                  {/* Badges / indicadores de día */}
+                  <div className="flex items-center gap-1">
+                    {hasMatch && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 ring-2 ring-blue-200" title="Partido oficial este día" />
+                    )}
+                    {hasTraining && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200" title="Entrenamiento este día" />
+                    )}
+                    {dayEvents.length > 0 && (
+                      <span className="text-[10px] font-bold text-gray-400 hidden sm:inline">{dayEvents.length}</span>
+                    )}
+                  </div>
                 </div>
                 
-                <div className="space-y-1 mt-1">
+                <div className="space-y-1">
                   {dayEvents.slice(0, 3).map(event => (
                     <div 
                       key={event.id}
                       onClick={(e) => { e.stopPropagation(); handleOpenEditModal(event); }}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] sm:text-xs font-bold truncate shadow-sm border cursor-pointer hover:opacity-90 transition-opacity ${
-                        event.event_type === 'Entrenamiento' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                        event.event_type === 'Partido' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                        'bg-amber-50 text-amber-700 border-amber-100'
-                      }`}
+                      className="cursor-pointer group/ev"
                     >
-                      <span className="shrink-0 flex items-center justify-center">
-                        {event.event_type === "Partido" ? "⚽" : event.event_type === "Entrenamiento" ? "🏃" : "📅"}
-                      </span>
-                      <span className="truncate hidden md:inline">{event.start_time.substring(0,5)} • {event.title}</span>
-                      <span className="truncate md:hidden">{event.title}</span>
+                      {/* Vista Móvil: Pastilla compacta con icono SVG nítido y hora */}
+                      <div className={`sm:hidden flex flex-col items-center justify-center py-1 px-0.5 rounded-md text-white font-black shadow-2xs border transition-transform active:scale-95 ${
+                        event.event_type === 'Partido'
+                          ? 'bg-blue-600 border-blue-700 shadow-blue-200'
+                          : event.event_type === 'Entrenamiento'
+                          ? 'bg-emerald-600 border-emerald-700 shadow-emerald-200'
+                          : 'bg-amber-500 border-amber-600 shadow-amber-200'
+                      }`}
+                      title={`${event.event_type}: ${event.title} (${event.start_time.substring(0,5)})`}
+                      >
+                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                          {event.event_type === 'Partido' ? (
+                            <Trophy className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                          ) : event.event_type === 'Entrenamiento' ? (
+                            <Shield className="w-3.5 h-3.5 text-white shrink-0" />
+                          ) : (
+                            <CalendarIcon className="w-3.5 h-3.5 text-white shrink-0" />
+                          )}
+                        </div>
+                        <span className="text-[9px] font-black leading-none mt-0.5 tracking-tight text-white">
+                          {event.start_time.substring(0,5)}
+                        </span>
+                      </div>
+
+                      {/* Vista PC / Tablet: Pastilla completa con icono SVG destacado, hora y título */}
+                      <div className={`hidden sm:flex items-center gap-1.5 px-1.5 py-1 rounded-md text-[11px] font-bold truncate shadow-2xs border border-l-4 transition-all hover:scale-[1.01] ${
+                        event.event_type === 'Partido'
+                          ? 'bg-blue-50/90 text-blue-950 border-blue-200 border-l-blue-600 hover:bg-blue-100'
+                          : event.event_type === 'Entrenamiento'
+                          ? 'bg-emerald-50/90 text-emerald-950 border-emerald-200 border-l-emerald-600 hover:bg-emerald-100'
+                          : 'bg-amber-50/90 text-amber-950 border-amber-200 border-l-amber-500 hover:bg-amber-100'
+                      }`}
+                      title={`${event.event_type}: ${event.start_time.substring(0,5)} • ${event.title}`}
+                      >
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 shadow-2xs ${
+                          event.event_type === 'Partido'
+                            ? 'bg-blue-600 text-amber-300'
+                            : event.event_type === 'Entrenamiento'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-500 text-white'
+                        }`}>
+                          {event.event_type === 'Partido' ? (
+                            <Trophy className="w-3 h-3 text-amber-300" />
+                          ) : event.event_type === 'Entrenamiento' ? (
+                            <Shield className="w-3 h-3 text-white" />
+                          ) : (
+                            <CalendarIcon className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <span className="text-[11px] font-black shrink-0 text-slate-800">{event.start_time.substring(0,5)}</span>
+                        <span className="truncate text-[11px] font-semibold">{event.title}</span>
+                      </div>
                     </div>
                   ))}
                   {dayEvents.length > 3 && (
-                    <div className="text-[11px] text-gray-500 font-bold px-1 pt-1">
+                    <div className="text-[10px] sm:text-[11px] text-gray-500 font-black px-1 pt-0.5 text-center sm:text-left">
                       +{dayEvents.length - 3} más
                     </div>
                   )}
@@ -454,16 +542,16 @@ export default function CalendarioEquipoPage() {
         ) : (
           <div className="space-y-3">
             {events.map(event => (
-              <div key={event.id} className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all">
+              <div key={event.id} className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs hover:border-slate-300 transition-all">
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-inner shrink-0 ${
-                    event.event_type === 'Entrenamiento' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                    event.event_type === 'Partido' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                    'bg-amber-50 text-amber-600 border-amber-100'
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center border shadow-xs shrink-0 ${
+                    event.event_type === 'Partido' ? 'bg-blue-600 text-amber-300 border-blue-700' :
+                    event.event_type === 'Entrenamiento' ? 'bg-emerald-600 text-white border-emerald-700' :
+                    'bg-amber-500 text-white border-amber-600'
                   }`}>
-                    {event.event_type === 'Partido' ? <Trophy size={22} /> : 
-                     event.event_type === 'Entrenamiento' ? <Shield size={22} /> : 
-                     <CalendarIcon size={22} />}
+                    {event.event_type === 'Partido' ? <Trophy size={22} className="text-amber-300" /> : 
+                     event.event_type === 'Entrenamiento' ? <Shield size={22} className="text-white" /> : 
+                     <CalendarIcon size={22} className="text-white" />}
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">

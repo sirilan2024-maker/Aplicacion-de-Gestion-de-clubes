@@ -481,29 +481,36 @@ export default function EntrenamientoDetailPage() {
                   </button>
                 </div>
               </div>
-              <div className="p-0 overflow-x-auto divide-y divide-gray-100">
+              <div className="p-0 overflow-x-auto divide-y divide-slate-200/80">
                 {allPlayers.map(player => {
                   const currentStatus = attendance[player.id];
                   
                   return (
-                    <div key={player.id} className="p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                    <div key={player.id} className="p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-blue-50/20 transition-colors border-b border-slate-200/80 odd:bg-white even:bg-slate-50/40">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
                           {player.avatar_url ? (
                             <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
                           ) : (
-                            <span className="text-slate-700 font-black text-base">{player.dorsal || `${player.first_name?.charAt(0)}${player.last_name?.charAt(0)}`}</span>
+                            <span className="text-slate-700 font-black text-sm">{player.dorsal || `${player.first_name?.charAt(0)}${player.last_name?.charAt(0)}`}</span>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-extrabold text-slate-900 text-base sm:text-base leading-tight truncate">
+
+                        {/* Dorsal cuadrado uniforme */}
+                        {player.dorsal ? (
+                          <span className="min-w-[28px] h-7 px-1.5 rounded-lg bg-slate-900 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-2xs">
+                            #{player.dorsal}
+                          </span>
+                        ) : (
+                          <span className="min-w-[28px] h-7 px-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center shrink-0">
+                            -
+                          </span>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-black text-slate-900 text-sm sm:text-base leading-snug break-words">
                             {player.first_name} {player.last_name}
                           </p>
-                          {player.dorsal && (
-                            <span className="inline-block mt-0.5 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                              Dorsal {player.dorsal}
-                            </span>
-                          )}
                           {(currentStatus === 'Justificado' || currentStatus === 'Lesionado' || currentStatus === 'excused') && (
                             <p className="mt-1 text-xs text-amber-700 italic line-clamp-2">
                               {currentStatus === 'Lesionado' ? '⚕️ Lesionado' : '📝 Justificado'}{attendanceNotes[player.id] ? `: ${attendanceNotes[player.id]}` : ''}
@@ -632,7 +639,7 @@ export default function EntrenamientoDetailPage() {
                     <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-bold text-gray-600 uppercase">
                       <th className="p-4">Jugador</th>
                       <th className="p-4 w-44">Minutos</th>
-                      <th className="p-4 w-44">RPE (1-10)</th>
+                      <th className="p-4 w-44">RPE (0-10)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
@@ -667,7 +674,7 @@ export default function EntrenamientoDetailPage() {
                           <td className="p-4">
                             <input 
                               type="number" 
-                              min={1} 
+                              min={0} 
                               max={10} 
                               value={rpeVal}
                               onChange={(e) => {
@@ -679,12 +686,12 @@ export default function EntrenamientoDetailPage() {
                                 }
                                 const num = parseInt(raw, 10);
                                 if (!isNaN(num)) {
-                                  const clamped = Math.min(10, Math.max(1, num));
+                                  const clamped = Math.min(10, Math.max(0, num));
                                   handleMetricChange(p.id, rpeMetric.id, clamped.toString(), 'number');
                                 }
                               }}
                               className="w-full max-w-[130px] border border-gray-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-bold text-slate-900 bg-white"
-                              placeholder="1 - 10"
+                              placeholder="0 - 10"
                             />
                           </td>
                         </tr>

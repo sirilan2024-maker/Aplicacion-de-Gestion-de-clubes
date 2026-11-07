@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X, ChevronDown, ChevronUp, UserCheck, Clock } from "lucide-react";
+import { Plus, Target, Activity, CalendarDays, ArrowRight, Loader2, Trash2, X, ChevronDown, ChevronUp, UserCheck, Clock, Check, Pencil } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { format, parseISO, differenceInDays, addDays, getDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -53,6 +53,7 @@ export default function EntrenamientosListPage() {
   // Collapsible History & Filter states
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<string>("current_month");
+  const [attendanceRecordedSessionIds, setAttendanceRecordedSessionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
@@ -74,6 +75,24 @@ export default function EntrenamientosListPage() {
 
     if (!evError && evData) {
       setSessions(evData);
+
+      // Comprobar sesiones con lista ya pasada
+      const sessionIds = evData.map(e => e.id);
+      if (sessionIds.length > 0) {
+        const { data: attList } = await supabase
+          .from('attendance')
+          .select('event_id, session_id')
+          .or(`event_id.in.(${sessionIds.join(',')}),session_id.in.(${sessionIds.join(',')})`);
+
+        const recordedSet = new Set<string>();
+        if (attList) {
+          attList.forEach((a: any) => {
+            if (a.event_id) recordedSet.add(a.event_id);
+            if (a.session_id) recordedSet.add(a.session_id);
+          });
+        }
+        setAttendanceRecordedSessionIds(recordedSet);
+      }
     }
 
     // 2. Calculate ACWR Manually
@@ -399,14 +418,31 @@ export default function EntrenamientosListPage() {
                       >
                         <Trash2 size={18} />
                       </button>
-                      <button 
-                        onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${featuredData.session.id}`)}
-                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95"
-                      >
-                        <UserCheck size={18} />
-                        <span>Pasar Lista</span>
-                        <ArrowRight size={16} />
-                      </button>
+
+                      {attendanceRecordedSessionIds.has(featuredData.session.id) ? (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-black text-xs sm:text-sm shadow-2xs">
+                            <Check size={16} className="text-emerald-600 shrink-0" />
+                            <span>Lista pasada</span>
+                          </span>
+                          <button 
+                            onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${featuredData.session.id}`)}
+                            className="p-2.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                            title="Modificar asistencia"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${featuredData.session.id}`)}
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                        >
+                          <UserCheck size={18} />
+                          <span>Pasar Lista</span>
+                          <ArrowRight size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -432,13 +468,29 @@ export default function EntrenamientosListPage() {
                             >
                               <Trash2 size={16} />
                             </button>
-                            <button 
-                              onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${extra.id}`)}
-                              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors"
-                            >
-                              <UserCheck size={16} />
-                              <span>Pasar Lista</span>
-                            </button>
+                            {attendanceRecordedSessionIds.has(extra.id) ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs">
+                                  <Check size={13} className="text-emerald-600 shrink-0" />
+                                  <span>Lista pasada</span>
+                                </span>
+                                <button 
+                                  onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${extra.id}`)}
+                                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Modificar asistencia"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${extra.id}`)}
+                                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors"
+                              >
+                                <UserCheck size={16} />
+                                <span>Pasar Lista</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -535,53 +587,92 @@ export default function EntrenamientosListPage() {
                       </div>
                     </div>
 
-                    {/* LISTA DE SESIONES FILTRADAS */}
+                    {/* LISTA DE SESIONES FILTRADAS CON TARJETAS INDEPENDIENTES (SIN SCROLL INTERNO) */}
                     {filteredHistorySessions.length === 0 ? (
-                      <div className="p-8 text-center text-sm text-gray-500">
+                      <div className="p-8 text-center text-sm text-gray-500 bg-white m-3 rounded-2xl border border-slate-200">
                         No hay sesiones registradas en este mes. Prueba cambiando a &ldquo;Toda la Temporada&rdquo;.
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-100 max-h-[520px] overflow-y-auto">
+                      <div className="p-3 sm:p-4 bg-slate-100/70 space-y-3">
                         {filteredHistorySessions.map(session => {
                           const isToday = session.date === todayStr;
                           return (
                             <div 
                               key={session.id} 
-                              className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50 transition-colors ${
-                                isToday ? "bg-blue-50/40" : ""
+                              className={`bg-white rounded-2xl border transition-all shadow-xs p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                                isToday 
+                                  ? "border-emerald-400 ring-2 ring-emerald-100 shadow-sm" 
+                                  : "border-slate-200/90 hover:border-slate-300"
                               }`}
                             >
-                              <div className="flex flex-col gap-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h3 className="font-bold text-gray-900 text-base sm:text-lg truncate">
-                                    {session.title}
-                                  </h3>
-                                  {isToday && (
-                                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                                      Hoy
-                                    </span>
-                                  )}
+                              <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                                {/* Bloque visual de fecha */}
+                                <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 border shadow-2xs ${
+                                  isToday 
+                                    ? "bg-emerald-600 text-white border-emerald-700" 
+                                    : "bg-slate-50 text-slate-800 border-slate-200"
+                                }`}>
+                                  <span className="text-[10px] font-black uppercase tracking-wider leading-none">
+                                    {format(parseISO(session.date), "MMM", { locale: es }).replace('.', '')}
+                                  </span>
+                                  <span className="text-xl font-black leading-none mt-1">
+                                    {format(parseISO(session.date), "d")}
+                                  </span>
                                 </div>
-                                <div className="text-xs sm:text-sm text-gray-500 font-medium capitalize">
-                                  {format(parseISO(session.date), "EEEE d 'de' MMMM, yyyy", { locale: es })} • {session.start_time.substring(0,5)} h
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-black text-slate-900 text-base sm:text-lg leading-snug break-words">
+                                      {session.title}
+                                    </h3>
+                                    {isToday && (
+                                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        Hoy
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 font-medium capitalize mt-1">
+                                    <Clock size={14} className="text-slate-400 shrink-0" />
+                                    <span>
+                                      {format(parseISO(session.date), "EEEE d 'de' MMMM", { locale: es })} • {session.start_time.substring(0, 5)} h
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-end gap-2 shrink-0">
+
+                              <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                                 <button 
                                   onClick={() => handleDeleteSession(session.id)}
-                                  className="flex items-center justify-center p-2 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
+                                  className="flex items-center justify-center p-2.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-red-100"
                                   title="Eliminar sesión"
                                 >
                                   <Trash2 size={18} />
                                 </button>
-                                <button 
-                                  onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${session.id}`)}
-                                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-blue-50 text-gray-800 hover:text-blue-700 font-bold text-sm rounded-xl transition-colors"
-                                >
-                                  <UserCheck size={16} />
-                                  <span>Pasar Lista</span>
-                                  <ArrowRight size={15} />
-                                </button>
+                                
+                                {attendanceRecordedSessionIds.has(session.id) ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-black text-xs shadow-2xs">
+                                      <Check size={14} className="text-emerald-600 shrink-0" />
+                                      <span>Lista pasada</span>
+                                    </span>
+                                    <button 
+                                      onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${session.id}`)}
+                                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
+                                      title="Modificar asistencia"
+                                    >
+                                      <Pencil size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button 
+                                    onClick={() => router.push(`/dashboard/equipos/${teamId}/entrenamientos/${session.id}`)}
+                                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors cursor-pointer"
+                                  >
+                                    <UserCheck size={16} />
+                                    <span>Pasar Lista</span>
+                                    <ArrowRight size={15} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );

@@ -3,8 +3,9 @@
 import React, { useState, useEffect, Fragment } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Check, X, Stethoscope, Loader2, Calendar as CalendarIcon, ArrowLeft, BarChart2, ListChecks, ChevronDown, ChevronUp, Save, Clock, AlertTriangle } from "lucide-react";
+import { Check, X, Stethoscope, Loader2, Calendar as CalendarIcon, ArrowLeft, BarChart2, ListChecks, ChevronDown, ChevronUp, Save, Clock, AlertTriangle, Download, FileDown, ChevronLeft, ChevronRight, FileSpreadsheet, Search } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { exportTeamAttendancePdfAction, exportPlayerAttendancePdfAction } from "@/app/actions/attendance-report-actions";
 
 interface Player {
   id: string;
@@ -29,6 +30,31 @@ interface AttendanceRecord {
   notes?: string | null;
 }
 
+// Funciones de formateo de fechas legibles en español peninsular
+function formatSpanishSessionDateLong(dateStr: string) {
+  try {
+    const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+    const dayName = d.toLocaleDateString('es-ES', { weekday: 'long' });
+    const formattedDate = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+    return `${capitalizedDay}, ${formattedDate}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatSpanishSessionDateShort(dateStr: string) {
+  try {
+    const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+    const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
+    const formattedDate = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+    const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1).replace('.', '');
+    return `${capitalizedDay} ${formattedDate}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function AsistenciaEquipoPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -45,6 +71,50 @@ export default function AsistenciaEquipoPage() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<'todos' | 'entrenamientos' | 'partidos'>('todos');
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState<string>('');
+  const [teamCategory, setTeamCategory] = useState<string>('');
+
+  // Buscador de jugadores en vista móvil
+  const [mobileSearchQuery, setMobileSearchQuery] = useState<string>('');
+
+  // Mobile session pagination state (5 sesiones por página en móvil)
+  const [mobilePage, setMobilePage] = useState<number>(0);
+
+  // Estados de exportación de informes (PDF y CSV)
+  const [exportModalOpen, setExportModalOpen] = useState<boolean>(false);
+  const [exportPeriod, setExportPeriod] = useState<'temporada' | 'mes'>('temporada');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv'>('pdf');
+  const [isExportingTeam, setIsExportingTeam] = useState<boolean>(false);
+  const [isExportingPlayer, setIsExportingPlayer] = useState<Record<string, boolean>>({});
+
+  // Refs y estados para sincronizar la doble barra de scroll (arriba y abajo) en PC
+  const topScrollRef = React.useRef<HTMLDivElement>(null);
+  const tableScrollRef = React.useRef<HTMLDivElement>(null);
+  const [scrollContentWidth, setScrollContentWidth] = useState<number>(0);
+  const isSyncingTopRef = React.useRef<boolean>(false);
+  const isSyncingTableRef = React.useRef<boolean>(false);
+
+  const handleTopScroll = () => {
+    if (isSyncingTopRef.current) {
+      isSyncingTopRef.current = false;
+      return;
+    }
+    if (topScrollRef.current && tableScrollRef.current) {
+      isSyncingTableRef.current = true;
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (isSyncingTableRef.current) {
+      isSyncingTableRef.current = false;
+      return;
+    }
+    if (topScrollRef.current && tableScrollRef.current) {
+      isSyncingTopRef.current = true;
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  };
 
   // Single event recording state
   const [eventDetails, setEventDetails] = useState<any>(null);
@@ -68,13 +138,37 @@ export default function AsistenciaEquipoPage() {
     }
   }, [teamId, queryEventId, queryDate]);
 
+  const downloadBase64Pdf = (base64: string, fileName: string) => {
+    try {
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error("Error al procesar el archivo PDF descargado");
+    }
+  };
+
   const fetchPlayers = async () => {
     if (!teamId) return;
     const supabase = createClient();
     try {
       // 1. Get team season or fallback to active season
       const { data: activeSeason } = await supabase.from('seasons').select('id').eq('is_active', true).limit(1).maybeSingle();
-      const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
+      const { data: teamData } = await supabase.from('teams').select('name, category, season_id').eq('id', teamId).single();
+      if (teamData?.name) setTeamName(teamData.name);
+      if (teamData?.category) setTeamCategory(teamData.category);
       let targetSeasonId = activeSeason?.id || (teamData?.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' ? teamData?.season_id : null);
 
       if (!targetSeasonId) return;
@@ -125,7 +219,9 @@ export default function AsistenciaEquipoPage() {
       const today = new Date().toISOString().split('T')[0];
 
       // 1. Obtener la temporada del equipo o activa
-      const { data: teamData } = await supabase.from('teams').select('season_id').eq('id', teamId).single();
+      const { data: teamData } = await supabase.from('teams').select('name, category, season_id').eq('id', teamId).single();
+      if (teamData?.name) setTeamName(teamData.name);
+      if (teamData?.category) setTeamCategory(teamData.category);
       const teamSeasonId = teamData?.season_id;
 
       // 2. Cargar eventos de team_events (entrenamientos y sesiones, excluyendo partidos)
@@ -136,7 +232,7 @@ export default function AsistenciaEquipoPage() {
         .neq('event_type', 'Partido')
         .lte('date', today)
         .order('date', { ascending: false })
-        .limit(20);
+        .limit(50);
 
       if (teamSeasonId && teamSeasonId !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c') {
         eventsQuery = eventsQuery.eq('season_id', teamSeasonId);
@@ -155,7 +251,7 @@ export default function AsistenciaEquipoPage() {
         .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
         .lte('fecha_hora', `${today}T23:59:59`)
         .order('fecha_hora', { ascending: false })
-        .limit(20);
+        .limit(30);
 
       if (teamSeasonId && teamSeasonId !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c') {
         matchesQuery = matchesQuery.eq('season_id', teamSeasonId);
@@ -189,7 +285,7 @@ export default function AsistenciaEquipoPage() {
 
       const combinedPastEvents = Array.from(allPastEventsMap.values())
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(-15); // Los últimos 15 eventos pasados
+        .slice(-40); // Hasta los últimos 40 eventos pasados de la temporada activa
 
       const combinedEventIds = combinedPastEvents.map(e => e.id);
 
@@ -497,6 +593,7 @@ export default function AsistenciaEquipoPage() {
     
     return {
       pct: Math.round((presents / applicableEvents.length) * 100),
+      asistencias: presents,
       faltas: absents,
       justificadas
     };
@@ -512,6 +609,46 @@ export default function AsistenciaEquipoPage() {
     if (s === 'not_called' || s === 'no_convocado') return 'bg-slate-100 text-slate-400 border border-slate-200';
     return 'bg-gray-100 text-gray-400';
   };
+
+  // --- COMPUTATIONS AND HOOKS FOR SUMMARY GRID ---
+  const filteredPastEvents = attendanceFilter === 'todos' 
+    ? pastEvents 
+    : pastEvents.filter(ev => ev.event_type === (attendanceFilter === 'entrenamientos' ? 'Entrenamiento' : 'Partido'));
+
+  const mobileFilteredPlayers = players.filter(p => {
+    if (!mobileSearchQuery.trim()) return true;
+    const q = mobileSearchQuery.toLowerCase().trim();
+    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
+    const dorsalStr = p.dorsal ? String(p.dorsal) : '';
+    return fullName.includes(q) || dorsalStr.includes(q);
+  });
+
+  const MOBILE_PAGE_SIZE = 5;
+  const totalMobilePages = Math.max(1, Math.ceil(filteredPastEvents.length / MOBILE_PAGE_SIZE));
+  const currentMobilePage = Math.min(mobilePage, totalMobilePages - 1);
+  const mobileVisibleEvents = filteredPastEvents.slice(currentMobilePage * MOBILE_PAGE_SIZE, (currentMobilePage + 1) * MOBILE_PAGE_SIZE);
+
+  const unrecordedTrainings = React.useMemo(() => {
+    return pastEvents.filter(ev => {
+      if (ev.event_type !== 'Entrenamiento') return false;
+      const hasAnyAtt = summaryData.some(a => a.event_id === ev.id || a.date === ev.date);
+      return !hasAnyAtt;
+    });
+  }, [pastEvents, summaryData]);
+
+  // Sincronizar el ancho exacto del scroll para la barra horizontal superior en vista PC
+  useEffect(() => {
+    if (!tableScrollRef.current) return;
+    const updateWidth = () => {
+      if (tableScrollRef.current) {
+        setScrollContentWidth(tableScrollRef.current.scrollWidth);
+      }
+    };
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(tableScrollRef.current);
+    return () => ro.disconnect();
+  }, [filteredPastEvents, players]);
 
   // --- RENDERING FOR SINGLE EVENT ---
   if (queryEventId) {
@@ -570,32 +707,37 @@ export default function AsistenciaEquipoPage() {
               No hay jugadores inscritos en este equipo para la temporada activa.
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-slate-200/80">
               {players.map(player => {
                 const currentStatus = singleEventAttendance[player.id];
                 const isSaving = savingStatus[player.id];
                 
                 return (
-                  <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                  <div key={player.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-blue-50/20 transition-colors border-b border-slate-200/80 odd:bg-white even:bg-slate-50/40">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
                         {player.avatar_url ? (
                           <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
                         ) : (
                           <span className="text-slate-600 font-extrabold text-xs">
-                            {player.dorsal || `${player.first_name?.charAt(0) || ''}${player.last_name?.charAt(0) || ''}`}
+                            {player.first_name?.charAt(0)}{player.last_name?.charAt(0)}
                           </span>
                         )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-900 text-sm sm:text-base leading-tight">{player.first_name} {player.last_name}</p>
-                          {player.dorsal && (
-                            <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
-                              #{player.dorsal}
-                            </span>
-                          )}
-                        </div>
+
+                      {/* Dorsal cuadrado uniforme */}
+                      {player.dorsal ? (
+                        <span className="min-w-[28px] h-7 px-1.5 rounded-lg bg-slate-900 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-2xs">
+                          #{player.dorsal}
+                        </span>
+                      ) : (
+                        <span className="min-w-[28px] h-7 px-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center shrink-0">
+                          -
+                        </span>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-gray-900 text-sm sm:text-base leading-snug break-words">{player.first_name} {player.last_name}</p>
                         {currentStatus === 'excused' && singleEventNotes[player.id] && (
                           <div className="flex items-center gap-1.5 mt-1">
                             {(() => {
@@ -787,18 +929,149 @@ export default function AsistenciaEquipoPage() {
     );
   }
 
-  // --- RENDERING FOR SUMMARY GRID ---
-  const filteredPastEvents = attendanceFilter === 'todos' 
-    ? pastEvents 
-    : pastEvents.filter(ev => ev.event_type === (attendanceFilter === 'entrenamientos' ? 'Entrenamiento' : 'Partido'));
+  // Exportar informe consolidado del equipo a CSV
+  const handleDownloadTeamCsv = (period: 'temporada' | 'mes') => {
+    try {
+      const isMes = period === 'mes';
+      const today = new Date();
+      const cutoffDate = isMes ? new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null;
 
-  const unrecordedTrainings = React.useMemo(() => {
-    return pastEvents.filter(ev => {
-      if (ev.event_type !== 'Entrenamiento') return false;
-      const hasAnyAtt = summaryData.some(a => a.event_id === ev.id || a.date === ev.date);
-      return !hasAnyAtt;
-    });
-  }, [pastEvents, summaryData]);
+      const eventsForExport = filteredPastEvents.filter(ev => {
+        if (cutoffDate && ev.date < cutoffDate) return false;
+        return true;
+      });
+
+      const headers = [
+        "Dorsal",
+        "Jugador",
+        "Entrenamientos Asistidos",
+        "Total Entrenamientos",
+        "Partidos Jugados",
+        "Total Partidos Convocado",
+        "Faltas Injustificadas",
+        "Faltas Justificadas",
+        "Retrasos",
+        "% Asistencia"
+      ];
+
+      const rows = players.map(player => {
+        let trPresent = 0;
+        let trTotal = 0;
+        let mPresent = 0;
+        let mTotal = 0;
+        let absents = 0;
+        let excused = 0;
+        let late = 0;
+
+        eventsForExport.forEach(ev => {
+          const att = summaryData.find(a => a.player_id === player.id && (a.event_id === ev.id || a.date === ev.date));
+          const s = (att?.status || '').toLowerCase();
+
+          if (ev.event_type === 'Partido') {
+            if (s === 'not_called' || s === 'no_convocado' || !s) return;
+            mTotal++;
+            if (s === 'present' || s === 'presente') mPresent++;
+            else if (s === 'retraso' || s === 'late') { mPresent++; late++; }
+            else if (['excused', 'justificado', 'justificada', 'lesionado'].includes(s)) excused++;
+            else if (s === 'absent' || s === 'ausente') absents++;
+          } else {
+            trTotal++;
+            if (s === 'present' || s === 'presente') trPresent++;
+            else if (s === 'retraso' || s === 'late') { trPresent++; late++; }
+            else if (['excused', 'justificado', 'justificada', 'lesionado'].includes(s)) excused++;
+            else if (s === 'absent' || s === 'ausente') absents++;
+          }
+        });
+
+        const totalApplicable = trTotal + mTotal;
+        const pct = totalApplicable > 0 ? Math.round(((trPresent + mPresent + excused) / totalApplicable) * 100) : 100;
+
+        return [
+          player.dorsal || '',
+          `"${player.last_name || ''}, ${player.first_name || ''}"`,
+          trPresent,
+          trTotal,
+          mPresent,
+          mTotal,
+          absents,
+          excused,
+          late,
+          `${pct}%`
+        ].join(';');
+      });
+
+      const csvContent = '\uFEFF' + [
+        `"Sporting Saladar - Informe de Asistencia de Equipo"`,
+        `"Equipo: ${teamName || 'Equipo'}"`,
+        `"Temporada: 2026/2027"`,
+        `"Filtro: ${attendanceFilter} | Rango: ${isMes ? 'Ultimos 30 dias' : 'Temporada 26/27'}"`,
+        `"Fecha de generacion: ${new Date().toLocaleDateString('es-ES')}"`,
+        "",
+        headers.join(';'),
+        ...rows
+      ].join('\r\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Asistencia_${(teamName || 'Equipo').replace(/[^a-zA-Z0-9_-]/g, '_')}_${isMes ? 'Mes' : '26-27'}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Archivo CSV generado correctamente");
+      setExportModalOpen(false);
+    } catch (err: any) {
+      toast.error("Error al exportar CSV: " + err.message);
+    }
+  };
+
+  // Exportar informe consolidado del equipo a PDF
+  const handleDownloadTeamPdf = async (period: 'temporada' | 'mes') => {
+    setIsExportingTeam(true);
+    try {
+      const res = await exportTeamAttendancePdfAction({
+        teamId,
+        filterType: attendanceFilter,
+        dateRange: period,
+      });
+      if (res.success && res.base64) {
+        downloadBase64Pdf(res.base64, res.fileName || `Informe_Asistencia_${teamName || 'Equipo'}.pdf`);
+        toast.success("Informe PDF del equipo descargado con éxito");
+        setExportModalOpen(false);
+      } else {
+        toast.error(res.error || "No se pudo generar el informe PDF");
+      }
+    } catch (err: any) {
+      toast.error("Error al generar PDF: " + err.message);
+    } finally {
+      setIsExportingTeam(false);
+    }
+  };
+
+  // Exportar informe individual del jugador a PDF
+  const handleDownloadPlayerPdf = async (playerId: string) => {
+    setIsExportingPlayer(prev => ({ ...prev, [playerId]: true }));
+    try {
+      const res = await exportPlayerAttendancePdfAction({
+        teamId,
+        playerId,
+        filterType: attendanceFilter,
+        dateRange: 'temporada',
+      });
+      if (res.success && res.base64) {
+        downloadBase64Pdf(res.base64, res.fileName || `Informe_Asistencia_Jugador.pdf`);
+        toast.success("Informe PDF del jugador descargado con éxito");
+      } else {
+        toast.error(res.error || "No se pudo generar el informe individual");
+      }
+    } catch (err: any) {
+      toast.error("Error al generar PDF del jugador: " + err.message);
+    } finally {
+      setIsExportingPlayer(prev => ({ ...prev, [playerId]: false }));
+    }
+  };
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -835,7 +1108,7 @@ export default function AsistenciaEquipoPage() {
         <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-gray-900">Análisis de Asistencia</h2>
-            <p className="text-gray-500 text-xs sm:text-sm mt-1">Cuadrícula con el historial de los últimos eventos. Pulsa en el título de un evento para pasar lista o editarlo.</p>
+            <p className="text-gray-500 text-xs sm:text-sm mt-1">Cuadrícula con el historial de eventos. En móvil puedes navegar de 5 en 5 sesiones sin scroll lateral incómodo.</p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -846,9 +1119,16 @@ export default function AsistenciaEquipoPage() {
               <CalendarIcon className="w-4 h-4 text-blue-600" />
               <span>Ver Calendario Mes</span>
             </button>
+            <button
+              onClick={() => setExportModalOpen(true)}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Descargar Informe</span>
+            </button>
             <div className="w-full sm:w-auto grid grid-cols-3 sm:flex bg-gray-100 p-1 rounded-2xl sm:rounded-full border border-gray-200 shadow-inner gap-1">
             <button
-              onClick={() => setAttendanceFilter('todos')}
+              onClick={() => { setAttendanceFilter('todos'); setMobilePage(0); }}
               className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 attendanceFilter === 'todos' 
                   ? 'bg-white text-slate-800 shadow-sm border border-gray-200/50' 
@@ -858,7 +1138,7 @@ export default function AsistenciaEquipoPage() {
               <span>Todos</span>
             </button>
             <button
-              onClick={() => setAttendanceFilter('entrenamientos')}
+              onClick={() => { setAttendanceFilter('entrenamientos'); setMobilePage(0); }}
               className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 attendanceFilter === 'entrenamientos' 
                   ? 'bg-white text-emerald-700 shadow-sm border border-gray-200/50' 
@@ -869,7 +1149,7 @@ export default function AsistenciaEquipoPage() {
               <span className="hidden sm:inline">Entrenamientos</span>
             </button>
             <button
-              onClick={() => setAttendanceFilter('partidos')}
+              onClick={() => { setAttendanceFilter('partidos'); setMobilePage(0); }}
               className={`flex items-center justify-center gap-1.5 px-2 sm:px-6 py-2 rounded-xl sm:rounded-full text-xs sm:text-sm font-bold transition-all min-w-0 ${
                 attendanceFilter === 'partidos' 
                   ? 'bg-white text-indigo-700 shadow-sm border border-gray-200/50' 
@@ -892,27 +1172,211 @@ export default function AsistenciaEquipoPage() {
             <p className="text-gray-500">No hay eventos pasados para analizar en esta categoría.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <>
+            {/* ══════════════════════════════════════════════════════════════════════════
+                1. VISTA MÓVIL: Lista limpia de jugadores con tabla vertical desplegable
+                ══════════════════════════════════════════════════════════════════════════ */}
+            <div className="block sm:hidden">
+              {/* Buscador de jugadores en móvil */}
+              <div className="p-3 bg-slate-50 border-b border-gray-200">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={mobileSearchQuery}
+                    onChange={(e) => setMobileSearchQuery(e.target.value)}
+                    placeholder="Buscar jugador por nombre o dorsal..."
+                    className="w-full pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  />
+                  {mobileSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMobileSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista limpia de jugadores con separación nítida */}
+              <div className="p-3 bg-slate-100/70 space-y-3">
+                {mobileFilteredPlayers.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
+                    No se encontraron jugadores que coincidan con la búsqueda.
+                  </div>
+                ) : (
+                  mobileFilteredPlayers.map((player) => {
+                    const stats = getPlayerPercentage(player.id, filteredPastEvents);
+                    const isExpanded = expandedPlayerId === player.id;
+                    const playerFullName = [player.first_name, player.last_name].filter(Boolean).join(' ') || (player as any).name || 'Jugador';
+
+                    const pctBadgeColor = stats.pct >= 85
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : stats.pct >= 70
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-red-50 text-red-700 border-red-200';
+
+                    return (
+                      <div 
+                        key={'mob-card-' + player.id} 
+                        className={`bg-white rounded-2xl border transition-all shadow-xs overflow-hidden ${
+                          isExpanded 
+                            ? 'border-blue-400 ring-2 ring-blue-100 shadow-sm' 
+                            : 'border-slate-200/90 hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Cabecera y métricas del jugador cuadradas y alineadas */}
+                        <div 
+                          onClick={() => setExpandedPlayerId(isExpanded ? null : player.id)}
+                          className="p-3.5 cursor-pointer select-none"
+                        >
+                          {/* Fila 1: Avatar, Dorsal cuadrado fijo, Nombre y % Asistencia con Chevron */}
+                          <div className="flex items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              {/* Avatar */}
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 shadow-2xs">
+                                {player.avatar_url ? (
+                                  <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
+                                ) : (
+                                  <span className="text-xs font-black text-slate-600">
+                                    {player.first_name?.charAt(0)}{player.last_name?.charAt(0)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Dorsal cuadrado con anchura y alineación fija */}
+                              {player.dorsal ? (
+                                <span className="min-w-[28px] h-7 px-1.5 rounded-lg bg-slate-900 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-2xs">
+                                  #{player.dorsal}
+                                </span>
+                              ) : (
+                                <span className="min-w-[28px] h-7 px-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center shrink-0">
+                                  -
+                                </span>
+                              )}
+
+                              {/* Nombre del jugador completo (sin puntos suspensivos) */}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-sm font-black text-slate-900 leading-snug break-words">
+                                    {playerFullName}
+                                  </span>
+                                  {stats.faltas >= 3 && (
+                                    <span className="shrink-0 text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.5 rounded uppercase tracking-wider" title="Múltiples faltas">
+                                      Alerta
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Porcentaje y Chevron alineados a la derecha */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className={`px-2.5 py-1 rounded-xl border text-xs font-black shadow-2xs ${pctBadgeColor}`}>
+                                {stats.pct}%
+                              </div>
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+                                {isExpanded ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4" />}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Fila 2: Grid cuadrado simétrico de 3 columnas para Asistencias, Faltas y Justificadas */}
+                          <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-100">
+                            {/* Asistencias */}
+                            <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-2xs">
+                              <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="text-xs font-black text-emerald-900">{stats.asistencias}</span>
+                              <span className="text-[10px] font-bold text-emerald-700 uppercase">asist.</span>
+                            </div>
+
+                            {/* Faltas */}
+                            <div className={`rounded-xl py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-2xs border ${
+                              stats.faltas > 0 
+                                ? 'bg-red-50/80 border-red-200/80 text-red-900' 
+                                : 'bg-slate-50 border-slate-200/70 text-slate-500'
+                            }`}>
+                              <X className={`w-3.5 h-3.5 shrink-0 ${stats.faltas > 0 ? 'text-red-600' : 'text-slate-400'}`} />
+                              <span className="text-xs font-black">{stats.faltas}</span>
+                              <span className="text-[10px] font-bold uppercase">faltas</span>
+                            </div>
+
+                            {/* Justificadas */}
+                            <div className={`rounded-xl py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-2xs border ${
+                              stats.justificadas > 0 
+                                ? 'bg-amber-50/80 border-amber-200/80 text-amber-900' 
+                                : 'bg-slate-50 border-slate-200/70 text-slate-400'
+                            }`}>
+                              <Stethoscope className={`w-3.5 h-3.5 shrink-0 ${stats.justificadas > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
+                              <span className="text-xs font-black">{stats.justificadas}</span>
+                              <span className="text-[10px] font-bold uppercase">justif.</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Panel expandido con tabla vertical completa de todas las sesiones */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-200/80 bg-slate-50 p-3.5 animate-in fade-in duration-200">
+                            <PlayerAttendanceSummary 
+                              playerId={player.id} 
+                              events={filteredPastEvents} 
+                              summaryData={summaryData}
+                              onDownloadPdf={handleDownloadPlayerPdf}
+                              isDownloadingPdf={Boolean(isExportingPlayer[player.id])}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════════════════
+                2. VISTA ESCRITORIO / PC: Tabla completa con doble barra de scroll (arriba y abajo)
+                ══════════════════════════════════════════════════════════════════════════ */}
+            <div className="hidden sm:flex flex-col w-full">
+              {/* Barra de scroll horizontal superior visible en PC */}
+              <div 
+                ref={topScrollRef} 
+                onScroll={handleTopScroll}
+                className="w-full overflow-x-auto overflow-y-hidden bg-slate-100/90 border-b border-gray-200 h-3.5"
+                style={{ scrollbarWidth: 'thin' }}
+                title="Desplazamiento horizontal de sesiones"
+              >
+                <div style={{ width: scrollContentWidth > 0 ? scrollContentWidth : '100%', height: '1px' }} />
+              </div>
+
+            <div 
+              ref={tableScrollRef} 
+              onScroll={handleTableScroll} 
+              className="w-full overflow-x-auto"
+              style={{ scrollbarWidth: 'thin' }}
+            >
+              <table className="w-full text-left border-collapse">
               <thead>
                 <tr>
-                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 sticky left-0 z-20 font-bold text-gray-700 min-w-[210px] sm:min-w-[270px] w-[210px] sm:w-[270px] shadow-[1px_0_0_0_#e5e7eb]">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 sticky left-0 z-20 font-bold text-gray-700 min-w-[170px] sm:min-w-[270px] w-[170px] sm:w-[270px] shadow-[1px_0_0_0_#e5e7eb] text-xs sm:text-sm">
                     Jugador
                   </th>
-                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-16 sm:w-20 border-l border-gray-200">
+                  <th className="hidden sm:table-cell p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-16 sm:w-20 border-l border-gray-200">
                     Faltas
                   </th>
-                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-16 sm:w-20 border-l border-gray-200" title="Faltas Justificadas">
+                  <th className="hidden sm:table-cell p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-16 sm:w-20 border-l border-gray-200" title="Faltas Justificadas">
                     Justif.
                   </th>
-                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 w-20 sm:w-28 border-l border-gray-200">
+                  <th className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50 text-center font-bold text-gray-700 min-w-[55px] w-[55px] sm:w-28 border-l border-gray-200 text-xs sm:text-sm">
                     % Total
                   </th>
+                  {/* Columnas para Desktop (todas las sesiones) */}
                   {filteredPastEvents.map((ev, i) => (
                     <th 
-                      key={ev.id || i} 
+                      key={'desk-h-' + (ev.id || i)} 
                       onClick={() => router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${ev.id}&date=${ev.date}`)}
-                      className="p-3 sm:p-4 border-b border-l border-gray-200 bg-gray-50 text-center text-xs font-bold text-gray-600 w-24 cursor-pointer hover:bg-gray-100/80 transition-colors group"
+                      className="hidden sm:table-cell p-3 sm:p-4 border-b border-l border-gray-200 bg-gray-50 text-center text-xs font-bold text-gray-600 w-24 cursor-pointer hover:bg-gray-100/80 transition-colors group"
                     >
                       <div className="truncate w-full max-w-[80px] mx-auto text-blue-600 group-hover:underline" title={ev.title}>
                         {ev.title}
@@ -922,22 +1386,40 @@ export default function AsistenciaEquipoPage() {
                       </div>
                     </th>
                   ))}
+                  {/* Columnas para Móvil (bloque de 5 sesiones) */}
+                  {mobileVisibleEvents.map((ev, i) => (
+                    <th 
+                      key={'mob-h-' + (ev.id || i)} 
+                      onClick={() => router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${ev.id}&date=${ev.date}`)}
+                      className="table-cell sm:hidden p-2 border-b border-l border-gray-200 bg-gray-50 text-center text-[10px] font-bold text-gray-600 w-10 min-w-[40px] cursor-pointer"
+                    >
+                      <div className="truncate text-blue-600 font-bold" title={ev.title}>
+                        {ev.event_type === 'Partido' ? 'Part.' : 'Ent.'}
+                      </div>
+                      <div className="text-[9px] text-gray-400 font-medium leading-none mt-0.5">
+                        {new Date(ev.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-200">
                 {players.map((player) => {
                   const stats = getPlayerPercentage(player.id, filteredPastEvents);
                   const pct = stats.pct;
                   const faltas = stats.faltas;
                   const isExpanded = expandedPlayerId === player.id;
+                  const playerFullName = [player.first_name, player.last_name].filter(Boolean).join(' ') || (player as any).name || 'Jugador';
                   
                   return (
                     <Fragment key={player.id}>
                     <tr 
                       onClick={() => setExpandedPlayerId(isExpanded ? null : player.id)}
-                      className={`hover:bg-blue-50/20 transition-colors cursor-pointer ${faltas >= 3 ? 'bg-red-50/10' : ''} ${isExpanded ? 'bg-blue-50/40' : ''}`}
+                      className={`hover:bg-blue-50/30 transition-colors cursor-pointer border-b border-slate-200 ${faltas >= 3 ? 'bg-red-50/15' : 'odd:bg-white even:bg-slate-50/50'} ${isExpanded ? '!bg-blue-50/50' : ''}`}
                     >
-                      <td className="p-3 sm:p-4 font-semibold text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] z-10 min-w-[210px] sm:min-w-[270px] w-[210px] sm:w-[270px]">
+                      <td className={`p-3 sm:p-4 font-semibold text-gray-900 sticky left-0 z-10 min-w-[170px] sm:min-w-[270px] w-[170px] sm:w-[270px] border-r border-slate-200 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] ${
+                        isExpanded ? 'bg-blue-50/70' : faltas >= 3 ? 'bg-red-50/20' : 'bg-white'
+                      }`}>
                         <div className="flex items-center gap-2 sm:gap-2.5">
                           {isExpanded ? <ChevronUp className="w-4 h-4 text-blue-600 shrink-0"/> : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0"/>}
                           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
@@ -950,35 +1432,35 @@ export default function AsistenciaEquipoPage() {
                             )}
                           </div>
                           {player.dorsal ? (
-                            <span className="text-xs text-gray-500 font-black w-4 text-right shrink-0">{player.dorsal}</span>
-                          ) : (
-                            <span className="text-xs text-gray-400 font-bold w-4 text-right shrink-0"></span>
-                          )}
+                            <span className="text-[10px] sm:text-xs text-gray-500 font-black w-3.5 sm:w-4 text-right shrink-0">{player.dorsal}</span>
+                          ) : null}
                           <div className="min-w-0 flex-1">
                             <span className="text-xs sm:text-sm font-bold text-slate-900 whitespace-normal break-words leading-tight block group-hover:text-blue-600 transition-colors">
-                              {player.first_name} {player.last_name}
+                              {playerFullName}
                             </span>
                           </div>
-                          {faltas >= 3 && <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" title="Múltiples faltas"></div>}
+                          {faltas >= 3 && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 shrink-0" title="Múltiples faltas"></div>}
                         </div>
                       </td>
                       
-                      <td className="p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-red-600 bg-red-50/30">
+                      <td className="hidden sm:table-cell p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-red-600 bg-red-50/30">
                         {faltas > 0 ? faltas : '-'}
                       </td>
 
-                      <td className="p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-amber-600 bg-amber-50/30">
+                      <td className="hidden sm:table-cell p-3 sm:p-4 text-center border-l border-gray-100 font-bold text-amber-600 bg-amber-50/30">
                         {stats.justificadas > 0 ? stats.justificadas : '-'}
                       </td>
                       
-                      <td className="p-3 sm:p-4 text-center font-black text-gray-900 border-l border-gray-200 bg-gray-50/50">
+                      <td className="p-2 sm:p-4 text-center font-black text-gray-900 border-l border-gray-200 bg-gray-50/50 text-xs sm:text-sm min-w-[50px] w-[50px] sm:w-28">
                         {pct}%
                       </td>
+
+                      {/* Celdas para Desktop (todas) */}
                       {filteredPastEvents.map((ev, i) => {
                         const att = summaryData.find(a => a.player_id === player.id && (a.event_id === ev.id || a.date === ev.date));
                         const stat = att?.status;
                         return (
-                          <td key={ev.id || i} className="p-3 sm:p-4 border-l border-gray-200 text-center">
+                          <td key={'desk-c-' + (ev.id || i)} className="hidden sm:table-cell p-3 sm:p-4 border-l border-gray-200 text-center">
                             <div 
                               className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center shadow-sm border border-black/5 ${getStatusColor(stat)}`}
                               title={att?.notes ? `${stat || 'Registrado'}: ${att.notes}` : stat || 'Sin registrar'}
@@ -993,14 +1475,37 @@ export default function AsistenciaEquipoPage() {
                           </td>
                         );
                       })}
+
+                      {/* Celdas para Móvil (bloque de 5 sesiones) */}
+                      {mobileVisibleEvents.map((ev, i) => {
+                        const att = summaryData.find(a => a.player_id === player.id && (a.event_id === ev.id || a.date === ev.date));
+                        const stat = att?.status;
+                        return (
+                          <td key={'mob-c-' + (ev.id || i)} className="table-cell sm:hidden p-1 border-l border-gray-200 text-center w-9 max-w-[38px]">
+                            <div 
+                              className={`w-6 h-6 rounded-full mx-auto flex items-center justify-center shadow-xs border border-black/5 ${getStatusColor(stat)}`}
+                              title={att?.notes ? `${stat || 'Registrado'}: ${att.notes}` : stat || 'Sin registrar'}
+                            >
+                              {!stat && <span className="text-[10px] text-gray-300">-</span>}
+                              {(stat?.toLowerCase() === 'not_called' || stat?.toLowerCase() === 'no_convocado') && <span className="text-[8px] font-bold text-slate-400">-</span>}
+                              {(stat?.toLowerCase() === 'presente' || stat?.toLowerCase() === 'present') && <Check className="w-3 h-3" />}
+                              {(stat?.toLowerCase() === 'retraso' || stat?.toLowerCase() === 'late') && <Clock className="w-3 h-3" />}
+                              {(stat?.toLowerCase() === 'ausente' || stat?.toLowerCase() === 'absent') && <X className="w-3 h-3" />}
+                              {['lesionado', 'excused', 'justificado', 'justificada', 'justified', 'permiso', 'enfermedad'].includes(stat?.toLowerCase() || '') && <Stethoscope className="w-3 h-3" />}
+                            </div>
+                          </td>
+                        );
+                      })}
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={filteredPastEvents.length + 4} className="p-0 border-b border-blue-100 bg-slate-50/90 shadow-inner">
+                        <td colSpan={999} className="p-0 border-b border-blue-100 bg-slate-50/90 shadow-inner">
                           <PlayerAttendanceSummary 
                             playerId={player.id} 
                             events={filteredPastEvents} 
-                            summaryData={summaryData} 
+                            summaryData={summaryData}
+                            onDownloadPdf={handleDownloadPlayerPdf}
+                            isDownloadingPdf={Boolean(isExportingPlayer[player.id])}
                           />
                         </td>
                       </tr>
@@ -1011,14 +1516,168 @@ export default function AsistenciaEquipoPage() {
               </tbody>
             </table>
           </div>
+        </div>
+        </>
         )}
       </div>
+
+      {/* Modal de Descarga de Informe de Asistencia del Equipo */}
+      {exportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden space-y-4 p-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Descargar Informe de Asistencia</h3>
+                  <p className="text-xs text-slate-500">{teamName || 'Equipo'} • Sporting Saladar</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExportModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Selector de Formato */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Formato del informe</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportFormat('pdf')}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                    exportFormat === 'pdf'
+                      ? 'bg-blue-50/60 border-blue-500 text-blue-900 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <FileDown className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-black">Documento PDF</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 leading-tight">Membrete oficial, KPIs y formato para compartir.</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExportFormat('csv')}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                    exportFormat === 'csv'
+                      ? 'bg-blue-50/60 border-blue-500 text-blue-900 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black">Archivo Excel / CSV</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 leading-tight">Datos tabulares para hojas de cálculo.</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Selector de Periodo */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Rango de fechas</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportPeriod('temporada')}
+                  className={`px-3 py-2 text-xs font-semibold rounded-xl border text-center transition-all cursor-pointer ${
+                    exportPeriod === 'temporada'
+                      ? 'bg-slate-900 border-slate-900 text-white font-bold shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  Toda la Temporada 26/27
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportPeriod('mes')}
+                  className={`px-3 py-2 text-xs font-semibold rounded-xl border text-center transition-all cursor-pointer ${
+                    exportPeriod === 'mes'
+                      ? 'bg-slate-900 border-slate-900 text-white font-bold shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  Últimos 30 días
+                </button>
+              </div>
+            </div>
+
+            {/* Información del filtro activo */}
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 flex items-center justify-between">
+              <span>Filtro de actividades:</span>
+              <span className="font-bold text-blue-700 capitalize">{attendanceFilter}</span>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setExportModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isExportingTeam}
+                onClick={() => {
+                  if (exportFormat === 'pdf') {
+                    handleDownloadTeamPdf(exportPeriod);
+                  } else {
+                    handleDownloadTeamCsv(exportPeriod);
+                  }
+                }}
+                className="px-4 py-2 text-xs font-black bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                {isExportingTeam ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Generando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Descargar {exportFormat === 'pdf' ? 'PDF' : 'CSV'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Subcomponente para mostrar un resumen visual de la asistencia (ultracompacto sin scroll)
-function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: string, events: PastEvent[], summaryData: AttendanceRecord[] }) {
+// Subcomponente para mostrar un resumen visual de la asistencia con tabla vertical completa
+function PlayerAttendanceSummary({ 
+  playerId, 
+  events, 
+  summaryData,
+  onDownloadPdf,
+  isDownloadingPdf,
+}: { 
+  playerId: string;
+  events: PastEvent[];
+  summaryData: AttendanceRecord[];
+  onDownloadPdf?: (playerId: string) => void;
+  isDownloadingPdf?: boolean;
+}) {
+  const router = useRouter();
+  const params = useParams();
+  const teamId = typeof params.teamId === 'string' ? params.teamId : '';
+
+  const [sessionFilter, setSessionFilter] = useState<'todos' | 'faltas'>('todos');
+
   if (events.length === 0) return <div className="p-3 text-center text-xs text-slate-500">No hay eventos para mostrar.</div>;
 
   const applicableEvents = events.filter(ev => {
@@ -1040,87 +1699,224 @@ function PlayerAttendanceSummary({ playerId, events, summaryData }: { playerId: 
 
   const pct = totalEvents > 0 ? Math.round(((presents + excused) / totalEvents) * 100) : 100;
 
-  const absencesList = events.filter(ev => {
+  // Lista ordenada cronológicamente (más recientes primero)
+  const sortedApplicableEvents = [...applicableEvents].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const absencesList = sortedApplicableEvents.filter(ev => {
     const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
     return att && (isAbsentsStatus(att.status) || isExcusedStatus(att.status));
   });
 
+  const eventsToShow = sessionFilter === 'faltas' ? absencesList : sortedApplicableEvents;
+
   return (
-    <div className="sticky left-0 p-3 sm:p-4 bg-slate-50/95 border-r border-slate-200/80 w-full max-w-[calc(100vw-36px)] sm:max-w-3xl">
+    <div className="w-full space-y-3">
       {/* Fila compacta de 4 métricas clave */}
-      <div className="grid grid-cols-4 gap-2 mb-2.5">
-        <div className="bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-2xs text-center">
-          <div className="text-base sm:text-lg font-black text-slate-900 leading-tight">{pct}%</div>
-          <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-tight">Total</div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-white px-2 py-1.5 rounded-xl border border-slate-200 shadow-2xs text-center">
+          <div className="text-base font-black text-slate-900 leading-tight">{pct}%</div>
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">Total</div>
         </div>
 
-        <div className="bg-white px-2 py-1.5 rounded-lg border border-emerald-100 shadow-2xs text-center">
-          <div className="text-base sm:text-lg font-black text-emerald-600 leading-tight">{presents}</div>
-          <div className="text-[9px] sm:text-[10px] font-bold text-emerald-700 uppercase tracking-tight">Asistencias</div>
+        <div className="bg-white px-2 py-1.5 rounded-xl border border-emerald-100 shadow-2xs text-center">
+          <div className="text-base font-black text-emerald-600 leading-tight">{presents}</div>
+          <div className="text-[9px] font-bold text-emerald-700 uppercase tracking-tight">Asistencias</div>
         </div>
 
-        <div className="bg-white px-2 py-1.5 rounded-lg border border-red-100 shadow-2xs text-center">
-          <div className="text-base sm:text-lg font-black text-red-600 leading-tight">{absents}</div>
-          <div className="text-[9px] sm:text-[10px] font-bold text-red-700 uppercase tracking-tight">Injustificadas</div>
+        <div className="bg-white px-2 py-1.5 rounded-xl border border-red-100 shadow-2xs text-center">
+          <div className="text-base font-black text-red-600 leading-tight">{absents}</div>
+          <div className="text-[9px] font-bold text-red-700 uppercase tracking-tight">Faltas</div>
         </div>
 
-        <div className="bg-white px-2 py-1.5 rounded-lg border border-amber-100 shadow-2xs text-center">
-          <div className="text-base sm:text-lg font-black text-amber-600 leading-tight">{excused}</div>
-          <div className="text-[9px] sm:text-[10px] font-bold text-amber-700 uppercase tracking-tight">Justificadas</div>
+        <div className="bg-white px-2 py-1.5 rounded-xl border border-amber-100 shadow-2xs text-center">
+          <div className="text-base font-black text-amber-600 leading-tight">{excused}</div>
+          <div className="text-[9px] font-bold text-amber-700 uppercase tracking-tight">Justificadas</div>
         </div>
       </div>
 
-      {/* Historial ultracompacto en chips horizontales (sin tablas gigantes ni scroll vertical) */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">Últimas incidencias:</span>
-        {absencesList.length === 0 ? (
-          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-            ✅ 100% Asistencia regular (sin ausencias)
-          </span>
-        ) : (
-          absencesList.slice(-3).reverse().map(ev => {
-            const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
-            const isExcused = isExcusedStatus(att?.status);
-            let noteTag = '';
-            let noteText = '';
-            if (att?.notes) {
-              const match = att.notes.match(/^\[(.*?)\]\s*(.*)$/);
-              if (match) {
-                noteTag = match[1];
-                noteText = match[2];
-              } else {
-                noteText = att.notes;
-              }
-            }
+      {/* Tabla vertical estructurada con todas las fechas */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+        {/* Cabecera con selector de filtro */}
+        <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="text-xs font-black text-slate-800">
+              Historial de Asistencias ({sortedApplicableEvents.length})
+            </span>
+          </div>
 
-            return (
-              <div 
-                key={ev.id} 
-                className={`text-[11px] px-2 py-1 rounded-md border flex items-center gap-1.5 ${
-                  isExcused 
-                    ? 'bg-amber-50/90 border-amber-200 text-amber-900' 
-                    : 'bg-red-50/90 border-red-200 text-red-900'
-                }`}
-              >
-                <span className="font-extrabold">{new Date(ev.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}</span>
-                <span>•</span>
-                <span className="font-semibold">{ev.title}</span>
-                <span>•</span>
-                <span className="font-bold">{isExcused ? 'Justif.' : 'Falta'}</span>
-                {noteTag && (
-                  <span className="text-[9px] font-black uppercase bg-amber-200/80 px-1 py-0.2 rounded text-amber-950">
-                    {noteTag}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSessionFilter('todos'); }}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                sessionFilter === 'todos' 
+                  ? 'bg-slate-900 text-white shadow-2xs' 
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Todos ({sortedApplicableEvents.length})
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSessionFilter('faltas'); }}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                sessionFilter === 'faltas' 
+                  ? 'bg-red-600 text-white shadow-2xs' 
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Faltas ({absencesList.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Filas estructuradas de sesiones con fecha completa y legible */}
+        <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+          {eventsToShow.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-500 font-medium">
+              {sessionFilter === 'faltas' ? '🎉 Sin faltas registradas' : 'No hay sesiones para mostrar.'}
+            </div>
+          ) : (
+            eventsToShow.map((ev) => {
+              const att = summaryData.find(a => a.player_id === playerId && (a.event_id === ev.id || a.date === ev.date));
+              const stat = att?.status?.toLowerCase();
+              const isPresent = isActualPresentStatus(stat);
+              const isAbsent = isAbsentsStatus(stat);
+              const isExcused = isExcusedStatus(stat);
+              const isLate = stat === 'retraso' || stat === 'late';
+              const isNotCalled = stat === 'not_called' || stat === 'no_convocado';
+
+              let statusBadge = (
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                  Sin registrar
+                </span>
+              );
+
+              if (isLate) {
+                statusBadge = (
+                  <span className="text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Retraso
                   </span>
-                )}
-                {noteText && !noteTag && (
-                  <span className="text-[10px] italic text-slate-600 truncate max-w-[120px]">
-                    ({noteText})
+                );
+              } else if (isPresent) {
+                statusBadge = (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Presente
                   </span>
-                )}
-              </div>
-            );
-          })
-        )}
+                );
+              } else if (isAbsent) {
+                statusBadge = (
+                  <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <X className="w-3 h-3" /> Falta
+                  </span>
+                );
+              } else if (isExcused) {
+                statusBadge = (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <Stethoscope className="w-3 h-3" /> Justificada
+                  </span>
+                );
+              } else if (isNotCalled) {
+                statusBadge = (
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                    No convocado
+                  </span>
+                );
+              }
+
+              let noteText = '';
+              let noteTag = '';
+              if (att?.notes) {
+                const match = att.notes.match(/^\[(.*?)\]\s*(.*)$/);
+                if (match) {
+                  noteTag = match[1];
+                  noteText = match[2];
+                } else {
+                  noteText = att.notes;
+                }
+              }
+
+              return (
+                <div 
+                  key={'mob-ev-' + ev.id}
+                  className="p-3 hover:bg-slate-50 transition-colors flex items-start justify-between gap-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black text-slate-900">
+                        {formatSpanishSessionDateLong(ev.date)}
+                      </span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
+                        ev.event_type === 'Partido' ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {ev.event_type === 'Partido' ? '🏆 Partido' : '⚽ Entreno'}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-600 font-semibold truncate mt-0.5">
+                      {ev.title}
+                    </div>
+
+                    {noteTag && (
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-fit">
+                        <span className="font-black uppercase">[{noteTag}]</span>
+                        {noteText && <span className="italic">{noteText}</span>}
+                      </div>
+                    )}
+                    {noteText && !noteTag && (
+                      <div className="mt-0.5 text-[10px] italic text-slate-500">
+                        Nota: {noteText}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                    {statusBadge}
+                    {teamId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/equipos/${teamId}/asistencia?eventId=${ev.id}&date=${ev.date}`);
+                        }}
+                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                        title="Pasar lista / ver esta sesión"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Botón para descargar informe individual del jugador */}
+      <div className="pt-2 flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[11px] text-slate-500 font-medium">Ficha individual con historial detallado</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDownloadPdf?.(playerId);
+          }}
+          disabled={isDownloadingPdf}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors cursor-pointer"
+        >
+          {isDownloadingPdf ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Generando...</span>
+            </>
+          ) : (
+            <>
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Descargar Informe PDF</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

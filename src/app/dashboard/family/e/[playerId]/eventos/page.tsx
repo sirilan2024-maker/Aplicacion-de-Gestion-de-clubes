@@ -238,11 +238,13 @@ export default function FamilyEventsPage() {
           />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div>
           {!events.length ? (
-            <div className="p-8 text-center text-gray-500">No hay eventos programados.</div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-gray-500 shadow-xs">
+              No hay eventos programados.
+            </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className="space-y-3.5">
               {events.map((e) => {
                 const date = new Date(e.date);
                 const eventAttendance = e.attendance?.find((a: any) => a.player_id === playerId) || null;
@@ -256,7 +258,7 @@ export default function FamilyEventsPage() {
                 const isPast = diffDays < 0;
 
                 return (
-                  <div key={e.id} className="p-6 flex flex-col md:flex-row md:items-start justify-between gap-4 hover:bg-gray-50 transition-colors">
+                  <div key={e.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-slate-300 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
                     <div className="flex items-start gap-4 flex-1">
                       <div className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center shrink-0 border ${
                         e.isOfficialMatch

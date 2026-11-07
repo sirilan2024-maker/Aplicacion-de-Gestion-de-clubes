@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getAuthenticatedContext, ADMIN_ROLES } from '@/lib/auth-helpers'
+import { getTeamHexColor } from '@/lib/team-colors'
 
 export interface GlobalCalendarEventDTO {
   id: string
@@ -14,6 +15,8 @@ export interface GlobalCalendarEventDTO {
   teamId: string
   teamName: string
   teamCategory: string
+  teamColor?: string
+  teamHex?: string
   isOfficialMatch?: boolean
   matchStatus?: string
   score?: string
@@ -31,7 +34,7 @@ export interface GlobalCalendarResponse {
   success: boolean
   error?: string
   events?: GlobalCalendarEventDTO[]
-  teams?: Array<{ id: string; name: string; category: string }>
+  teams?: Array<{ id: string; name: string; category: string; color?: string; hex?: string }>
   kpis?: CalendarMonthKPIs
 }
 
@@ -65,7 +68,7 @@ export async function getGlobalCalendarAction(params?: {
 
     let teamsQuery = supabase
       .from('teams')
-      .select('id, name, category')
+      .select('id, name, category, color')
       .eq('club_id', clubId)
 
     if (activeSeason?.id) {
@@ -80,9 +83,19 @@ export async function getGlobalCalendarAction(params?: {
       return { success: false, error: teamsError.message }
     }
 
-    const teams = teamsData || []
-    const teamMap = new Map<string, { name: string; category: string }>()
-    teams.forEach(t => teamMap.set(t.id, { name: t.name, category: t.category }))
+    const rawTeams = teamsData || []
+    const teamMap = new Map<string, { name: string; category: string; hex: string }>()
+    const teams = rawTeams.map((t, idx) => {
+      const hex = getTeamHexColor(t, idx)
+      teamMap.set(t.id, { name: t.name, category: t.category, hex })
+      return {
+        id: t.id,
+        name: t.name,
+        category: t.category,
+        color: t.color || hex,
+        hex
+      }
+    })
     const allTeamIds = teams.map(t => t.id)
 
     if (allTeamIds.length === 0) {
@@ -162,6 +175,8 @@ export async function getGlobalCalendarAction(params?: {
         teamId: ev.team_id,
         teamName: teamInfo?.name || 'Equipo',
         teamCategory: teamInfo?.category || '-',
+        teamColor: teamInfo?.hex,
+        teamHex: teamInfo?.hex || '#2563eb',
         isOfficialMatch: evType === 'Partido',
         notes: ev.notes || undefined
       })
@@ -194,6 +209,8 @@ export async function getGlobalCalendarAction(params?: {
         teamId: p.equipo_id,
         teamName: teamInfo?.name || 'Equipo',
         teamCategory: teamInfo?.category || '-',
+        teamColor: teamInfo?.hex,
+        teamHex: teamInfo?.hex || '#2563eb',
         isOfficialMatch: true,
         matchStatus: p.estado || 'Pendiente',
         score: scoreStr,

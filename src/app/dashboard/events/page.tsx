@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Search,
   ChevronLeft,
@@ -25,8 +25,10 @@ import { createClient } from "@/lib/supabase/client"
 import toast, { Toaster } from "react-hot-toast"
 import { useRouter } from "next/navigation"
 import { ManageMatchModal } from "@/components/features/matches/ManageMatchModal"
+import { createTeamEventAction, updateTeamEventAction, deleteTeamEventAction } from "@/app/actions/event-actions"
 import { format, parseISO, addDays, getDay, subDays } from "date-fns"
 import { es } from "date-fns/locale"
+import { getTeamHexColor } from "@/lib/team-colors"
 
 type ViewMode = "month" | "list"
 
@@ -49,6 +51,7 @@ export default function EventsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [dbTeams, setDbTeams] = useState<TeamData[]>([])
@@ -162,10 +165,10 @@ export default function EventsPage() {
       return
     }
 
-    const mappedTeams = equipos.map(eq => ({
+    const mappedTeams = equipos.map((eq, idx) => ({
       id: eq.id,
       name: eq.name,
-      hex: eq.color || "#10b981"
+      hex: getTeamHexColor(eq, idx)
     }))
     setDbTeams(mappedTeams)
 
@@ -195,28 +198,7 @@ export default function EventsPage() {
       const mappedEvents: CalendarEvent[] = []
       const seenKeys = new Set<string>()
 
-      if (eventsRes.data) {
-        eventsRes.data.forEach((ev: any) => {
-          const teamInfo = mappedTeams.find(t => t.id === ev.team_id)
-          const key = `${ev.team_id}_${ev.date}_${ev.event_type}`
-          seenKeys.add(key)
-
-          mappedEvents.push({
-            id: ev.id,
-            title: ev.title,
-            date: ev.date, // "YYYY-MM-DD" expected
-            time: ev.start_time ? ev.start_time.substring(0, 5) : "00:00",
-            type: ev.event_type as "Entrenamiento" | "Partido" | "Reunión" | "Otro",
-            teamId: ev.team_id,
-            teamName: teamInfo?.name || "Equipo",
-            teamColor: "", 
-            teamHex: teamInfo?.hex || "#10b981",
-            location: ev.location || "",
-            isOfficialMatch: ev.event_type === 'Partido'
-          })
-        })
-      }
-
+      // 1. Procesar primero los partidos oficiales de `partidos` para conservar su ID real y permitir abrir/editar el partido
       if (partidosRes.data) {
         partidosRes.data.forEach((p: any) => {
           if (!p.fecha_hora) return;
@@ -224,6 +206,7 @@ export default function EventsPage() {
           const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
           const key = `${p.equipo_id}_${dateStr}_Partido`
           if (seenKeys.has(key)) return;
+          seenKeys.add(key)
 
           const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
           const teamInfo = mappedTeams.find(t => t.id === p.equipo_id)
@@ -244,9 +227,35 @@ export default function EventsPage() {
             teamId: p.equipo_id,
             teamName: teamInfo?.name || "Equipo",
             teamColor: "", 
-            teamHex: teamInfo?.hex || "#10b981",
+            teamHex: teamInfo?.hex || getTeamHexColor(teamInfo),
             location: p.lugar || "",
             isOfficialMatch: true
+          })
+        })
+      }
+
+      // 2. Procesar los eventos de `team_events` (entrenamientos, reuniones y eventos manuales no duplicados)
+      if (eventsRes.data) {
+        eventsRes.data.forEach((ev: any) => {
+          const teamInfo = mappedTeams.find(t => t.id === ev.team_id)
+          const key = `${ev.team_id}_${ev.date}_${ev.event_type}`
+          if (ev.event_type === 'Partido' && seenKeys.has(key)) {
+            return
+          }
+          seenKeys.add(key)
+
+          mappedEvents.push({
+            id: ev.id,
+            title: ev.title,
+            date: ev.date, // "YYYY-MM-DD" expected
+            time: ev.start_time ? ev.start_time.substring(0, 5) : "00:00",
+            type: ev.event_type as "Entrenamiento" | "Partido" | "Reunión" | "Otro",
+            teamId: ev.team_id,
+            teamName: teamInfo?.name || "Equipo",
+            teamColor: "", 
+            teamHex: teamInfo?.hex || getTeamHexColor(teamInfo),
+            location: ev.location || "",
+            isOfficialMatch: false
           })
         })
       }
@@ -269,13 +278,16 @@ export default function EventsPage() {
   const handlePrev = () => {
     const d = new Date(year, month - 1, 1)
     setCurrentDate(d)
+    setSelectedCalendarDate(null)
   }
   const handleNext = () => {
     const d = new Date(year, month + 1, 1)
     setCurrentDate(d)
+    setSelectedCalendarDate(null)
   }
   const handleToday = () => {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1))
+    setSelectedCalendarDate(null)
   }
 
   // --- Modal Handlers ---
@@ -323,14 +335,18 @@ export default function EventsPage() {
     }
     if (!confirm("¿Eliminar este evento permanentemente?")) return
     setSubmitting(true)
-    const { error } = await supabase.from("team_events").delete().eq("id", id)
-    setSubmitting(false)
-    if (error) {
-      toast.error("Error al eliminar: " + error.message)
-    } else {
+    const targetEv = dbEvents.find(ev => ev.id === id)
+    const targetTeamId = targetEv?.teamId || modalSelectedTeams[0]
+    try {
+      if (!targetTeamId) throw new Error("No se pudo identificar el equipo del evento")
+      await deleteTeamEventAction(id, targetTeamId)
       toast.success("Evento eliminado")
       setShowModal(false)
       fetchData()
+    } catch (err: any) {
+      toast.error("Error al eliminar: " + (err?.message || "Error inesperado"))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -353,94 +369,97 @@ export default function EventsPage() {
       return new Date(`${dStr}T${rsvpTime}:00`).toISOString()
     }
     
-    if (editingEventId) {
-      // Edit a single event
-      const eventData = {
-        title: modalTitle,
-        event_type: modalType,
-        date: modalDate,
-        start_time: modalStartTime,
-        end_time: modalEndTime,
-        location: modalLocation,
-        rsvp_reminder_time: computeReminderTime(modalDate)
-      }
-      const { error } = await supabase.from("team_events").update(eventData).eq("id", editingEventId)
-      if (error) {
-        toast.error("Error al actualizar: " + error.message)
-      } else {
+    try {
+      if (editingEventId) {
+        // Edit a single event via Server Action
+        const targetTeamId = modalSelectedTeams[0]
+        const eventData = {
+          title: modalTitle,
+          event_type: modalType,
+          date: modalDate,
+          start_time: modalStartTime,
+          end_time: modalEndTime || null,
+          location: modalLocation || null,
+          rsvp_reminder_time: computeReminderTime(modalDate)
+        }
+        await updateTeamEventAction(editingEventId, targetTeamId, eventData)
         toast.success("Evento actualizado")
         setShowModal(false)
         fetchData()
-      }
-    } else {
-      // Create new event(s) for all selected teams
-      if (isRecurring && (!recurringEndDate || recurringDays.length === 0)) {
-        toast.error("Selecciona días y fecha fin para la recurrencia.")
-        setSubmitting(false)
-        return
-      }
-
-      const eventsToInsert: any[] = []
-      
-      if (!isRecurring) {
-        const reminderTime = computeReminderTime(modalDate)
-        modalSelectedTeams.forEach(tid => {
-          eventsToInsert.push({
-            team_id: tid,
-            season_id: activeSeasonId,
-            title: modalTitle,
-            event_type: modalType,
-            date: modalDate,
-            start_time: modalStartTime,
-            end_time: modalEndTime,
-            location: modalLocation,
-            rsvp_reminder_time: reminderTime
-          })
-        })
       } else {
-        let currentDate = parseISO(modalDate)
-        const end = parseISO(recurringEndDate)
-        
-        let iterations = 0
-        while (currentDate <= end && iterations < 730) {
-          if (recurringDays.includes(getDay(currentDate))) {
-            const dateStr = format(currentDate, 'yyyy-MM-dd')
-            const reminderTime = computeReminderTime(dateStr)
-            modalSelectedTeams.forEach(tid => {
-              eventsToInsert.push({
-                team_id: tid,
-                season_id: activeSeasonId,
-                title: modalTitle,
-                event_type: modalType,
-                date: dateStr,
-                start_time: modalStartTime,
-                end_time: modalEndTime,
-                location: modalLocation,
-                rsvp_reminder_time: reminderTime
-              })
-            })
-          }
-          currentDate = addDays(currentDate, 1)
-          iterations++
-        }
-        
-        if (eventsToInsert.length === 0) {
-          toast.error("No hay fechas válidas en el rango seleccionado.")
+        // Create new event(s) for all selected teams via Server Action
+        if (isRecurring && (!recurringEndDate || recurringDays.length === 0)) {
+          toast.error("Selecciona días y fecha fin para la recurrencia.")
           setSubmitting(false)
           return
         }
-      }
 
-      const { error } = await supabase.from("team_events").insert(eventsToInsert)
-      if (error) {
-        toast.error("Error al crear: " + error.message)
-      } else {
+        const eventsToInsert: Array<{ teamId: string; payload: any }> = []
+        
+        if (!isRecurring) {
+          const reminderTime = computeReminderTime(modalDate)
+          modalSelectedTeams.forEach(tid => {
+            eventsToInsert.push({
+              teamId: tid,
+              payload: {
+                title: modalTitle,
+                event_type: modalType,
+                date: modalDate,
+                start_time: modalStartTime,
+                end_time: modalEndTime || null,
+                location: modalLocation || null,
+                rsvp_reminder_time: reminderTime
+              }
+            })
+          })
+        } else {
+          let currentDate = parseISO(modalDate)
+          const end = parseISO(recurringEndDate)
+          
+          let iterations = 0
+          while (currentDate <= end && iterations < 730) {
+            if (recurringDays.includes(getDay(currentDate))) {
+              const dateStr = format(currentDate, 'yyyy-MM-dd')
+              const reminderTime = computeReminderTime(dateStr)
+              modalSelectedTeams.forEach(tid => {
+                eventsToInsert.push({
+                  teamId: tid,
+                  payload: {
+                    title: modalTitle,
+                    event_type: modalType,
+                    date: dateStr,
+                    start_time: modalStartTime,
+                    end_time: modalEndTime || null,
+                    location: modalLocation || null,
+                    rsvp_reminder_time: reminderTime
+                  }
+                })
+              })
+            }
+            currentDate = addDays(currentDate, 1)
+            iterations++
+          }
+          
+          if (eventsToInsert.length === 0) {
+            toast.error("No hay fechas válidas en el rango seleccionado.")
+            setSubmitting(false)
+            return
+          }
+        }
+
+        for (const item of eventsToInsert) {
+          await createTeamEventAction(item.teamId, item.payload, activeSeasonId || undefined)
+        }
+
         toast.success(eventsToInsert.length > 1 ? `${eventsToInsert.length} eventos creados` : "Evento creado")
         setShowModal(false)
         fetchData()
       }
+    } catch (err: any) {
+      toast.error("Error al guardar: " + (err?.message || "Error inesperado"))
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   const toggleType = (type: string) => {
@@ -472,6 +491,13 @@ export default function EventsPage() {
     e.date.startsWith(monthStr)
   ).length
 
+  const displayListEvents = useMemo(() => {
+    if (selectedCalendarDate) {
+      return filteredEvents.filter(e => e.date === selectedCalendarDate);
+    }
+    return filteredEvents;
+  }, [filteredEvents, selectedCalendarDate]);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center bg-gray-50/50 min-h-screen">
@@ -483,17 +509,17 @@ export default function EventsPage() {
   return (
     <div className="min-h-full bg-gray-50/50">
       <Toaster position="bottom-right" />
-      <div className="max-w-screen-xl mx-auto px-5 py-7">
+      <div className="w-full max-w-[1720px] mx-auto px-3 sm:px-5 lg:px-6 py-4">
 
         {/* ─── Page Header ──────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Eventos y Calendario</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl font-black text-gray-900 tracking-tight">Eventos y Calendario</h1>
+            <p className="text-xs font-semibold text-gray-500 mt-0.5">
               {eventCountThisMonth} eventos en {MONTH_NAMES[month]}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={async () => {
                 const res = await fetch('/api/events/send-reminders', { method: 'POST' });
@@ -504,56 +530,56 @@ export default function EventsPage() {
                   toast.error("Error al enviar recordatorios");
                 }
               }}
-              className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-xl border border-slate-300 transition-all"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 transition-all shadow-2xs"
             >
-              <CalendarDays className="w-4 h-4" />
+              <CalendarDays className="w-3.5 h-3.5 text-slate-500" />
               Enviar Recordatorios
             </button>
             <button 
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm shadow-blue-200 transition-all"
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs shadow-blue-200 transition-all"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               Nuevo Evento
             </button>
           </div>
         </div>
 
         {/* ─── Two-column Layout ────────────────────────────────────────── */}
-        <div className="flex gap-5 flex-col md:flex-row">
+        <div className="flex gap-3.5 lg:gap-4 flex-col md:flex-row items-start">
 
-          {/* ── LEFT SIDEBAR ───────────────────────────────────────────── */}
-          <aside className="w-full md:w-52 shrink-0 space-y-4">
+          {/* ── LEFT SIDEBAR (COMPACT) ─────────────────────────────────── */}
+          <aside className="w-full md:w-44 lg:w-48 shrink-0 space-y-2.5">
 
             {/* Tipos de evento */}
-            <details className="bg-white rounded-2xl border-2 border-blue-100 shadow-sm group [&_summary::-webkit-details-marker]:hidden hover:border-blue-300 transition-colors">
-              <summary className="flex items-center justify-between p-4 cursor-pointer outline-none bg-blue-50/30 rounded-t-2xl group-open:bg-blue-50/50 transition-colors">
+            <details className="bg-white rounded-xl border border-blue-100 shadow-2xs group [&_summary::-webkit-details-marker]:hidden hover:border-blue-200 transition-colors">
+              <summary className="flex items-center justify-between p-2.5 cursor-pointer outline-none bg-blue-50/30 rounded-t-xl group-open:bg-blue-50/50 transition-colors">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                    <CalendarDays className="w-4 h-4" />
+                  <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <CalendarDays className="w-3.5 h-3.5" />
                   </div>
-                  <p className="text-[13px] font-black uppercase tracking-wider text-blue-900">Eventos</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-blue-900">Eventos</p>
                 </div>
-                <span className="text-blue-400 group-open:rotate-180 transition-transform font-bold">▼</span>
+                <span className="text-blue-400 group-open:rotate-180 transition-transform text-xs font-bold">▼</span>
               </summary>
-              <div className="px-5 pb-5 space-y-3 pt-3">
+              <div className="px-3 pb-3 space-y-2 pt-2">
                 {(["Entrenamiento", "Partido", "Reunión", "Otro"]).map((type) => (
-                  <label key={type} className="flex items-center gap-3 cursor-pointer group">
+                  <label key={type} className="flex items-center gap-2 cursor-pointer group">
                     <input
                       type="checkbox"
                       checked={selectedTypes.includes(type)}
                       onChange={() => toggleType(type)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       {type === "Entrenamiento" ? (
-                        <Dumbbell className="w-4 h-4 text-emerald-500" />
+                        <Dumbbell className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       ) : type === "Partido" ? (
-                        <Trophy className="w-4 h-4 text-blue-500" />
+                        <Trophy className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       ) : (
-                        <CalendarDays className="w-4 h-4 text-slate-500" />
+                        <CalendarDays className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                       )}
-                      <span className="text-sm text-gray-700 font-bold group-hover:text-blue-700 transition-colors">
+                      <span className="text-xs text-gray-700 font-bold group-hover:text-blue-700 transition-colors truncate">
                         {type}
                       </span>
                     </div>
@@ -563,33 +589,33 @@ export default function EventsPage() {
             </details>
 
             {/* Equipos */}
-            <details className="bg-white rounded-2xl border-2 border-blue-100 shadow-sm group [&_summary::-webkit-details-marker]:hidden hover:border-blue-300 transition-colors">
-              <summary className="flex items-center justify-between p-4 cursor-pointer outline-none bg-blue-50/30 rounded-t-2xl group-open:bg-blue-50/50 transition-colors">
+            <details className="bg-white rounded-xl border border-blue-100 shadow-2xs group [&_summary::-webkit-details-marker]:hidden hover:border-blue-200 transition-colors">
+              <summary className="flex items-center justify-between p-2.5 cursor-pointer outline-none bg-blue-50/30 rounded-t-xl group-open:bg-blue-50/50 transition-colors">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </div>
-                  <p className="text-[13px] font-black uppercase tracking-wider text-blue-900">Equipos</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-blue-900">Equipos</p>
                 </div>
-                <span className="text-blue-400 group-open:rotate-180 transition-transform font-bold">▼</span>
+                <span className="text-blue-400 group-open:rotate-180 transition-transform text-xs font-bold">▼</span>
               </summary>
-              <div className="px-5 pb-5 space-y-3 max-h-64 overflow-y-auto pt-3">
+              <div className="px-3 pb-3 space-y-2 max-h-56 overflow-y-auto pt-2">
                 {dbTeams.map((team) => (
-                  <label key={team.id} className="flex items-center gap-3 cursor-pointer group">
+                  <label key={team.id} className="flex items-center gap-2 cursor-pointer group">
                     <input
                       type="checkbox"
                       checked={selectedTeams.includes(team.id)}
                       onChange={() => toggleTeam(team.id)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span
-                        className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs border border-white"
                         style={{ backgroundColor: team.hex }}
                       />
-                      <span className="text-sm text-gray-700 font-bold group-hover:text-blue-700 transition-colors truncate">
+                      <span className="text-xs text-gray-800 font-bold group-hover:text-blue-700 transition-colors truncate">
                         {team.name}
                       </span>
                     </div>
@@ -599,22 +625,22 @@ export default function EventsPage() {
             </details>
 
             {/* Mini stats */}
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-4 text-white shadow-sm shadow-blue-200">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-200 mb-3">Este mes</p>
-              <div className="space-y-2">
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-white shadow-2xs">
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-200 mb-2">Este mes</p>
+              <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-blue-100 flex items-center gap-1.5">
+                  <span className="text-xs text-blue-100 flex items-center gap-1.5 font-medium">
                     <Dumbbell className="w-3.5 h-3.5" /> Entrenos
                   </span>
-                  <span className="font-bold text-lg">
+                  <span className="font-black text-base">
                     {dbEvents.filter(e => e.date.startsWith(monthStr) && e.type === "Entrenamiento").length}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-blue-100 flex items-center gap-1.5">
+                  <span className="text-xs text-blue-100 flex items-center gap-1.5 font-medium">
                     <Trophy className="w-3.5 h-3.5" /> Partidos
                   </span>
-                  <span className="font-bold text-lg">
+                  <span className="font-black text-base">
                     {dbEvents.filter(e => e.date.startsWith(monthStr) && e.type === "Partido").length}
                   </span>
                 </div>
@@ -742,35 +768,85 @@ export default function EventsPage() {
                     events={filteredEvents}
                     today={today}
                     onEventClick={handleOpenEditModal}
+                    selectedDate={selectedCalendarDate}
+                    onDateClick={(dateStr) => {
+                      setSelectedCalendarDate(dateStr);
+                      setTimeout(() => {
+                        const el = document.getElementById('events-day-section');
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 50);
+                    }}
                   />
 
-                  {/* Lista de eventos del mes debajo del calendario */}
-                  <div className="mt-8 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <CalendarDays className="w-5 h-5 text-blue-600" />
-                        Eventos de {MONTH_NAMES[month]} de {year} ({filteredEvents.length})
-                      </h3>
+                  {/* Lista de eventos del mes o del día seleccionado */}
+                  <div id="events-day-section" className="mt-8 bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4 scroll-mt-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                          <CalendarDays className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900 capitalize tracking-tight">
+                            {selectedCalendarDate 
+                              ? format(parseISO(selectedCalendarDate), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
+                              : `Eventos de ${MONTH_NAMES[month]} de ${year}`}
+                          </h3>
+                          <p className="text-xs text-slate-500 font-medium">
+                            {displayListEvents.length} {displayListEvents.length === 1 ? 'evento programado' : 'eventos programados'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {selectedCalendarDate && (
+                        <button
+                          onClick={() => setSelectedCalendarDate(null)}
+                          className="self-start sm:self-auto px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-2xs cursor-pointer"
+                          title="Mostrar todos los eventos del mes"
+                        >
+                          <span>Ver todo el mes ({filteredEvents.length})</span>
+                          <span className="w-4 h-4 rounded-full bg-slate-300 text-slate-700 flex items-center justify-center text-[10px]">✕</span>
+                        </button>
+                      )}
                     </div>
 
-                    {filteredEvents.length === 0 ? (
-                      <div className="text-center py-8 text-slate-400">
-                        <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                        <p className="font-semibold text-sm">No hay eventos registrados para este mes con los filtros seleccionados.</p>
+                    {displayListEvents.length === 0 ? (
+                      <div className="text-center py-10 text-slate-400">
+                        <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-50 text-slate-300" />
+                        <p className="font-bold text-sm text-slate-700">
+                          {selectedCalendarDate 
+                            ? `No hay eventos programados para el ${format(parseISO(selectedCalendarDate), "d 'de' MMMM", { locale: es })}.`
+                            : "No hay eventos registrados para este mes con los filtros seleccionados."}
+                        </p>
+                        {selectedCalendarDate && (
+                          <button
+                            onClick={() => setSelectedCalendarDate(null)}
+                            className="mt-3 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Mostrar todos los eventos de {MONTH_NAMES[month]} ({filteredEvents.length})
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 gap-3">
-                        {filteredEvents.map((event) => (
+                        {displayListEvents.map((event) => {
+                          const hex = event.teamHex || '#2563eb';
+                          return (
                           <div 
                             key={event.id}
-                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all bg-white gap-4"
+                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all bg-white gap-4 border-l-4"
+                            style={{ borderLeftColor: hex }}
                           >
                             <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-inner shrink-0 ${
-                                event.type === 'Entrenamiento' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                event.type === 'Partido' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                'bg-amber-50 text-amber-600 border-amber-100'
-                              }`}>
+                              <div 
+                                className="w-12 h-12 rounded-xl flex items-center justify-center border shadow-2xs shrink-0"
+                                style={{
+                                  backgroundColor: `${hex}15`,
+                                  borderColor: `${hex}30`,
+                                  color: hex
+                                }}
+                              >
                                 {event.type === 'Partido' ? <Trophy className="w-5 h-5" /> : 
                                  event.type === 'Entrenamiento' ? <Dumbbell className="w-5 h-5" /> : 
                                  <CalendarDays className="w-5 h-5" />}
@@ -788,9 +864,15 @@ export default function EventsPage() {
                                     {event.type}
                                   </span>
                                   {event.teamName && (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
-                                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: event.color || '#3b82f6' }}></span>
-                                      {event.teamName}
+                                    <span 
+                                      className="text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs text-slate-900"
+                                      style={{
+                                        backgroundColor: `${hex}18`,
+                                        borderColor: `${hex}45`,
+                                      }}
+                                    >
+                                      <span className="w-2 h-2 rounded-full shrink-0 border border-white" style={{ backgroundColor: hex }}></span>
+                                      <span className="text-slate-900 font-bold">{event.teamName}</span>
                                     </span>
                                   )}
                                 </div>
@@ -853,7 +935,8 @@ export default function EventsPage() {
                               )}
                             </div>
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
                     )}
                   </div>

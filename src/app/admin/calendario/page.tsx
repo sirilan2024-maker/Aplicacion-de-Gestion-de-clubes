@@ -126,7 +126,7 @@ export default function AdminCalendarioPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-3 sm:p-5 lg:p-6 w-full max-w-[1720px] mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div className="flex items-center gap-3">
@@ -300,9 +300,9 @@ export default function AdminCalendarioPage() {
         </div>
       ) : viewMode === 'mes' ? (
         /* VISTA MES CUADRÍCULA */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calendario 2/3 */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-5">
+          {/* Calendario 3/4 para máximo ancho */}
+          <div className="xl:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4">
             {/* Días de la semana */}
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold uppercase tracking-wider text-slate-400 pb-2 border-b border-slate-100">
               <span>Lun</span>
@@ -331,7 +331,15 @@ export default function AdminCalendarioPage() {
                 return (
                   <div
                     key={dateStr}
-                    onClick={() => setSelectedDay(day)}
+                    onClick={() => {
+                      setSelectedDay(day);
+                      setTimeout(() => {
+                        const el = document.getElementById('admin-day-detail-panel');
+                        if (el && window.innerWidth < 1280) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 50);
+                    }}
                     className={`min-h-[75px] md:min-h-[90px] p-1.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
                       isSelected
                         ? 'border-blue-600 bg-blue-50/40 shadow-sm'
@@ -359,17 +367,27 @@ export default function AdminCalendarioPage() {
                       )}
                     </div>
 
-                    {/* Indicadores de eventos */}
+                    {/* Indicadores de eventos con color de equipo */}
                     <div className="space-y-1 mt-1 overflow-hidden">
-                      {dayEvents.slice(0, 2).map((ev) => (
-                        <div
-                          key={ev.id}
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded truncate border ${getEventBadgeClass(ev.type)}`}
-                          title={`${ev.startTime} ${ev.title} (${ev.teamName})`}
-                        >
-                          {ev.startTime} {ev.title}
-                        </div>
-                      ))}
+                      {dayEvents.slice(0, 2).map((ev) => {
+                        const hex = ev.teamHex || '#2563eb'
+                        return (
+                          <div
+                            key={ev.id}
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded truncate border border-l-2 shadow-2xs"
+                            style={{
+                              borderLeftColor: hex,
+                              backgroundColor: `${hex}15`,
+                              borderColor: `${hex}30`,
+                              color: '#0f172a'
+                            }}
+                            title={`${ev.startTime} ${ev.title} (${ev.teamName})`}
+                          >
+                            <span className="font-black mr-1" style={{ color: hex }}>•</span>
+                            {ev.startTime} {ev.title}
+                          </div>
+                        )
+                      })}
                       {dayEvents.length > 2 && (
                         <div className="text-[9px] font-bold text-slate-400 text-center">
                           +{dayEvents.length - 2} más
@@ -383,7 +401,7 @@ export default function AdminCalendarioPage() {
           </div>
 
           {/* Panel Lateral: Detalle del Día Seleccionado */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 flex flex-col justify-between space-y-4">
+          <div id="admin-day-detail-panel" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 flex flex-col justify-between space-y-4 scroll-mt-6">
             <div>
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                 <h3 className="font-bold text-slate-900 text-base capitalize flex items-center gap-2">
@@ -403,14 +421,24 @@ export default function AdminCalendarioPage() {
                     <p className="text-xs text-slate-400">No hay eventos programados para este día</p>
                   </div>
                 ) : (
-                  selectedDayEvents.map((ev) => (
+                  selectedDayEvents.map((ev) => {
+                    const hex = ev.teamHex || '#2563eb'
+                    return (
                     <div
                       key={ev.id}
-                      className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition space-y-2"
+                      className="p-3.5 rounded-xl border bg-slate-50/50 hover:bg-slate-50 transition space-y-2 border-l-4 shadow-2xs"
+                      style={{ borderLeftColor: hex }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${getEventBadgeClass(ev.type)}`}>
-                          {ev.type}
+                        <span 
+                          className="text-[11px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs text-slate-900"
+                          style={{
+                            backgroundColor: `${hex}18`,
+                            borderColor: `${hex}45`,
+                          }}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hex }} />
+                          <span className="text-slate-900 font-bold">{ev.teamName}</span>
                         </span>
                         <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -425,7 +453,11 @@ export default function AdminCalendarioPage() {
                       <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
                         <span className="font-semibold text-slate-700 flex items-center gap-1">
                           <Shield className="w-3.5 h-3.5 text-blue-600" />
-                          {ev.teamName} ({ev.teamCategory})
+                          <span className="text-slate-500">{ev.teamCategory}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                            {ev.type}
+                          </span>
                         </span>
                         {ev.score && (
                           <span className="font-black text-slate-900 bg-slate-200 px-2 py-0.5 rounded">
@@ -441,7 +473,8 @@ export default function AdminCalendarioPage() {
                         </div>
                       )}
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
             </div>
@@ -480,8 +513,10 @@ export default function AdminCalendarioPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredEvents.map((ev) => (
-                    <tr key={ev.id} className="hover:bg-slate-50/60 transition">
+                  filteredEvents.map((ev) => {
+                    const hex = ev.teamHex || '#2563eb'
+                    return (
+                    <tr key={ev.id} className="hover:bg-slate-50/70 transition border-l-4" style={{ borderLeftColor: hex }}>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <div className="font-semibold text-slate-900">{ev.date}</div>
                         <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
@@ -494,9 +529,18 @@ export default function AdminCalendarioPage() {
                           {ev.type}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{ev.teamName}</div>
-                        <div className="text-xs text-slate-400 uppercase font-medium">{ev.teamCategory}</div>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span 
+                          className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs font-bold border shadow-2xs text-slate-900"
+                          style={{
+                            backgroundColor: `${hex}18`,
+                            borderColor: `${hex}45`,
+                          }}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs border border-white" style={{ backgroundColor: hex }} />
+                          <span className="text-slate-900 font-bold">{ev.teamName}</span>
+                        </span>
+                        <div className="text-[11px] text-slate-400 uppercase font-medium mt-0.5 pl-1">{ev.teamCategory}</div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-800">
                         {ev.title}
@@ -518,7 +562,8 @@ export default function AdminCalendarioPage() {
                         )}
                       </td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
             </table>

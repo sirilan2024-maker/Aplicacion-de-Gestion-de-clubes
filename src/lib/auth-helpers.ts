@@ -232,6 +232,20 @@ export async function getAuthenticatedContext(): Promise<{
 
 
 /**
+ * Obtiene la lista normalizada de todos los roles asignados al usuario en su contexto autenticado
+ * (combinando `profile.role` y el array `profile.roles`).
+ */
+export function getUserAllRoles(ctx: AuthenticatedContext): string[] {
+  return Array.from(
+    new Set(
+      [ctx.profile.role, ...(ctx.profile.roles || [])]
+        .filter(Boolean)
+        .map((r) => String(r).toLowerCase())
+    )
+  );
+}
+
+/**
  * Verifica si un usuario tiene permisos para consultar o modificar a un jugador específico.
  */
 export async function canUserAccessPlayer(
@@ -254,8 +268,10 @@ export async function canUserAccessPlayer(
     return { allowed: false, reason: "El jugador no pertenece a tu club" };
   }
 
+  const userRoles = getUserAllRoles(ctx);
+
   // 1. Directiva / Admin o simulación activa para este jugador
-  if (ADMIN_ROLES.includes(ctx.profile.role) || (ctx.isImpersonating && ctx.impersonatedPlayerId === playerId)) {
+  if (userRoles.some((r) => ADMIN_ROLES.includes(r)) || (ctx.isImpersonating && ctx.impersonatedPlayerId === playerId)) {
     return { allowed: true, player };
   }
 
@@ -281,7 +297,7 @@ export async function canUserAccessPlayer(
   }
 
   // 4. Entrenador asignado al equipo del jugador o del mismo club (para convocatorias cruzadas entre categorías)
-  if (COACH_ROLES.includes(ctx.profile.role)) {
+  if (userRoles.some((r) => COACH_ROLES.includes(r))) {
     if (player.team_id) {
       const { data: coachAssignment } = await adminClient
         .from("team_coaches")
@@ -464,7 +480,8 @@ export async function canUserDeleteTeam(
   ctx: AuthenticatedContext,
   teamId: string
 ): Promise<{ allowed: boolean; team?: any; reason?: string }> {
-  if (!ADMIN_ROLES.includes(ctx.profile.role)) {
+  const userRoles = getUserAllRoles(ctx);
+  if (!userRoles.some((r) => ADMIN_ROLES.includes(r))) {
     return { allowed: false, reason: "No tienes permisos de administración para eliminar equipos" };
   }
 
@@ -494,7 +511,8 @@ export async function canUserUpdateRegistrationEmail(
   registrationId: string,
   userId?: string
 ): Promise<{ allowed: boolean; reason?: string }> {
-  if (!ADMIN_ROLES.includes(ctx.profile.role)) {
+  const userRoles = getUserAllRoles(ctx);
+  if (!userRoles.some((r) => ADMIN_ROLES.includes(r))) {
     return { allowed: false, reason: "No tienes permisos administrativos para modificar emails de inscripciones" };
   }
 
@@ -540,7 +558,8 @@ export async function canUserUpdateStaffProfile(
   staffId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
   const isSelf = ctx.user.id === staffId;
-  const isAdmin = ADMIN_ROLES.includes(ctx.profile.role);
+  const userRoles = getUserAllRoles(ctx);
+  const isAdmin = userRoles.some((r) => ADMIN_ROLES.includes(r));
 
   if (!isSelf && !isAdmin) {
     return { allowed: false, reason: "No tienes permisos para modificar el perfil de este miembro de staff" };
@@ -571,7 +590,8 @@ export async function canUserManageClubStaff(
   ctx: AuthenticatedContext,
   targetUserId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
-  if (!ADMIN_ROLES.includes(ctx.profile.role)) {
+  const userRoles = getUserAllRoles(ctx);
+  if (!userRoles.some((r) => ADMIN_ROLES.includes(r))) {
     return { allowed: false, reason: "No tienes permisos de administración" };
   }
 
@@ -614,11 +634,13 @@ export async function canUserManageTeam(
     return { allowed: false, reason: "El equipo no pertenece a tu club" };
   }
 
-  if (ADMIN_ROLES.includes(ctx.profile.role)) {
+  const userRoles = getUserAllRoles(ctx);
+
+  if (userRoles.some((r) => ADMIN_ROLES.includes(r))) {
     return { allowed: true, team };
   }
 
-  if (COACH_ROLES.includes(ctx.profile.role)) {
+  if (userRoles.some((r) => COACH_ROLES.includes(r))) {
     const { data: coachAssignment } = await adminClient
       .from("team_coaches")
       .select("id")
@@ -642,7 +664,8 @@ export async function canUserManageRegistration(
   ctx: AuthenticatedContext,
   registrationId: string
 ): Promise<{ allowed: boolean; registration?: any; reason?: string }> {
-  if (!ADMIN_ROLES.includes(ctx.profile.role)) {
+  const userRoles = getUserAllRoles(ctx);
+  if (!userRoles.some((r) => ADMIN_ROLES.includes(r))) {
     return { allowed: false, reason: "No tienes permisos de administración" };
   }
 

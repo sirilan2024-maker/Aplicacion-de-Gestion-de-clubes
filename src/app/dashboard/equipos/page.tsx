@@ -558,11 +558,20 @@ export default function EquiposPage() {
       // Fetch user profile to get club_id and role
       const { data: profile } = await supabase
         .from("profiles")
-        .select("club_id, role")
+        .select("club_id, role, roles")
         .eq("id", user.id)
         .single();
         
       if (!profile?.club_id) { setTeams([]); setLoading(false); return; }
+
+      const userRole = (profile.role || '').toLowerCase();
+      const allRoles = Array.from(new Set([userRole, ...((profile.roles || []).map((r) => (r || '').toLowerCase()))])).filter(Boolean);
+      const isStaffOrCoach = allRoles.some((r) => ['admin', 'superadmin', 'administrador', 'admin_club', 'coordinador', 'coach', 'entrenador', 'delegado', 'preparador_fisico', 'metodologo', 'secretario', 'tesorero', 'utillero'].includes(r));
+
+      if (!isStaffOrCoach || userRole === 'jugador' || userRole === 'tutor' || userRole === 'familiar' || userRole === 'family' || userRole === 'familia') {
+        router.push("/dashboard");
+        return;
+      }
 
       // Resolver temporada objetivo: seleccionada del context o activa como fallback
       let targetSeasonId = selectedSeasonId;

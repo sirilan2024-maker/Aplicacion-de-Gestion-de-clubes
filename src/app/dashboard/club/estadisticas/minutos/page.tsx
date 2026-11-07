@@ -69,7 +69,12 @@ function MinutosPageContent() {
         .eq('season_id', effectiveSeasonId)
         .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c');
 
-      const { data: profileRoleData } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const { data: profileRoleData } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
+      const currentRole = (profileRoleData?.role || '').toLowerCase();
+      if (currentRole === 'jugador' || currentRole === 'tutor' || currentRole === 'familiar' || currentRole === 'family' || currentRole === 'familia') {
+        router.push('/dashboard');
+        return;
+      }
       if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {
         const { data: coachTeams } = await supabase.from('team_coaches').select('team_id').eq('profile_id', user.id);
         const teamIds = coachTeams?.map(ct => ct.team_id) || [];

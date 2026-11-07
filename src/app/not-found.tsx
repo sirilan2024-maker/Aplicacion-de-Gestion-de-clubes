@@ -19,7 +19,7 @@ export default function NotFound() {
 
         <div className="pt-4">
           <Link 
-            href="/dashboard/equipos"
+            href="/dashboard"
             className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm active:scale-95"
           >
             <ArrowLeft className="w-5 h-5" />

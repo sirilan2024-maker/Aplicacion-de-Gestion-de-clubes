@@ -316,7 +316,6 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
         label: "GENERAL/CLUB",
         items: [
           { name: "CENTRO DE CONTROL", href: "/admin/inicio", icon: LayoutDashboard },
-          { name: "Centro de Rendimiento", href: "/dashboard/rendimiento", icon: Activity },
           { name: "Miembros", href: getHref("Directorio", "/dashboard/club/miembros"), icon: Users },
           { name: "Equipos", href: "/dashboard/equipos", icon: Shield },
           { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
@@ -398,7 +397,6 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
             href: isCoach ? `/dashboard/mis-equipos` : `/dashboard`, 
             icon: LayoutDashboard 
           },
-          { name: "Rendimiento Global", href: "/dashboard/rendimiento", icon: Activity },
           { name: "En directo", href: "/live", icon: Trophy },
           { name: "Ajustes", href: "/dashboard/mi-perfil", icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
@@ -432,7 +430,6 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
       {
         label: "TEAMS CLUB",
         items: [
-          { name: "Rendimiento Global", href: "/dashboard/rendimiento", icon: Activity },
           { name: "En directo", href: "/live", icon: Trophy },
           { name: "Ajustes", href: `/dashboard/family/e/${activeFamilyPlayerId}/ajustes`, icon: Settings },
           { name: "Cerrar sesión", href: "#", icon: LogOut, action: 'logout' }
@@ -472,6 +469,16 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
       if (isPlayerOrFamily && (n.name.toLowerCase() === "directorio" || n.href.includes("/club/miembros"))) {
         return false;
       }
+      // 5. Restricción adicional para jugadores y familias:
+      // Nunca mostrar módulos de gestión técnica o transversal del club
+      if (isPlayerOrFamily && (
+        n.href === "/dashboard/equipos" || 
+        n.href === "/dashboard/exercises" || 
+        n.href.includes("/dashboard/rendimiento") ||
+        n.href.includes("/dashboard/club/estadisticas")
+      )) {
+        return false;
+      }
       return true;
     });
     
@@ -497,21 +504,6 @@ export function Sidebar({ signOutAction }: { signOutAction?: any }) {
     if (isCoach && !hasMisEquipos) {
       if (!itemsByCategory["General / Club"]) itemsByCategory["General / Club"] = [];
       itemsByCategory["General / Club"].push({ name: "Mis Equipos", href: "/dashboard/mis-equipos", icon: Shield });
-    }
-
-    const isPreparadorFisico = userRole === 'preparador_fisico' || availableRoles.includes('preparador_fisico');
-    const hasRendimientoGlobal = globalNavItems.some(n => n.href === "/dashboard/rendimiento");
-
-    if ((isCoach || isPreparadorFisico) && !hasRendimientoGlobal) {
-      if (!itemsByCategory["General / Club"]) itemsByCategory["General / Club"] = [];
-      const alreadyAdded = itemsByCategory["General / Club"].some(i => i.href === "/dashboard/rendimiento");
-      if (!alreadyAdded) {
-        itemsByCategory["General / Club"].unshift({
-          name: "Centro de Rendimiento",
-          href: "/dashboard/rendimiento",
-          icon: Activity
-        });
-      }
     }
 
     navGroups = [];

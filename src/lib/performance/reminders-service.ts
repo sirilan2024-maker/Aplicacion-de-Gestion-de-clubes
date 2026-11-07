@@ -2,9 +2,9 @@
  * Sporting Saladar — Módulo de Rendimiento: Servicio Puro de Avisos y Recordatorios
  * 
  * Reglas arquitectónicas obligatorias:
- * 1. Aviso de bienestar previo: programado exclusivamente respecto a la hora real de inicio (start_time).
- * 2. Aviso de feedback post-sesión: programado exclusivamente respecto a la hora real de finalización (end_time).
- * 3. No inventar horarios: si falta start_time o end_time, se declara horario no programable.
+ * 1. Aviso de bienestar previo: programado 3 horas (180 min) antes de la hora real de inicio (start_time).
+ * 2. Aviso de feedback post-sesión: programado exactamente 90 minutos después de start_time, sin utilizar end_time.
+ * 3. No inventar horarios: si falta start_time, se declara horario no programable.
  * 4. Resolución de destinatario: jugador con cuenta propia (user_auth_id) o tutor autorizado (tutor_id) cuando es menor sin cuenta.
  * 5. Omitir envío si el formulario ya está completado. Si la tabla no está disponible, no fingir conocimiento.
  * 6. Generación determinista de claves de idempotencia para evitar duplicados.
@@ -136,37 +136,38 @@ export function calculateWellnessReminderWindow(
 
 /**
  * Calcula la ventana de aviso para el Feedback Post-Entrenamiento (RPE y Minutos).
- * Regla: Se programa respecto a la hora real de finalización (end_time).
- * Por defecto abre 15 min tras terminar la sesión y permanece activa durante 240 min (4h).
- * Si falta end_time, NO inventa duración y devuelve isValid: false.
+ * Regla: Se programa exactamente a los 90 minutos después del inicio de la sesión (start_time),
+ * sin requerir ni utilizar end_time.
+ * Permanece activa durante windowDurationMinutes (por defecto 240 min = 4h).
+ * Si falta start_time, NO inventa horario y devuelve isValid: false.
  */
 export function calculateFeedbackReminderWindow(
   dateStr: string,
-  endTimeStr?: string | null,
-  delayAfterMinutes: number = 15,
+  startTimeStr?: string | null,
+  minutesAfterStart: number = 90,
   windowDurationMinutes: number = 240
 ): ReminderWindowResult {
-  if (!endTimeStr || endTimeStr.trim() === '') {
+  if (!startTimeStr || startTimeStr.trim() === '') {
     return {
       isValid: false,
-      reason: 'missing_end_time'
+      reason: 'missing_start_time'
     };
   }
 
-  const sessionEnd = parseSpainDateTime(dateStr, endTimeStr);
-  if (!sessionEnd || isNaN(sessionEnd.getTime())) {
+  const sessionStart = parseSpainDateTime(dateStr, startTimeStr);
+  if (!sessionStart || isNaN(sessionStart.getTime())) {
     return {
       isValid: false,
-      reason: 'invalid_end_time_format'
+      reason: 'invalid_start_time_format'
     };
   }
 
-  const windowStart = new Date(sessionEnd.getTime() + delayAfterMinutes * 60 * 1000);
+  const windowStart = new Date(sessionStart.getTime() + minutesAfterStart * 60 * 1000);
   const windowEnd = new Date(windowStart.getTime() + windowDurationMinutes * 60 * 1000);
 
   return {
     isValid: true,
-    targetEventTime: sessionEnd,
+    targetEventTime: sessionStart,
     windowStart,
     windowEnd
   };
@@ -284,9 +285,10 @@ export function evaluateReminderEligibility(params: {
   // 4. Calcular ventana horaria
   let window: ReminderWindowResult;
   if (reminderType === 'WELLNESS_REMINDER') {
-    window = calculateWellnessReminderWindow(schedule.date, schedule.startTime);
+    window = calculateWellnessReminderWindow(schedule.date, schedule.startTime, 180);
   } else {
-    window = calculateFeedbackReminderWindow(schedule.date, schedule.endTime);
+    // RPE: exactamente 90 minutos después de start_time, sin requerir end_time
+    window = calculateFeedbackReminderWindow(schedule.date, schedule.startTime, 90, 240);
   }
 
   if (!window.isValid) {
@@ -295,9 +297,7 @@ export function evaluateReminderEligibility(params: {
       reason: 'missing_schedule',
       recipient,
       window,
-      message: window.reason === 'missing_start_time'
-        ? 'La sesión no tiene hora de inicio especificada. Horario no programable.'
-        : 'La sesión no tiene hora de finalización especificada. Horario no programable.'
+      message: 'La sesión no tiene hora de inicio especificada (start_time). Horario no programable.'
     };
   }
 

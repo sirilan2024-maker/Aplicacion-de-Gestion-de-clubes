@@ -46,8 +46,16 @@ interface TeamData {
 export default function EventsPage() {
   const router = useRouter()
   const today = new Date()
+  const initialDate = useMemo(() => {
+    const d = new Date()
+    // Temporada 26/27: no permitir meses de 2025 ni anteriores a Ago 2026
+    if (d.getFullYear() < 2026 || (d.getFullYear() === 2026 && d.getMonth() < 7)) {
+      return new Date(2026, 7, 1)
+    }
+    return d
+  }, [])
   const [viewMode, setViewMode] = useState<ViewMode>("month")
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState<Date>(initialDate)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
@@ -277,6 +285,10 @@ export default function EventsPage() {
 
   const handlePrev = () => {
     const d = new Date(year, month - 1, 1)
+    // No permitir retroceder a 2025 (temporada cerrada)
+    if (d.getFullYear() < 2026 || (d.getFullYear() === 2026 && d.getMonth() < 7)) {
+      return
+    }
     setCurrentDate(d)
     setSelectedCalendarDate(null)
   }
@@ -657,7 +669,9 @@ export default function EventsPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrev}
-                  className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-all shadow-sm"
+                  disabled={year === 2026 && month <= 7}
+                  className="w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={year === 2026 && month <= 7 ? "Inicio de temporada 26/27" : "Mes anterior"}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -679,18 +693,19 @@ export default function EventsPage() {
               </div>
 
               {/* Selector rápido de meses de la temporada con badge de partidos */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar">
+              <div className="w-full sm:w-auto min-w-0 max-w-full flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-1 no-scrollbar touch-pan-x">
                 {[
                   { label: "Ago 26", y: 2026, m: 7 },
-                  { label: "Sep 25", y: 2025, m: 8 },
-                  { label: "Oct 25", y: 2025, m: 9 },
-                  { label: "Nov 25", y: 2025, m: 10 },
-                  { label: "Dic 25", y: 2025, m: 11 },
-                  { label: "Ene 26", y: 2026, m: 0 },
-                  { label: "Feb 26", y: 2026, m: 1 },
-                  { label: "Mar 26", y: 2026, m: 2 },
-                  { label: "Abr 26", y: 2026, m: 3 },
-                  { label: "May 26", y: 2026, m: 4 },
+                  { label: "Sep 26", y: 2026, m: 8 },
+                  { label: "Oct 26", y: 2026, m: 9 },
+                  { label: "Nov 26", y: 2026, m: 10 },
+                  { label: "Dic 26", y: 2026, m: 11 },
+                  { label: "Ene 27", y: 2027, m: 0 },
+                  { label: "Feb 27", y: 2027, m: 1 },
+                  { label: "Mar 27", y: 2027, m: 2 },
+                  { label: "Abr 27", y: 2027, m: 3 },
+                  { label: "May 27", y: 2027, m: 4 },
+                  { label: "Jun 27", y: 2027, m: 5 },
                 ].map((item) => {
                   const isSel = year === item.y && month === item.m;
                   const matchCount = dbEvents.filter(e => e.date.startsWith(`${item.y}-${String(item.m+1).padStart(2,'0')}`) && e.type === "Partido").length;
@@ -698,16 +713,17 @@ export default function EventsPage() {
                     <button
                       key={item.label}
                       onClick={() => setCurrentDate(new Date(item.y, item.m, 1))}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 whitespace-nowrap shadow-sm ${
+                      className={`h-8 shrink-0 px-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm ${
                         isSel
-                          ? 'bg-blue-600 text-white shadow-blue-200'
+                          ? 'bg-blue-600 text-white shadow-blue-200 ring-2 ring-blue-400/50'
                           : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <span>{item.label}</span>
+                      <span className="leading-none">{item.label}</span>
                       {matchCount > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSel ? 'bg-blue-800 text-white' : 'bg-blue-100 text-blue-800'}`}>
-                          ⚽ {matchCount}
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none shrink-0 ${isSel ? 'bg-blue-800 text-white' : 'bg-blue-100 text-blue-800'}`}>
+                          <Trophy className="w-2.5 h-2.5 shrink-0 text-amber-400" />
+                          <span>{matchCount}</span>
                         </span>
                       )}
                     </button>

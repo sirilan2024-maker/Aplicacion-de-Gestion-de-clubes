@@ -38,7 +38,13 @@ import {
 } from '@/app/actions/calendar-actions'
 
 export default function AdminCalendarioPage() {
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => {
+    const d = new Date();
+    if (d.getFullYear() < 2026 || (d.getFullYear() === 2026 && d.getMonth() < 7)) {
+      return new Date(2026, 7, 1);
+    }
+    return d;
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [events, setEvents] = useState<GlobalCalendarEventDTO[]>([])
@@ -147,9 +153,16 @@ export default function AdminCalendarioPage() {
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-sm p-1">
             <button
-              onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition"
-              title="Mes anterior"
+              onClick={() => setCurrentMonth(prev => {
+                const prevM = subMonths(prev, 1);
+                if (prevM.getFullYear() < 2026 || (prevM.getFullYear() === 2026 && prevM.getMonth() < 7)) {
+                  return prev;
+                }
+                return prevM;
+              })}
+              disabled={currentMonth.getFullYear() === 2026 && currentMonth.getMonth() <= 7}
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
+              title={currentMonth.getFullYear() === 2026 && currentMonth.getMonth() <= 7 ? "Inicio de temporada 26/27" : "Mes anterior"}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -367,9 +380,9 @@ export default function AdminCalendarioPage() {
                       )}
                     </div>
 
-                    {/* Indicadores de eventos con color de equipo */}
-                    <div className="space-y-1 mt-1 overflow-hidden">
-                      {dayEvents.slice(0, 2).map((ev) => {
+                                        {/* Indicadores de eventos con color de equipo - Muestra todos los eventos */}
+                    <div className="space-y-1 mt-1">
+                      {dayEvents.map((ev) => {
                         const hex = ev.teamHex || '#2563eb'
                         return (
                           <div
@@ -388,11 +401,6 @@ export default function AdminCalendarioPage() {
                           </div>
                         )
                       })}
-                      {dayEvents.length > 2 && (
-                        <div className="text-[9px] font-bold text-slate-400 text-center">
-                          +{dayEvents.length - 2} más
-                        </div>
-                      )}
                     </div>
                   </div>
                 )

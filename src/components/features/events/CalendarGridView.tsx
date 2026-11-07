@@ -31,11 +31,14 @@ export function CalendarGridView({
   const startOffset = (firstDay.getDay() + 6) % 7; // Monday = 0
   const totalDays = lastDay.getDate();
 
-  // Group events by date string
+  // Group events by date string and sort chronologically
   const eventsByDate: Record<string, CalendarEvent[]> = {};
   events.forEach((ev) => {
     if (!eventsByDate[ev.date]) eventsByDate[ev.date] = [];
     eventsByDate[ev.date].push(ev);
+  });
+  Object.keys(eventsByDate).forEach((key) => {
+    eventsByDate[key].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   });
 
   // Build cells array
@@ -101,7 +104,7 @@ export function CalendarGridView({
                     onDateClick && onDateClick(dateStr);
                   }
                 }}
-                className={`bg-white min-h-[64px] md:min-h-[84px] p-1 md:p-1.5 flex flex-col justify-between transition-all relative cursor-pointer group ${
+                className={`bg-white min-h-[64px] md:min-h-[84px] p-1 md:p-1.5 flex flex-col justify-start transition-all relative cursor-pointer group ${
                   isWeekend ? "bg-slate-50/30" : ""
                 } ${isCellSelected ? "ring-2 ring-blue-500 bg-blue-50/50 shadow-inner" : "hover:bg-blue-50/30"}`}
               >
@@ -169,9 +172,9 @@ export function CalendarGridView({
                     )}
                   </div>
 
-                  {/* Vista PC / Tablet: Pastilla completa con color del equipo, icono y hora */}
-                  <div className="hidden md:flex flex-col gap-1 overflow-hidden mt-0.5">
-                    {dayEvents.slice(0, 3).map((ev) => {
+                  {/* Vista PC / Tablet: Pastilla completa con color del equipo, icono y hora - Muestra todos los eventos */}
+                  <div className="hidden md:flex flex-col gap-1 mt-0.5">
+                    {dayEvents.map((ev) => {
                       const hex = ev.teamHex || '#2563eb';
                       return (
                         <div
@@ -204,11 +207,6 @@ export function CalendarGridView({
                         </div>
                       );
                     })}
-                    {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-gray-500 font-bold pl-1 pt-0.5">
-                        +{dayEvents.length - 3} más
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>

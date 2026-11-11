@@ -5,6 +5,7 @@ import { Check, BarChart3, Award } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import { useParams } from "next/navigation"
 import Link from "next/link"
+import { PlayerAvatar } from "./PlayerAvatar"
 
 export function StatsTab({ players = [], convocatorias = [], matchEvents }: { players?: any[], convocatorias?: any[], matchEvents?: any[] }) {
   const { rol } = useUserRole()
@@ -14,10 +15,11 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
     const conv = convocatorias.find(c => c.player_id === p.id);
     return {
       id: p.id,
-      number: p.dorsal || '-',
-      name: `${p.first_name} ${p.last_name}`,
+      raw: p,
+      number: conv?.dorsal ?? p.dorsal ?? '-',
+      name: `${p.first_name} ${p.last_name}`.trim(),
       avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
-      position: p.posicion_principal || "Jugador",
+      position: p.posicion_principal || p.posicion || "Jugador",
       status: (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado') ? conv.estado_asistencia : 'Presente',
       coachRating: conv?.coach_rating || 0,
       actitud: conv?.actitud || 0,
@@ -159,10 +161,8 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
                       <tr key={player.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-2.5 px-3 text-center font-bold text-slate-400">{player.number}</td>
                         <td className="py-2.5 px-4 font-bold text-slate-800">
-                          <div className="flex items-center gap-2 p-1 -m-1">
-                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[8px] font-black text-blue-700">
-                              {player.avatar}
-                            </div>
+                          <div className="flex items-center gap-2.5 p-1 -m-1">
+                            <PlayerAvatar player={player.raw} dorsal={player.number} size="sm" />
                             <span className="text-slate-800">{player.name}</span>
                           </div>
                         </td>
@@ -207,9 +207,7 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
                 <div key={player.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-black text-blue-700 shrink-0">
-                        {player.avatar}
-                      </div>
+                      <PlayerAvatar player={player.raw} dorsal={player.number} size="md" />
                       <div>
                         <span className="font-bold text-slate-900 text-base block">{player.name}</span>
                         <span className="text-xs font-semibold text-slate-400">#{player.number} • {player.position}</span>
@@ -307,9 +305,7 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3 p-1 -m-1">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
-                        {player.avatar}
-                      </div>
+                      <PlayerAvatar player={player.raw} dorsal={player.number} size="sm" />
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-900 truncate">
                           {player.name}
@@ -370,9 +366,7 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
             <div key={player.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-black text-blue-700 shrink-0">
-                    {player.avatar}
-                  </div>
+                  <PlayerAvatar player={player.raw} dorsal={player.number} size="md" />
                   <div>
                     <span className="font-bold text-slate-900 text-base block">{player.name}</span>
                     <span className="text-xs font-semibold text-slate-400">#{player.number} • {player.position}</span>

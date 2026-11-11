@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { X, Save } from "lucide-react"
+import toast from "react-hot-toast"
 import { updateMatchDetails, createPartidoAction, saveMatchReport } from "@/app/actions/match-actions"
 
 interface ManageMatchModalProps {
@@ -113,34 +114,38 @@ export function ManageMatchModal({ match, teamId, teams, onClose, onSave }: Mana
               rsvp_reminder_time: rsvpReminderTime
             };
 
-            if (match.id === 'new') {
-              const res = await createPartidoAction(equipoIdStr, updatedData);
-              // Also save notes if any
-              if (notasStr) {
-                await saveMatchReport(res.match.id, { 
-                  coach_rating: 0, coach_summary: notasStr, positive_aspects: '', improvement_aspects: '', attitude_notes: '' 
-                });
-              }
-              onSave({...res.match, coach_summary: notasStr});
-            } else {
-              await updateMatchDetails(match.id, equipoIdStr, updatedData);
-              if (notasStr !== match.coach_summary) {
-                await saveMatchReport(match.id, { 
-                  coach_rating: match.coach_rating || 0, 
-                  coach_summary: notasStr, 
-                  positive_aspects: match.positive_aspects || '', 
-                  improvement_aspects: match.improvement_aspects || '', 
-                  attitude_notes: match.attitude_notes || '' 
+            try {
+              if (match.id === 'new') {
+                const res = await createPartidoAction(equipoIdStr, updatedData);
+                // Also save notes if any
+                if (notasStr) {
+                  await saveMatchReport(res.match.id, { 
+                    coach_rating: 0, coach_summary: notasStr, positive_aspects: '', improvement_aspects: '', attitude_notes: '' 
+                  });
+                }
+                onSave({...res.match, coach_summary: notasStr});
+              } else {
+                await updateMatchDetails(match.id, equipoIdStr, updatedData);
+                if (notasStr !== match.coach_summary) {
+                  await saveMatchReport(match.id, { 
+                    coach_rating: match.coach_rating || 0, 
+                    coach_summary: notasStr, 
+                    positive_aspects: match.positive_aspects || '', 
+                    improvement_aspects: match.improvement_aspects || '', 
+                    attitude_notes: match.attitude_notes || '' 
+                  });
+                }
+                
+                onSave({ 
+                  ...match, 
+                  ...updatedData
                 });
               }
               
-              onSave({ 
-                ...match, 
-                ...updatedData
-              });
+              onClose();
+            } catch (err: any) {
+              toast.error("Error al guardar el partido: " + (err?.message || "Error inesperado"));
             }
-            
-            onClose();
           }
         }}
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200"

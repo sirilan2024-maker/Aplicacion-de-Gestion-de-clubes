@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { X, Save, Star } from "lucide-react"
 import { updatePlayerRatingsBatch } from "@/app/actions/match-actions"
 import { useRouter } from "next/navigation"
+import { PlayerAvatar } from "./PlayerAvatar"
 
 interface Player {
   id: string
@@ -96,9 +97,7 @@ export function PlayerRatingsModal({ matchId, players, convocatorias, onClose }:
           {playerList.map(player => (
             <div key={player.id} className="flex items-center justify-between p-3 border border-slate-150 rounded-xl bg-white hover:border-slate-300 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-black text-blue-700 shrink-0">
-                  {player.first_name[0] || ''}{player.last_name[0] || ''}
-                </div>
+                <PlayerAvatar player={player} dorsal={player.dorsal} size="sm" />
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800 truncate">
                     {player.first_name} {player.last_name}

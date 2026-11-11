@@ -8,6 +8,7 @@ import { useUserRole } from "@/hooks/useUserRole"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { MVPAward } from "./MVPAward"
+import { PlayerAvatar } from "./PlayerAvatar"
 import { MOCK_LIVE_PLAYERS } from "./LiveTab"
 
 interface PlayerRow {
@@ -474,13 +475,7 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
                     <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                       {player.number || "-"}
                     </span>
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-black text-blue-700 shrink-0 shadow-2xs">
-                      {player.avatarUrl ? (
-                        <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_20%]" />
-                      ) : (
-                        <span>{player.avatar}</span>
-                      )}
-                    </div>
+                    <PlayerAvatar player={{ first_name: player.name, photo_url: player.avatarUrl, posicion: player.pos }} dorsal={player.number} size="sm" showDorsalBadge={false} />
                     <div>
                       <h5 className="text-xs font-bold text-slate-800">{player.name}</h5>
                       <span className="text-[10px] text-slate-400 font-semibold">{player.pos}</span>
@@ -570,19 +565,13 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
               Banquillo de Suplentes ({benchList.length})
             </p>
             {benchList.length > 0 ? (
-              <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto pr-1">
+              <div className="flex flex-wrap gap-2">
                 {benchList.map(supl => (
                   <div key={supl.id} className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl shadow-2xs">
                     <span className="w-5 h-5 rounded-md bg-slate-800 text-white font-mono font-black text-[9px] flex items-center justify-center shrink-0">
                       {supl.number || "-"}
                     </span>
-                    <div className="w-6 h-6 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center text-[8px] font-black text-blue-700 shrink-0">
-                      {supl.avatarUrl ? (
-                        <img src={supl.avatarUrl} alt={supl.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{supl.avatar}</span>
-                      )}
-                    </div>
+                    <PlayerAvatar player={{ first_name: supl.name, photo_url: supl.avatarUrl, posicion: supl.pos }} dorsal={supl.number} size="sm" showDorsalBadge={false} />
                     <span className="text-xs font-bold text-slate-700">{supl.name.split(" ")[0]}</span>
                     {supl.coachRating > 0 && (
                       <span className="text-[9px] font-extrabold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">

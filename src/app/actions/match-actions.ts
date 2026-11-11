@@ -2,7 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessMatch, canUserAccessPlayer } from "@/lib/auth-helpers"
+import { getAuthenticatedContext, ADMIN_ROLES, canUserAccessMatch, canUserAccessPlayer, canUserManageTeam, getUserAllRoles } from "@/lib/auth-helpers"
 import { NotificationService } from "@/lib/notifications/notification-service"
 import { getConvocationEmailHtml, getUnconvocationEmailHtml } from "@/lib/email-service"
 import { isSeasonEditable, assertSeasonEditable } from "@/lib/season-utils"
@@ -542,20 +542,86 @@ export async function updateMatchDetails(
     resultado_rival?: number | null, 
     estado?: string, 
     rsvp_reminder_time?: string | null, 
-    tipo_partido?: string 
+    tipo_partido?: string,
+    equipo_id?: string,
+    coach_summary?: string,
+    highlight_jornada?: boolean
   }
 ) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
-    return { success: false, error: authError || "No autenticado" };
+    throw new Error(authError || "No autenticado");
   }
   const adminSupabase = await createAdminClient();
   const access = await canUserAccessMatch(adminSupabase, context, matchId);
   if (!access.allowed || !access.match) {
-    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+    throw new Error(access.reason || "No tienes acceso a este partido");
   }
-  await adminSupabase.from('partidos').update(updates).eq('id', matchId);
-  revalidatePath(`/dashboard/e/${teamId}/partidos`, 'page');
+
+  const effectiveTeamId = updates.equipo_id || teamId || access.match.equipo_id;
+  const teamAccess = await canUserManageTeam(adminSupabase, context, effectiveTeamId);
+  if (!teamAccess.allowed) {
+    throw new Error(teamAccess.reason || "No tienes permisos para modificar partidos de este equipo");
+  }
+
+  const oldFechaHora = access.match.fecha_hora;
+
+  const { error: updateErr } = await adminSupabase
+    .from('partidos')
+    .update(updates)
+    .eq('id', matchId);
+
+  if (updateErr) {
+    throw new Error(updateErr.message);
+  }
+
+  // Regla 5.3 AGENTS.md: Propagación conjunta a Partidos y Agenda (team_events)
+  if (oldFechaHora && (updates.fecha_hora || updates.lugar || updates.rival_nombre)) {
+    try {
+      const oldDt = new Date(oldFechaHora);
+      if (!isNaN(oldDt.getTime())) {
+        const oldDateStr = oldDt.toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+        const newDt = updates.fecha_hora ? new Date(updates.fecha_hora) : oldDt;
+        const newDateStr = !isNaN(newDt.getTime())
+          ? newDt.toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' })
+          : oldDateStr;
+        const newTimeStr = !isNaN(newDt.getTime())
+          ? newDt.toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false })
+          : undefined;
+
+        const teamName = (access.match.equipo as any)?.name || 'Equipo';
+        const rival = updates.rival_nombre || access.match.rival_nombre || 'Rival';
+        const lugar = updates.lugar || access.match.lugar || 'Local';
+        const newTitle = lugar === 'Local' ? `${teamName} vs ${rival}` : `${rival} vs ${teamName}`;
+
+        const eventPatch: Record<string, any> = {
+          date: newDateStr,
+          title: newTitle,
+          location: lugar,
+        };
+        if (newTimeStr) {
+          eventPatch.start_time = newTimeStr;
+        }
+        if (updates.rsvp_reminder_time !== undefined) {
+          eventPatch.rsvp_reminder_time = updates.rsvp_reminder_time;
+        }
+
+        await adminSupabase
+          .from('team_events')
+          .update(eventPatch)
+          .eq('team_id', access.match.equipo_id)
+          .eq('event_type', 'Partido')
+          .eq('date', oldDateStr);
+      }
+    } catch (syncErr) {
+      console.warn('[updateMatchDetails] Error sincronizando team_events:', syncErr);
+    }
+  }
+
+  revalidatePath(`/dashboard/equipos/${effectiveTeamId}/partidos`, 'page');
+  revalidatePath(`/dashboard/equipos/${effectiveTeamId}/calendario`, 'page');
+  revalidatePath(`/dashboard/matches`);
+  revalidatePath(`/dashboard/events`);
   return { success: true };
 }
 
@@ -816,7 +882,8 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
       return { success: false, error: authError || "No autenticado" };
     }
 
-    if (!ADMIN_ROLES.includes(context.profile.role)) {
+    const userRoles = getUserAllRoles(context);
+    if (!userRoles.some((r) => ADMIN_ROLES.includes(r))) {
       return { success: false, error: "Solo los administradores pueden eliminar partidos" };
     }
 
@@ -836,9 +903,29 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
       return { success: false, error: error.message };
     }
 
+    // Limpiar también cualquier evento espejo en team_events para esa fecha y equipo
+    if (matchAccess.match?.fecha_hora && matchAccess.match?.equipo_id) {
+      try {
+        const dt = new Date(matchAccess.match.fecha_hora);
+        if (!isNaN(dt.getTime())) {
+          const dateStr = dt.toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+          await adminClient
+            .from('team_events')
+            .delete()
+            .eq('team_id', matchAccess.match.equipo_id)
+            .eq('event_type', 'Partido')
+            .eq('date', dateStr);
+        }
+      } catch (e) {
+        // Ignorar error secundario
+      }
+    }
+
     revalidatePath(`/dashboard/matches`);
+    revalidatePath(`/dashboard/events`);
     if (teamId) {
       revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
+      revalidatePath(`/dashboard/equipos/${teamId}/calendario`);
     }
     revalidatePath(`/live`);
     return { success: true };
@@ -850,36 +937,32 @@ export async function deleteMatchAction(matchId: string, teamId: string) {
 
 
 export async function createPartidoAction(teamId: string, data: { fecha_hora: string, hora_citacion?: string | null, lugar?: string, rival_nombre?: string, season_id?: string, tipo_partido?: string, estado?: string, resultado_propio?: number | null, resultado_rival?: number | null, rsvp_reminder_time?: string | null }) {
-  const supabase = await createClient()
-
-  // Obtener el club_id del usuario autenticado
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    throw new Error("No autenticado")
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    throw new Error(authError || "No autenticado");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("club_id, role")
-    .eq("id", user.id)
-    .single()
-
-  if (profileError || !profile?.club_id) {
-    throw new Error("No se pudo obtener el club del usuario")
+  const adminClient = await createAdminClient();
+  const teamAccess = await canUserManageTeam(adminClient, context, teamId);
+  if (!teamAccess.allowed) {
+    throw new Error(teamAccess.reason || "No tienes permisos para crear partidos en este equipo");
   }
+
+  const profile = context.profile;
+  const userRoles = getUserAllRoles(context);
 
   let finalSeasonId = data.season_id;
 
   // Fase 1 Caja Fuerte & Llave Maestra: Validación estricta del season_id
   if (finalSeasonId) {
-    const { data: targetSeason } = await supabase.from('seasons').select('is_active, name').eq('id', finalSeasonId).single();
-    const isOverride = targetSeason && targetSeason.name.includes('🔓') && profile.role === 'admin';
+    const { data: targetSeason } = await adminClient.from('seasons').select('is_active, name').eq('id', finalSeasonId).single();
+    const isOverride = targetSeason && targetSeason.name.includes('🔓') && (userRoles.includes('admin') || userRoles.includes('superadmin'));
     if (!targetSeason || (!targetSeason.is_active && !isOverride)) {
       throw new Error("No se pueden crear datos en una temporada cerrada.");
     }
   } else {
     // Si no lo pasan, buscar la temporada activa
-    const { data: activeSeason } = await supabase.from('seasons').select('id').eq('club_id', profile.club_id).eq('is_active', true).single();
+    const { data: activeSeason } = await adminClient.from('seasons').select('id').eq('club_id', profile.club_id).eq('is_active', true).single();
     if (!activeSeason) throw new Error("No hay una temporada activa para guardar el partido");
     finalSeasonId = activeSeason.id;
   }
@@ -892,7 +975,7 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
     }
   }
   
-  const { data: newMatch, error } = await supabase
+  const { data: newMatch, error } = await adminClient
     .from("partidos")
     .insert({
       club_id: profile.club_id,
@@ -916,7 +999,9 @@ export async function createPartidoAction(teamId: string, data: { fecha_hora: st
   }
 
   revalidatePath(`/dashboard/matches`)
+  revalidatePath(`/dashboard/events`)
   revalidatePath(`/dashboard/equipos/${teamId}/partidos`)
+  revalidatePath(`/dashboard/equipos/${teamId}/calendario`)
   return { success: true, match: newMatch }
 }
 
@@ -964,7 +1049,12 @@ export async function updatePlayerNickname(playerId: string, nickname: string) {
 }
 
 
-export async function saveLineup(matchId: string, assignedPlayers: {playerId: string, x: number, y: number}[], tactic: string) {
+export async function saveLineup(
+  matchId: string, 
+  assignedPlayers: {playerId: string, x: number, y: number}[], 
+  tactic: string,
+  extraConvocadosPlayerIds?: string[]
+) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {
     return { success: false, error: authError || "No autenticado" };
@@ -986,7 +1076,7 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
     for (const player of assignedPlayers) {
       const { data: existing } = await adminSupabase
         .from('convocatorias')
-        .select('id')
+        .select('id, status')
         .eq('partido_id', matchId)
         .eq('player_id', player.playerId)
         .single();
@@ -994,7 +1084,12 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
       if (existing) {
         await adminSupabase
           .from('convocatorias')
-          .update({ titular: true, tactical_x: player.x, tactical_y: player.y })
+          .update({ 
+            titular: true, 
+            tactical_x: player.x, 
+            tactical_y: player.y,
+            status: existing.status === 'no_convocado' ? 'convocado' : (existing.status || 'convocado')
+          })
           .eq('id', existing.id);
       } else {
         await adminSupabase
@@ -1011,8 +1106,131 @@ export async function saveLineup(matchId: string, assignedPlayers: {playerId: st
     }
   }
 
+  // Guardar jugadores adicionales de la convocatoria si se pasaron (ej. banquillo predeterminado)
+  if (extraConvocadosPlayerIds && extraConvocadosPlayerIds.length > 0) {
+    const assignedSet = new Set(assignedPlayers.map(p => p.playerId));
+    for (const pid of extraConvocadosPlayerIds) {
+      if (assignedSet.has(pid)) continue;
+      const { data: existing } = await adminSupabase
+        .from('convocatorias')
+        .select('id')
+        .eq('partido_id', matchId)
+        .eq('player_id', pid)
+        .single();
+
+      if (!existing) {
+        await adminSupabase
+          .from('convocatorias')
+          .insert({
+            partido_id: matchId,
+            player_id: pid,
+            status: 'convocado',
+            titular: false
+          });
+      }
+    }
+  }
+
   revalidatePath(`/dashboard`, 'layout');
   return { success: true };
+}
+
+/**
+ * Obtiene la alineación y convocatoria del partido inmediatamente anterior del mismo equipo
+ * dentro de la temporada activa (excluyendo temporadas cerradas 25/26).
+ */
+export async function getPreviousMatchLineupAction(currentMatchId: string, teamId?: string) {
+  const { context, error: authError } = await getAuthenticatedContext();
+  if (!context || authError) {
+    return { success: false, error: authError || "No autenticado" };
+  }
+  const adminSupabase = await createAdminClient();
+  const access = await canUserAccessMatch(adminSupabase, context, currentMatchId);
+  if (!access.allowed || !access.match) {
+    return { success: false, error: access.reason || "No tienes acceso a este partido" };
+  }
+
+  const currentMatch = access.match;
+  const effectiveTeamId = teamId || currentMatch.equipo_id;
+  if (!effectiveTeamId) {
+    return { success: false, error: "Equipo no especificado" };
+  }
+
+  const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+
+  // Buscar partidos del mismo equipo en la temporada activa, ordenados de más reciente a más antiguo
+  let query = adminSupabase
+    .from('partidos')
+    .select('id, rival_nombre, fecha_hora, jornada, season_id')
+    .eq('equipo_id', effectiveTeamId)
+    .neq('season_id', CLOSED_SEASON_ID)
+    .neq('id', currentMatchId);
+
+  if (currentMatch.fecha_hora) {
+    query = query.lt('fecha_hora', currentMatch.fecha_hora);
+  }
+
+  const { data: pastMatches, error: pastErr } = await query
+    .order('fecha_hora', { ascending: false })
+    .limit(10);
+
+  if (pastErr || !pastMatches || pastMatches.length === 0) {
+    return { success: true, data: null };
+  }
+
+  // Buscar el partido previo más reciente que tenga titulares en convocatorias
+  let previousMatchWithLineup: any = null;
+  let previousConvocatorias: any[] = [];
+
+  for (const pm of pastMatches) {
+    const { data: convs } = await adminSupabase
+      .from('convocatorias')
+      .select('player_id, status, titular, tactical_x, tactical_y')
+      .eq('partido_id', pm.id);
+
+    if (convs && convs.length > 0 && convs.some((c: any) => c.titular)) {
+      previousMatchWithLineup = pm;
+      previousConvocatorias = convs;
+      break;
+    }
+  }
+
+  // Fallback: si ninguno tenía titulares explícitos pero sí convocatorias guardadas
+  if (!previousMatchWithLineup) {
+    for (const pm of pastMatches) {
+      const { data: convs } = await adminSupabase
+        .from('convocatorias')
+        .select('player_id, status, titular, tactical_x, tactical_y')
+        .eq('partido_id', pm.id);
+
+      if (convs && convs.length > 0) {
+        previousMatchWithLineup = pm;
+        previousConvocatorias = convs;
+        break;
+      }
+    }
+  }
+
+  if (!previousMatchWithLineup) {
+    return { success: true, data: null };
+  }
+
+  return {
+    success: true,
+    data: {
+      previousMatch: {
+        id: previousMatchWithLineup.id,
+        rival_nombre: previousMatchWithLineup.rival_nombre,
+        fecha_hora: previousMatchWithLineup.fecha_hora,
+        jornada: previousMatchWithLineup.jornada,
+      },
+      convocatorias: previousConvocatorias,
+      titulares: previousConvocatorias.filter((c: any) => c.titular),
+      convocadosIds: previousConvocatorias
+        .filter((c: any) => c.status === 'convocado' || c.status === 'titular' || c.status === 'suplente' || c.titular)
+        .map((c: any) => c.player_id),
+    }
+  };
 }
 
 
@@ -1020,7 +1238,7 @@ export async function updateMatchAttendanceBatch(
   matchId: string, 
   teamId: string, 
   matchDate: string | null, 
-  records: { playerId: string, status: string }[]
+  records: { playerId: string, status: string, notes?: string }[]
 ) {
   const supabase = await createClient();
   const dateStr = matchDate ? matchDate.split('T')[0] : new Date().toISOString().split('T')[0];
@@ -1065,10 +1283,15 @@ export async function updateMatchAttendanceBatch(
       .limit(1)
       .single();
 
+    const attPayload: any = { status: record.status, event_id: eventId };
+    if (record.notes !== undefined) {
+      attPayload.notes = record.notes || null;
+    }
+
     if (existingAtt) {
       await supabase
         .from('attendance')
-        .update({ status: record.status, event_id: eventId })
+        .update(attPayload)
         .eq('id', existingAtt.id);
     } else {
       await supabase
@@ -1078,7 +1301,7 @@ export async function updateMatchAttendanceBatch(
           player_id: record.playerId,
           event_id: eventId,
           date: dateStr,
-          status: record.status
+          ...attPayload
         });
     }
   }
@@ -1127,13 +1350,19 @@ export async function updateMatchFullReportBatch(
     yellows: number;
     reds: number;
     minutes: number;
+    motive?: string;
+    notes?: string;
   }[]
 ) {
   try {
     const supabase = await createClient();
 
   // 1. Update attendance in team_events / attendance table
-  const attendanceRecords = reports.map(r => ({ playerId: r.playerId, status: r.status }));
+  const attendanceRecords = reports.map(r => ({ 
+    playerId: r.playerId, 
+    status: r.status,
+    notes: r.motive || r.notes || ''
+  }));
   await updateMatchAttendanceBatch(matchId, teamId, matchDate, attendanceRecords);
 
   // 2. Update convocatorias with all stats, ratings, and attendance

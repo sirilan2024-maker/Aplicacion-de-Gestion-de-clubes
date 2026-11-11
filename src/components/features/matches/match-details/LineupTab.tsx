@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useTransition, useEffect, useRef, useMemo } from "react"
-import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle, RotateCcw, Pencil } from "lucide-react"
+import { Users, Save, X, HelpCircle, Plus, Trash2, AlertCircle, RotateCcw, Pencil, Sparkles } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
-import { saveLineup, updatePlayerNickname } from "@/app/actions/match-actions"
+import { saveLineup, updatePlayerNickname, getPreviousMatchLineupAction } from "@/app/actions/match-actions"
 
 interface Player {
   id: string
@@ -149,11 +149,13 @@ function getFirstSurname(rawLastName: string): string {
 
 export function LineupTab({ 
   matchId, 
+  match,
   players = [], 
   convocatorias = [],
   onLineupSaved
 }: { 
   matchId?: string
+  match?: any
   players?: any[]
   convocatorias?: any[]
   onLineupSaved?: (updatedConvocatorias: any[]) => void
@@ -259,7 +261,7 @@ export function LineupTab({
 
   const initialPitchPlayers: Record<string, PitchPlayerPosition> = {};
   
-  // Titulares
+  // Titulares existentes en este partido
   const titularesDb = convocatorias.filter(c => c.titular);
   const defaultSlots = DEFAULT_FORMATIONS["4-3-3"];
 
@@ -295,20 +297,6 @@ export function LineupTab({
         slotLabel: matchedSlot?.label
       };
     });
-  } else {
-    // Si no hay datos, cargar la táctica inicial
-    let i = 0;
-    for (const p of initialPlayersList) {
-      if (i < 11 && defaultSlots[i]) {
-        initialPitchPlayers[p.id] = { 
-          x: defaultSlots[i].x, 
-          y: defaultSlots[i].y,
-          slotId: defaultSlots[i].id,
-          slotLabel: defaultSlots[i].label
-        };
-        i++;
-      }
-    }
   }
 
   const [tactic, setTactic] = useState<string>("4-3-3")
@@ -323,6 +311,90 @@ export function LineupTab({
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [showClearPitchModal, setShowClearPitchModal] = useState(false);
   const [editingNicknamePlayer, setEditingNicknamePlayer] = useState<Player | null>(null);
+
+  // Estados para precarga inteligente de alineación y convocatoria del partido anterior
+  const [preloadedPreviousMatch, setPreloadedPreviousMatch] = useState<{ id: string; rival_nombre: string; fecha_hora?: string } | null>(null);
+  const [preloadedConvocadosIds, setPreloadedConvocadosIds] = useState<string[] | null>(null);
+  const [isLoadingPrevious, setIsLoadingPrevious] = useState(false);
+
+  useEffect(() => {
+    // Si ya existen titulares guardados para este partido, no precargar del anterior
+    if (!matchId || titularesDb.length > 0) return;
+
+    let isMounted = true;
+    setIsLoadingPrevious(true);
+
+    getPreviousMatchLineupAction(matchId, match?.equipo_id)
+      .then(res => {
+        if (!isMounted) return;
+        if (res.success && res.data) {
+          const prev = res.data;
+          setPreloadedPreviousMatch(prev.previousMatch);
+          setPreloadedConvocadosIds(prev.convocadosIds);
+
+          // Filtrar titulares del partido previo:
+          // Excluir del campo a cualquier jugador marcado en este partido como no convocado, lesionado o duda
+          const validTitulares = prev.titulares.filter((t: any) => {
+            if (convocatorias && convocatorias.length > 0) {
+              const currentConv = convocatorias.find(c => c.player_id === t.player_id);
+              if (currentConv) {
+                if (currentConv.status === 'no_convocado' || currentConv.status === 'lesionado' || currentConv.status === 'duda') {
+                  return false;
+                }
+              }
+            }
+            return true;
+          });
+
+          if (validTitulares.length > 0) {
+            const defaultSlots = DEFAULT_FORMATIONS["4-3-3"];
+            const assignedSlots = new Set<string>();
+            const loadedPositions: Record<string, PitchPlayerPosition> = {};
+
+            validTitulares.forEach((c: any, idx: number) => {
+              let matchedSlot: { id: string; label: string; x: number; y: number } | null = null;
+              if (c.tactical_x != null && c.tactical_y != null) {
+                let minDist = Infinity;
+                for (const s of defaultSlots) {
+                  if (assignedSlots.has(s.id)) continue;
+                  const dist = Math.hypot(c.tactical_x - s.x, c.tactical_y - s.y);
+                  if (dist < minDist) {
+                    minDist = dist;
+                    matchedSlot = s;
+                  }
+                }
+              }
+
+              if (!matchedSlot) {
+                matchedSlot = defaultSlots.find(s => !assignedSlots.has(s.id)) || defaultSlots[idx] || null;
+              }
+
+              if (matchedSlot) {
+                assignedSlots.add(matchedSlot.id);
+              }
+
+              loadedPositions[c.player_id] = {
+                x: c.tactical_x != null ? c.tactical_x : (matchedSlot ? matchedSlot.x : 50),
+                y: c.tactical_y != null ? c.tactical_y : (matchedSlot ? matchedSlot.y : 50),
+                slotId: matchedSlot?.id,
+                slotLabel: matchedSlot?.label
+              };
+            });
+
+            setPitchPlayers(loadedPositions);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("[LineupTab] Error al cargar alineación previa:", err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingPrevious(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [matchId, match?.equipo_id, titularesDb.length]);
+
   const [newNicknameInput, setNewNicknameInput] = useState("");
   const [isSavingNickname, setIsSavingNickname] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -485,7 +557,38 @@ export function LineupTab({
   const isFamilyView = rol === "familia" || rol === "jugador"
   
   const assignedPlayerIds = Object.keys(pitchPlayers);
-  const availablePlayers = initialPlayersList.filter(p => !assignedPlayerIds.includes(p.id));
+  
+  // Lista de suplentes y jugadores disponibles para la alineación:
+  // Filtra estrictamente excluyendo a cualquier jugador marcado como "No convocado", "Lesionado" o "Duda".
+  const availablePlayers = useMemo(() => {
+    return initialPlayersList.filter(player => {
+      // 1. Si ya está colocado en el campo como titular, no sale en la lista de disponibles/suplentes
+      if (assignedPlayerIds.includes(player.id)) return false;
+
+      // 2. Si el partido actual tiene convocatoria registrada en la base de datos
+      if (convocatorias && convocatorias.length > 0) {
+        const conv = convocatorias.find(c => c.player_id === player.id);
+        if (!conv) {
+          // No está registrado en la convocatoria de este partido
+          return false;
+        }
+        // Excluir explícitamente No convocado, Lesionado y Duda
+        if (conv.status === 'no_convocado' || conv.status === 'lesionado' || conv.status === 'duda') {
+          return false;
+        }
+        // Solo permitir si el estado es convocado, titular o suplente
+        return conv.status === 'convocado' || conv.status === 'titular' || conv.status === 'suplente';
+      }
+
+      // 3. Si no hay convocatoria previa para este partido pero se precargó del partido anterior
+      if (preloadedConvocadosIds && preloadedConvocadosIds.length > 0) {
+        return preloadedConvocadosIds.includes(player.id);
+      }
+
+      // 4. Si es el primer partido de la temporada (sin partido previo ni convocatoria)
+      return true;
+    });
+  }, [initialPlayersList, assignedPlayerIds, convocatorias, preloadedConvocadosIds]);
 
   // Función para mostrar alerta si se sobrepasa el límite de 11 jugadores
   const showLimitError = () => {
@@ -621,7 +724,13 @@ export function LineupTab({
         x: pitchPlayers[playerId].x,
         y: pitchPlayers[playerId].y
       }));
-      await saveLineup(matchId, assigned, tactic)
+
+      // Extraer lista de convocados (titulares en el campo + suplentes en la lista disponible)
+      const allConvocadosSet = new Set<string>();
+      assigned.forEach(a => allConvocadosSet.add(a.playerId));
+      availablePlayers.forEach(p => allConvocadosSet.add(p.id));
+
+      await saveLineup(matchId, assigned, tactic, Array.from(allConvocadosSet))
 
       if (onLineupSaved) {
         // Generar lista actualizada de convocatorias con los titulares y sus coordenadas
@@ -649,9 +758,25 @@ export function LineupTab({
             });
           }
         }
+
+        // Asegurar que jugadores disponibles en banquillo también queden como convocados
+        for (const player of availablePlayers) {
+          if (!updated.some(c => c.player_id === player.id)) {
+            updated.push({
+              partido_id: matchId,
+              player_id: player.id,
+              titular: false,
+              tactical_x: null,
+              tactical_y: null,
+              status: 'convocado'
+            });
+          }
+        }
+
         onLineupSaved(updated);
       }
 
+      setPreloadedPreviousMatch(null);
       setSavedAlert(true)
       setTimeout(() => setSavedAlert(false), 3000)
     })
@@ -836,6 +961,28 @@ export function LineupTab({
             </div>
           )}
         </div>
+
+        {/* Banner Informativo de Alineación Precargada del Partido Anterior */}
+        {preloadedPreviousMatch && !isFamilyView && (
+          <div className="bg-gradient-to-r from-indigo-50/90 to-blue-50/90 border border-indigo-200/90 text-indigo-950 px-4 py-2.5 rounded-xl flex items-center justify-between gap-3 text-xs font-semibold animate-in fade-in duration-200 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>
+                Alineación base del partido anterior {preloadedPreviousMatch.rival_nombre ? <strong>(vs {preloadedPreviousMatch.rival_nombre})</strong> : null}. Solo tienes que ajustar los cambios y guardar.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPitchPlayers({});
+                setPreloadedPreviousMatch(null);
+              }}
+              className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline shrink-0 cursor-pointer"
+            >
+              Limpiar campo
+            </button>
+          </div>
+        )}
 
         {savedAlert && (
           <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-3 rounded-xl animate-in fade-in duration-200">
@@ -1258,7 +1405,7 @@ export function LineupTab({
               )}
 
               {availablePlayers.length > 0 ? (
-                <div className="space-y-2 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 max-h-[360px] overflow-y-auto">
+                <div className="space-y-2 p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80">
                   {availablePlayers.map(player => (
                     <div
                       key={player.id}

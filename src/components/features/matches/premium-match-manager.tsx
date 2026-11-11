@@ -103,33 +103,41 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
           {activeTab === "resumen" && <SummaryTab matchId={matchId} match={match} players={activePlayers} convocatorias={currentConvocatorias} />}
 
           {/* TAB: ALINEACIÓN (Modo Edición Interactiva) */}
-          {activeTab === "alineacion" && <LineupTab matchId={matchId} players={activePlayers} convocatorias={currentConvocatorias} onLineupSaved={handleLineupSaved} />}
+          {activeTab === "alineacion" && (
+            <LineupTab 
+              matchId={matchId} 
+              match={match}
+              players={activePlayers} 
+              convocatorias={currentConvocatorias} 
+              onLineupSaved={handleLineupSaved} 
+            />
+          )}
 
           {/* TAB: ESTADÍSTICAS */}
           {activeTab === "estadisticas" && <StatsTab players={activePlayers} convocatorias={currentConvocatorias} matchEvents={matchEvents} />}
 
           {/* TAB: EN DIRECTO */}
           {activeTab === "live" && (
-            <LiveTab matchId={matchId} match={match} players={activePlayers} convocatorias={convocatorias} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
+            <LiveTab matchId={matchId} match={match} players={activePlayers} convocatorias={currentConvocatorias} matchEvents={matchEvents} onEventChange={handleLiveEventChange} />
           )}
 
           {/* TAB: ACTA OFICIAL */}
           {activeTab === "acta" && (
-            <MatchActaTab matchId={matchId} match={match} players={activePlayers} convocatorias={convocatorias} />
+            <MatchActaTab matchId={matchId} match={match} players={activePlayers} convocatorias={currentConvocatorias} />
           )}
 
 
           {/* TAB: CONVOCATORIA */}
           {activeTab === "convocatoria" && (
             <div className="space-y-4">
-              <ConvocatoriaList players={activePlayers} matchId={matchId} convocatorias={convocatorias} match={match} />
+              <ConvocatoriaList players={activePlayers} matchId={matchId} convocatorias={currentConvocatorias} match={match} />
             </div>
           )}
 
           {/* TAB: POST-PARTIDO */}
           {activeTab === "post-partido" && (
             <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm font-medium">Cargando informe...</div>}>
-              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={convocatorias} allMatches={allMatches} />
+              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={currentConvocatorias} allMatches={allMatches} />
             </Suspense>
           )}
 

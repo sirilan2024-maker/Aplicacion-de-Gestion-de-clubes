@@ -1,8 +1,104 @@
 // "use client"
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
-import { Trash2, Clock, X, Target, AlertTriangle, Bandage, Plus, Edit2, Mic, MicOff } from "lucide-react";
+import { 
+  Trash2, Clock, X, Target, AlertTriangle, Bandage, Plus, Edit2, Mic, MicOff, 
+  Check, ArrowRight, UserMinus, UserPlus, Users, MessageSquare, Zap, Shield, 
+  Flame, Activity, ChevronDown, ChevronUp, Sparkles, Scale
+} from "lucide-react";
+import { PlayerAvatar, getPositionTheme } from "./PlayerAvatar";
+
+const CLOSED_SEASON_ID = "584f508a-fc1a-4339-b5b2-4296ffde2f4c";
+
+function getFirstName(player: any): string {
+  if (!player) return "Jugador";
+  if (player.nickname && player.nickname.trim().length > 0) return player.nickname.trim();
+  if (player.first_name && player.first_name.trim().length > 0) return player.first_name.trim().split(" ")[0];
+  if (player.last_name && player.last_name.trim().length > 0) return player.last_name.trim().split(" ")[0];
+  if (player.name && player.name.trim().length > 0) return player.name.trim().split(" ")[0];
+  return "Jugador";
+}
+
+function getDorsal(player: any, convs: any[] = []): string | number {
+  if (!player) return "-";
+  const conv = convs.find((c: any) => c.player_id === player?.id);
+  return conv?.dorsal ?? player?.dorsal ?? "-";
+}
+
+interface PlayerSelectCardProps {
+  player: any;
+  dorsal: string | number;
+  isStarter?: boolean;
+  selected: boolean;
+  onClick: () => void;
+  badgeText?: string;
+  badgeVariant?: "emerald" | "rose" | "blue" | "default";
+}
+
+function PlayerSelectCard({
+  player,
+  dorsal,
+  isStarter,
+  selected,
+  onClick,
+  badgeText,
+  badgeVariant = "default"
+}: PlayerSelectCardProps) {
+  const firstName = getFirstName(player);
+  const posTheme = getPositionTheme(player.posicion || player.posicion_principal);
+
+  const variantStyles = {
+    emerald: selected
+      ? "bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/30 text-emerald-950 shadow-sm"
+      : "bg-white hover:bg-emerald-50/40 border-slate-200 text-slate-800",
+    rose: selected
+      ? "bg-rose-50/90 border-rose-500 ring-2 ring-rose-500/30 text-rose-950 shadow-sm"
+      : "bg-white hover:bg-rose-50/40 border-slate-200 text-slate-800",
+    blue: selected
+      ? "bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/30 text-blue-950 shadow-sm"
+      : "bg-white hover:bg-blue-50/40 border-slate-200 text-slate-800",
+    default: selected
+      ? "bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/30 text-blue-950 shadow-sm"
+      : "bg-white hover:bg-slate-50 border-slate-200 text-slate-800"
+  }[badgeVariant];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative flex items-center gap-2.5 p-2 rounded-xl border transition-all text-left group ${variantStyles}`}
+    >
+      <PlayerAvatar player={player} dorsal={dorsal} size="sm" />
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-black tracking-tight truncate">
+            #{dorsal} {firstName}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 truncate">
+          <span className={`px-1 rounded text-[9px] font-bold ${posTheme.badgeBg}`}>
+            {posTheme.code}
+          </span>
+          {isStarter && (
+            <span className="text-slate-400 font-medium text-[9px]">
+              • Titular
+            </span>
+          )}
+        </div>
+      </div>
+      {badgeText && selected && (
+        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs shrink-0 ${
+          badgeVariant === "rose" ? "bg-rose-600 text-white" :
+          badgeVariant === "emerald" ? "bg-emerald-600 text-white" :
+          "bg-blue-600 text-white"
+        }`}>
+          {badgeText}
+        </span>
+      )}
+    </button>
+  );
+}
 import { createClient } from "@/lib/supabase/client";
 import { toggleMatchTimer, addLiveEvent, deleteLiveEvent, updateMatchState } from "@/app/actions/live-match-actions";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -183,18 +279,172 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
     }
   };
 
+  const [showAllPlayersInModal, setShowAllPlayersInModal] = useState(false);
+
+  // Roster de jugadores disponibles para el partido (excluyendo temporada cerrada)
+  const matchRoster = useMemo(() => {
+    const eligible = (players || []).filter((p: any) => {
+      if (p.team?.season_id === CLOSED_SEASON_ID) return false;
+      const st = (p.status || "").toLowerCase().trim();
+      if (st.includes("inactiv") || st.includes("baja")) return false;
+      const pos = (p.posicion || p.posicion_principal || "").toLowerCase();
+      if (pos.includes("entrenador") || pos.includes("delegado") || pos.includes("tecnico") || pos.includes("staff")) return false;
+      return true;
+    });
+
+    const convMap = new Map<string, any>();
+    (convocatorias || []).forEach((c: any) => {
+      const hasStarterFlag =
+        c?.titular === true ||
+        c?.titular === 1 ||
+        String(c?.titular) === "1" ||
+        c?.status === "titular" ||
+        (c?.tactical_x != null && c?.tactical_y != null);
+      if (c.player_id && (c.status !== "no_convocado" || hasStarterFlag)) {
+        convMap.set(c.player_id, c);
+      }
+    });
+
+    const eventPlayerIds = new Set<string>();
+    (events || []).forEach((ev: any) => {
+      if (ev.player_id) eventPlayerIds.add(ev.player_id);
+      const matchIn = ev.notas?.match(/\[in:([a-zA-Z0-9_-]+)\]/);
+      if (matchIn?.[1]) eventPlayerIds.add(matchIn[1]);
+      const matchOut = ev.notas?.match(/\[out:([a-zA-Z0-9_-]+)\]/);
+      if (matchOut?.[1]) eventPlayerIds.add(matchOut[1]);
+    });
+
+    const roster = convMap.size > 0
+      ? eligible.filter((p: any) => convMap.has(p.id) || eventPlayerIds.has(p.id))
+      : eligible.filter((p: any) => p.team_id === match?.equipo_id || p.team?.id === match?.equipo_id || !p.team_id || eventPlayerIds.has(p.id));
+
+    const seen = new Set<string>();
+    return roster.filter((p: any) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }, [players, convocatorias, match, events]);
+
+  // Cálculo en vivo de jugadores dentro del campo y en el banquillo adaptado a cambios y rojas
+  const { playersOnPitch, playersOnBench, initialTitularIds } = useMemo(() => {
+    const convMap = new Map<string, any>();
+    (convocatorias || []).forEach((c: any) => {
+      if (c.player_id) convMap.set(c.player_id, c);
+    });
+
+    const initTitulars = new Set<string>();
+    matchRoster.forEach((p: any) => {
+      const c = convMap.get(p.id);
+      const isTit =
+        c?.titular === true ||
+        c?.titular === 1 ||
+        String(c?.titular) === "1" ||
+        c?.status === "titular" ||
+        (c?.tactical_x != null && c?.tactical_y != null);
+      if (isTit) initTitulars.add(p.id);
+    });
+
+    // Si no se han marcado titulares en la convocatoria, asignamos los primeros 11 (u 8 para F8)
+    if (initTitulars.size === 0 && matchRoster.length > 0) {
+      const category = (match?.equipo?.category || match?.equipo?.name || "").toLowerCase();
+      const isF8 =
+        category.includes("alev") ||
+        category.includes("benjam") ||
+        category.includes("prebenjam") ||
+        category.includes("f8");
+      const count = isF8 ? 8 : 11;
+      matchRoster.slice(0, count).forEach((p: any) => initTitulars.add(p.id));
+    }
+
+    const pitchSet = new Set<string>(initTitulars);
+    const benchSet = new Set<string>();
+    const expelledSet = new Set<string>();
+
+    matchRoster.forEach((p: any) => {
+      if (!pitchSet.has(p.id)) {
+        benchSet.add(p.id);
+      }
+    });
+
+    // Replay cronológico de sustituciones y tarjetas rojas
+    const sorted = [...events].sort((a, b) => {
+      if (a.minuto !== b.minuto) return a.minuto - b.minuto;
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeA - timeB;
+    });
+
+    for (const ev of sorted) {
+      if (ev.tipo_evento === "Cambio") {
+        const matchIn = ev.notas?.match(/\[in:([a-zA-Z0-9_-]+)\]/);
+        const playerInId = ev.player_id || (matchIn ? matchIn[1] : null);
+        let playerOutId: string | null = null;
+
+        if (ev.notas) {
+          const matchOut = ev.notas.match(/\[out:([a-zA-Z0-9_-]+)\]/);
+          if (matchOut && matchOut[1]) {
+            playerOutId = matchOut[1];
+          } else {
+            const matchName = ev.notas.match(/por\s+(?:#\d+\s+)?([A-Za-zÀ-ÿ0-9\s]+?)(?:\s*\(|\s*\[|$)/i);
+            if (matchName && matchName[1]) {
+              const nameSearch = matchName[1].trim().toLowerCase();
+              const found = matchRoster.find((p: any) =>
+                p.first_name?.toLowerCase() === nameSearch ||
+                getFirstName(p).toLowerCase() === nameSearch ||
+                `${p.first_name} ${p.last_name}`.toLowerCase().includes(nameSearch)
+              );
+              if (found) playerOutId = found.id;
+            }
+          }
+        }
+
+        if (playerOutId && playerInId && playerOutId !== playerInId) {
+          pitchSet.delete(playerOutId);
+          if (!expelledSet.has(playerOutId)) {
+            benchSet.add(playerOutId);
+          }
+        }
+        if (playerInId) {
+          benchSet.delete(playerInId);
+          if (!expelledSet.has(playerInId)) {
+            pitchSet.add(playerInId);
+          }
+        }
+      } else if (ev.tipo_evento === "Tarjeta Roja" || ev.tipo_evento === "Roja" || ev.tipo_evento === "Doble Amarilla") {
+        if (ev.player_id) {
+          expelledSet.add(ev.player_id);
+          pitchSet.delete(ev.player_id);
+          benchSet.delete(ev.player_id);
+        }
+      }
+    }
+
+    return {
+      playersOnPitch: matchRoster.filter((p: any) => pitchSet.has(p.id)),
+      playersOnBench: matchRoster.filter((p: any) => benchSet.has(p.id)),
+      initialTitularIds: initTitulars,
+      expelledPlayerIds: expelledSet
+    };
+  }, [matchRoster, convocatorias, events, match]);
+
   // Ref para autoscroll
   const formRef = useRef<HTMLDivElement | HTMLFormElement>(null);
 
   const handleSelectAction = (tipo: string) => {
     setActiveForm(tipo);
     setMinuto(Math.floor(seconds / 60));
+    setPlayerId("");
+    setPlayerOutId("");
+    setNotes("");
+    setIsRival(false);
+    setShowAllPlayersInModal(false);
     if (tipo === "Ocasión Peligrosa") {
       setSubTipoOcasion("Tiro al palo");
     }
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+
+
+
   };
 
   // Realtime subscription for events and timer
@@ -349,6 +599,16 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
     e.preventDefault();
     if (!activeForm || isSubmitting) return;
 
+    if (activeForm === "Cambio" && (!playerId || !playerOutId)) {
+      toast.error("Debes seleccionar el jugador que sale y el que entra");
+      return;
+    }
+
+    if (!isRival && (activeForm === "Tarjeta Amarilla" || activeForm === "Tarjeta Roja") && !playerId) {
+      toast.error("Debes seleccionar el jugador que recibe la tarjeta");
+      return;
+    }
+
     setIsSubmitting(true);
     let desc = "";
     
@@ -360,8 +620,9 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
         desc = `${activeForm} del equipo rival ${notes ? `(${notes})` : ""}`;
       }
     } else {
-      const player = players.find((p: any) => p.id === playerId);
-      const playerName = player ? `${player.first_name}`.trim() : "Jugador";
+      const player = matchRoster.find((p: any) => p.id === playerId);
+      const playerName = player ? getFirstName(player) : "Jugador";
+      const dorsal = player ? getDorsal(player, convocatorias) : "-";
 
       if (activeForm === "Ocasión Peligrosa") {
         const ocasionLabel = subTipoOcasion || "Ocasión Peligrosa";
@@ -369,13 +630,16 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
           ? `Ocasión: ${ocasionLabel} de ${playerName} ${notes ? `(${notes})` : ""}`
           : `Ocasión peligrosa: ${ocasionLabel} ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Gol") {
-        desc = `Gol de ${playerName} ${notes ? `(${notes})` : ""}`;
+        desc = `Gol de #${dorsal} ${playerName} ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Amarilla" || activeForm === "Tarjeta Amarilla") {
-        desc = `Tarjeta Amarilla para ${playerName} ${notes ? `(${notes})` : ""}`;
+        desc = `Tarjeta Amarilla para #${dorsal} ${playerName} ${notes ? `(${notes})` : ""}`;
+      } else if (activeForm === "Roja" || activeForm === "Tarjeta Roja") {
+        desc = `Tarjeta Roja para #${dorsal} ${playerName} ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Cambio") {
-        const playerOut = players.find((p: any) => p.id === playerOutId);
-        const playerOutName = playerOut ? `${playerOut.first_name}`.trim() : "Jugador";
-        desc = `Cambio: Entra ${playerName} por ${playerOutName} ${notes ? `(${notes})` : ""}`;
+        const playerOut = matchRoster.find((p: any) => p.id === playerOutId);
+        const playerOutName = playerOut ? getFirstName(playerOut) : "Jugador";
+        const outDorsal = playerOut ? getDorsal(playerOut, convocatorias) : "-";
+        desc = `Cambio: Entra #${dorsal} ${playerName} por #${outDorsal} ${playerOutName} [out:${playerOutId}] [in:${playerId}] ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Tiro al larguero") {
         desc = `Tiro al larguero de ${playerName} ${notes ? `(${notes})` : ""}`;
       } else if (activeForm === "Tiro al palo") {
@@ -552,6 +816,565 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
         )}
       </div>
 
+      {/* ---------- Sensaciones Rápidas del Entrenador (Barra Superior Accesible) ---------- */}
+      {!isFamilyView && partidoEstado !== "Finalizado" && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3 mt-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                Sensaciones Rápidas del Entrenador (1 toque)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditingPhrases(!isEditingPhrases)}
+              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 transition-colors"
+            >
+              <Edit2 className="w-3 h-3" />
+              <span>{isEditingPhrases ? "Listo" : "Gestionar Frases"}</span>
+            </button>
+          </div>
+
+          {isEditingPhrases && (
+            <div className="bg-indigo-50/60 border border-indigo-100 p-3 rounded-xl space-y-2 animate-in fade-in duration-200">
+              <p className="text-[10px] font-bold text-indigo-900">
+                Añade o borra las frases rápidas fijadas en la barra superior:
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Ej. El equipo necesita más intensidad en las bandas ⚡..."
+                  value={newPhraseInput}
+                  onChange={(e) => setNewPhraseInput(e.target.value)}
+                  className="flex-1 text-xs font-medium bg-white border border-indigo-200 rounded-xl px-3 py-1.5 outline-none focus:ring-1 focus:ring-indigo-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (!newPhraseInput.trim()) return;
+                      savePhrases([...customPhrases, newPhraseInput.trim()]);
+                      setNewPhraseInput("");
+                      toast.success("Frase fijada guardada");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newPhraseInput.trim()) return;
+                    savePhrases([...customPhrases, newPhraseInput.trim()]);
+                    setNewPhraseInput("");
+                    toast.success("Frase fijada guardada");
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Fijar</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Botones de 1 toque altamente accesibles */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {(() => {
+              const rawTeamName = match?.equipo?.name || 'El equipo';
+              return customPhrases.map((phraseTemplate, idx) => {
+                const fullPhrase = phraseTemplate.replace(/{TEAM}/g, rawTeamName);
+                return (
+                  <div key={idx} className="relative group">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const currentMin = Math.floor(seconds / 60);
+                        const { success, error } = await addLiveEvent(matchId, {
+                          player_id: null,
+                          tipo: "Comentario del Entrenador",
+                          minuto: currentMin,
+                          descripcion: fullPhrase
+                        });
+                        if (success) {
+                          toast.success(`Publicado: ${fullPhrase}`);
+                        } else {
+                          toast.error("Error al publicar: " + (error || ""));
+                        }
+                      }}
+                      className="w-full h-full p-2.5 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300 border border-slate-200 rounded-xl text-center transition-all shadow-2xs hover:shadow-xs active:scale-95 flex items-center justify-center min-h-[44px]"
+                    >
+                      <span className="line-clamp-2 leading-tight">{fullPhrase}</span>
+                    </button>
+                    {isEditingPhrases && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filtered = customPhrases.filter((_, i) => i !== idx);
+                          savePhrases(filtered);
+                          toast.success("Frase eliminada");
+                        }}
+                        className="absolute -top-1.5 -right-1.5 p-1 bg-rose-600 text-white rounded-full shadow hover:bg-rose-700 transition-colors z-10"
+                        title="Eliminar frase"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
+          {/* Dictado por voz o comentario libre inmediato */}
+          <div className="pt-2 border-t border-slate-100 flex gap-2 items-center">
+            <div className="relative flex-1 flex items-center">
+              <input
+                type="text"
+                id="coach-custom-comment-input"
+                placeholder="Escribe o dicta una sensación personalizada..."
+                className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-9 py-2 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const val = e.currentTarget.value.trim();
+                    if (!val) return;
+                    const inputEl = e.currentTarget;
+                    const currentMin = Math.floor(seconds / 60);
+                    const { success, error } = await addLiveEvent(matchId, {
+                      player_id: null,
+                      tipo: "Comentario del Entrenador",
+                      minuto: currentMin,
+                      descripcion: `💬 ${val}`
+                    });
+                    if (success) {
+                      toast.success("Comentario publicado");
+                      inputEl.value = "";
+                    } else {
+                      toast.error("Error al publicar comentario: " + (error || "Error desconocido"));
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={isLiveRecording ? stopLiveVoiceDictation : startLiveVoiceDictation}
+                className={`absolute right-2 p-1.5 rounded-lg transition-colors ${
+                  isLiveRecording 
+                    ? "text-red-500 bg-red-100 animate-pulse" 
+                    : "text-slate-400 hover:text-indigo-600 hover:bg-slate-100"
+                }`}
+                title={isLiveRecording ? "Detener dictado por voz" : "Dictar sensación por voz"}
+              >
+                {isLiveRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const inputEl = document.getElementById('coach-custom-comment-input') as HTMLInputElement;
+                if (!inputEl || !inputEl.value.trim()) return;
+                const val = inputEl.value.trim();
+                const currentMin = Math.floor(seconds / 60);
+                const { success, error } = await addLiveEvent(matchId, {
+                  player_id: null,
+                  tipo: "Comentario del Entrenador",
+                  minuto: currentMin,
+                  descripcion: `💬 ${val}`
+                });
+                if (success) {
+                  toast.success("Comentario publicado");
+                  inputEl.value = "";
+                } else {
+                  toast.error("Error: " + (error || ""));
+                }
+              }}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0"
+            >
+              Publicar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Modal de Registro de Evento en Vivo ---------- */}
+      {activeForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className={`px-5 py-3.5 border-b flex items-center justify-between text-white ${
+              activeForm === "Gol" ? "bg-emerald-600 border-emerald-700" :
+              activeForm === "Cambio" ? "bg-blue-600 border-blue-700" :
+              activeForm === "Tarjeta Amarilla" || activeForm === "Amarilla" ? "bg-amber-600 border-amber-700" :
+              activeForm === "Tarjeta Roja" || activeForm === "Roja" ? "bg-rose-600 border-rose-700" :
+              "bg-slate-800 border-slate-900"
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">
+                  {activeForm === "Gol" ? "⚽" :
+                   activeForm === "Cambio" ? "🔄" :
+                   activeForm === "Tarjeta Amarilla" ? "🟨" :
+                   activeForm === "Tarjeta Roja" ? "🟥" :
+                   activeForm === "Ocasión Peligrosa" ? "⚠️" :
+                   activeForm === "Parada" ? "🧤" :
+                   activeForm === "Tiro al larguero" || activeForm === "Tiro al palo" ? "🥅" :
+                   activeForm === "Penalti" ? "🎯" :
+                   activeForm === "Lesión" ? "🚑" :
+                   activeForm === "Falta" ? "🛑" :
+                   activeForm === "Fuera de juego" ? "🚩" :
+                   activeForm === "Gol en propia puerta" ? "🤦‍♂️" : "📌"}
+                </span>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-wide">
+                    {activeForm === "Cambio" ? "Realizar Sustitución" :
+                     activeForm === "Gol" ? "Registrar Gol" :
+                     activeForm === "Tarjeta Amarilla" ? "Tarjeta Amarilla" :
+                     activeForm === "Tarjeta Roja" ? "Tarjeta Roja" :
+                     `Registrar ${activeForm}`}
+                  </h3>
+                  <p className="text-[11px] text-white/80 font-medium">
+                    {activeForm === "Cambio"
+                      ? "Selecciona el jugador que sale y el que entra al campo"
+                      : "Asigna el evento al jugador correspondiente"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Selector de Minuto y Cerrar */}
+              <div className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-xl border border-white/20">
+                <button
+                  type="button"
+                  onClick={() => setMinuto(prev => Math.max(0, prev - 1))}
+                  className="w-6 h-6 rounded-lg bg-white/20 hover:bg-white/30 text-white font-black flex items-center justify-center text-xs transition-colors"
+                  title="Minuto anterior"
+                >
+                  -
+                </button>
+                <div className="flex items-center gap-1 px-1">
+                  <Clock className="w-3.5 h-3.5 text-white/80" />
+                  <span className="text-sm font-black tabular-nums">{minuto}'</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMinuto(prev => prev + 1)}
+                  className="w-6 h-6 rounded-lg bg-white/20 hover:bg-white/30 text-white font-black flex items-center justify-center text-xs transition-colors"
+                  title="Minuto siguiente"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveForm(null)}
+                  className="ml-2 w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleAddEvent} className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+              {/* Selector de Equipo (excepto en Cambios que son del club) */}
+              {activeForm !== "Cambio" && (
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => { setIsRival(false); }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      !isRival ? "bg-white shadow-xs text-blue-700" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Nuestro Equipo ({match?.equipo?.name || "Sporting Saladar"})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsRival(true); setPlayerId(""); }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      isRival ? "bg-white shadow-xs text-red-600" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Equipo Rival ({match?.rival_nombre || "Rival"})
+                  </button>
+                </div>
+              )}
+
+              {/* Mensaje de equipo rival */}
+              {isRival && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-center">
+                  <p className="text-xs font-bold text-red-800">
+                    El evento será atribuido al equipo rival ({match?.rival_nombre || "Equipo Rival"}).
+                  </p>
+                </div>
+              )}
+
+              {/* MODO CAMBIO: Entra y Sale adaptado dinámicamente */}
+              {activeForm === "Cambio" && (
+                <div className="space-y-4">
+                  {/* Resumen del cambio preparado */}
+                  {(playerId || playerOutId) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between gap-2 text-xs font-bold text-blue-900">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-blue-600">🔄 Resumen:</span>
+                        {playerOutId ? (
+                          <span className="inline-flex items-center gap-1 text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md">
+                            Sale #{getDorsal(matchRoster.find(p => p.id === playerOutId), convocatorias)} {getFirstName(matchRoster.find(p => p.id === playerOutId))}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">Selecciona quién sale...</span>
+                        )}
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        {playerId ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                            Entra #{getDorsal(matchRoster.find(p => p.id === playerId), convocatorias)} {getFirstName(matchRoster.find(p => p.id === playerId))}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">Selecciona quién entra...</span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-blue-600 font-black shrink-0">Minuto {minuto}'</span>
+                    </div>
+                  )}
+
+                  {/* Sección 1: Quién SALE del campo (En juego) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                        <UserMinus className="w-4 h-4 text-rose-600" />
+                        1. ¿Quién SALE del campo? (En juego actualmente)
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {playersOnPitch.length} en el campo
+                      </span>
+                    </div>
+
+                    {playersOnPitch.length === 0 ? (
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                        No hay jugadores registrados en el terreno de juego.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {playersOnPitch.map((player: any) => {
+                          const dorsal = getDorsal(player, convocatorias);
+                          const isSelected = playerOutId === player.id;
+                          const isStarter = initialTitularIds.has(player.id);
+                          return (
+                            <PlayerSelectCard
+                              key={player.id}
+                              player={player}
+                              dorsal={dorsal}
+                              isStarter={isStarter}
+                              selected={isSelected}
+                              badgeText="Sale 🔻"
+                              badgeVariant="rose"
+                              onClick={() => setPlayerOutId(isSelected ? "" : player.id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sección 2: Quién ENTRA al campo (Banquillo) */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                        <UserPlus className="w-4 h-4 text-emerald-600" />
+                        2. ¿Quién ENTRA al campo? (Banquillo / Suplentes)
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {playersOnBench.length} en banquillo
+                      </span>
+                    </div>
+
+                    {playersOnBench.length === 0 ? (
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                        No hay jugadores disponibles en el banquillo.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {playersOnBench.map((player: any) => {
+                          const dorsal = getDorsal(player, convocatorias);
+                          const isSelected = playerId === player.id;
+                          return (
+                            <PlayerSelectCard
+                              key={player.id}
+                              player={player}
+                              dorsal={dorsal}
+                              selected={isSelected}
+                              badgeText="Entra 🔺"
+                              badgeVariant="emerald"
+                              onClick={() => setPlayerId(isSelected ? "" : player.id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* MODO GENERAL (Gol, Tarjetas, Ocasión, etc.): Jugadores en juego */}
+              {activeForm !== "Cambio" && !isRival && (
+                <div className="space-y-3">
+                  {/* Selector de subtipo de ocasión si aplica */}
+                  {activeForm === "Ocasión Peligrosa" && (
+                    <div>
+                      <label className="block text-[10px] font-black text-amber-800 uppercase tracking-wider mb-1">
+                        Tipo de ocasión producida
+                      </label>
+                      <select
+                        value={subTipoOcasion}
+                        onChange={e => setSubTipoOcasion(e.target.value)}
+                        className="w-full text-xs font-bold text-amber-900 bg-amber-50/60 border border-amber-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-amber-500/20"
+                      >
+                        <option value="Tiro al palo">Tiro al palo</option>
+                        <option value="Tiro al larguero">Tiro al larguero</option>
+                        <option value="Remate de cabeza">Remate de cabeza</option>
+                        <option value="Tiro desde fuera del área">Tiro desde fuera del área</option>
+                        <option value="Mano a mano con el portero">Mano a mano con el portero</option>
+                        <option value="Ocasión clara de gol">Ocasión clara de gol</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Cabecera de selección */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      {activeForm === "Gol" ? "¿Quién ha marcado el gol?" :
+                       activeForm === "Tarjeta Amarilla" ? "¿Quién recibe la tarjeta amarilla?" :
+                       activeForm === "Tarjeta Roja" ? "¿Quién recibe la tarjeta roja?" :
+                       "Jugador implicado"}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {playersOnPitch.length} en el campo
+                    </span>
+                  </div>
+
+                  {/* Grid de jugadores en el campo */}
+                  {playersOnPitch.length === 0 ? (
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                      No hay jugadores registrados en el campo en este momento.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {playersOnPitch.map((player: any) => {
+                        const dorsal = getDorsal(player, convocatorias);
+                        const isSelected = playerId === player.id;
+                        const isStarter = initialTitularIds.has(player.id);
+                        return (
+                          <PlayerSelectCard
+                            key={player.id}
+                            player={player}
+                            dorsal={dorsal}
+                            isStarter={isStarter}
+                            selected={isSelected}
+                            badgeText="Seleccionado ✓"
+                            badgeVariant={
+                              activeForm === "Gol" ? "emerald" :
+                              activeForm === "Tarjeta Amarilla" ? "default" :
+                              activeForm === "Tarjeta Roja" ? "rose" : "blue"
+                            }
+                            onClick={() => setPlayerId(isSelected ? "" : player.id)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Botón discreto para ver suplentes en el banquillo */}
+                  {playersOnBench.length > 0 && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllPlayersInModal(!showAllPlayersInModal)}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                      >
+                        {showAllPlayersInModal ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        <span>{showAllPlayersInModal ? "Ocultar jugadores del banquillo" : `+ Ver jugadores en el banquillo (${playersOnBench.length})`}</span>
+                      </button>
+
+                      {showAllPlayersInModal && (
+                        <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 animate-in fade-in duration-150">
+                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                            Banquillo / Suplentes
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {playersOnBench.map((player: any) => {
+                              const dorsal = getDorsal(player, convocatorias);
+                              const isSelected = playerId === player.id;
+                              return (
+                                <PlayerSelectCard
+                                  key={player.id}
+                                  player={player}
+                                  dorsal={dorsal}
+                                  selected={isSelected}
+                                  badgeText="Seleccionado ✓"
+                                  badgeVariant="default"
+                                  onClick={() => setPlayerId(isSelected ? "" : player.id)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Detalles / Comentario */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  Detalles / Comentario opcional
+                </label>
+                <input
+                  type="text"
+                  placeholder={
+                    activeForm === "Gol" ? "Ej. Remate de cabeza tras córner / Golazo por la escuadra..." :
+                    activeForm === "Cambio" ? "Ej. Cambio táctico / Molestias en el tobillo..." :
+                    activeForm === "Tarjeta Amarilla" ? "Ej. Falta táctica / Protestar al árbitro..." :
+                    "Detalles adicionales..."
+                  }
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white"
+                />
+              </div>
+
+              {/* Botones de acción del Modal */}
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setActiveForm(null)}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    isSubmitting ||
+                    (activeForm === "Cambio" && (!playerId || !playerOutId)) ||
+                    (!isRival && (activeForm === "Tarjeta Amarilla" || activeForm === "Tarjeta Roja") && !playerId)
+                  }
+                  className={`flex-1 py-2.5 rounded-xl text-white text-xs font-black shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    activeForm === "Gol" ? "bg-emerald-600 hover:bg-emerald-700" :
+                    activeForm === "Cambio" ? "bg-blue-600 hover:bg-blue-700" :
+                    activeForm === "Tarjeta Amarilla" ? "bg-amber-600 hover:bg-amber-700" :
+                    activeForm === "Tarjeta Roja" ? "bg-rose-600 hover:bg-rose-700" :
+                    "bg-slate-900 hover:bg-slate-800"
+                  }`}
+                >
+                  {isSubmitting ? "Registrando..." :
+                   activeForm === "Cambio" ? "Confirmar Sustitución" :
+                   `Registrar ${activeForm}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ---------- Acciones y Timeline ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
 
@@ -564,7 +1387,7 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
             </div>
           ) : (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-150 rounded-xl p-5 shadow-sm space-y-4">
+            <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-xs space-y-4">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
                 Registrar Eventos en Vivo
               </h3>
@@ -592,7 +1415,8 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
                 ))}
               </div>
 
-              {/* Frases rápidas del Entrenador según estado de partido */}
+              {/* Old coach phrases removed - now in prominent top bar */}
+              {false && (
               <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -781,6 +1605,8 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
                 </div>
               </div>
 
+              )}
+
               {/* Botones adicionales */}
               <div className="grid grid-cols-4 gap-2 mt-4">
                 {([
@@ -834,7 +1660,8 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
             </div>
 
             {/* Dynamic add form */}
-            {activeForm && (
+            {/* Old inline form replaced by modal overlay */}
+            {false && activeForm && (
               <form ref={formRef as any} onSubmit={handleAddEvent} className="bg-white border border-slate-200 rounded-xl p-5 shadow-md space-y-4 animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <span className="text-xs font-black uppercase text-slate-400 tracking-wider">
@@ -1051,7 +1878,10 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
                         {/* Text */}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-slate-700 leading-tight">
-                            {ev.notas || ev.tipo_evento}
+                            {(ev.notas || ev.tipo_evento)
+                              .replace(/\s*\[out:[^\]]+\]\s*/g, ' ')
+                              .replace(/\s*\[in:[^\]]+\]\s*/g, ' ')
+                              .trim()}
                           </p>
                         </div>
 

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Clock, CalendarDays, Goal, TrendingUp, Shield, Activity, X } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+import { PlayerAvatar } from "@/components/features/matches/match-details/PlayerAvatar";
 
 export interface PlayerStatsData {
   id: string;
@@ -34,13 +35,7 @@ export function PlayerStatsModal({ player, onClose }: PlayerStatsModalProps) {
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg shadow-sm border border-blue-200 shrink-0">
-              {player.avatar_url ? (
-                <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
-              ) : (
-                <span>{player.first_name?.charAt(0) || ''}{player.last_name?.charAt(0) || ''}</span>
-              )}
-            </div>
+            <PlayerAvatar player={player} dorsal={player.dorsal} size="xl" />
             <div>
               <h2 className="text-xl font-black text-slate-900 leading-tight">
                 {player.first_name} {player.last_name}

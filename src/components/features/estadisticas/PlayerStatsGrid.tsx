@@ -3,6 +3,7 @@ import { User, Activity, Clock, Shield, Goal, AlertTriangle, CalendarDays, Chevr
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { useExport } from "@/components/providers/ExportContext";
 import { PlayerStatsModal, type PlayerStatsData } from "./PlayerStatsModal";
+import { PlayerAvatar } from "@/components/features/matches/match-details/PlayerAvatar";
 
 interface RawData {
   players: any[];
@@ -106,13 +107,7 @@ export function PlayerStatsGrid({ rawData, teamId }: { rawData: RawData; teamId:
             className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group hover:border-blue-300"
           >
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg border border-slate-200 group-hover:border-blue-200 transition-colors shrink-0">
-                {player.avatar_url ? (
-                  <img src={player.avatar_url} alt={player.first_name} className="w-full h-full object-cover object-[center_25%]" />
-                ) : (
-                  <span>{player.first_name?.charAt(0) || ''}{player.last_name?.charAt(0) || ''}</span>
-                )}
-              </div>
+              <PlayerAvatar player={player} dorsal={player.dorsal} size="xl" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-slate-900 truncate" title={`${player.first_name} ${player.last_name}`}>
                   {player.first_name} {player.last_name}

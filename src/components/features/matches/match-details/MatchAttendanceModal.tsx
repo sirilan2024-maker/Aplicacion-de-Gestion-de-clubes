@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { X, Save, CalendarCheck } from "lucide-react"
 import { updateMatchAttendanceBatch } from "@/app/actions/match-actions"
 import { useRouter } from "next/navigation"
+import { PlayerAvatar } from "./PlayerAvatar"
 
 interface Player {
   id: string
@@ -88,9 +89,7 @@ export function MatchAttendanceModal({ matchId, matchDate, teamId, players, conv
           {playerList.map(player => (
             <div key={player.id} className="flex items-center justify-between p-3 border border-slate-150 rounded-xl bg-white hover:border-slate-300 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-black text-emerald-700 shrink-0">
-                  {player.first_name[0] || ''}{player.last_name[0] || ''}
-                </div>
+                <PlayerAvatar player={player} dorsal={convocatorias.find(c => c.player_id === player.id)?.dorsal ?? (player as any).dorsal} size="sm" />
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800 truncate">
                     {player.first_name} {player.last_name}

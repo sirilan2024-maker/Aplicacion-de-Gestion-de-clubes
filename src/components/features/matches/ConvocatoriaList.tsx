@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from 'react';
-import { 
-  updateConvocatoria, 
-  sendConvocatoriaAlerts, 
-  getAvailableLowerCategoryPlayersAction 
+import {
+  getAvailableLowerCategoryPlayersAction
 } from '@/app/actions/match-actions';
 import { detectLowerCategoryTarget } from '@/lib/matches/category-promotion';
-import { Loader2, UserPlus, X, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, UserPlus, X, Clock, CheckCircle2, XCircle, Save } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { PlayerAvatar } from '@/components/features/matches/match-details/PlayerAvatar';
 
 export type AttendanceStatus = 'Convocado' | 'No convocado' | 'Duda' | 'Lesión' | null;
 
@@ -23,21 +23,24 @@ export interface Player {
   dorsal?: number | null;
   estadoAsistencia?: 'Confirmado' | 'Ausente' | 'Pendiente' | null;
   asistenciaConfirmadaFamilia?: boolean | null;
+  rawPlayer?: any;
 }
 
-export function ConvocatoriaList({ 
-  players = [], 
-  matchId, 
-  convocatorias = [], 
+export function ConvocatoriaList({
+  players = [],
+  matchId,
+  convocatorias = [],
   onCloseModal,
   match
-}: { 
-  players?: any[], 
-  matchId?: string, 
-  convocatorias?: any[], 
+}: {
+  players?: any[],
+  matchId?: string,
+  convocatorias?: any[],
   onCloseModal?: () => void,
   match?: any
 }) {
+  const isModal = Boolean(onCloseModal);
+
   const validPlayers = players.filter(p => {
     const pos = (p.posicion || '').toLowerCase();
     return !pos.includes('entrenador') && !pos.includes('delegado') && !pos.includes('cuerpo técnico');
@@ -64,20 +67,21 @@ export function ConvocatoriaList({
     }
     const isJuv = p.teams?.category?.toLowerCase().includes('juvenil') || p.team_category?.toLowerCase().includes('juvenil');
 
-    const estadoAsistencia = conv?.estado_asistencia 
+    const estadoAsistencia = conv?.estado_asistencia
       || (conv?.asistencia_confirmada_familia === true ? 'Confirmado' : (conv?.asistencia_confirmada_familia === false ? 'Ausente' : (status === 'Convocado' ? 'Pendiente' : null)));
 
     mappedPlayers.push({
       id: p.id,
       name: `${p.first_name} ${p.last_name}`.toUpperCase(),
-      position: (p.posicion || 'Jugador').toLowerCase(),
+      position: (p.posicion || p.posicion_principal || 'Jugador').toLowerCase(),
       status: status,
       teamName: p.teams?.name || (isJuv ? 'Juvenil' : undefined),
       isJuvenile: isJuv,
       avatarUrl: p.avatar_url,
       dorsal: p.dorsal,
       estadoAsistencia: estadoAsistencia as any,
-      asistenciaConfirmadaFamilia: conv?.asistencia_confirmada_familia ?? null
+      asistenciaConfirmadaFamilia: conv?.asistencia_confirmada_familia ?? null,
+      rawPlayer: p
     });
   });
 
@@ -191,7 +195,9 @@ export function ConvocatoriaList({
         teamName: p.teams?.name || (targetCategory ? targetCategory.toUpperCase() : 'Refuerzo'),
         isLowerCategory: true,
         avatarUrl: p.avatar_url,
-        dorsal: p.dorsal
+        dorsal: p.dorsal,
+        estadoAsistencia: 'Pendiente',
+        rawPlayer: p
       };
       setPlayerList(prev => [newPlayer, ...prev]);
     }
@@ -214,16 +220,28 @@ export function ConvocatoriaList({
   };
 
   const handleConvocarTodos = () => {
-    setPlayerList((prev) => prev.map(p => ({ ...p, status: 'Convocado' })));
+    setPlayerList((prev) =>
+      prev.map(p => ({
+        ...p,
+        status: 'Convocado',
+        estadoAsistencia: p.estadoAsistencia || 'Pendiente'
+      }))
+    );
   };
 
   const handleDesmarcarTodos = () => {
-    setPlayerList((prev) => prev.map(p => ({ ...p, status: 'No convocado' })));
+    setPlayerList((prev) =>
+      prev.map(p => ({
+        ...p,
+        status: 'No convocado',
+        estadoAsistencia: null
+      }))
+    );
   };
 
   const handleGuardar = () => {
     if (!matchId) return;
-    
+
     startTransition(async () => {
       const updates = playerList.map(p => {
         let dbStatus: "convocado" | "lesionado" | "duda" | "no_convocado" | "titular" | "suplente" | null = null;
@@ -238,7 +256,7 @@ export function ConvocatoriaList({
         else if (p.status === 'No convocado') dbStatus = 'no_convocado';
         else if (p.status === 'Duda') dbStatus = 'duda';
         else if (p.status === 'Lesión') dbStatus = 'lesionado';
-        
+
         return { playerId: p.id, status: dbStatus };
       });
 
@@ -249,39 +267,118 @@ export function ConvocatoriaList({
         const datePart = !isNaN(baseDate.getTime()) ? baseDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
         finalCitacionISO = new Date(`${datePart}T${horaCitacion}:00`).toISOString();
       }
-      
+
       const { updateConvocatoriaBatch } = await import('@/app/actions/match-actions');
       const result = await updateConvocatoriaBatch(matchId, updates, { horaCitacion: finalCitacionISO });
-      
+
       if (result && !result.success) {
         const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || "Error desconocido";
-        alert("Error al guardar la convocatoria: " + errorMsg);
-      } else if (onCloseModal) {
-        onCloseModal();
+        toast.error("Error al guardar la convocatoria: " + errorMsg);
+      } else {
+        toast.success("Convocatoria guardada correctamente");
+        if (onCloseModal) {
+          onCloseModal();
+        }
       }
     });
   };
 
   const getStatusClasses = (currentStatus: AttendanceStatus, targetStatus: AttendanceStatus) => {
-    const baseClasses = "flex-1 sm:flex-none px-2 sm:px-3 py-1.5 sm:py-1 text-[11px] font-bold rounded-lg sm:rounded-md transition-all text-center";
-    
+    const baseClasses = "flex-1 sm:flex-none px-2.5 py-1.5 sm:py-1 text-[10px] font-black uppercase tracking-wide rounded-lg sm:rounded-md transition-all text-center cursor-pointer";
+
     if (currentStatus !== targetStatus) {
       return `${baseClasses} bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200`;
     }
 
     switch (targetStatus) {
       case 'Convocado':
-        return `${baseClasses} bg-emerald-500 text-white shadow-emerald-500/30 border border-emerald-600`;
+        return `${baseClasses} bg-emerald-600 text-white shadow-xs border border-emerald-700`;
       case 'No convocado':
-        return `${baseClasses} bg-slate-700 text-white shadow-slate-700/30 border border-slate-800`;
+        return `${baseClasses} bg-slate-700 text-white shadow-xs border border-slate-800`;
       case 'Duda':
-        return `${baseClasses} bg-amber-500 text-white shadow-amber-500/30 border border-amber-600`;
+        return `${baseClasses} bg-amber-500 text-white shadow-xs border border-amber-600`;
       case 'Lesión':
-        return `${baseClasses} bg-rose-500 text-white shadow-rose-500/30 border border-rose-600`;
+        return `${baseClasses} bg-rose-600 text-white shadow-xs border border-rose-700`;
       default:
         return `${baseClasses} bg-slate-100 text-slate-500 border border-slate-200`;
     }
   };
+
+  const getAvatarPlayerData = (player: Player) =>
+    player.rawPlayer || {
+      first_name: player.name,
+      avatar_url: player.avatarUrl,
+      posicion: player.position,
+      dorsal: player.dorsal
+    };
+
+  const renderFamilyAttendanceBadge = (player: Player, compact = false) => {
+    if (player.status !== 'Convocado') {
+      return (
+        <span className="inline-block px-2 py-0.5 text-[10px] font-black bg-slate-100 text-slate-400 rounded-md">
+          -
+        </span>
+      );
+    }
+
+    if (player.estadoAsistencia === 'Confirmado') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-700">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+          {compact ? 'Confirmado' : 'Confirmado por familia'}
+        </span>
+      );
+    }
+
+    if (player.estadoAsistencia === 'Ausente') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-red-100 text-red-700">
+          <XCircle className="w-3 h-3 text-red-600 shrink-0" />
+          {compact ? 'Baja' : 'No asiste (Baja)'}
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-700">
+        <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+        Pendiente
+      </span>
+    );
+  };
+
+  const renderStatusButtons = (player: Player, gridMobile = false) => (
+    <div className={gridMobile ? "grid grid-cols-4 gap-1.5 w-full" : "inline-flex items-center gap-1.5 justify-end"}>
+      <button
+        type="button"
+        onClick={() => handleStatusChange(player.id, 'Convocado')}
+        className={getStatusClasses(player.status, 'Convocado')}
+      >
+        Conv.
+      </button>
+      <button
+        type="button"
+        onClick={() => handleStatusChange(player.id, 'No convocado')}
+        className={getStatusClasses(player.status, 'No convocado')}
+      >
+        No Conv.
+      </button>
+      <button
+        type="button"
+        onClick={() => handleStatusChange(player.id, 'Duda')}
+        className={getStatusClasses(player.status, 'Duda')}
+      >
+        Duda
+      </button>
+      <button
+        type="button"
+        onClick={() => handleStatusChange(player.id, 'Lesión')}
+        className={getStatusClasses(player.status, 'Lesión')}
+      >
+        Les.
+      </button>
+    </div>
+  );
 
   const counts = playerList.reduce(
     (acc, player) => {
@@ -306,30 +403,48 @@ export function ConvocatoriaList({
   );
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl">
-      <div className="flex flex-col gap-3 mb-4 shrink-0 px-1">
-        {/* Barra superior de Resumen y Hora de Citación */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100 gap-2.5">
+    <div className={isModal ? "flex flex-col flex-1 min-h-0 space-y-4" : "space-y-4"}>
+      {/* Cabecera estandarizada de pestaña (oculta en modal porque QuickConvocatoriaModal ya tiene su propia cabecera) */}
+      {!isModal && (
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2 gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Lista de Convocados</h3>
+            <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Citación y disponibilidad de plantilla</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">
+              {playerList.length} Jugadores
+            </span>
+            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+              {counts.convocados} Convocados
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Barra superior de Resumen, Hora de Citación y Acciones */}
+      <div className="bg-slate-50 rounded-xl border border-slate-150 p-3 sm:p-4 space-y-3 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">Resumen</span>
-            <div className="text-xs font-bold flex flex-wrap gap-1.5 items-center">
-              <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">Conv: {counts.convocados}</span>
-              <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">Dudas: {counts.dudas}</span>
-              <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">Les: {counts.lesionados}</span>
+            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Resumen</span>
+            <div className="text-[11px] font-bold flex flex-wrap gap-1.5 items-center">
+              <span className="text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">Conv: {counts.convocados}</span>
+              <span className="text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md">Dudas: {counts.dudas}</span>
+              <span className="text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-md">Les: {counts.lesionados}</span>
               {counts.convocados > 0 && (
                 <>
                   <span className="text-slate-300">|</span>
-                  <span className="text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1 shadow-2xs font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {attendanceCounts.confirmados} Confirmados
+                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {attendanceCounts.confirmados} Confirmados
                   </span>
                   {attendanceCounts.ausentes > 0 && (
-                    <span className="text-rose-700 bg-rose-100/90 px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1 shadow-2xs font-bold">
-                      <XCircle className="w-3.5 h-3.5 text-rose-600" /> {attendanceCounts.ausentes} Bajas
+                    <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1">
+                      <XCircle className="w-3 h-3 text-rose-600" /> {attendanceCounts.ausentes} Bajas
                     </span>
                   )}
                   {attendanceCounts.pendientes > 0 && (
-                    <span className="text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1 font-semibold">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" /> {attendanceCounts.pendientes} Pendientes
+                    <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-600" /> {attendanceCounts.pendientes} Pendientes
                     </span>
                   )}
                 </>
@@ -338,9 +453,9 @@ export function ConvocatoriaList({
           </div>
 
           {/* Campo editable de Hora de Citación */}
-          <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs self-start sm:self-auto">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs self-start sm:self-auto">
             <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">📍 Citación:</span>
+            <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap uppercase tracking-wide">Citación:</span>
             <input
               type="time"
               value={horaCitacion}
@@ -351,154 +466,177 @@ export function ConvocatoriaList({
           </div>
         </div>
 
-        {/* Botones de acción superiores: adaptativos a móvil con grid de 2 columnas o 1 fila en desktop */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2">
-          {targetCategory && (
+        {/* Botones de acción */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center justify-between gap-2 pt-2 border-t border-slate-200/70">
+          <div className="col-span-2 sm:col-span-1 flex flex-wrap gap-2">
+            {targetCategory && (
+              <button
+                onClick={openLowerCategoryModal}
+                type="button"
+                className="flex-1 sm:flex-none py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                title={`Convocar jugadores de categoría ${targetCategory}`}
+              >
+                <UserPlus className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="truncate">+ {targetCategory}</span>
+              </button>
+            )}
             <button
-              onClick={openLowerCategoryModal}
               type="button"
-              className="col-span-1 py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-              title={`Convocar jugadores de categoría ${targetCategory}`}
+              onClick={handleConvocarTodos}
+              className="flex-1 sm:flex-none py-1.5 px-3 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-2xs truncate"
             >
-              <UserPlus className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-              <span className="truncate">+ {targetCategory}</span>
+              Convocar Todos
             </button>
-          )}
+            <button
+              type="button"
+              onClick={handleDesmarcarTodos}
+              className="flex-1 sm:flex-none py-1.5 px-3 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-2xs truncate"
+            >
+              Desmarcar Todos
+            </button>
+          </div>
+
           <button
-            onClick={handleConvocarTodos}
-            className="col-span-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-xs truncate"
-          >
-            Convocar Todos
-          </button>
-          <button
-            onClick={handleDesmarcarTodos}
-            className="col-span-1 py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-xs truncate"
-          >
-            Desmarcar Todos
-          </button>
-          <button 
+            type="button"
             onClick={handleGuardar}
             disabled={isPending}
-            className="col-span-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="col-span-2 sm:col-span-1 py-1.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
-            <span className="truncate">Guardar</span>
+            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Save className="w-3.5 h-3.5 shrink-0" />}
+            <span>Guardar Convocatoria</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 pr-1 sm:pr-2 custom-scrollbar px-1">
+      {/* Tabla de Plantilla (Desktop) y Tarjetas (Mobile) siguiendo el diseño de Estadísticas */}
+      <div className={`border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white ${isModal ? 'flex-1 overflow-y-auto min-h-0 custom-scrollbar' : ''}`}>
         {playerList.length === 0 ? (
-          <div className="text-center text-slate-500 py-8 text-sm">
+          <div className="text-center text-slate-400 py-12 text-xs font-bold uppercase tracking-wider">
             No hay jugadores disponibles en la plantilla.
           </div>
         ) : (
-          <ul className="space-y-2">
-            {playerList.map((player) => (
-              <li 
-                key={player.id} 
-                className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-2.5 sm:gap-0 ${
-                  player.status === 'Convocado' 
-                    ? 'border-emerald-200 bg-emerald-50/30' 
-                    : 'border-slate-100 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 w-full sm:w-auto pr-0 sm:pr-4">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                    {player.avatarUrl ? (
-                      <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover object-[center_25%]" />
-                    ) : (
-                      <span className="text-slate-600 font-extrabold text-[11px]">
-                        {player.dorsal || player.name.slice(0, 2)}
-                      </span>
-                    )}
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-3.5 px-3 text-center w-12">#</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">Jugador</th>
+                    <th className="py-3.5 px-3 text-center">Confirmación</th>
+                    <th className="py-3.5 px-4 text-right">Estado Convocatoria</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {playerList.map((player) => (
+                    <tr
+                      key={player.id}
+                      className={`transition-colors ${
+                        player.status === 'Convocado'
+                          ? 'bg-emerald-50/25 hover:bg-emerald-50/50'
+                          : 'hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <td className="py-3 px-3 text-center text-xs font-bold text-slate-400">
+                        {player.dorsal || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <PlayerAvatar player={getAvatarPlayerData(player)} dorsal={player.dorsal} size="sm" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-xs font-bold text-slate-900 truncate uppercase" title={player.name}>
+                                {player.name}
+                              </p>
+                              {(player.isLowerCategory || player.isJuvenile) && player.teamName && (
+                                <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 rounded border border-indigo-200 shrink-0">
+                                  {player.teamName}
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-[9px] font-semibold uppercase tracking-wide ${player.status === 'Convocado' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {player.position}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center">
+                          {renderFamilyAttendanceBadge(player, true)}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {renderStatusButtons(player, false)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="block md:hidden space-y-3 p-3 bg-slate-50/50">
+              {playerList.map((player) => (
+                <div
+                  key={player.id}
+                  className={`bg-white p-4 rounded-xl shadow-sm border transition-all ${
+                    player.status === 'Convocado' ? 'border-emerald-200' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <PlayerAvatar player={getAvatarPlayerData(player)} dorsal={player.dorsal} size="md" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm block truncate uppercase" title={player.name}>
+                            {player.name}
+                          </span>
+                          {(player.isLowerCategory || player.isJuvenile) && player.teamName && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 rounded border border-indigo-200 shrink-0">
+                              {player.teamName}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase block mt-0.5">
+                          {player.dorsal ? `#${player.dorsal} • ` : ''}{player.position}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {renderFamilyAttendanceBadge(player, true)}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-800 text-sm block truncate uppercase" title={player.name}>{player.name}</span>
-                      {player.dorsal && (
-                        <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-200 shrink-0">
-                          #{player.dorsal}
-                        </span>
-                      )}
-                      {(player.isLowerCategory || player.isJuvenile) && player.teamName && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded border border-indigo-200 shrink-0">
-                          {player.teamName}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                      <span className={`text-[11px] font-bold block truncate ${player.status === 'Convocado' ? 'text-emerald-700' : 'text-slate-500'}`}>{player.position}</span>
-                      {player.status === 'Convocado' && (
-                        player.estadoAsistencia === 'Confirmado' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Confirmado por familia
-                          </span>
-                        ) : player.estadoAsistencia === 'Ausente' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                            <XCircle className="w-3 h-3 text-rose-600" /> No asiste (Baja)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock className="w-3 h-3 text-amber-500" /> Pendiente confirmación
-                          </span>
-                        )
-                      )}
-                    </div>
+
+                  <div className="pt-3">
+                    {renderStatusButtons(player, true)}
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-4 sm:flex sm:flex-nowrap gap-1.5 w-full sm:w-auto shrink-0 mt-1 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                  <button
-                    onClick={() => handleStatusChange(player.id, 'Convocado')}
-                    className={getStatusClasses(player.status, 'Convocado')}
-                  >
-                    Conv.
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(player.id, 'No convocado')}
-                    className={getStatusClasses(player.status, 'No convocado')}
-                  >
-                    No Conv.
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(player.id, 'Duda')}
-                    className={getStatusClasses(player.status, 'Duda')}
-                  >
-                    Duda
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(player.id, 'Lesión')}
-                    className={getStatusClasses(player.status, 'Lesión')}
-                  >
-                    Les.
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      <div className="mt-2 shrink-0 bg-white border-t border-slate-200 p-3 sm:p-4 flex items-center justify-end rounded-b-xl">
-        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-          {onCloseModal && (
-            <button 
-              onClick={onCloseModal}
-              className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-sm"
-            >
-              Cancelar
-            </button>
-          )}
-          <button 
-            onClick={handleGuardar}
-            disabled={isPending}
-            className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+      {/* Footer de guardado inferior */}
+      <div className="pt-2 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+        {onCloseModal && (
+          <button
+            type="button"
+            onClick={onCloseModal}
+            className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-200 shadow-xs"
           >
-            {isPending && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
-            Guardar Convocatoria
+            Cancelar
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={handleGuardar}
+          disabled={isPending}
+          className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+        >
+          {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Save className="w-3.5 h-3.5 shrink-0" />}
+          Guardar Convocatoria
+        </button>
       </div>
 
       {/* Modal para convocar jugadores de categoría inferior */}
@@ -506,16 +644,17 @@ export function ConvocatoriaList({
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500 text-white flex items-center justify-center font-bold">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-sm">Convocar Jugador {targetCategory || 'Inferior'}</h3>
+                  <h3 className="font-black text-slate-800 text-sm uppercase tracking-wide">Convocar Jugador {targetCategory || 'Inferior'}</h3>
                   <p className="text-[11px] text-slate-500">Sube a un jugador de categoría {targetCategory || 'inferior'} para este partido</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowLowerCategoryModal(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
               >
@@ -554,22 +693,25 @@ export function ConvocatoriaList({
                   .map(p => {
                     const isAlreadyAdded = playerList.some(item => item.id === p.id && item.status === 'Convocado');
                     return (
-                      <div key={p.id} className="py-2.5 flex items-center justify-between hover:bg-slate-50 px-2 rounded-lg transition-colors">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs uppercase">{p.first_name} {p.last_name}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-slate-500 font-medium">{p.posicion || 'Jugador'}</span>
-                            <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-100">
-                              {p.teams?.name || targetCategory || 'Refuerzo'}
-                            </span>
-                            {p.dorsal && <span className="text-[10px] text-slate-400 font-semibold">#{p.dorsal}</span>}
+                      <div key={p.id} className="py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 px-2 rounded-lg transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <PlayerAvatar player={p} dorsal={p.dorsal} size="sm" />
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 text-xs uppercase truncate">{p.first_name} {p.last_name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="text-[10px] text-slate-500 font-medium">{p.posicion || 'Jugador'}</span>
+                              <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 text-[9px] font-bold rounded border border-indigo-100">
+                                {p.teams?.name || targetCategory || 'Refuerzo'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => handleAddCandidate(p)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            isAlreadyAdded 
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 pointer-events-none' 
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                            isAlreadyAdded
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 pointer-events-none'
                               : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
                           }`}
                         >
@@ -583,6 +725,7 @@ export function ConvocatoriaList({
 
             <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button
+                type="button"
                 onClick={() => setShowLowerCategoryModal(false)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors"
               >

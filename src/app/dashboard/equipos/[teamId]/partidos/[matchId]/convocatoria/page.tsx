@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Users, AlertTriangle, ShieldAlert, CheckCircle2, User, ChevronLeft } from "lucide-react"
 import Link from "next/link"
+import { PlayerAvatar } from "@/components/features/matches/match-details/PlayerAvatar"
 
 export default function MatchConvocatoriaPage({ params }: { params: Promise<{ teamId: string, matchId: string }> }) {
   const { teamId, matchId } = use(params);
@@ -22,7 +23,7 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
         .select("*")
         .eq("id", matchId)
         .single()
-      
+
       if (matchData) setMatchDetails(matchData)
 
 
@@ -43,7 +44,7 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
       // 3. Fetch all team players AND valid call-ups strictly in active season
       let query = supabase
         .from("players")
-        .select("id, first_name, last_name, dorsal, avatar_url, status, medical_notes, team_id, teams:teams!inner(name, category, season_id)")
+        .select("id, first_name, last_name, dorsal, avatar_url, posicion, posicion_principal, status, medical_notes, team_id, teams:teams!inner(name, category, season_id)")
         .neq('status', 'inactive')
         .neq('teams.season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
         .order("first_name")
@@ -96,27 +97,29 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
         <ChevronLeft size={16} /> Volver a Partidos
       </Link>
 
-      <div className="bg-slate-900 text-white p-6 rounded-xl shadow-lg border border-slate-800 flex justify-between items-center">
+      <div className="bg-white p-5 sm:p-6 rounded-xl shadow-sm border border-slate-150 flex justify-between items-center gap-4">
         <div>
-          <p className="text-blue-400 text-sm font-bold uppercase tracking-wider mb-1">Pre-Partido: Convocatoria</p>
-          <h1 className="text-3xl font-black">{matchDetails?.rival_nombre || 'Partido'}</h1>
-          <p className="text-slate-400 mt-2 text-sm">{matchDetails?.lugar} • {matchDetails ? new Date(matchDetails.fecha_hora).toLocaleString() : ''}</p>
+          <p className="text-emerald-600 text-[10px] font-black uppercase tracking-wider mb-1">Pre-Partido: Convocatoria</p>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">{matchDetails?.rival_nombre || 'Partido'}</h1>
+          <p className="text-slate-500 mt-1 text-xs font-medium">{matchDetails?.lugar} • {matchDetails ? new Date(matchDetails.fecha_hora).toLocaleString() : ''}</p>
         </div>
-        <div className="text-right">
-          <div className="text-5xl font-black text-blue-500">{convocados.size}</div>
-          <div className="text-slate-400 text-sm font-medium uppercase mt-1">Convocados</div>
+        <div className="text-right bg-emerald-50 border border-emerald-100 px-4 py-2.5 rounded-xl shrink-0">
+          <div className="text-3xl font-black text-emerald-600 leading-none">{convocados.size}</div>
+          <div className="text-emerald-700 text-[10px] font-black uppercase tracking-wider mt-1">Convocados</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-slate-400"/> Plantilla Disponible</h3>
-          <span className="text-xs font-semibold text-slate-500 bg-white px-3 py-1 rounded-full border shadow-sm">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-150 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <Users size={16} className="text-slate-400" /> Plantilla Disponible
+          </h3>
+          <span className="text-[10px] font-bold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
             Total Plantilla: {players.length}
           </span>
         </div>
-        
-        <div className="divide-y divide-gray-100">
+
+        <div className="divide-y divide-slate-100">
           {players.map(p => {
             const isConvocado = convocados.has(p.id)
             const isLesionado = p.status === 'Lesionado'
@@ -127,34 +130,19 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
             const isAbsent = convItem?.estado_asistencia === 'Ausente'
 
             return (
-              <div 
-                key={p.id} 
-                className={`p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between transition-colors gap-3 sm:gap-4 ${!isAvailable ? 'bg-red-50/30' : 'hover:bg-slate-50'}`}
+              <div
+                key={p.id}
+                className={`p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between transition-colors gap-3 sm:gap-4 ${!isAvailable ? 'bg-red-50/30' : isConvocado ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50'}`}
               >
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs border-2 shrink-0
-                    ${isConvocado ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-500/20' : 
-                      !isAvailable ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-white text-slate-600 border-gray-200'}`}>
-                    {p.avatar_url ? (
-                      <img src={p.avatar_url} alt={p.first_name} className="w-full h-full object-cover object-[center_25%]" />
-                    ) : (
-                      <span className={isConvocado ? 'text-blue-700 font-black' : 'text-slate-600 font-bold'}>
-                        {p.dorsal || `${p.first_name?.charAt(0) || ''}${p.last_name?.charAt(0) || ''}`}
-                      </span>
-                    )}
-                  </div>
+                  <PlayerAvatar player={p} dorsal={p.dorsal} size="md" />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className={`font-bold text-sm sm:text-base truncate ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
+                      <h4 className={`font-bold text-sm truncate uppercase ${!isAvailable ? 'text-gray-500' : 'text-slate-900'}`}>
                         {p.first_name} {p.last_name}
                       </h4>
-                      {p.dorsal && (
-                        <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
-                          #{p.dorsal}
-                        </span>
-                      )}
                       {(p.teams?.category?.toLowerCase().includes('juvenil') || p.team_id !== teamId) && (
-                        <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
+                        <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 shrink-0">
                           {p.teams?.name || 'Juvenil'}
                         </span>
                       )}
@@ -170,21 +158,21 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                       </p>
                     )}
                     {isAvailable && (
-                      <p className="text-slate-400 text-xs font-medium mt-0.5">Disponible</p>
+                      <p className="text-slate-400 text-[11px] font-semibold mt-0.5">{p.posicion || p.posicion_principal || 'Disponible'}</p>
                     )}
                     {isConvocado && (
                       <div className="mt-1">
                         {isConfirmed ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-700">
                             <CheckCircle2 size={12} className="text-emerald-600" /> Confirmado por familia
                           </span>
                         ) : isAbsent ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                            ❌ No asiste (Baja)
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-red-100 text-red-700">
+                            No asiste (Baja)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            ⏳ Pendiente confirmación
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-700">
+                            Pendiente confirmación
                           </span>
                         )}
                       </div>
@@ -195,15 +183,15 @@ export default function MatchConvocatoriaPage({ params }: { params: Promise<{ te
                 <button
                   onClick={() => toggleConvocatoria(p.id, p.status)}
                   disabled={!isAvailable}
-                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all duration-200 w-full sm:w-auto shrink-0
-                    ${isConvocado 
-                      ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 hover:text-green-800' 
-                      : !isAvailable 
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60' 
-                        : 'bg-white border border-gray-300 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 shadow-xs'
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all duration-200 w-full sm:w-auto shrink-0
+                    ${isConvocado
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                      : !isAvailable
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
                     }`}
                 >
-                  {isConvocado ? <><CheckCircle2 size={16} /> Convocado</> : <><User size={16} /> Convocar</>}
+                  {isConvocado ? <><CheckCircle2 size={15} /> Convocado</> : <><User size={15} /> Convocar</>}
                 </button>
               </div>
             )

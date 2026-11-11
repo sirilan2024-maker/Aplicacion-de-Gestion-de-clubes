@@ -805,7 +805,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       }
     }
 
-    // Auto-sync acta details (cards, minutes, lineup) if match is played and has no convocatorias yet
+    // Auto-sync acta details (cards, minutes, lineup) if match is played
     if (isPlayed && fm.ffcv_match_id) {
       try {
         const { count } = await supabase
@@ -813,7 +813,8 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
           .select('id', { count: 'exact', head: true })
           .eq('partido_id', pm.id);
 
-        if (!count || count === 0) {
+        const rivalHasSporting = (pm.rival_nombre || '').toLowerCase().includes('sporting');
+        if (!count || count === 0 || rivalHasSporting) {
           await syncFFCVActaToConvocatorias(String(fm.ffcv_match_id), undefined, supabase);
         }
       } catch (actaErr) {

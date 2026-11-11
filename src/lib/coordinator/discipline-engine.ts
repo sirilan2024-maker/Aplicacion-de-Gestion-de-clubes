@@ -148,7 +148,11 @@ export function calculatePlayerFfcvDiscipline(params: CalculateDisciplineParams)
   let statusReason = 'Sin incidencias disciplinarias';
   let isSuspendedNextMatch = false;
 
-  if (activeSuspension) {
+  if (activeSuspension && cycleSuspensionActive) {
+    status = 'Sancionado';
+    statusReason = `${activeSuspensionReason} + ${cycleSuspensionReason}`;
+    isSuspendedNextMatch = true;
+  } else if (activeSuspension) {
     status = 'Sancionado';
     statusReason = activeSuspensionReason;
     isSuspendedNextMatch = true;

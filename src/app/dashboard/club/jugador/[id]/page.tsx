@@ -2453,14 +2453,23 @@ function DisciplineTab({ playerId }: { playerId: string }) {
 
         setData(filtered)
         
-        let y = 0, r = 0
-        filtered.forEach(c => {
+        // Ordenar cronológicamente para calcular ciclo oficial FFCV:
+        // - 1 amarilla (con o sin roja directa) -> suma +1 al ciclo de 5
+        // - 2 amarillas mismo partido (doble amarilla) -> 1 partido sanción y NO suma al ciclo de 5
+        const chrono = [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        let y = 0, r = 0, cycleC = 0, cyclesComp = 0
+        chrono.forEach(c => {
           y += c.yellows
           r += c.reds
+          if (c.yellows === 1) {
+            cycleC += 1
+            if (cycleC === 5) {
+              cyclesComp += 1
+              cycleC = 0
+            }
+          }
         })
         
-        const cyclesComp = Math.floor(y / 5)
-        const cycleC = y % 5
         setTotals({ yellows: y, reds: r, cycleCards: cycleC, cyclesCompleted: cyclesComp })
       }
       setLoading(false)
@@ -2474,6 +2483,76 @@ function DisciplineTab({ playerId }: { playerId: string }) {
 
   return (
     <div className="space-y-6">
+      {/* Resumen de Ciclos Disciplinarios FFCV */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Amarillas Totales</span>
+            <div className="w-3.5 h-5 bg-yellow-400 rounded-sm shadow-sm" />
+          </div>
+          <div className="text-3xl font-black text-slate-900">{totals.yellows}</div>
+          <p className="text-xs text-slate-500 mt-1">En todas las actas de la temporada</p>
+        </div>
+
+        <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Ciclo Actual</span>
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-amber-900">{totals.cycleCards}</span>
+            <span className="text-sm font-bold text-amber-700">/ 5 tarjetas</span>
+          </div>
+          <p className="text-xs text-amber-700 mt-1 font-medium">
+            {5 - totals.cycleCards === 1
+              ? '🚨 ¡A 1 tarjeta de sanción!'
+              : `Faltan ${5 - totals.cycleCards} tarjetas para cumplir sanción`}
+          </p>
+        </div>
+
+        <div className="bg-indigo-50/60 border border-indigo-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-indigo-800 uppercase tracking-wider">Ciclos Cumplidos</span>
+            <Shield className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div className="text-3xl font-black text-indigo-900">{totals.cyclesCompleted}</div>
+          <p className="text-xs text-indigo-700 mt-1">Sanciones por 5 amarillas ({totals.cyclesCompleted} partidos)</p>
+        </div>
+
+        <div className="bg-red-50/60 border border-red-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-red-800 uppercase tracking-wider">Tarjetas Rojas</span>
+            <div className="w-3.5 h-5 bg-red-500 rounded-sm shadow-sm" />
+          </div>
+          <div className="text-3xl font-black text-red-900">{totals.reds}</div>
+          <p className="text-xs text-red-700 mt-1">Expulsiones directas o doble amarilla</p>
+        </div>
+      </div>
+
+      {/* Barra de progreso de ciclo actual */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+          <span>Estado del Ciclo Disciplinario Activo</span>
+          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold">
+            Ciclo #{totals.cyclesCompleted + 1}
+          </span>
+        </h4>
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5].map((slot) => {
+            const isFilled = slot <= totals.cycleCards;
+            return (
+              <div
+                key={slot}
+                className={`flex-1 h-3 rounded-full transition-all ${
+                  isFilled ? (totals.cycleCards === 4 ? 'bg-amber-500 animate-pulse' : 'bg-yellow-400') : 'bg-slate-100 border border-slate-200'
+                }`}
+                title={`Tarjeta ${slot} del ciclo`}
+              />
+            );
+          })}
+        </div>
+      </div>
+
       <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-white">
           <h3 className="font-bold text-slate-800">Registro de Partidos con Amonestación</h3>
@@ -2491,6 +2570,23 @@ function DisciplineTab({ playerId }: { playerId: string }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-slate-800">{item.title}</span>
                     <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{item.type}</span>
+                    {item.yellows >= 2 ? (
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
+                        Doble Amarilla (No suma a ciclo • 1 partido sanción)
+                      </span>
+                    ) : item.yellows === 1 && item.reds >= 1 ? (
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
+                        1 Amarilla (+1 ciclo) + Roja Directa (1 partido sanción)
+                      </span>
+                    ) : item.reds >= 1 ? (
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
+                        Roja Directa (1 partido sanción)
+                      </span>
+                    ) : item.yellows === 1 ? (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                        +1 al ciclo de 5 amarillas
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-sm text-slate-500 mt-1">
                     {new Date(item.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

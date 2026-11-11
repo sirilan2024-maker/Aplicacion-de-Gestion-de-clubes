@@ -2342,6 +2342,23 @@ function DisciplineTab({ playerId }: { playerId: string }) {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-slate-900">vs {item.rival} ({item.lugar})</span>
+                    {item.yellows >= 2 ? (
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
+                        Doble Amarilla (No suma a ciclo • 1 partido sanción)
+                      </span>
+                    ) : item.yellows === 1 && item.reds >= 1 ? (
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
+                        1 Amarilla (+1 ciclo) + Roja Directa (1 partido sanción)
+                      </span>
+                    ) : item.reds >= 1 ? (
+                      <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">
+                        Roja Directa (1 partido sanción)
+                      </span>
+                    ) : item.yellows === 1 ? (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                        +1 al ciclo de 5 amarillas
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
                     {new Date(item.date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

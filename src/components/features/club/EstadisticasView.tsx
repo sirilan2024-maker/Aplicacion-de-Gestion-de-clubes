@@ -310,6 +310,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
         teamId: p.team_id,
         goles: 0,
         amarillas: 0,
+        amarillasCiclo: 0,
         rojas: 0,
         minutos: 0,
         sumRen: 0,
@@ -386,6 +387,10 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       if (pStats) {
         pStats.goles += match.goals;
         pStats.amarillas += match.yellow_cards;
+        // Regla FFCV: 2 amarillas en el mismo partido (doble amarilla) NO suman al ciclo de 5; 1 amarilla (con o sin roja directa) SÍ suma
+        if (match.yellow_cards === 1) {
+          pStats.amarillasCiclo += 1;
+        }
         pStats.rojas += match.red_cards;
         pStats.minutos += match.minutes_played;
       }
@@ -939,8 +944,9 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
             </div>
             <div className="p-3 flex-1 flex flex-col gap-2.5">
               {stats.topDisciplina.length > 0 ? stats.topDisciplina.map((p: any, i: number) => {
-                const cyclesComp = Math.floor((p.amarillas || 0) / 5);
-                const currentCycleCardCount = (p.amarillas || 0) % 5;
+                const cycleTotal = p.amarillasCiclo ?? p.amarillas ?? 0;
+                const cyclesComp = Math.floor(cycleTotal / 5);
+                const currentCycleCardCount = cycleTotal % 5;
                 const isApercibido = currentCycleCardCount === 4;
                 return (
                   <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/70 hover:bg-slate-100/80 border border-slate-100 transition-colors">

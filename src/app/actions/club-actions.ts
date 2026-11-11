@@ -1142,7 +1142,7 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
         .or('goals.gt.0,goles.gt.0,minutes_played.gt.0,minutos_jugados.gt.0,yellow_cards.gt.0,tarjetas_amarillas.gt.0');
 
       if (convData && convData.length > 0) {
-        const playerStatsMap = new Map<string, { id: string; name: string; teamName: string; goals: number; minutes: number; yellows: number }>();
+        const playerStatsMap = new Map<string, { id: string; name: string; teamName: string; goals: number; minutes: number; yellows: number; cycleYellows: number }>();
 
         convData.forEach((c: any) => {
           const p = c.players;
@@ -1154,12 +1154,18 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
             teamName: p.teams?.name || 'Equipo',
             goals: 0,
             minutes: 0,
-            yellows: 0
+            yellows: 0,
+            cycleYellows: 0
           };
 
+          const yCount = Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
           existing.goals += Number(c.goals ?? c.goles ?? 0);
           existing.minutes += Number(c.minutes_played ?? c.minutos_jugados ?? 0);
-          existing.yellows += Number(c.yellow_cards ?? c.tarjetas_amarillas ?? 0);
+          existing.yellows += yCount;
+          // Regla FFCV: 1 amarilla (con o sin roja directa) suma al ciclo de 5; 2 amarillas en el mismo partido (doble amarilla) NO suman al ciclo
+          if (yCount === 1) {
+            existing.cycleYellows += 1;
+          }
           playerStatsMap.set(pid, existing);
         });
 
@@ -1187,8 +1193,8 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
           };
         }
 
-        // Apercibidos (con 4 amarillas acumuladas)
-        apercibidosCount = pList.filter(p => p.yellows % 5 === 4).length;
+        // Apercibidos (con 4 amarillas acumuladas en ciclo oficial)
+        apercibidosCount = pList.filter(p => p.cycleYellows % 5 === 4).length;
       }
     }
 

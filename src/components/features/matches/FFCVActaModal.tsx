@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Trophy, ShieldCheck, User, AlertCircle, RefreshCw, Clock, MapPin, Award, ArrowRightLeft, ShieldAlert, FileText, ArrowRight, FolderOpen, CheckCircle2 } from "lucide-react";
+import { X, Trophy, ShieldCheck, User, AlertCircle, RefreshCw, Clock, MapPin, Award, ArrowRightLeft, ShieldAlert, FileText, ArrowRight, FolderOpen, CheckCircle2, Download } from "lucide-react";
 import { getFFCVMatchReportAction } from "@/app/actions/ffcv-actions";
 import { FFCVRawMatchDetails } from "@/lib/ffcv/types";
+import { isFfcvRawCardRed } from "@/lib/ffcv/discipline-rules";
 
 interface FFCVActaModalProps {
   codacta: string;
@@ -304,13 +305,18 @@ export function FFCVActaModal({
                       <span className="text-[11px] font-bold text-slate-500 uppercase block">{data.equipo_local || "Local"}</span>
                       {data.tarjetas_equipo_local && data.tarjetas_equipo_local.length > 0 ? (
                         data.tarjetas_equipo_local.map((t: any, idx: number) => {
-                          const isRed = t.codigo_tipo_amonestacion === "2" || t.tipo_tarjeta === "roja" || t.tarjeta === "roja" || t.segunda_amarilla === "1";
+                          const isRed = isFfcvRawCardRed(t);
+                          const isSecondYellow = String(t.segunda_amarilla) === "1";
                           return (
                             <div key={idx} className={`p-2 rounded-lg text-xs font-semibold flex justify-between items-center border ${isRed ? "bg-red-50 border-red-100 text-red-900" : "bg-amber-50 border-amber-100 text-amber-900"}`}>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className={`inline-block w-2.5 h-3.5 rounded-xs ${isRed ? "bg-red-600" : "bg-amber-400"}`}></span>
                                 <span>{t.nombre_jugador || t.jugador || t.nombre || "Amonestado"}</span>
-                                {t.segunda_amarilla === "1" && <span className="text-[9px] font-bold text-red-600 uppercase">(2ª Amarilla)</span>}
+                                {isSecondYellow ? (
+                                  <span className="text-[9px] font-bold text-red-600 uppercase">(2ª Amarilla)</span>
+                                ) : isRed ? (
+                                  <span className="text-[9px] font-bold text-red-600 uppercase">(Roja Directa)</span>
+                                ) : null}
                               </div>
                               <span className="font-bold">{t.minuto ? `${t.minuto}'` : ""}</span>
                             </div>
@@ -326,13 +332,18 @@ export function FFCVActaModal({
                       <span className="text-[11px] font-bold text-slate-500 uppercase block">{data.equipo_visitante || "Visitante"}</span>
                       {data.tarjetas_equipo_visitante && data.tarjetas_equipo_visitante.length > 0 ? (
                         data.tarjetas_equipo_visitante.map((t: any, idx: number) => {
-                          const isRed = t.codigo_tipo_amonestacion === "2" || t.tipo_tarjeta === "roja" || t.tarjeta === "roja" || t.segunda_amarilla === "1";
+                          const isRed = isFfcvRawCardRed(t);
+                          const isSecondYellow = String(t.segunda_amarilla) === "1";
                           return (
                             <div key={idx} className={`p-2 rounded-lg text-xs font-semibold flex justify-between items-center border ${isRed ? "bg-red-50 border-red-100 text-red-900" : "bg-amber-50 border-amber-100 text-amber-900"}`}>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className={`inline-block w-2.5 h-3.5 rounded-xs ${isRed ? "bg-red-600" : "bg-amber-400"}`}></span>
                                 <span>{t.nombre_jugador || t.jugador || t.nombre || "Amonestado"}</span>
-                                {t.segunda_amarilla === "1" && <span className="text-[9px] font-bold text-red-600 uppercase">(2ª Amarilla)</span>}
+                                {isSecondYellow ? (
+                                  <span className="text-[9px] font-bold text-red-600 uppercase">(2ª Amarilla)</span>
+                                ) : isRed ? (
+                                  <span className="text-[9px] font-bold text-red-600 uppercase">(Roja Directa)</span>
+                                ) : null}
                               </div>
                               <span className="font-bold">{t.minuto ? `${t.minuto}'` : ""}</span>
                             </div>
@@ -534,14 +545,25 @@ export function FFCVActaModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
-          <button
-            onClick={handleNavigateToActas}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Ver acta en Actas</span>
-          </button>
+        <div className="p-4 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleNavigateToActas}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Ver PDF en Visor de Actas</span>
+            </button>
+
+            <a
+              href={`/api/partidos/generar-acta-pdf?codacta=${codacta}${matchId ? `&partidoId=${matchId}` : ''}&download=1`}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5"
+              title="Descargar el Acta Oficial en formato PDF y añadirla al visor"
+            >
+              <Download className="w-4 h-4" />
+              <span>Descargar Acta PDF</span>
+            </a>
+          </div>
 
           <button
             onClick={onClose}

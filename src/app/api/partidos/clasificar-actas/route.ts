@@ -530,13 +530,36 @@ export async function POST(req: NextRequest) {
                   const tipo_evento = cardStr.includes('roja') || cardStr.includes('doble') ? 'Tarjeta Roja' : 'Tarjeta Amarilla';
                   const matchedPlayer = teamPlayers ? matchPlayerInList(nameRaw, teamPlayers) : null;
                   if (matchedPlayer) {
-                    matchEventsToInsert.push({
-                      partido_id: bestMatch.id,
-                      player_id: matchedPlayer.id,
-                      tipo_evento,
-                      minuto: isNaN(minuto) ? 1 : minuto,
-                      notas: `${tipo_evento} a ${matchedPlayer.first_name} ${matchedPlayer.last_name}`
-                    });
+                    if (cardStr.includes('doble')) {
+                      // Doble amarilla: aseguramos que tenga las 2 amarillas y la expulsión (yellow_cards=2, red_cards=1)
+                      const existingYellowsForPlayer = matchEventsToInsert.filter(
+                        e => e.player_id === matchedPlayer.id && e.tipo_evento === 'Tarjeta Amarilla'
+                      ).length;
+                      for (let k = existingYellowsForPlayer; k < 2; k++) {
+                        matchEventsToInsert.push({
+                          partido_id: bestMatch.id,
+                          player_id: matchedPlayer.id,
+                          tipo_evento: 'Tarjeta Amarilla',
+                          minuto: isNaN(minuto) ? 1 : minuto,
+                          notas: `Tarjeta Amarilla a ${matchedPlayer.first_name} ${matchedPlayer.last_name}`
+                        });
+                      }
+                      matchEventsToInsert.push({
+                        partido_id: bestMatch.id,
+                        player_id: matchedPlayer.id,
+                        tipo_evento: 'Tarjeta Roja',
+                        minuto: isNaN(minuto) ? 1 : minuto,
+                        notas: `Doble Amarilla (Expulsión) a ${matchedPlayer.first_name} ${matchedPlayer.last_name}`
+                      });
+                    } else {
+                      matchEventsToInsert.push({
+                        partido_id: bestMatch.id,
+                        player_id: matchedPlayer.id,
+                        tipo_evento,
+                        minuto: isNaN(minuto) ? 1 : minuto,
+                        notas: `${tipo_evento} a ${matchedPlayer.first_name} ${matchedPlayer.last_name}`
+                      });
+                    }
                   }
                 }
               });

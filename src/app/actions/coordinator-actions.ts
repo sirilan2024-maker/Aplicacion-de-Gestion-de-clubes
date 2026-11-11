@@ -566,17 +566,33 @@ export async function getCoordinatorDashboardAction(overrideSeasonId?: string): 
         sortedEvents.forEach(evt => {
           const isLastMatch = evt.partido_id === lastTeamMatchId;
 
-          if (evt.yellow === 2 || (evt.red > 0 && evt.yellow > 0)) {
+          if (evt.yellow >= 2) {
+            // Regla 2: 2 amarillas en el mismo partido = 1 partido de suspensión y NO suman al ciclo de 5
             if (isLastMatch) {
               isPendingSanction = true;
               sanctionReason = 'Doble amarilla (1 partido)';
             }
+          } else if (evt.yellow === 1 && evt.red > 0) {
+            // Regla 3: 1 amarilla y 1 roja directa = la amarilla SÍ suma (+1) al ciclo de 5 y la roja conlleva suspensión
+            cycleCards += 1;
+            const completedCycle = cycleCards === 5;
+            if (completedCycle) {
+              cycleCards = 0;
+            }
+            if (isLastMatch) {
+              isPendingSanction = true;
+              sanctionReason = completedCycle
+                ? 'Roja directa y ciclo de 5 amarillas (2 partidos)'
+                : 'Roja directa (1 partido, +1 amarilla al ciclo)';
+            }
           } else if (evt.red > 0 && evt.yellow === 0) {
+            // Regla 5: 1 roja directa = 1 partido de suspensión
             if (isLastMatch) {
               isPendingSanction = true;
               sanctionReason = 'Roja directa (1 partido)';
             }
           } else if (evt.yellow === 1) {
+            // Regla 1 y 4: 1 amarilla suma al ciclo de 5; 5 amarillas = 1 partido de suspensión
             cycleCards += 1;
             if (cycleCards === 5) {
               cycleCards = 0;

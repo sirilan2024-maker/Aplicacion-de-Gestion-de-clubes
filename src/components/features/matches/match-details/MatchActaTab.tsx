@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { FileText, RefreshCw, AlertCircle, ExternalLink, Edit3, UploadCloud, ShieldCheck } from "lucide-react"
+import { FileText, RefreshCw, AlertCircle, ExternalLink, Edit3, UploadCloud, ShieldCheck, Download } from "lucide-react"
 import { ActaConciliationModal } from "../ActaConciliationModal"
 import { FFCVActaModal } from "../FFCVActaModal"
 
@@ -22,8 +22,34 @@ export function MatchActaTab({ matchId, match, players = [], convocatorias = [],
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [showConciliation, setShowConciliation] = useState(false)
   const [uploadingDirect, setUploadingDirect] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
   const [pdfZoomScale, setPdfZoomScale] = useState<number>(100)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleGeneratePdf = async () => {
+    const matchCodacta = codacta || match?.ffcv_match_id || (match?.acta_oficial_url ? match.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null)
+    setGeneratingPdf(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch("/api/partidos/generar-acta-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partidoId: matchId, codacta: matchCodacta })
+      })
+      const data = await res.json()
+      if (res.ok && data.signedUrl) {
+        setSignedUrl(data.signedUrl)
+        setIsExternal(false)
+        if (data.codacta) setCodacta(data.codacta)
+      } else {
+        alert(data.error || "No se pudo generar el PDF del acta oficial.")
+      }
+    } catch (err: any) {
+      alert("Error al generar el PDF del acta oficial.")
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
 
   const fetchSignedUrl = async () => {
     setLoading(true)
@@ -117,15 +143,26 @@ export function MatchActaTab({ matchId, match, players = [], convocatorias = [],
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           {(codacta || match?.ffcv_match_id || (match?.acta_oficial_url && match.acta_oficial_url.includes('CodPartido='))) && (
-            <button
-              onClick={() => setShowFfcvModal(true)}
-              className="flex-1 sm:flex-none justify-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-200" />
-              <span>Ver Acta Digital FFCV</span>
-            </button>
+            <>
+              <button
+                onClick={() => setShowFfcvModal(true)}
+                className="flex-1 sm:flex-none justify-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-200" />
+                <span>Ficha Digital FFCV</span>
+              </button>
+
+              <a
+                href={`/api/partidos/generar-acta-pdf?partidoId=${matchId}&codacta=${codacta || match?.ffcv_match_id || match?.acta_oficial_url?.match(/CodPartido=(\d+)/i)?.[1] || ''}&download=1`}
+                className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all border border-slate-700"
+                title="Descargar PDF del Acta Oficial"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Descargar PDF</span>
+              </a>
+            </>
           )}
 
           {signedUrl && !isExternal && (
@@ -139,7 +176,7 @@ export function MatchActaTab({ matchId, match, players = [], convocatorias = [],
             </a>
           )}
 
-          {!isReadOnly && !signedUrl && (
+          {!isReadOnly && (
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingDirect}
@@ -150,7 +187,7 @@ export function MatchActaTab({ matchId, match, players = [], convocatorias = [],
               ) : (
                 <UploadCloud className="w-3.5 h-3.5" />
               )}
-              {uploadingDirect ? "Subiendo..." : "Añadir Acta"}
+              {uploadingDirect ? "Subiendo..." : "Subir PDF"}
             </button>
           )}
 
@@ -199,11 +236,20 @@ export function MatchActaTab({ matchId, match, players = [], convocatorias = [],
 
               <div className="flex flex-wrap items-center justify-center gap-3 mt-2 w-full">
                 <button
+                  onClick={handleGeneratePdf}
+                  disabled={generatingPdf}
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all hover:scale-[1.02] disabled:opacity-50"
+                >
+                  {generatingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  {generatingPdf ? "Generando PDF..." : "Ver Acta en PDF en el Visor"}
+                </button>
+
+                <button
                   onClick={() => setShowFfcvModal(true)}
                   className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all hover:scale-[1.02]"
                 >
-                  <FileText className="w-4 h-4" />
-                  Abrir Acta Digital FFCV
+                  <ShieldCheck className="w-4 h-4" />
+                  Abrir Ficha Digital FFCV
                 </button>
 
                 {signedUrl && (

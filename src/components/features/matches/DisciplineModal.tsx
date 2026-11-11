@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { AlertCircle, X, Edit3, Loader2 } from "lucide-react"
 import { updatePlayerCardsInMatch } from "@/app/actions/match-actions"
 import { useRouter } from "next/navigation"
+import { evaluatePlayerDiscipline, classifyMatchCards } from "@/lib/ffcv/discipline-rules"
 
 interface DisciplineModalProps {
   player: any
@@ -77,25 +78,9 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
     return true;
   });
 
-  // Calculate cycle status and sanctions based on chronological events
-  const chronologicalEvents = [...validCardEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
-  let cycleCards = 0;
-  let cyclesCompleted = 0;
-  let redSanctions = 0;
-  chronologicalEvents.forEach(evt => {
-    if (evt.yellow === 2 || (evt.red > 0 && evt.yellow > 0)) {
-      redSanctions += 1;
-    } else if (evt.red > 0 && evt.yellow === 0) {
-      redSanctions += 1;
-    } else if (evt.yellow === 1) {
-      cycleCards += 1;
-      if (cycleCards === 5) {
-        cyclesCompleted += 1;
-        cycleCards = 0;
-      }
-    }
-  });
-  const totalSanctions = cyclesCompleted + redSanctions;
+  // Calculate cycle status and sanctions based on official FFCV rules
+  const evalResult = evaluatePlayerDiscipline(validCardEvents);
+  const { cycleCards, cyclesCompleted, redSanctions, totalSanctions } = evalResult;
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -189,16 +174,20 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                               </div>
                             )}
                           </div>
-                          {(ev.yellow === 2 || (ev.yellow > 0 && ev.red > 0)) && (
-                            <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded whitespace-nowrap">
-                              Doble Amarilla • 1 partido de sanción
-                            </span>
-                          )}
-                          {ev.red > 0 && ev.yellow === 0 && (
-                            <span className="text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded whitespace-nowrap">
-                              Roja Directa • 1 partido de sanción
-                            </span>
-                          )}
+                          {(() => {
+                            const cls = classifyMatchCards(ev.yellow || 0, ev.red || 0);
+                            if (!cls.badgeLabel) return null;
+                            const isWarnOrRed = cls.isDoubleYellow || cls.isYellowPlusDirectRed || cls.isDirectRedOnly;
+                            return (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap border ${
+                                isWarnOrRed
+                                  ? 'text-red-700 bg-red-100 border-red-200'
+                                  : 'text-amber-800 bg-amber-50 border-amber-200'
+                              }`}>
+                                {cls.badgeLabel}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadCloud, CheckCircle2, AlertCircle, FileText, Search, RefreshCw, Eye, Edit3, ArrowRight, ShieldCheck, ChevronRight, ExternalLink, Maximize2, X, Trophy, Dumbbell, Sparkles, Layers } from "lucide-react"
+import { UploadCloud, CheckCircle2, AlertCircle, FileText, Search, RefreshCw, Eye, Edit3, ArrowRight, ShieldCheck, ChevronRight, ExternalLink, Maximize2, X, Trophy, Dumbbell, Sparkles, Layers, Download } from "lucide-react"
 import { ActaConciliationModal } from "./ActaConciliationModal"
 import { FFCVActaModal } from "./FFCVActaModal"
 import { createClient } from "@/lib/supabase/client"
@@ -58,8 +58,11 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
   const [activeCodacta, setActiveCodacta] = useState<string | null>(null)
   const [isExternalActa, setIsExternalActa] = useState(false)
   const [loadingSignedUrl, setLoadingSignedUrl] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [uploadingDirectPdf, setUploadingDirectPdf] = useState(false)
   const [signedUrlError, setSignedUrlError] = useState<string | null>(null)
   const [conciliatingMatch, setConciliatingMatch] = useState<any>(null)
+  const directMatchFileInputRef = useRef<HTMLInputElement>(null)
   const [viewingFfcvModal, setViewingFfcvModal] = useState<{
     codacta: string;
     matchId?: string;
@@ -155,6 +158,67 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
       fetchMatchEvents(selectedMatchId)
     }
   }, [selectedMatchId])
+
+  // Generar e incorporar el Acta Oficial FFCV en PDF dentro del visor
+  const handleGenerateAndEmbedPdf = async (matchObj?: any) => {
+    const targetMatch = matchObj || matches.find((m) => m.id === selectedMatchId)
+    if (!targetMatch) return
+    const codacta = activeCodacta || targetMatch.ffcv_match_id || (targetMatch.acta_oficial_url ? targetMatch.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null)
+    setGeneratingPdf(true)
+    setSignedUrlError(null)
+    try {
+      const res = await fetch("/api/partidos/generar-acta-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partidoId: targetMatch.id, codacta })
+      })
+      const data = await res.json()
+      if (res.ok && data.signedUrl) {
+        setActiveSignedUrl(data.signedUrl)
+        setIsExternalActa(false)
+        if (data.codacta) setActiveCodacta(data.codacta)
+        fetchMatchEvents(targetMatch.id)
+      } else {
+        alert(data.error || "No se pudo generar el PDF del acta oficial.")
+      }
+    } catch (err: any) {
+      alert("Error al generar el PDF del acta oficial.")
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
+  // Subir un PDF directamente al partido seleccionado para verlo en el visor
+  const handleDirectMatchPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedMatchId) return
+    if (file.type !== "application/pdf") {
+      alert("Por favor selecciona un archivo PDF válido.")
+      return
+    }
+    setUploadingDirectPdf(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("partidoId", selectedMatchId)
+      const res = await fetch("/api/partidos/asignar-acta", {
+        method: "POST",
+        body: formData
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        await loadSignedUrlForMatch(selectedMatchId)
+        await fetchMatchEvents(selectedMatchId)
+      } else {
+        alert(data.error || "Error al subir el PDF del acta.")
+      }
+    } catch (err: any) {
+      alert("Error al subir el PDF del acta.")
+    } finally {
+      setUploadingDirectPdf(false)
+      if (directMatchFileInputRef.current) directMatchFileInputRef.current.value = ""
+    }
+  }
 
   // Manejador de subida masiva de archivos
   const handleFilesUpload = async (filesList: FileList | File[]) => {
@@ -480,28 +544,62 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Botón Ver Acta Digital FFCV */}
+                  <input
+                    ref={directMatchFileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={handleDirectMatchPdfUpload}
+                  />
+
+                  {/* Botón Ver Acta Digital FFCV y Descargar / Incorporar PDF */}
                   {(() => {
                     const matchCodacta = activeCodacta || selectedMatch?.ffcv_match_id || (selectedMatch?.acta_oficial_url ? selectedMatch.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null);
-                    if (!matchCodacta) return null;
                     const isUsLocal = selectedMatch.lugar === 'Local';
                     const homeTeam = isUsLocal ? (selectedMatch.equipo?.name || 'Mi Equipo') : selectedMatch.rival_nombre;
                     const awayTeam = isUsLocal ? selectedMatch.rival_nombre : (selectedMatch.equipo?.name || 'Mi Equipo');
 
                     return (
-                      <button
-                        onClick={() => setViewingFfcvModal({
-                          codacta: matchCodacta,
-                          matchId: selectedMatch.id,
-                          teamId: selectedMatch.equipo_id,
-                          homeTeamName: homeTeam,
-                          awayTeamName: awayTeam
-                        })}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-blue-200" />
-                        Ver Acta FFCV
-                      </button>
+                      <>
+                        {matchCodacta && (
+                          <>
+                            <button
+                              onClick={() => setViewingFfcvModal({
+                                codacta: matchCodacta,
+                                matchId: selectedMatch.id,
+                                teamId: selectedMatch.equipo_id,
+                                homeTeamName: homeTeam,
+                                awayTeamName: awayTeam
+                              })}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                            >
+                              <ShieldCheck className="w-4 h-4 text-blue-200" />
+                              Ficha FFCV
+                            </button>
+
+                            <a
+                              href={`/api/partidos/generar-acta-pdf?partidoId=${selectedMatch.id}&codacta=${matchCodacta}&download=1`}
+                              className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                              title="Descargar el Acta Oficial en formato PDF"
+                            >
+                              <Download className="w-4 h-4 text-emerald-400" />
+                              Descargar PDF
+                            </a>
+                          </>
+                        )}
+
+                        {!isReadOnly && (
+                          <button
+                            onClick={() => directMatchFileInputRef.current?.click()}
+                            disabled={uploadingDirectPdf}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                            title="Subir archivo PDF de acta a este partido"
+                          >
+                            {uploadingDirectPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4 text-blue-600" />}
+                            {uploadingDirectPdf ? "Subiendo..." : "Subir PDF"}
+                          </button>
+                        )}
+                      </>
                     );
                   })()}
 
@@ -745,6 +843,15 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
 
                       <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
                         <button
+                          onClick={() => handleGenerateAndEmbedPdf(selectedMatch)}
+                          disabled={generatingPdf}
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition-all hover:scale-[1.02] disabled:opacity-50"
+                        >
+                          {generatingPdf ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                          {generatingPdf ? "Generando PDF..." : "Ver Acta en PDF en el Visor"}
+                        </button>
+
+                        <button
                           onClick={() => {
                             const matchCodacta = activeCodacta || selectedMatch?.ffcv_match_id || (selectedMatch?.acta_oficial_url ? selectedMatch.acta_oficial_url.match(/CodPartido=(\d+)/i)?.[1] : null);
                             const isUsLocal = selectedMatch.lugar === 'Local';
@@ -758,8 +865,8 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                           }}
                           className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition-all hover:scale-[1.02]"
                         >
-                          <FileText className="w-4 h-4" />
-                          Abrir Acta Digital FFCV
+                          <ShieldCheck className="w-4 h-4" />
+                          Abrir Ficha Digital FFCV
                         </button>
 
                         {activeSignedUrl && (
@@ -779,7 +886,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                         <div className="mt-5 pt-4 border-t border-slate-800/80 w-full flex flex-col items-center">
                           <p className="text-[11px] text-slate-500 mb-1.5">¿Quieres adjuntar además una copia en archivo PDF escaneado?</p>
                           <button
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => directMatchFileInputRef.current?.click()}
                             className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5 transition-colors"
                           >
                             <UploadCloud className="w-3.5 h-3.5" />
@@ -795,7 +902,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                       <p className="text-xs text-slate-400">{signedUrlError}</p>
                       {!isReadOnly && (
                         <button
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => directMatchFileInputRef.current?.click()}
                           className="mt-3 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md transition-all"
                         >
                           <UploadCloud className="w-4 h-4" /> Añadir / Subir Acta Ahora
@@ -804,7 +911,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
                     </div>
                   ) : activeSignedUrl ? (
                     <iframe
-                      src={`${activeSignedUrl}#toolbar=0&navpanes=0`}
+                      src={activeSignedUrl.startsWith('data:') ? activeSignedUrl : `${activeSignedUrl}#toolbar=1&navpanes=0`}
                       className="w-full h-full min-h-[450px] md:min-h-[550px] border-0 bg-white rounded-lg shadow-inner"
                       title="Visor de Acta Oficial PDF"
                     />

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { DisciplineModal } from "./DisciplineModal"
 import { sendDisciplineAlertAction } from "@/app/actions/chat-actions"
 import { createClient } from "@/lib/supabase/client"
+import { evaluatePlayerDiscipline } from "@/lib/ffcv/discipline-rules"
 
 interface TeamDisciplineViewProps {
   matches: any[]
@@ -152,45 +153,25 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
 
     const lastFinishedMatchId = finishedTeamMatches[finishedTeamMatches.length - 1]?.id;
 
-    // Ordenar cronológicamente para calcular ciclos y sanciones
-    const chronologicalEvents = [...rawEvents].sort((a, b) => new Date(a.match.fecha_hora).getTime() - new Date(b.match.fecha_hora).getTime());
-    let cycleCards = 0;
-    let cyclesCompleted = 0;
-    let redSanctions = 0;
-    let pendingSanction = false;
-    let pendingReason = '';
-
-    chronologicalEvents.forEach(evt => {
-      const isLastFinished = evt.match.id === lastFinishedMatchId;
-
-      if (evt.yellow === 2 || (evt.red > 0 && evt.yellow > 0)) {
-        // Doble amarilla = Expulsión y 1 partido de sanción (Art. 113 FFCV/RFEF)
-        redSanctions += 1;
-        if (isLastFinished) {
-          pendingSanction = true;
-          pendingReason = 'Doble amarilla (1 partido)';
-        }
-      } else if (evt.red > 0 && evt.yellow === 0) {
-        // Roja directa = Expulsión y al menos 1 partido de sanción
-        redSanctions += 1;
-        if (isLastFinished) {
-          pendingSanction = true;
-          pendingReason = 'Roja directa (1 partido)';
-        }
-      } else if (evt.yellow === 1) {
-        cycleCards += 1;
-        if (cycleCards === 5) {
-          cyclesCompleted += 1;
-          cycleCards = 0;
-          if (isLastFinished) {
-            pendingSanction = true;
-            pendingReason = 'Ciclo de 5 amarillas';
-          }
-        }
-      }
+    // Calcular ciclos y sanciones con el motor normativo oficial FFCV
+    // - 1 amarilla -> suma +1 al ciclo de 5
+    // - 2 amarillas mismo partido -> 1 partido suspensión y NO suma al ciclo de 5
+    // - 1 amarilla y 1 roja directa -> la amarilla SÍ suma (+1) al ciclo de 5 y la roja conlleva suspensión
+    // - 5 amarillas -> 1 ciclo cumplido (1 partido suspensión)
+    // - 1 roja directa -> 1 partido suspensión
+    const evalResult = evaluatePlayerDiscipline(rawEvents, {
+      lastFinishedMatchId,
+      teamMatches: finishedTeamMatches
     });
 
-    const totalSanctions = cyclesCompleted + redSanctions;
+    const {
+      cycleCards,
+      cyclesCompleted,
+      redSanctions,
+      totalSanctions,
+      pendingSanction,
+      pendingReason
+    } = evalResult;
 
     return {
       player,

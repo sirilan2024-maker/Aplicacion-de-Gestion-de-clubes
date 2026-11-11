@@ -2,6 +2,7 @@ import { createAdminClient } from '../supabase/admin';
 import { fetchMatchDetails } from './client';
 import { FFCVRawMatchDetails } from './types';
 import { getOfficialMatchDuration } from '../utils';
+import { isFfcvRawCardRed } from './discipline-rules';
 
 const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
 const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
@@ -213,17 +214,20 @@ export async function syncFFCVActaToConvocatorias(
     }
 
     // Determine if Saladar is home or away
+    // IMPORTANTE: Priorizar 'saladar' sobre 'sporting' para no confundir con rivales llamados "Sporting Dolores", "Sporting Guardamar", etc.
     const localName = (details.equipo_local || '').toLowerCase();
     const awayName = (details.equipo_visitante || '').toLowerCase();
-    const isHome = localName.includes('saladar') || localName.includes('sporting');
-    const isAway = awayName.includes('saladar') || awayName.includes('sporting');
+    const localHasSaladar = localName.includes('saladar');
+    const awayHasSaladar = awayName.includes('saladar');
+    const isHome = localHasSaladar || (!awayHasSaladar && localName.includes('sporting'));
+    const isAway = awayHasSaladar || (!localHasSaladar && awayName.includes('sporting'));
 
     // Strict guard: NEVER sync an acta if our club is neither home nor away
     if (!isHome && !isAway) {
       return { success: false, syncedCount: 0, error: `Acta #${codacta} does not involve Sporting Saladar (${details.equipo_local} vs ${details.equipo_visitante})` };
     }
 
-    const isSaladarHome = isHome;
+    const isSaladarHome = localHasSaladar ? true : awayHasSaladar ? false : isHome;
     const ourPlayers = isSaladarHome ? details.jugadores_equipo_local : details.jugadores_equipo_visitante;
     const ourCards = isSaladarHome ? (details.tarjetas_equipo_local || []) : (details.tarjetas_equipo_visitante || []);
     const ourSubs = isSaladarHome ? (details.sustituciones_equipo_local || []) : (details.sustituciones_equipo_visitante || []);
@@ -345,7 +349,7 @@ export async function syncFFCVActaToConvocatorias(
           if (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) {
             yellows += 1;
             reds += 1;
-          } else if (c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja' || (c.tarjeta || '').toLowerCase() === 'roja') {
+          } else if (isFfcvRawCardRed(c)) {
             reds += 1;
           } else {
             yellows += 1;
@@ -372,8 +376,7 @@ export async function syncFFCVActaToConvocatorias(
         const matchByCode = c.codjugador && String(c.codjugador) === String(fp.codjugador);
         const matchByName = !c.codjugador && countCommonWords(normalizeNameWords(c.nombre_jugador), normalizeNameWords(fp.nombre_jugador)) >= 2;
         if (matchByCode || matchByName) {
-          const isRed = (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) ||
-                        (c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja' || (c.tarjeta || '').toLowerCase() === 'roja');
+          const isRed = isFfcvRawCardRed(c);
           if (isRed && c.minuto) {
             sendOffMinute = Number(c.minuto);
           }
@@ -408,20 +411,9 @@ export async function syncFFCVActaToConvocatorias(
 
       minutes = Math.max(0, Math.min(minutes, maxMatchMinutes));
 
-      // Preservar correcciones manuales de tarjetas si el club ya ajustó expresamente los datos
-      // (por ejemplo, actas de Novanet donde el árbitro anotó 2ª amarilla erróneamente en vez de roja directa)
-      let finalYellows = yellows;
-      let finalReds = reds;
-      if (existingConv) {
-        const prevY = existingConv.tarjetas_amarillas ?? existingConv.yellow_cards;
-        const prevR = existingConv.tarjetas_rojas ?? existingConv.red_cards;
-        if (typeof prevY === 'number' && typeof prevR === 'number') {
-          if (yellows === 2 && reds >= 1 && prevY === 1 && prevR === 1) {
-            finalYellows = 1;
-            finalReds = 1;
-          }
-        }
-      }
+      // Las tarjetas del acta oficial FFCV son la fuente de verdad federativa
+      const finalYellows = yellows;
+      const finalReds = reds;
 
       rowsToUpsert.push({
         partido_id: partido.id,
@@ -462,7 +454,7 @@ export async function syncFFCVActaToConvocatorias(
             if (sc.segunda_amarilla === '1' || sc.segunda_amarilla === 1) {
               staffYellows += 1;
               staffReds += 1;
-            } else if (sc.codigo_tipo_amonestacion === '200' || sc.codigo_tipo_amonestacion === '2' || (sc.tipo_tarjeta || '').toLowerCase() === 'roja' || (sc.tarjeta || '').toLowerCase() === 'roja') {
+            } else if (isFfcvRawCardRed(sc)) {
               staffReds += 1;
             } else {
               staffYellows += 1;
@@ -594,7 +586,7 @@ export async function syncFFCVActaToConvocatorias(
       // Cards: Local
       (details.tarjetas_equipo_local || []).forEach((c: any) => {
         const pId = isSaladarHome ? findSaladarPlayerId(c.nombre_jugador) : null;
-        const isRed = c.segunda_amarilla === '1' || c.segunda_amarilla === 1 || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja';
+        const isRed = isFfcvRawCardRed(c);
         newEvents.push({
           partido_id: partido.id,
           player_id: pId,
@@ -607,7 +599,7 @@ export async function syncFFCVActaToConvocatorias(
       // Cards: Visitante
       (details.tarjetas_equipo_visitante || []).forEach((c: any) => {
         const pId = !isSaladarHome ? findSaladarPlayerId(c.nombre_jugador) : null;
-        const isRed = c.segunda_amarilla === '1' || c.segunda_amarilla === 1 || c.codigo_tipo_amonestacion === '200' || c.codigo_tipo_amonestacion === '2' || (c.tipo_tarjeta || '').toLowerCase() === 'roja';
+        const isRed = isFfcvRawCardRed(c);
         newEvents.push({
           partido_id: partido.id,
           player_id: pId,

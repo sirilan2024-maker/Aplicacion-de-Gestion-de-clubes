@@ -50,7 +50,13 @@ export async function GET(req: NextRequest) {
       .from("actas-partidos")
       .list(folderPath, { search: fileName });
 
-    const fileExistsInStorage = Array.isArray(existingFiles) && existingFiles.some(f => f.name === fileName);
+    const matchedFile = Array.isArray(existingFiles)
+      ? existingFiles.find(f => f.name === fileName)
+      : null;
+    // Un PDF oficial CTA FFCV de 3 páginas (subido o generado con logo oficial) ocupa > 15 KB.
+    // Si tiene menos de 12 KB era la versión antigua de 1 página y se regenera al formato CTA de 3 páginas.
+    const fileSize = Number(matchedFile?.metadata?.size || 0);
+    const fileExistsInStorage = Boolean(matchedFile && (fileSize === 0 || fileSize >= 12000));
 
     if (fileExistsInStorage) {
       // Si además tiene codacta FFCV, sincronizar en segundo plano las convocatorias para asegurar coherencia de tarjetas

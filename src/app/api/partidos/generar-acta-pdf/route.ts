@@ -97,9 +97,59 @@ export async function GET(req: NextRequest) {
     const partidoId = searchParams.get("partidoId");
     const codactaParam = searchParams.get("codacta");
     const download = searchParams.get("download") === "1";
+    const force = searchParams.get("force") === "1";
 
     const supabase = getAdminSupabase();
     const { partido, codacta } = await resolvePartidoAndCodacta(supabase, partidoId, codactaParam);
+
+    // Si existe un PDF original FFCV ya subido en Storage (>= 25 KB) y no se fuerza regeneración, servirlo directamente
+    if (partido?.id && !force) {
+      const folderPath = `partidos/${partido.id}`;
+      const { data: existingFiles } = await supabase.storage
+        .from("actas-partidos")
+        .list(folderPath, { search: "acta_oficial.pdf" });
+      const existing = Array.isArray(existingFiles)
+        ? existingFiles.find((f: any) => f.name === "acta_oficial.pdf")
+        : null;
+      const existingSize = Number(existing?.metadata?.size || 0);
+
+      if (existing && existingSize >= 25000) {
+        const storagePath = `${folderPath}/acta_oficial.pdf`;
+        if (download) {
+          const { data: fileBlob } = await supabase.storage
+            .from("actas-partidos")
+            .download(storagePath);
+          if (fileBlob) {
+            const arrayBuf = await fileBlob.arrayBuffer();
+            const rivalSlug = (partido?.rival_nombre || codacta || "partido")
+              .replace(/[^a-zA-Z0-9_-]/g, "_")
+              .slice(0, 40);
+            return new NextResponse(Buffer.from(arrayBuf), {
+              status: 200,
+              headers: {
+                "Content-Type": "application/pdf",
+                "Content-Disposition": `attachment; filename="Acta_Oficial_FFCV_${codacta || partido.id}_${rivalSlug}.pdf"`,
+                "Cache-Control": "no-store",
+              },
+            });
+          }
+        } else {
+          const { data: signed } = await supabase.storage
+            .from("actas-partidos")
+            .createSignedUrl(storagePath, 3600);
+          if (signed?.signedUrl) {
+            return NextResponse.json({
+              success: true,
+              signedUrl: signed.signedUrl,
+              isExternal: false,
+              codacta,
+              partidoId: partido.id,
+              pdfGenerated: false,
+            });
+          }
+        }
+      }
+    }
 
     if (!codacta) {
       return NextResponse.json(

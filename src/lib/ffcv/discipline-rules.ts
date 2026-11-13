@@ -82,7 +82,7 @@ export interface PlayerDisciplineSummary {
 
 /**
  * Determina si un registro de tarjeta crudo de la API FFCV (Novanet) es tarjeta roja
- * (ya sea roja directa código "200" / "2" o expulsión por segunda amarilla).
+ * (ya sea roja directa código "101" / "200" / "2" o expulsión por segunda amarilla).
  */
 export function isFfcvRawCardRed(card: any): boolean {
   if (!card) return false;
@@ -90,6 +90,8 @@ export function isFfcvRawCardRed(card: any): boolean {
   const secondYellow = String(card.segunda_amarilla ?? '').trim() === '1';
   const tipo = String(card.tipo_tarjeta ?? card.tarjeta ?? '').toLowerCase().trim();
   return (
+    code === '101' ||
+    code === '102' ||
     code === '200' ||
     code === '201' ||
     code === '2' ||
@@ -195,8 +197,12 @@ export function classifyMatchCards(
  */
 export function evaluatePlayerDiscipline(
   events: MatchCardInput[],
-  lastFinishedMatchId?: string | null
+  optionsOrLastMatchId?: string | null | { lastFinishedMatchId?: string | null; teamMatches?: any[] }
 ): PlayerDisciplineSummary {
+  const lastFinishedMatchId =
+    typeof optionsOrLastMatchId === 'object' && optionsOrLastMatchId !== null
+      ? optionsOrLastMatchId.lastFinishedMatchId
+      : optionsOrLastMatchId;
   const getEventDateMs = (e: MatchCardInput): number => {
     const d = e.fecha_hora || e.date || e.match?.fecha_hora;
     if (!d) return 0;

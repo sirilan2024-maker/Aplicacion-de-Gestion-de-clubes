@@ -58,7 +58,7 @@ export function EstadisticasView({ fixedTeamId }: { fixedTeamId?: string }) {
       const { data: profileRoleData } = await supabase.from('profiles').select('role, roles').eq('id', user.id).single()
       const currentRole = (profileRoleData?.role || '').toLowerCase();
       if (currentRole === 'jugador' || currentRole === 'tutor' || currentRole === 'familiar' || currentRole === 'family' || currentRole === 'familia') {
-        router.push('/dashboard');
+        if (typeof window !== 'undefined') window.location.href = '/dashboard';
         return;
       }
       if (profileRoleData?.role === 'coach' || profileRoleData?.role === 'entrenador' || profileRoleData?.role === 'delegado') {

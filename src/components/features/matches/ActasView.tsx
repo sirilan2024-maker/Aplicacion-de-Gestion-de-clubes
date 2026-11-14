@@ -973,7 +973,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
       )}
 
       {/* Modal de Conciliación */}
-      {conciliatingMatch && (
+      {!isReadOnly && conciliatingMatch && (
         <ActaConciliationModal
           match={conciliatingMatch}
           players={players.filter((p) => p.team_id === conciliatingMatch.equipo_id)}
@@ -994,6 +994,7 @@ export function ActasView({ matches, teams, players = [], convocatorias = [], is
           teamId={viewingFfcvModal.teamId}
           homeTeamName={viewingFfcvModal.homeTeamName}
           awayTeamName={viewingFfcvModal.awayTeamName}
+          isReadOnly={isReadOnly}
           onClose={() => {
             const currentMatchId = viewingFfcvModal.matchId || selectedMatchId;
             setViewingFfcvModal(null);

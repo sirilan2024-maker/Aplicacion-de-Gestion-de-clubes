@@ -1,12 +1,46 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { TeamMatchesView } from '@/components/features/matches/TeamMatchesView';
+import { resolveOrAutoLinkFamilyPlayer } from "@/lib/family-helpers"
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardTeamMatchesPage({ params }: { params: Promise<{ teamId: string }> }) {
   const { teamId } = await params;
+  const supabase = await createClient();
   const adminClient = createAdminClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/auth/login');
+  }
+
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('club_id, role, roles, linked_player_id, is_active')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.is_active === false) {
+    redirect('/dashboard/cuenta-bloqueada?reason=blocked');
+  }
+
+  const userRole = (profile?.role || '').toLowerCase().trim();
+  const allRoles = Array.from(new Set([userRole, ...(profile?.roles || []).map((r: string) => String(r).toLowerCase().trim())]));
+  const isActiveFamilyOrPlayer = ['familia', 'tutor', 'family', 'familiar', 'jugador'].includes(userRole);
+  const isFamilyOrPlayer = allRoles.some(r => ['familia', 'tutor', 'family', 'familiar', 'jugador'].includes(r));
+  const isStaffOrCoach = allRoles.some(r => ['admin', 'superadmin', 'administrador', 'admin_club', 'coordinador', 'coordinador_general', 'metodologo', 'metodologia', 'coach', 'entrenador', 'delegado', 'preparador_fisico', 'utillero', 'socio', 'directivo', 'secretario', 'secretaria', 'tesorero', 'tesoreria'].includes(r));
+
+  if (isActiveFamilyOrPlayer || (isFamilyOrPlayer && !isStaffOrCoach)) {
+    const linkedId = await resolveOrAutoLinkFamilyPlayer(user.id, user.email);
+    if (linkedId) {
+      redirect(`/dashboard/family/e/${linkedId}/partidos`);
+    }
+    redirect('/dashboard/bienvenida-familia');
+  }
+
+  const isReadOnly = ['socio', 'utillero', 'directivo', 'secretario', 'secretaria', 'tesorero', 'tesoreria', 'delegado'].includes(userRole);
 
   // 1. Obtener el equipo solicitado
   const { data: requestedTeam } = await adminClient
@@ -14,6 +48,10 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
     .select('id, name, club_id, season_id, ffcv_url, ffcv_season_id, ffcv_competition_id, ffcv_group_id, ffcv_team_id, ffcv_last_synced_at, color, category')
     .eq('id', teamId)
     .maybeSingle();
+
+  if (requestedTeam && profile?.club_id && requestedTeam.club_id !== profile.club_id) {
+    redirect('/dashboard');
+  }
 
   // 2. Obtener la temporada activa del club (TEMPORADA 26/27)
   const clubId = requestedTeam?.club_id || '7ff5dbeb-2942-4576-8e74-b45a17646fb7';
@@ -208,6 +246,8 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
       serverPlayers={players || []}
       serverConvocatorias={convocatorias || []}
       serverGroupInfo={groupInfo}
+      isReadOnly={isReadOnly}
+      userRole={userRole}
     />
   );
 }

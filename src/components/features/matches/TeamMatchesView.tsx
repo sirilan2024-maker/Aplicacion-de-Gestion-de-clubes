@@ -32,6 +32,8 @@ interface TeamMatchesViewProps {
   serverPlayers?: any[];
   serverConvocatorias?: any[];
   serverGroupInfo?: any;
+  isReadOnly?: boolean;
+  userRole?: string;
 }
 
 export function TeamMatchesView({
@@ -42,18 +44,21 @@ export function TeamMatchesView({
   serverPlayers = [],
   serverConvocatorias = [],
   serverGroupInfo = null,
+  isReadOnly = false,
+  userRole = '',
 }: TeamMatchesViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialView = (searchParams.get('view') as any) || 'partidos'
+  const rawInitialView = (searchParams.get('view') as any) || 'partidos'
+  const initialView = (isReadOnly && (rawInitialView === 'disciplina' || rawInitialView === 'informes')) ? 'partidos' : rawInitialView
   const [viewMode, setViewMode] = useState<'partidos' | 'clasificacion' | 'disciplina' | 'actas' | 'informes'>(initialView)
   const [matchesSubTab, setMatchesSubTab] = useState<'club' | 'ffcv'>(searchParams.get('sub') === 'ffcv' ? 'ffcv' : 'club')
 
   useEffect(() => {
     const v = searchParams.get('view')
-    if (v === 'actas' || v === 'clasificacion' || v === 'disciplina' || v === 'informes' || v === 'partidos') {
-      setViewMode(v)
-    } else if (!v) {
+    if (v === 'actas' || v === 'clasificacion' || (!isReadOnly && (v === 'disciplina' || v === 'informes')) || v === 'partidos') {
+      setViewMode(v as any)
+    } else {
       setViewMode('partidos')
     }
     const sub = searchParams.get('sub')
@@ -62,9 +67,12 @@ export function TeamMatchesView({
     } else if (!sub) {
       setMatchesSubTab('club')
     }
-  }, [searchParams])
+  }, [searchParams, isReadOnly])
 
   const handleViewChange = (newView: 'partidos' | 'clasificacion' | 'disciplina' | 'actas' | 'informes') => {
+    if (isReadOnly && (newView === 'disciplina' || newView === 'informes')) {
+      return
+    }
     setViewMode(newView)
     if (newView === 'partidos') {
       setMatchesSubTab('club')
@@ -253,36 +261,40 @@ export function TeamMatchesView({
           >
             <FileText size={16} /> Actas
           </button>
-          <button
-            onClick={() => handleViewChange('informes')}
-            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
-              viewMode === 'informes'
-                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <ClipboardList size={16} /> Informes
-          </button>
-          <button
-            onClick={() => handleViewChange('disciplina')}
-            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
-              viewMode === 'disciplina'
-                ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <AlertCircle size={16} /> Disciplina
-            {apercibidosCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                {apercibidosCount}
-              </span>
-            )}
-          </button>
+          {!isReadOnly && (
+            <>
+              <button
+                onClick={() => handleViewChange('informes')}
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+                  viewMode === 'informes'
+                    ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <ClipboardList size={16} /> Informes
+              </button>
+              <button
+                onClick={() => handleViewChange('disciplina')}
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl sm:rounded-full text-sm font-bold transition-all flex items-center justify-center gap-2 relative ${
+                  viewMode === 'disciplina'
+                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <AlertCircle size={16} /> Disciplina
+                {apercibidosCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                    {apercibidosCount}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Banner de Apercibidos */}
-      {viewMode === 'partidos' && apercibidosCount > 0 && (
+      {!isReadOnly && viewMode === 'partidos' && apercibidosCount > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-4 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
             <div className="bg-orange-100 p-2 rounded-full">
@@ -311,10 +323,11 @@ export function TeamMatchesView({
           teams={data.teams}
           players={data.players}
           convocatorias={data.convocatorias}
-          isReadOnly={false}
+          isReadOnly={isReadOnly}
+          userRole={userRole}
           userTeamIds={[teamId]}
         />
-      ) : viewMode === 'informes' ? (
+      ) : viewMode === 'informes' && !isReadOnly ? (
         <TeamPostMatchReportsView
           teamId={teamId}
           teamName={teamName}
@@ -329,7 +342,7 @@ export function TeamMatchesView({
           ffcvUrl={ffcvUrl}
           teamName={teamName}
         />
-      ) : viewMode === 'disciplina' ? (
+      ) : viewMode === 'disciplina' && !isReadOnly ? (
         <div className="pt-2">
           <TeamDisciplineView
             matches={(data.matches || []).filter(m => m.season_id !== '584f508a-fc1a-4339-b5b2-4296ffde2f4c' && (!m.season_id || m.season_id === '663ed6ef-1dab-4350-9489-ed50f9e9ac15'))}
@@ -369,22 +382,24 @@ export function TeamMatchesView({
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                {syncMessage && (
-                  <span className={`text-xs font-bold ${syncMessage.startsWith('Error') ? 'text-rose-600' : 'text-emerald-600'} animate-in fade-in`}>
-                    {syncMessage}
-                  </span>
-                )}
-                <button
-                  onClick={handleSyncFFCV}
-                  disabled={isSyncing}
-                  className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs hover:shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  title={isLigaBrave ? "Sincronizar horarios y resultados con la Liga Brave" : "Sincronizar horarios y resultados oficiales con la FFCV"}
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando...' : (isLigaBrave ? 'Sincronizar Liga Brave' : 'Sincronizar FFCV')}</span>
-                </button>
-              </div>
+              {!isReadOnly && (
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  {syncMessage && (
+                    <span className={`text-xs font-bold ${syncMessage.startsWith('Error') ? 'text-rose-600' : 'text-emerald-600'} animate-in fade-in`}>
+                      {syncMessage}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleSyncFFCV}
+                    disabled={isSyncing}
+                    className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs hover:shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    title={isLigaBrave ? "Sincronizar horarios y resultados con la Liga Brave" : "Sincronizar horarios y resultados oficiales con la FFCV"}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-blue-600 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isSyncing ? 'Sincronizando...' : (isLigaBrave ? 'Sincronizar Liga Brave' : 'Sincronizar FFCV')}</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -395,6 +410,8 @@ export function TeamMatchesView({
               players={data.players}
               convocatorias={data.convocatorias}
               fixedTeamId={teamId}
+              isReadOnly={isReadOnly}
+              userRole={userRole}
             />
           ) : (
             <FFCVMatchesSection
@@ -405,6 +422,7 @@ export function TeamMatchesView({
               groupInfo={serverGroupInfo}
               ffcvSeasonId={serverTeamData?.ffcv_season_id || '22'}
               refreshTrigger={syncRefreshTrigger}
+              isReadOnly={isReadOnly}
             />
           )}
         </div>

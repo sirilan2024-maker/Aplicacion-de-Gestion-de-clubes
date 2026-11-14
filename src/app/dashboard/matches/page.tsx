@@ -1,8 +1,10 @@
 import { Suspense } from "react"
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getEffectiveSelectedSeasonId } from "@/lib/auth-helpers"
 import { GlobalMatchesView } from "@/components/features/matches/GlobalMatchesView"
+import { resolveOrAutoLinkFamilyPlayer } from "@/lib/family-helpers"
 export const dynamic = 'force-dynamic';
 
 export default async function PartidosPage() {
@@ -14,7 +16,28 @@ export default async function PartidosPage() {
   if (!userData.user) return null
 
   // Obtener contexto de autenticación y club
-  const { data: profile } = await adminClient.from('profiles').select('club_id, role').eq('id', userData.user.id).single()
+  const { data: profile } = await adminClient.from('profiles').select('club_id, role, roles, linked_player_id, is_active').eq('id', userData.user.id).single()
+  
+  if (profile?.is_active === false) {
+    redirect('/dashboard/cuenta-bloqueada?reason=blocked')
+  }
+
+  const userRole = (profile?.role || '').toLowerCase().trim()
+  const allRoles = Array.from(new Set([userRole, ...(profile?.roles || []).map((r: string) => r.toLowerCase().trim())]))
+  const isActiveFamilyOrPlayer = ['familia', 'tutor', 'family', 'familiar', 'jugador'].includes(userRole)
+  const isFamilyOrPlayer = allRoles.some(r => ['familia', 'tutor', 'family', 'familiar', 'jugador'].includes(r))
+  const isStaffOrCoach = allRoles.some(r => ['admin', 'superadmin', 'coordinador', 'metodologo', 'coach', 'entrenador', 'delegado', 'preparador_fisico', 'utillero'].includes(r))
+
+  // Si el rol activo es familiar/jugador o es exclusivamente familiar/jugador, NUNCA permitir ver todos los partidos del club
+  if (isActiveFamilyOrPlayer || (isFamilyOrPlayer && !isStaffOrCoach)) {
+    const linkedId = await resolveOrAutoLinkFamilyPlayer(userData.user.id, userData.user.email)
+    if (linkedId) {
+      redirect(`/dashboard/family/e/${linkedId}/partidos`)
+    } else {
+      redirect('/dashboard/bienvenida-familia')
+    }
+  }
+
   const clubId = profile?.club_id
 
   // Obtener obligatoriamente la temporada activa del club (TEMPORADA 26/27)

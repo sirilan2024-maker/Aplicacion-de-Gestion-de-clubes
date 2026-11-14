@@ -15,6 +15,7 @@ interface FFCVMatchesSectionProps {
   groupInfo?: FFCVGroupRecord | null;
   ffcvSeasonId?: string | null;
   refreshTrigger?: number;
+  isReadOnly?: boolean;
 }
 
 export function FFCVMatchesSection({
@@ -26,6 +27,7 @@ export function FFCVMatchesSection({
   groupInfo,
   ffcvSeasonId,
   refreshTrigger = 0,
+  isReadOnly = false,
 }: FFCVMatchesSectionProps) {
 
   const [matches, setMatches] = useState<FFCVMatchRecord[]>(initialMatches);
@@ -422,6 +424,7 @@ export function FFCVMatchesSection({
           teamId={teamId || undefined}
           homeTeamName={viewingActa.homeName}
           awayTeamName={viewingActa.awayName}
+          isReadOnly={isReadOnly}
           onClose={() => setViewingActa(null)}
         />
       )}

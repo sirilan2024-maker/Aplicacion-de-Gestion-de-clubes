@@ -53,9 +53,11 @@ function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[
     if (found) return found;
   }
 
-  // 2. Extract CodPartido from official FFCV URL
+  // 2. Extract CodPartido from official FFCV URL or Apúntamelo match ID from /partido/{id}
   if (partido.acta_oficial_url) {
-    const match = partido.acta_oficial_url.match(/CodPartido=(\d+)/);
+    const match =
+      partido.acta_oficial_url.match(/CodPartido=(\d+)/) ||
+      partido.acta_oficial_url.match(/\/partido\/(\d+)/);
     if (match) {
       const found = ffcvMatches.find(m => String(m.ffcv_match_id) === match[1] || String(m.codacta) === match[1]);
       if (found) return found;
@@ -121,9 +123,10 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedSeasonId, activeSeason } = useSeason()
+  const rawInitialView = (searchParams.get('view') as 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo' | 'actas') || 'partidos'
   const initialView = fixedTeamId
     ? 'partidos'
-    : ((searchParams.get('view') as 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo' | 'actas') || 'partidos')
+    : (isReadOnly && rawInitialView === 'disciplina' ? 'partidos' : rawInitialView)
   const [matches, setMatches] = useState(initialMatches)
   const [teams, setTeams] = useState(initialTeams)
   const [players, setPlayers] = useState(initialPlayers)
@@ -238,18 +241,19 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
       return
     }
     const v = searchParams.get('view') as any
-    if (v === 'actas' || v === 'clasificacion' || v === 'disciplina' || v === 'en-directo' || v === 'partidos') {
+    if (v === 'actas' || v === 'clasificacion' || (!isReadOnly && v === 'disciplina') || v === 'en-directo' || v === 'partidos') {
       setViewMode(v)
-    } else if (!v) {
+    } else {
       setViewMode('partidos')
     }
     const teamParam = searchParams.get('team') || searchParams.get('teamId')
     if (teamParam) {
       setSelectedTeamId(teamParam)
     }
-  }, [searchParams, fixedTeamId])
+  }, [searchParams, fixedTeamId, isReadOnly])
 
   const handleGlobalTabChange = (newView: 'partidos' | 'clasificacion' | 'disciplina' | 'en-directo' | 'actas') => {
+    if (isReadOnly && newView === 'disciplina') return
     setViewMode(newView)
     if (newView === 'partidos') {
       router.replace('/dashboard/matches')
@@ -1343,6 +1347,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
           teamId={viewingFfcvActa.teamId}
           homeTeamName={viewingFfcvActa.homeTeamName}
           awayTeamName={viewingFfcvActa.awayTeamName}
+          isReadOnly={isReadOnly}
           onClose={() => setViewingFfcvActa(null)}
         />
       )}

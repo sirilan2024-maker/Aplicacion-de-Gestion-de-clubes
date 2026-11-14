@@ -6,6 +6,7 @@ import { X, Trophy, ShieldCheck, User, AlertCircle, RefreshCw, Clock, MapPin, Aw
 import { getFFCVMatchReportAction } from "@/app/actions/ffcv-actions";
 import { FFCVRawMatchDetails } from "@/lib/ffcv/types";
 import { isFfcvRawCardRed } from "@/lib/ffcv/discipline-rules";
+import { createClient } from "@/lib/supabase/client";
 
 interface FFCVActaModalProps {
   codacta: string;
@@ -13,6 +14,7 @@ interface FFCVActaModalProps {
   teamId?: string;
   homeTeamName?: string;
   awayTeamName?: string;
+  isReadOnly?: boolean;
   onClose: () => void;
 }
 
@@ -22,6 +24,7 @@ export function FFCVActaModal({
   teamId,
   homeTeamName,
   awayTeamName,
+  isReadOnly = false,
   onClose,
 }: FFCVActaModalProps) {
   const router = useRouter();
@@ -29,6 +32,34 @@ export function FFCVActaModal({
   const [data, setData] = useState<FFCVRawMatchDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSynced, setIsSynced] = useState(false);
+  const [isRestrictedRole, setIsRestrictedRole] = useState(isReadOnly);
+
+  useEffect(() => {
+    if (isReadOnly) {
+      setIsRestrictedRole(true);
+      return;
+    }
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: authData }) => {
+      if (!authData?.user || cancelled) return;
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authData.user.id)
+        .single()
+        .then(({ data: profile }) => {
+          if (cancelled || !profile) return;
+          const r = (profile.role || "").toLowerCase().trim();
+          if (["jugador", "familia", "family", "familiar", "tutor", "socio", "utillero", "directivo", "secretario", "tesorero", "delegado"].includes(r)) {
+            setIsRestrictedRole(true);
+          }
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isReadOnly]);
 
   useEffect(() => {
     async function loadReport() {
@@ -506,40 +537,42 @@ export function FFCVActaModal({
               )}
 
               {/* Sección 2: ACCESO A LA SECCIÓN DE ACTAS DE LA APLICACIÓN */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
-                      <FileText className="w-5 h-5" />
+              {!isRestrictedRole && (
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          Gestor y Visor de Actas del Club
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Accede directamente a la sección de Actas del club para consultar el acta, conciliar estadísticas o gestionar el partido
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                        Gestor y Visor de Actas del Club
-                      </h4>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        Accede directamente a la sección de Actas del club para consultar el acta, conciliar estadísticas o gestionar el partido
-                      </p>
-                    </div>
+
+                    <button
+                      onClick={handleNavigateToActas}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-sm shrink-0 self-start sm:self-auto cursor-pointer"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                      <span>Ver acta en Actas</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  <button
-                    onClick={handleNavigateToActas}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-sm shrink-0 self-start sm:self-auto cursor-pointer"
-                  >
-                    <FolderOpen className="w-4 h-4" />
-                    <span>Ver acta en Actas</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-700">Identificador federativo oficial:</span>
-                    <code className="bg-slate-200/70 text-slate-800 px-2 py-0.5 rounded font-mono text-[11px] font-bold">#{codacta}</code>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-700">Identificador federativo oficial:</span>
+                      <code className="bg-slate-200/70 text-slate-800 px-2 py-0.5 rounded font-mono text-[11px] font-bold">#{codacta}</code>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium">Navegación interna en Equipos → Actas</span>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-medium">Navegación interna en Equipos → Actas</span>
                 </div>
-              </div>
+              )}
             </>
           ) : null}
         </div>
@@ -547,13 +580,15 @@ export function FFCVActaModal({
         {/* Footer */}
         <div className="p-4 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleNavigateToActas}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Ver PDF en Visor de Actas</span>
-            </button>
+            {!isRestrictedRole && (
+              <button
+                onClick={handleNavigateToActas}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Ver PDF en Visor de Actas</span>
+              </button>
+            )}
 
             <a
               href={`/api/partidos/generar-acta-pdf?codacta=${codacta}${matchId ? `&partidoId=${matchId}` : ''}&download=1`}

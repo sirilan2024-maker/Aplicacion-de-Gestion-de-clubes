@@ -652,6 +652,7 @@ export default function FamilyMatchesPage() {
           teamId={viewingFfcvActa.teamId}
           homeTeamName={viewingFfcvActa.homeTeamName}
           awayTeamName={viewingFfcvActa.awayTeamName}
+          isReadOnly={true}
           onClose={() => setViewingFfcvActa(null)}
         />
       )}

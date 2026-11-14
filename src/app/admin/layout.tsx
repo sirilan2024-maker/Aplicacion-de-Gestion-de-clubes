@@ -17,7 +17,7 @@ export default async function AdminLayout({
     redirect("/login")
   }
 
-  const effectiveRole = ctx.realAdminRole || ctx.profile.role
+  const effectiveRole = ctx.isImpersonating ? ctx.profile.role : (ctx.realAdminRole || ctx.profile.role)
   const userRoles = ctx.profile.roles || []
 
   const isAllowed = (effectiveRole && ADMIN_ROLES.includes(effectiveRole)) || userRoles.some((r: string) => ADMIN_ROLES.includes(r))

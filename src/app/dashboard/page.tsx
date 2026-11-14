@@ -1,8 +1,21 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { COACH_ROLES } from "@/lib/auth-helpers";
+import { COACH_ROLES, getAuthenticatedContext } from "@/lib/auth-helpers";
+import { resolveOrAutoLinkFamilyPlayer } from "@/lib/family-helpers";
 
 export default async function DashboardPage() {
+  const { context: ctx } = await getAuthenticatedContext();
+  if (ctx?.isImpersonating) {
+    const impRole = (ctx.profile.role || '').toLowerCase().trim();
+    if (['jugador', 'tutor', 'familia', 'family', 'familiar'].includes(impRole)) {
+      const targetPlayerId = ctx.impersonatedPlayerId || ctx.profile.linked_player_id || await resolveOrAutoLinkFamilyPlayer(ctx.user.id, ctx.user.email);
+      if (targetPlayerId) {
+        redirect(`/dashboard/family/e/${targetPlayerId}/perfil`);
+      }
+      redirect('/dashboard/bienvenida-familia');
+    }
+  }
+
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   
@@ -12,9 +25,13 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, roles, linked_player_id")
+    .select("role, roles, linked_player_id, is_active")
     .eq("id", authData.user.id)
     .single();
+
+  if (profile?.is_active === false) {
+    redirect("/dashboard/bienvenida-familia");
+  }
 
   const role = profile?.role;
   const userRoles: string[] = profile?.roles || [];
@@ -40,39 +57,12 @@ export default async function DashboardPage() {
     redirect('/admin/metodologia');
   } else if (role === 'utillero') {
     redirect('/dashboard/utilleria');
-  } else if (role === 'jugador') {
-    if (profile?.linked_player_id) {
-      redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
+  } else if (role === 'jugador' || role === 'tutor' || role === 'familia' || role === 'family') {
+    const linkedId = await resolveOrAutoLinkFamilyPlayer(authData.user.id, authData.user.email);
+    if (linkedId) {
+      redirect(`/dashboard/family/e/${linkedId}/perfil`);
     }
-
-    const { data: playerRec } = await supabase
-      .from('players')
-      .select('id')
-      .or(`user_auth_id.eq.${authData.user.id},tutor_id.eq.${authData.user.id},user_id.eq.${authData.user.id}`)
-      .neq('status', 'inactive')
-      .limit(1)
-      .maybeSingle();
-
-    if (playerRec) {
-      redirect(`/dashboard/family/e/${playerRec.id}/perfil`);
-    } else {
-      const { data: tutorLink } = await supabase
-        .from('player_tutors')
-        .select('player_id')
-        .eq('tutor_id', authData.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (tutorLink) {
-        redirect(`/dashboard/family/e/${tutorLink.player_id}/perfil`);
-      }
-    }
-    redirect('/dashboard/family');
-  } else if (role === 'tutor' || role === 'familia' || role === 'family') {
-    if (profile?.linked_player_id) {
-      redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
-    }
-    redirect('/dashboard/family');
+    redirect('/dashboard/bienvenida-familia');
   }
 
   // 2. Si no hay rol activo o no coincide, evaluar roles secundarios en profile.roles por jerarquía
@@ -81,17 +71,11 @@ export default async function DashboardPage() {
   else if (userRoles.some(r => COACH_ROLES.includes(r))) redirect('/dashboard/mis-equipos');
   else if (userRoles.includes('metodologo') || userRoles.includes('metodologia')) redirect('/admin/metodologia');
   else if (userRoles.includes('utillero')) redirect('/dashboard/utilleria');
-  else if (userRoles.includes('jugador')) {
-    if (profile?.linked_player_id) redirect(`/dashboard/family/e/${profile.linked_player_id}/perfil`);
-    const { data: playerRec } = await supabase
-      .from('players')
-      .select('id')
-      .or(`user_auth_id.eq.${authData.user.id},tutor_id.eq.${authData.user.id},user_id.eq.${authData.user.id}`)
-      .neq('status', 'inactive')
-      .maybeSingle();
-    if (playerRec) redirect(`/dashboard/family/e/${playerRec.id}/perfil`);
+  else if (userRoles.some(r => ['jugador', 'tutor', 'family', 'familia'].includes(r))) {
+    const linkedId = await resolveOrAutoLinkFamilyPlayer(authData.user.id, authData.user.email);
+    if (linkedId) redirect(`/dashboard/family/e/${linkedId}/perfil`);
+    redirect('/dashboard/bienvenida-familia');
   }
-  else if (userRoles.includes('tutor') || userRoles.includes('family') || userRoles.includes('familia')) redirect('/dashboard/family');
 
   // Fallback seguro: si el usuario tiene rol de entrenador de cualquier forma, nunca enviar a global-club
   const allRoles = Array.from(new Set([role, ...userRoles].filter(Boolean)));
@@ -99,5 +83,6 @@ export default async function DashboardPage() {
     redirect('/dashboard/mis-equipos');
   }
 
-  redirect("/dashboard/global-club");
+  // Si no tiene rol válido o autorizado
+  redirect("/dashboard/bienvenida-familia");
 }

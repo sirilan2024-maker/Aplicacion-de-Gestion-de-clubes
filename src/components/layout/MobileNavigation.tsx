@@ -47,6 +47,7 @@ import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { NotificationBell } from "@/components/features/notifications/NotificationBell"
 import { switchActiveRoleAction } from "@/app/actions/club-actions"
+import { getImpersonationStatusAction } from "@/app/actions/impersonation-actions"
 import { EditClubModal } from "@/components/features/admin/EditClubModal"
 
 const IconMap: Record<string, React.ComponentType<any>> = {
@@ -115,7 +116,10 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     const supabaseClient = createClient()
 
     const fetchData = async () => {
-      const { data: { user } } = await supabaseClient.auth.getUser()
+      const [{ data: { user } }, impStatus] = await Promise.all([
+        supabaseClient.auth.getUser(),
+        getImpersonationStatusAction().catch(() => ({ isImpersonating: false } as any)),
+      ])
       if (user && !isCancelled) {
         const { data: profile } = await supabaseClient
           .from("profiles")
@@ -124,8 +128,17 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
           .single()
           
         if (profile && !isCancelled) {
-          setUserRole(profile.role)
-          setAvailableRoles(profile.roles && profile.roles.length > 0 ? profile.roles : [profile.role || 'usuario'])
+          const isImp = Boolean(impStatus?.isImpersonating);
+          const rawImpRole = String(impStatus?.impersonatedBaseRole || impStatus?.impersonatedRole || 'familia').toLowerCase().trim();
+          const effectiveRole = isImp
+            ? (rawImpRole.startsWith('jugador') ? 'jugador' : rawImpRole)
+            : String(profile.role || 'usuario').toLowerCase().trim();
+          const effectiveRoles = isImp
+            ? [effectiveRole]
+            : (profile.roles && profile.roles.length > 0 ? profile.roles.map((r: string) => String(r).toLowerCase().trim()) : [effectiveRole]);
+
+          setUserRole(effectiveRole)
+          setAvailableRoles(effectiveRoles)
           
           if (profile.club_id) {
             const { data: club } = await supabaseClient.from('clubs').select('id, name, logo_url').eq('id', profile.club_id).single()
@@ -140,7 +153,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             }
             query = query.order("name")
 
-            if (profile.role === 'coach' || profile.role === 'entrenador' || profile.role === 'delegado') {
+            if (effectiveRole === 'coach' || effectiveRole === 'entrenador' || effectiveRole === 'delegado') {
               const { data: coachTeams } = await supabaseClient.from('team_coaches').select('team_id').eq('profile_id', user.id);
               const teamIds = coachTeams?.map(ct => ct.team_id) || [];
               if (teamIds.length > 0) {
@@ -153,8 +166,10 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
             if (eqData && !isCancelled) setEquipos(eqData)
 
             // Fetch dynamic navigation
-            const allUserRoles = Array.from(new Set([profile.role, ...(profile.roles || [])].filter(Boolean)));
-            const isAdminUser = allUserRoles.some((r: string) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
+            const allUserRoles = isImp
+              ? [effectiveRole]
+              : Array.from(new Set([effectiveRole, ...effectiveRoles].filter(Boolean)));
+            const isAdminUser = !isImp && allUserRoles.some((r: string) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
             const isCoachUser = allUserRoles.some((r: string) => ['coach', 'entrenador', 'delegado', 'preparador_fisico'].includes(r));
 
             const { data: navData } = await supabaseClient
@@ -244,15 +259,14 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "Partidos", href: getHref("Partidos", "/admin/partidos"), icon: Trophy },
         { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
       ];
-    } else if (userRole === 'tutor' || userRole === 'family' || userRole === 'familia' || userRole === 'jugador') {
-      const familyTarget = activeFamilyPlayerId
-        ? `/dashboard/family/e/${activeFamilyPlayerId}/perfil`
-        : `/dashboard`;
+    } else if (userRole === 'tutor' || userRole === 'family' || userRole === 'familia' || userRole === 'familiar' || userRole === 'jugador') {
       bottomLinks = [
-        { name: "Inicio", href: "/dashboard", icon: LayoutDashboard },
-        { name: "Mis Cuotas", href: familyTarget, icon: Wallet },
+        { name: "Bienvenida", href: "/dashboard/bienvenida-familia", icon: Shield },
+        { name: "Inscripción", href: "/tutorial-inscripcion", icon: BookOpen },
         { name: "Perfil", href: "/dashboard/mi-perfil", icon: User },
       ]
+    } else if (!userRole) {
+      bottomLinks = []
     } else {
       // Coach / Entrenador
       bottomLinks = [
@@ -284,7 +298,6 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     ]
   } else if (activeFamilyPlayerId) {
     secondaryLinks = [
-      { name: "Volver a Inicio", href: "/dashboard", icon: LayoutDashboard },
       { name: "En directo", href: "/live", icon: Radio },
       { name: "Eventos", href: `/dashboard/family/e/${activeFamilyPlayerId}/eventos`, icon: CalendarDays },
       { name: "Entrenamientos", href: `/dashboard/family/e/${activeFamilyPlayerId}/entrenamientos`, icon: Target },
@@ -321,6 +334,15 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         { name: "FFCV/NOVANET", href: "/admin/ffcv-api", icon: Globe },
         { name: "Ajustes de Perfil", href: "/dashboard/mi-perfil", icon: Settings },
       ].filter(item => !bottomHrefs.includes(item.href));
+    } else if (['tutor', 'family', 'familia', 'familiar', 'jugador'].includes(userRole || '')) {
+      // Familias/Jugadores no vinculados: NUNCA mostrar enlaces del club
+      secondaryLinks = [
+        { name: "Bienvenida Familiar", href: "/dashboard/bienvenida-familia", icon: Shield },
+        { name: "Tutorial Inscripción", href: "/tutorial-inscripcion", icon: BookOpen },
+        { name: "Ajustes de Perfil", href: "/dashboard/mi-perfil", icon: Settings },
+      ].filter(item => !bottomHrefs.includes(item.href));
+    } else if (!userRole) {
+      secondaryLinks = [];
     } else {
       const bottomNames = bottomLinks.map(b => b.name.toLowerCase());
       secondaryLinks = globalNavItems.filter(item => 
@@ -332,19 +354,18 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
       const isTreasuryAuthorized = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club', 'tesorero', 'tesoreria'].includes(r));
       const isSuperAdmin = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club'].includes(r));
       const isAdminAreaAuthorized = allRoles.some((r: any) => ['admin', 'superadmin', 'administrador', 'admin_club', 'coordinador', 'metodologo', 'secretario', 'secretaria'].includes(r));
-      const isFamilyOrPlayer = ['tutor', 'family', 'familia', 'jugador'].includes(userRole || '');
 
       secondaryLinks = secondaryLinks.filter(item => {
         if ((item.href.includes('/treasury') || item.name.toLowerCase() === 'tesorería') && !isTreasuryAuthorized) return false;
         if ((item.href.includes('/admin/configuracion') || item.href.includes('/admin/temporadas')) && !isSuperAdmin) return false;
         if (item.href.startsWith('/admin/') && !isAdminAreaAuthorized) return false;
-        if (isFamilyOrPlayer && (item.href.includes('/club/miembros') || item.name.toLowerCase() === 'miembros' || item.name.toLowerCase() === 'directorio')) return false;
         return true;
       });
     }
     
-    // Asegurar que En directo siempre esté disponible si no está en el bottom bar
-    if (!bottomHrefs.includes("/live") && !secondaryLinks.some(s => s.href === "/live")) {
+    // Asegurar que En directo siempre esté disponible si no está en el bottom bar (solo para staff y usuarios activos)
+    const isUnlinkedFamily = ['tutor', 'family', 'familia', 'jugador'].includes(userRole || '');
+    if (!isUnlinkedFamily && !bottomHrefs.includes("/live") && !secondaryLinks.some(s => s.href === "/live")) {
       secondaryLinks.push({ name: "En directo", href: "/live", icon: Radio });
     }
 

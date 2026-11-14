@@ -7,6 +7,7 @@ import { Bell, Check, X, Smartphone, ArrowRight } from "lucide-react"
 import { getUnreadNotificationsAction, markNotificationAsReadAction, markAllNotificationsAsReadAction } from "@/app/actions/notification-actions"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { getImpersonationStatusAction } from "@/app/actions/impersonation-actions"
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([])
@@ -52,21 +53,33 @@ export function NotificationBell() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+      const [profileRes, impStatus] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('role, linked_player_id')
+          .eq('id', user.id)
+          .single(),
+        getImpersonationStatusAction().catch(() => null),
+      ])
 
-      if (profile?.role) setUserRole(profile.role)
+      const profile = profileRes.data
+      const effectiveRole = impStatus?.isImpersonating && impStatus.impersonatedRole
+        ? impStatus.impersonatedRole
+        : (profile?.role || '')
 
-      // For family/tutor roles, fetch first linked player
-      const isFamilyRole = ['family', 'familia', 'tutor'].includes(profile?.role || '')
+      if (effectiveRole) setUserRole(effectiveRole)
+
+      // For family/tutor/player roles, fetch first linked player
+      const isFamilyRole = ['family', 'familia', 'familiar', 'tutor', 'jugador'].includes(effectiveRole)
       if (isFamilyRole) {
+        if (profile?.linked_player_id && !impStatus?.isImpersonating) {
+          setLinkedPlayerId(profile.linked_player_id)
+          return
+        }
         const { data: players } = await supabase
           .from('players')
           .select('id')
-          .eq('tutor_id', user.id)
+          .eq('tutor_id', impStatus?.isImpersonating && impStatus.impersonatedId ? impStatus.impersonatedId : user.id)
           .limit(1)
 
         if (players && players.length > 0) {
@@ -81,38 +94,46 @@ export function NotificationBell() {
   const unreadCount = notifications.length
 
   const getNavigationUrl = (notification: any): string => {
+    const isFamilyRole = ['family', 'familia', 'familiar', 'tutor', 'jugador'].includes(userRole)
+    const familyFallback = linkedPlayerId ? `/dashboard/family/e/${linkedPlayerId}/perfil` : '/dashboard/family'
+
     if (notification.link) {
+      if (isFamilyRole) {
+        const restrictedPrefixes = ['/admin', '/dashboard/equipos', '/dashboard/treasury', '/dashboard/matches', '/dashboard/club']
+        if (restrictedPrefixes.some(p => notification.link.startsWith(p))) {
+          return familyFallback
+        }
+      }
       return notification.link
     }
     const type = notification.type
-    const isFamilyRole = ['family', 'familia', 'tutor'].includes(userRole)
 
     // Deep link based on notification type
     switch (type) {
       case 'reminder':
-        if (isFamilyRole && linkedPlayerId) {
-          return `/dashboard/family/e/${linkedPlayerId}/eventos`
+        if (isFamilyRole) {
+          return linkedPlayerId ? `/dashboard/family/e/${linkedPlayerId}/eventos` : familyFallback
         }
         return '/dashboard'
 
       case 'partido':
       case 'convocatoria':
-        if (isFamilyRole && linkedPlayerId) {
-          return `/dashboard/family/e/${linkedPlayerId}/partidos`
+        if (isFamilyRole) {
+          return linkedPlayerId ? `/dashboard/family/e/${linkedPlayerId}/partidos` : familyFallback
         }
         return '/dashboard/matches'
 
       case 'tesoreria':
         if (isFamilyRole) {
-          return linkedPlayerId ? `/dashboard/family/e/${linkedPlayerId}/perfil` : '/dashboard'
+          return familyFallback
         }
         return '/dashboard/treasury'
 
       case 'disciplina':
-        return '/dashboard'
+        return isFamilyRole ? familyFallback : '/dashboard'
 
       default:
-        return '/dashboard'
+        return isFamilyRole ? familyFallback : '/dashboard'
     }
   }
 

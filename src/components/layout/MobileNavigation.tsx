@@ -364,7 +364,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
     }
     
     // Asegurar que En directo siempre esté disponible si no está en el bottom bar (solo para staff y usuarios activos)
-    const isUnlinkedFamily = ['tutor', 'family', 'familia', 'jugador'].includes(userRole || '');
+    const isUnlinkedFamily = ['tutor', 'family', 'familia', 'familiar', 'jugador'].includes(userRole || '');
     if (!isUnlinkedFamily && !bottomHrefs.includes("/live") && !secondaryLinks.some(s => s.href === "/live")) {
       secondaryLinks.push({ name: "En directo", href: "/live", icon: Radio });
     }
@@ -421,7 +421,7 @@ export function MobileNavigation({ signOutAction }: { signOutAction?: any }) {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <NotificationBell />
-          <Link href="/dashboard/mi-perfil" className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
+          <Link href={activeFamilyPlayerId ? `/dashboard/family/e/${activeFamilyPlayerId}/ajustes` : "/dashboard/mi-perfil"} className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-sm">
             U
           </Link>
         </div>

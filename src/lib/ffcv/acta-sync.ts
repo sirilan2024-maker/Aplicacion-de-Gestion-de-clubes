@@ -3,6 +3,11 @@ import { fetchMatchDetails } from './client';
 import { FFCVRawMatchDetails } from './types';
 import { getOfficialMatchDuration } from '../utils';
 import { isFfcvRawCardRed } from './discipline-rules';
+import {
+  assignTacticalCoordinatesForStarters,
+  resolveOfficialFormation,
+  StarterPositionInput
+} from './tactical-lineup';
 
 const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
 const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
@@ -240,7 +245,7 @@ export async function syncFFCVActaToConvocatorias(
     // 1. Locate the internal match in 'partidos' (ACTIVE SEASON ONLY)
     let { data: matches } = await supabase
       .from('partidos')
-      .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar, equipo:teams(id, name, category)')
+      .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar, estado, coach_report, live_timer_started_at, live_timer_elapsed_seconds, equipo:teams(id, name, category)')
       .neq('season_id', CLOSED_SEASON_ID)
       .eq('season_id', ACTIVE_SEASON_ID)
       .ilike('acta_oficial_url', `%${codacta}%`);
@@ -274,7 +279,7 @@ export async function syncFFCVActaToConvocatorias(
           const fmRival = fmHome.includes('saladar') ? fmAway : fmHome;
           const { data: candidatePartidos } = await supabase
             .from('partidos')
-            .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar, equipo:teams(id, name, category)')
+            .select('id, equipo_id, rival_nombre, season_id, acta_oficial_url, fecha_hora, lugar, estado, coach_report, live_timer_started_at, live_timer_elapsed_seconds, equipo:teams(id, name, category)')
             .neq('season_id', CLOSED_SEASON_ID)
             .eq('season_id', ACTIVE_SEASON_ID)
             .eq('equipo_id', team.id);
@@ -305,7 +310,7 @@ export async function syncFFCVActaToConvocatorias(
 
     const { data: allPlayersData } = await supabase
       .from('players')
-      .select('id, first_name, last_name, dorsal, team_id, status, is_senior, teams:teams(id, name, category)')
+      .select('id, first_name, last_name, dorsal, team_id, status, is_senior, posicion, teams:teams(id, name, category)')
       .in('team_id', activeTeamIds)
       .neq('status', 'inactive');
 
@@ -320,23 +325,63 @@ export async function syncFFCVActaToConvocatorias(
     const teamPlayers = allPlayers.filter((p: any) => p.team_id === partido.equipo_id);
     const maxMatchMinutes = getOfficialMatchDuration(teamCategory, details.nombre_competicion);
 
-    // Load existing convocatorias for manual minute preservation in base football and card overrides
+    // Load existing convocatorias for manual minute preservation, tactical coordinates and card overrides
     const { data: existingConvocatorias } = await supabase
       .from('convocatorias')
-      .select('player_id, minutos_jugados, minutes_played, tarjetas_amarillas, yellow_cards, tarjetas_rojas, red_cards')
+      .select('player_id, titular, tactical_x, tactical_y, minutos_jugados, minutes_played, tarjetas_amarillas, yellow_cards, tarjetas_rojas, red_cards')
       .eq('partido_id', partido.id);
+
+    const isClosed = String(details.acta_cerrada) === '1';
+    const isInPlay = String(details.partido_en_juego) === '1' && !isClosed;
+    const hasScores =
+      details.goles_local !== undefined &&
+      details.goles_local !== null &&
+      String(details.goles_local).trim() !== '' &&
+      details.goles_visitante !== undefined &&
+      details.goles_visitante !== null &&
+      String(details.goles_visitante).trim() !== '';
+    const hasMatchStarted = isClosed || isInPlay || hasScores || ourGoals.length > 0 || ourSubs.length > 0 || ourCards.length > 0;
+
+    // 2.5 Compute tactical coordinates for starters based on official formation & position
+    const ourRawFormation = isSaladarHome ? (details as any).esquema_local : (details as any).esquema_visitante;
+    const rivalRawFormation = isSaladarHome ? (details as any).esquema_visitante : (details as any).esquema_local;
+
+    const matchedOurPlayersList: Array<{ fp: any; matched: any; isTitular: boolean }> = [];
+    const starterPositionInputs: StarterPositionInput[] = [];
+
+    for (const fp of ourPlayers) {
+      const matched = matchPlayer(fp.nombre_jugador, fp.dorsal, allPlayers || [], teamPlayers, isSeniorMatch);
+      if (!matched) continue;
+      const isTitular = String(fp.titular) === '1' || fp.titular === 1 || fp.titular === true;
+      matchedOurPlayersList.push({ fp, matched, isTitular });
+
+      if (isTitular) {
+        const existingConv = (existingConvocatorias || []).find((c: any) => c.player_id === matched.id);
+        starterPositionInputs.push({
+          playerId: matched.id,
+          dorsal: fp.dorsal ?? matched.dorsal,
+          isGoalkeeper: String(fp.portero) === '1' || fp.portero === 1 || fp.portero === true,
+          ffcvPosAbbr: (fp as any).posicion_jugador_abreviatura || null,
+          ffcvPosName: (fp as any).posicion || null,
+          dbPosition: matched.posicion || null,
+          existingTacticalX: existingConv?.tactical_x ?? null,
+          existingTacticalY: existingConv?.tactical_y ?? null,
+          wasAlreadyTitular: Boolean(existingConv?.titular)
+        });
+      }
+    }
+
+    const { formation: ourFormation, coordinatesByPlayerId } = assignTacticalCoordinatesForStarters(
+      starterPositionInputs,
+      ourRawFormation
+    );
+    const rivalFormation = resolveOfficialFormation(rivalRawFormation);
 
     // 3. Build convocatorias payload
     const rowsToUpsert: any[] = [];
     const matchedCardIndices = new Set<number>();
 
-    for (const fp of ourPlayers) {
-      const matched = matchPlayer(fp.nombre_jugador, fp.dorsal, allPlayers || [], teamPlayers, isSeniorMatch);
-      if (!matched) {
-        continue;
-      }
-
-      const isTitular = String(fp.titular) === '1' || fp.titular === 1 || fp.titular === true;
+    for (const { fp, matched, isTitular } of matchedOurPlayersList) {
 
       // Cards parsing
       let yellows = 0;
@@ -384,12 +429,14 @@ export async function syncFFCVActaToConvocatorias(
       });
 
       // Minutes played calculation (ajustado a la duración reglamentaria de la categoría)
-      // En fútbol formativo (Cadete e Infantil), los árbitros a menudo no registran las sustituciones en el acta electrónica.
+      // Si el partido aún no ha comenzado (pre-partido con alineaciones publicadas), minutos = 0.
       const existingConv = (existingConvocatorias || []).find((c: any) => c.player_id === matched.id);
       const hasManualMinutes = existingConv && typeof existingConv.minutos_jugados === 'number' && existingConv.minutos_jugados > 0 && existingConv.minutos_jugados <= maxMatchMinutes;
 
       let minutes = 0;
-      if (ourSubs.length === 0 && hasManualMinutes) {
+      if (!hasMatchStarted) {
+        minutes = 0;
+      } else if (ourSubs.length === 0 && hasManualMinutes) {
         // Preservar minutos manuales registrados por el cuerpo técnico si el acta no incluye cambios
         minutes = existingConv.minutos_jugados;
       } else if (isTitular) {
@@ -414,12 +461,15 @@ export async function syncFFCVActaToConvocatorias(
       // Las tarjetas del acta oficial FFCV son la fuente de verdad federativa
       const finalYellows = yellows;
       const finalReds = reds;
+      const tacticalCoords = isTitular ? coordinatesByPlayerId.get(matched.id) : null;
 
       rowsToUpsert.push({
         partido_id: partido.id,
         player_id: matched.id,
         status: 'convocado',
         titular: isTitular,
+        tactical_x: tacticalCoords ? tacticalCoords.x : null,
+        tactical_y: tacticalCoords ? tacticalCoords.y : null,
         yellow_cards: finalYellows,
         tarjetas_amarillas: finalYellows,
         red_cards: finalReds,
@@ -534,6 +584,8 @@ export async function syncFFCVActaToConvocatorias(
           .update({
             status: 'no_convocado',
             titular: false,
+            tactical_x: null,
+            tactical_y: null,
             minutes_played: 0,
             minutos_jugados: 0,
             goals: 0,
@@ -622,31 +674,291 @@ export async function syncFFCVActaToConvocatorias(
       console.warn('[syncFFCVActaToConvocatorias] Warning: error syncing match_events:', eventsErr);
     }
 
-    // Also ensure partido status and score are up to date
-    const isClosed = String(details.acta_cerrada) === '1';
-    const hasScores = details.goles_local !== undefined && details.goles_local !== null && details.goles_local !== '' &&
-                      details.goles_visitante !== undefined && details.goles_visitante !== null && details.goles_visitante !== '';
+    // 5. Build FFCV Live & Official Lineup metadata inside coach_report (for /live and Match Details)
+    const rivalRawPlayers = isSaladarHome ? (details.jugadores_equipo_visitante || []) : (details.jugadores_equipo_local || []);
+    const rivalCards = isSaladarHome ? (details.tarjetas_equipo_visitante || []) : (details.tarjetas_equipo_local || []);
+    const rivalGoals = isSaladarHome ? (details.goles_equipo_visitante || []) : (details.goles_equipo_local || []);
+    const rivalSubs = isSaladarHome ? (details.sustituciones_equipo_visitante || []) : (details.sustituciones_equipo_local || []);
 
-    if (isClosed || hasScores) {
+    const mapFfcvSidePlayers = (rawList: any[], sideGoals: any[], sideCards: any[], sideSubs: any[], isOurSide: boolean) => {
+      return (rawList || []).map((p: any) => {
+        const isStarter = String(p.titular) === '1' || p.titular === 1 || p.titular === true;
+        const isCap = String(p.capitan) === '1' || p.capitan === 1 || p.capitan === true;
+        const isGk = String(p.portero) === '1' || p.portero === 1 || p.portero === true;
+
+        let pGoals = 0;
+        sideGoals.forEach((g: any) => {
+          if (String(g.tipo_gol) === '102' || g.tipo_gol === 102) return;
+          const matchByCode = g.codjugador && p.codjugador && String(g.codjugador) === String(p.codjugador);
+          const matchByName = !g.codjugador && countCommonWords(normalizeNameWords(g.nombre_jugador), normalizeNameWords(p.nombre_jugador)) >= 2;
+          if (matchByCode || matchByName) pGoals++;
+        });
+
+        let pYellows = 0;
+        let pReds = 0;
+        sideCards.forEach((c: any) => {
+          const matchByCode = c.codjugador && p.codjugador && String(c.codjugador) === String(p.codjugador);
+          const matchByName = !c.codjugador && countCommonWords(normalizeNameWords(c.nombre_jugador), normalizeNameWords(p.nombre_jugador)) >= 2;
+          if (matchByCode || matchByName) {
+            if (c.segunda_amarilla === '1' || c.segunda_amarilla === 1) {
+              pYellows++;
+              pReds++;
+            } else if (isFfcvRawCardRed(c)) {
+              pReds++;
+            } else {
+              pYellows++;
+            }
+          }
+        });
+
+        const subOut = sideSubs.find((s: any) => p.codjugador && String(s.codjugador_sale) === String(p.codjugador));
+        const subIn = sideSubs.find((s: any) => p.codjugador && String(s.codjugador_entra) === String(p.codjugador));
+        const matchedInternal = isOurSide
+          ? matchedOurPlayersList.find((m) => String(m.fp.codjugador) === String(p.codjugador) || m.fp.nombre_jugador === p.nombre_jugador)?.matched
+          : null;
+
+        return {
+          codjugador: p.codjugador || null,
+          playerId: matchedInternal?.id || null,
+          nombre: p.nombre_jugador || 'Jugador',
+          dorsal: p.dorsal ? Number(p.dorsal) || p.dorsal : '-',
+          titular: isStarter,
+          capitan: isCap,
+          portero: isGk,
+          positionLabel:
+            (p as any).posicion_jugador_abreviatura ||
+            (isGk ? 'POR' : (p as any).posicion || (matchedInternal?.posicion || '')),
+          goles: pGoals,
+          amarillas: pYellows,
+          rojas: pReds,
+          sustituidoMinuto: subOut?.minuto ? Number(subOut.minuto) : null,
+          entroMinuto: subIn?.minuto ? Number(subIn.minuto) : null
+        };
+      });
+    };
+
+    const ourCoachRaw = isSaladarHome
+      ? ((details as any).entrenador_local || (details as any).tecnicos_equipo_local?.[0]?.nombre_tecnico)
+      : ((details as any).entrenador_visitante || (details as any).tecnicos_equipo_visitante?.[0]?.nombre_tecnico);
+    const rivalCoachRaw = isSaladarHome
+      ? ((details as any).entrenador_visitante || (details as any).tecnicos_equipo_visitante?.[0]?.nombre_tecnico)
+      : ((details as any).entrenador_local || (details as any).tecnicos_equipo_local?.[0]?.nombre_tecnico);
+
+    let parsedCoachReport: Record<string, any> = {};
+    if (typeof partido.coach_report === 'string') {
+      try {
+        parsedCoachReport = JSON.parse(partido.coach_report);
+      } catch {
+        parsedCoachReport = {};
+      }
+    } else if (partido.coach_report && typeof partido.coach_report === 'object') {
+      parsedCoachReport = { ...partido.coach_report };
+    }
+
+    parsedCoachReport.official_tactic = ourFormation;
+    parsedCoachReport.ffcv_live = {
+      codPartido: String(codacta),
+      url: `https://ffcv.es/dep/actas?CodPartido=${codacta}`,
+      partidoEnJuego: isInPlay,
+      actaCerrada: isClosed,
+      campo: details.campo || (details as any).instalacion || null,
+      arbitros: Array.isArray(details.arbitros_partido)
+        ? details.arbitros_partido.map((a: any) => a.nombre_arbitro || a.nombre).filter(Boolean)
+        : [],
+      ourFormation,
+      rivalFormation,
+      ourCoach: typeof ourCoachRaw === 'string' ? ourCoachRaw : null,
+      rivalCoach: typeof rivalCoachRaw === 'string' ? rivalCoachRaw : null,
+      ourPlayers: mapFfcvSidePlayers(ourPlayers, ourGoals, ourCards, ourSubs, true),
+      rivalPlayers: mapFfcvSidePlayers(rivalRawPlayers, rivalGoals, rivalCards, rivalSubs, false),
+      updatedAt: new Date().toISOString()
+    };
+
+    // 6. Update partido status, score, live timer and coach_report
+    const hasRecordedEvents =
+      ourGoals.length > 0 ||
+      rivalGoals.length > 0 ||
+      ourSubs.length > 0 ||
+      rivalSubs.length > 0 ||
+      ourCards.length > 0 ||
+      rivalCards.length > 0;
+    const shouldMarkFinished = isClosed || (!isInPlay && hasScores && hasRecordedEvents);
+
+    const partidoUpdate: Record<string, any> = {
+      acta_oficial_url: `https://ffcv.es/dep/actas?CodPartido=${codacta}`,
+      coach_report: JSON.stringify(parsedCoachReport)
+    };
+
+    if (shouldMarkFinished) {
       const homeScore = Number(details.goles_local) || 0;
       const awayScore = Number(details.goles_visitante) || 0;
-      const ownScore = isSaladarHome ? homeScore : awayScore;
-      const rivalScore = isSaladarHome ? awayScore : homeScore;
-
-      await supabase
-        .from('partidos')
-        .update({
-          estado: 'Finalizado',
-          resultado_propio: ownScore,
-          resultado_rival: rivalScore,
-          acta_oficial_url: `https://ffcv.es/dep/actas?CodPartido=${codacta}`
-        })
-        .eq('id', partido.id);
+      partidoUpdate.estado = 'Finalizado';
+      partidoUpdate.resultado_propio = isSaladarHome ? homeScore : awayScore;
+      partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
+      partidoUpdate.live_timer_started_at = null;
+      partidoUpdate.live_timer_elapsed_seconds = 0;
+    } else if (isInPlay) {
+      partidoUpdate.estado = 'En Curso';
+      if (hasScores) {
+        const homeScore = Number(details.goles_local) || 0;
+        const awayScore = Number(details.goles_visitante) || 0;
+        partidoUpdate.resultado_propio = isSaladarHome ? homeScore : awayScore;
+        partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
+      } else {
+        partidoUpdate.resultado_propio = ourGoals.length;
+        partidoUpdate.resultado_rival = rivalGoals.length;
+      }
+      if (!partido.live_timer_started_at) {
+        partidoUpdate.live_timer_started_at = new Date().toISOString();
+      }
+    } else if (hasScores) {
+      const homeScore = Number(details.goles_local) || 0;
+      const awayScore = Number(details.goles_visitante) || 0;
+      partidoUpdate.resultado_propio = isSaladarHome ? homeScore : awayScore;
+      partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
     }
+
+    await supabase
+      .from('partidos')
+      .update(partidoUpdate)
+      .eq('id', partido.id);
 
     return { success: true, syncedCount: payload.length };
   } catch (err: any) {
     console.error('[syncFFCVActaToConvocatorias] Unexpected error:', err);
     return { success: false, syncedCount: 0, error: err.message };
+  }
+}
+
+let lastFfcvLivePollTimestampMs = 0;
+const lastFfcvMatchPollMap = new Map<string, number>();
+const FFCV_LIVE_POLL_COOLDOWN_MS = 15 * 1000;
+
+/**
+ * Sincroniza de forma ligera e inteligente las alineaciones previas (30-45 min antes),
+ * el seguimiento en directo y el acta final de los partidos FFCV de la temporada activa 26/27.
+ */
+export async function syncFFCVLiveMatchesIfNeeded(
+  customSupabaseClient?: any,
+  specificMatchId?: string
+): Promise<void> {
+  const now = Date.now();
+
+  if (specificMatchId) {
+    const lastSpecific = lastFfcvMatchPollMap.get(specificMatchId) || 0;
+    if (now - lastSpecific < FFCV_LIVE_POLL_COOLDOWN_MS) return;
+    lastFfcvMatchPollMap.set(specificMatchId, now);
+  } else {
+    if (now - lastFfcvLivePollTimestampMs < FFCV_LIVE_POLL_COOLDOWN_MS) return;
+    lastFfcvLivePollTimestampMs = now;
+  }
+
+  try {
+    const supabase = customSupabaseClient || createAdminClient();
+
+    let query = supabase
+      .from('partidos')
+      .select('id, equipo_id, rival_nombre, fecha_hora, estado, acta_oficial_url, coach_report, equipo:teams(id, name, ffcv_group_id)')
+      .eq('season_id', ACTIVE_SEASON_ID)
+      .neq('season_id', CLOSED_SEASON_ID);
+
+    if (specificMatchId) {
+      query = query.eq('id', specificMatchId);
+    }
+
+    const { data: matches } = await query;
+    if (!matches || matches.length === 0) return;
+
+    const nonBraveMatches = matches.filter(
+      (m: any) => !(m.acta_oficial_url && String(m.acta_oficial_url).includes('apuntamelo.com'))
+    );
+
+    // Determinar el ancla de la jornada activa (último partido jugado/en curso en la temporada activa)
+    const playedOrLiveDates = nonBraveMatches
+      .filter((m: any) => m.estado === 'Finalizado' || m.estado === 'En Curso' || m.estado === 'En curso' || m.estado === 'Descanso')
+      .map((m: any) => (m.fecha_hora ? new Date(m.fecha_hora).getTime() : NaN))
+      .filter((ms: number) => !isNaN(ms));
+    const latestActiveMatchdayMs = playedOrLiveDates.length > 0 ? Math.max(...playedOrLiveDates) : NaN;
+
+    const candidates = nonBraveMatches.filter((m: any) => {
+      if (specificMatchId && m.id === specificMatchId) {
+        return true;
+      }
+      const isLiveState = m.estado === 'En Curso' || m.estado === 'En curso' || m.estado === 'Descanso';
+      if (isLiveState) return true;
+      if (!m.fecha_hora) return false;
+      const matchMs = new Date(m.fecha_hora).getTime();
+      const diffHoursNow = (now - matchMs) / (1000 * 60 * 60);
+      if (diffHoursNow >= -2 && diffHoursNow <= 14) return true;
+
+      // Fallback para el fin de semana / jornada activa en curso
+      if (!isNaN(latestActiveMatchdayMs)) {
+        const diffHoursCluster = Math.abs(matchMs - latestActiveMatchdayMs) / (1000 * 60 * 60);
+        if (diffHoursCluster <= 36) return true;
+      }
+      return false;
+    });
+
+    if (candidates.length === 0) return;
+
+    for (const cand of candidates) {
+      let parsedReport: any = {};
+      if (typeof cand.coach_report === 'string') {
+        try {
+          parsedReport = JSON.parse(cand.coach_report);
+        } catch {
+          parsedReport = {};
+        }
+      } else if (cand.coach_report && typeof cand.coach_report === 'object') {
+        parsedReport = cand.coach_report;
+      }
+
+      // Si ya está finalizado con acta cerrada y tiene ffcv_live + coordenadas tácticas, omitir
+      if (cand.estado === 'Finalizado' && parsedReport?.ffcv_live?.actaCerrada && parsedReport?.official_tactic) {
+        const { data: existingConvs } = await supabase
+          .from('convocatorias')
+          .select('titular, tactical_x')
+          .eq('partido_id', cand.id);
+        const hasTacticalCoords = (existingConvs || []).some((c: any) => c.titular && c.tactical_x != null);
+        if (hasTacticalCoords) continue;
+      }
+
+      // Resolver codacta desde acta_oficial_url o desde ffcv_matches (temporada 22)
+      let codacta = cand.acta_oficial_url?.match(/CodPartido=(\d+)/i)?.[1] || null;
+
+      if (!codacta && (cand.equipo as any)?.ffcv_group_id && cand.fecha_hora) {
+        const { data: ffcvGroupMatches } = await supabase
+          .from('ffcv_matches')
+          .select('ffcv_match_id, home_team_name, away_team_name, match_date')
+          .neq('ffcv_season_id', '21')
+          .eq('ffcv_season_id', '22')
+          .eq('ffcv_group_id', (cand.equipo as any).ffcv_group_id);
+
+        const cDateMs = new Date(cand.fecha_hora).getTime();
+        const cRival = (cand.rival_nombre || '').toLowerCase();
+        const rivalWords = cRival.split(/\s+/).filter((w: string) => w.length > 3 && !w.includes('c.f.') && !w.includes('c.d.'));
+
+        const matchedFm = (ffcvGroupMatches || []).find((fm: any) => {
+          if (!fm.match_date || !fm.ffcv_match_id) return false;
+          const fmHome = (fm.home_team_name || '').toLowerCase();
+          const fmAway = (fm.away_team_name || '').toLowerCase();
+          if (!fmHome.includes('saladar') && !fmAway.includes('saladar')) return false;
+          const diffDays = Math.abs((cDateMs - new Date(fm.match_date).getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays > 7) return false;
+          const fmRival = fmHome.includes('saladar') ? fmAway : fmHome;
+          return rivalWords.some((w: string) => fmRival.includes(w)) || fmRival.includes(cRival);
+        });
+
+        if (matchedFm?.ffcv_match_id) {
+          codacta = String(matchedFm.ffcv_match_id);
+        }
+      }
+
+      if (codacta) {
+        await syncFFCVActaToConvocatorias(codacta, undefined, supabase);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[syncFFCVLiveMatchesIfNeeded] Warning:', err.message);
   }
 }

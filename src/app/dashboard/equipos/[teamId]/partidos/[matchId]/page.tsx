@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { PremiumMatchManager } from "@/components/features/matches/premium-match-manager"
 import { FamilyMatchView } from "@/components/features/matches/family-match-view"
@@ -9,8 +10,23 @@ const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
 export default async function MatchPage({ params }: { params: Promise<{ teamId: string, matchId: string }> }) {
   const { teamId, matchId } = await params
   const supabase = await createClient()
+  const adminClient = createAdminClient()
 
-  const { data: matchData } = await supabase
+  // Sincronizar automáticamente alineación, pizarra táctica y estado en vivo (FFCV / Liga Brave)
+  try {
+    const [{ syncApuntameloLiveMatchesIfNeeded }, { syncFFCVLiveMatchesIfNeeded }] = await Promise.all([
+      import("@/lib/apuntamelo/sync"),
+      import("@/lib/ffcv/acta-sync")
+    ])
+    await Promise.all([
+      syncApuntameloLiveMatchesIfNeeded(adminClient, matchId),
+      syncFFCVLiveMatchesIfNeeded(adminClient, matchId)
+    ])
+  } catch (syncErr) {
+    console.warn("[MatchPage] Non-blocking auto-sync warning:", syncErr)
+  }
+
+  const { data: matchData } = await adminClient
     .from("partidos")
     .select(`
       *,
@@ -22,7 +38,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
 
   if (!matchData) redirect(`/dashboard/equipos/${teamId}/partidos`)
 
-  const { data: convocatoriasData } = await supabase
+  const { data: convocatoriasData } = await adminClient
     .from("convocatorias")
     .select("*")
     .eq("partido_id", matchId)
@@ -32,7 +48,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
   // Strictly enforce active season: players must belong to active season teams and never be inactive
   const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
 
-  const { data: teamPlayers } = await supabase
+  const { data: teamPlayers } = await adminClient
     .from("players")
     .select("id, first_name, last_name, nickname, dorsal, avatar_url, status, medical_notes, posicion, team_id, team:teams!inner(id, season_id)")
     .eq("team_id", teamId)
@@ -72,7 +88,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .order("created_at", { ascending: true })
 
   // All matches for this team strictly in the active season (never past 25/26)
-  const { data: allMatchesData } = await supabase
+  const { data: allMatchesData } = await adminClient
     .from("partidos")
     .select("id, competicion_nombre, fecha_hora, rival_nombre, resultado_propio, resultado_rival, estado")
     .eq("equipo_id", matchData?.equipo_id || teamId)

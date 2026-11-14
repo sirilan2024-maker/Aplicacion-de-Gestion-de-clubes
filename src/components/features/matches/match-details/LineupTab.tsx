@@ -259,11 +259,31 @@ export function LineupTab({
     slotLabel?: string;
   }
 
+  const parsedMatchReport = useMemo(() => {
+    if (!match?.coach_report) return {};
+    if (typeof match.coach_report === 'string') {
+      try {
+        return JSON.parse(match.coach_report);
+      } catch {
+        return {};
+      }
+    }
+    return match.coach_report || {};
+  }, [match?.coach_report]);
+
+  const initialOfficialTactic = useMemo(() => {
+    const candidate =
+      parsedMatchReport?.official_tactic ||
+      parsedMatchReport?.ffcv_live?.ourFormation ||
+      parsedMatchReport?.liga_brave_live?.ourFormation;
+    return candidate && DEFAULT_FORMATIONS[candidate] ? candidate : "4-3-3";
+  }, [parsedMatchReport]);
+
   const initialPitchPlayers: Record<string, PitchPlayerPosition> = {};
   
   // Titulares existentes en este partido
   const titularesDb = convocatorias.filter(c => c.titular);
-  const defaultSlots = DEFAULT_FORMATIONS["4-3-3"];
+  const defaultSlots = DEFAULT_FORMATIONS[initialOfficialTactic] || DEFAULT_FORMATIONS["4-3-3"];
 
   if (titularesDb.length > 0 && playersList.length > 0) {
     const assignedSlots = new Set<string>();
@@ -299,7 +319,7 @@ export function LineupTab({
     });
   }
 
-  const [tactic, setTactic] = useState<string>("4-3-3")
+  const [tactic, setTactic] = useState<string>(initialOfficialTactic)
   const [pitchPlayers, setPitchPlayers] = useState<Record<string, PitchPlayerPosition>>(initialPitchPlayers)
   const [savedAlert, setSavedAlert] = useState(false)
   const [limitWarning, setLimitWarning] = useState<string | null>(null)

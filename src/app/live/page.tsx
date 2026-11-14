@@ -10,6 +10,17 @@ export const revalidate = 0 // Opt out of caching for live route
 
 export default async function PublicLivePage() {
   const supabase = await createAdminClient()
+
+  try {
+    const [{ syncApuntameloLiveMatchesIfNeeded }, { syncFFCVLiveMatchesIfNeeded }] = await Promise.all([
+      import("@/lib/apuntamelo/sync"),
+      import("@/lib/ffcv/acta-sync")
+    ])
+    await Promise.all([
+      syncApuntameloLiveMatchesIfNeeded(supabase),
+      syncFFCVLiveMatchesIfNeeded(supabase)
+    ])
+  } catch {}
   
   // Fetch active season to show matches for the current active season
   const { data: activeSeason } = await supabase

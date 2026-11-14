@@ -670,11 +670,13 @@ export async function saveMatchReport(
   };
 
   const updatePayload: any = {
-    coach_rating: report.coach_rating,
-    coach_summary: report.coach_summary,
-    positive_aspects: report.positive_aspects,
-    improvement_aspects: report.improvement_aspects,
-    attitude_notes: report.attitude_notes,
+    coach_rating: (report.coach_rating !== undefined && report.coach_rating !== null && !isNaN(Number(report.coach_rating))) 
+      ? Number(report.coach_rating) 
+      : null,
+    coach_summary: report.coach_summary ?? '',
+    positive_aspects: report.positive_aspects ?? '',
+    improvement_aspects: report.improvement_aspects ?? '',
+    attitude_notes: report.attitude_notes ?? '',
     coach_report: mergedCoachReport
   };
 
@@ -1240,100 +1242,148 @@ export async function updateMatchAttendanceBatch(
   matchDate: string | null, 
   records: { playerId: string, status: string, notes?: string }[]
 ) {
-  const supabase = await createClient();
-  const dateStr = matchDate ? matchDate.split('T')[0] : new Date().toISOString().split('T')[0];
-  
-  // 1. Ensure a team_events record exists for this match
-  let eventId = null;
-  const { data: existingEvent } = await supabase
-    .from('team_events')
-    .select('id')
-    .eq('team_id', teamId)
-    .eq('event_type', 'Partido')
-    .eq('date', dateStr)
-    .limit(1)
-    .single();
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
 
-  if (existingEvent) {
-    eventId = existingEvent.id;
-  } else {
-    const { data: newEvent } = await supabase
+    const adminSupabase = await createAdminClient();
+
+    if (matchId) {
+      const matchAccess = await canUserAccessMatch(adminSupabase, context, matchId);
+      if (!matchAccess.allowed) {
+        return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+      }
+      if (matchAccess.match?.season_id) {
+        const editable = await isSeasonEditable(matchAccess.match.season_id, context.profile.club_id);
+        if (!editable) {
+          return { success: false, error: "No se pueden modificar datos de una temporada cerrada." };
+        }
+      }
+    }
+
+    const dateStr = matchDate ? matchDate.split('T')[0] : new Date().toISOString().split('T')[0];
+    
+    // 1. Ensure a team_events record exists for this match
+    let eventId: string | null = null;
+    const { data: existingEvents } = await adminSupabase
       .from('team_events')
-      .insert({
-        team_id: teamId,
-        title: 'Partido (Autogenerado por Asistencia)',
-        date: dateStr,
-        event_type: 'Partido'
-      })
-      .select()
-      .single();
-    if (newEvent) {
-      eventId = newEvent.id;
-    }
-  }
-
-  // 2. Insert/Update attendance records
-  for (const record of records) {
-    // Check if exists
-    const { data: existingAtt } = await supabase
-      .from('attendance')
       .select('id')
-      .eq('player_id', record.playerId)
+      .eq('team_id', teamId)
+      .eq('event_type', 'Partido')
       .eq('date', dateStr)
-      .limit(1)
-      .single();
+      .limit(1);
 
-    const attPayload: any = { status: record.status, event_id: eventId };
-    if (record.notes !== undefined) {
-      attPayload.notes = record.notes || null;
-    }
-
-    if (existingAtt) {
-      await supabase
-        .from('attendance')
-        .update(attPayload)
-        .eq('id', existingAtt.id);
+    if (existingEvents && existingEvents.length > 0) {
+      eventId = existingEvents[0].id;
     } else {
-      await supabase
-        .from('attendance')
+      const { data: newEvent, error: newEvErr } = await adminSupabase
+        .from('team_events')
         .insert({
           team_id: teamId,
-          player_id: record.playerId,
-          event_id: eventId,
+          title: 'Partido (Autogenerado por Asistencia)',
           date: dateStr,
-          ...attPayload
-        });
-    }
-  }
+          event_type: 'Partido'
+        })
+        .select('id')
+        .maybeSingle();
 
-  revalidatePath(`/dashboard`, 'layout');
-  return { success: true };
+      if (newEvErr) {
+        console.warn("[updateMatchAttendanceBatch] Warning creating team_event:", newEvErr.message);
+      }
+      if (newEvent) {
+        eventId = newEvent.id;
+      }
+    }
+
+    // 2. Insert/Update attendance records
+    for (const record of records) {
+      const { data: existingAttList } = await adminSupabase
+        .from('attendance')
+        .select('id')
+        .eq('player_id', record.playerId)
+        .eq('date', dateStr)
+        .limit(1);
+
+      const existingAtt = existingAttList?.[0];
+
+      const attPayload: any = { status: record.status, event_id: eventId };
+      if (record.notes !== undefined) {
+        attPayload.notes = record.notes || null;
+      }
+
+      if (existingAtt) {
+        await adminSupabase
+          .from('attendance')
+          .update(attPayload)
+          .eq('id', existingAtt.id);
+      } else {
+        await adminSupabase
+          .from('attendance')
+          .insert({
+            team_id: teamId,
+            player_id: record.playerId,
+            event_id: eventId,
+            date: dateStr,
+            ...attPayload
+          });
+      }
+    }
+
+    revalidatePath(`/dashboard`, 'layout');
+    return { success: true };
+  } catch (err: any) {
+    console.error("[updateMatchAttendanceBatch] Exception:", err);
+    return { success: false, error: err.message || "Error al registrar asistencia" };
+  }
 }
 
 export async function updateMatchStatsBatch(matchId: string, stats: { playerId: string, goals: number, assists: number, yellows: number, reds: number, minutes: number }[]) {
-  const supabase = await createClient();
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
 
-  for (const stat of stats) {
-    await supabase
-      .from('convocatorias')
-      .update({
-        goals: stat.goals,
-        goles: stat.goals,
-        assists: stat.assists,
-        asistencias: stat.assists,
-        yellow_cards: stat.yellows,
-        tarjetas_amarillas: stat.yellows,
-        red_cards: stat.reds,
-        tarjetas_rojas: stat.reds,
-        minutes_played: stat.minutes,
-        minutos_jugados: stat.minutes
-      })
-      .eq('partido_id', matchId)
-      .eq('player_id', stat.playerId);
+    const adminSupabase = await createAdminClient();
+    const matchAccess = await canUserAccessMatch(adminSupabase, context, matchId);
+    if (!matchAccess.allowed) {
+      return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+    }
+
+    if (matchAccess.match?.season_id) {
+      const editable = await isSeasonEditable(matchAccess.match.season_id, context.profile.club_id);
+      if (!editable) {
+        return { success: false, error: "No se pueden modificar datos de una temporada cerrada." };
+      }
+    }
+
+    for (const stat of stats) {
+      await adminSupabase
+        .from('convocatorias')
+        .update({
+          goals: stat.goals,
+          goles: stat.goals,
+          assists: stat.assists,
+          asistencias: stat.assists,
+          yellow_cards: stat.yellows,
+          tarjetas_amarillas: stat.yellows,
+          red_cards: stat.reds,
+          tarjetas_rojas: stat.reds,
+          minutes_played: stat.minutes,
+          minutos_jugados: stat.minutes
+        })
+        .eq('partido_id', matchId)
+        .eq('player_id', stat.playerId);
+    }
+
+    revalidatePath(`/dashboard`, 'layout');
+    return { success: true };
+  } catch (err: any) {
+    console.error("[updateMatchStatsBatch] Exception:", err);
+    return { success: false, error: err.message || "Error al actualizar estadísticas" };
   }
-
-  revalidatePath(`/dashboard`, 'layout');
-  return { success: true };
 }
 
 export async function updateMatchFullReportBatch(
@@ -1355,59 +1405,104 @@ export async function updateMatchFullReportBatch(
   }[]
 ) {
   try {
-    const supabase = await createClient();
-
-  // 1. Update attendance in team_events / attendance table
-  const attendanceRecords = reports.map(r => ({ 
-    playerId: r.playerId, 
-    status: r.status,
-    notes: r.motive || r.notes || ''
-  }));
-  await updateMatchAttendanceBatch(matchId, teamId, matchDate, attendanceRecords);
-
-  // 2. Update convocatorias with all stats, ratings, and attendance
-  for (const report of reports) {
-    const { data: existing } = await supabase
-      .from('convocatorias')
-      .select('id')
-      .eq('partido_id', matchId)
-      .eq('player_id', report.playerId)
-      .single();
-
-    const payload = {
-      estado_asistencia: report.status,
-      coach_rating: report.rating,
-      actitud: report.actitud,
-      goals: report.goals,
-      goles: report.goals,
-      assists: report.assists,
-      asistencias: report.assists,
-      yellow_cards: report.yellows,
-      tarjetas_amarillas: report.yellows,
-      red_cards: report.reds,
-      tarjetas_rojas: report.reds,
-      minutes_played: report.minutes,
-      minutos_jugados: report.minutes
-    };
-
-    if (existing) {
-      await supabase
-        .from('convocatorias')
-        .update(payload)
-        .eq('id', existing.id);
-    } else {
-      await supabase
-        .from('convocatorias')
-        .insert({
-          partido_id: matchId,
-          player_id: report.playerId,
-          ...payload
-        });
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
     }
-  }
 
-  revalidatePath(`/dashboard`, 'layout');
-  return { success: true };
+    const adminSupabase = await createAdminClient();
+    const matchAccess = await canUserAccessMatch(adminSupabase, context, matchId);
+    if (!matchAccess.allowed || !matchAccess.match) {
+      return { success: false, error: matchAccess.reason || "No tienes acceso a este partido" };
+    }
+
+    if (matchAccess.match.season_id) {
+      const editable = await isSeasonEditable(matchAccess.match.season_id, context.profile.club_id);
+      if (!editable) {
+        return { success: false, error: "No se pueden modificar datos de una temporada cerrada." };
+      }
+    }
+
+    const effectiveTeamId = teamId || matchAccess.match.equipo_id || "";
+
+    // 1. Update attendance in team_events / attendance table
+    const attendanceRecords = reports.map(r => ({ 
+      playerId: r.playerId, 
+      status: r.status,
+      notes: r.motive || r.notes || ''
+    }));
+    await updateMatchAttendanceBatch(matchId, effectiveTeamId, matchDate, attendanceRecords);
+
+    // 2. Update convocatorias with all stats, ratings, and attendance
+    for (const report of reports) {
+      const { data: existingRows } = await adminSupabase
+        .from('convocatorias')
+        .select('id, status, titular')
+        .eq('partido_id', matchId)
+        .eq('player_id', report.playerId)
+        .limit(1);
+
+      const existing = existingRows?.[0];
+
+      // Mapear estado_asistencia a los valores permitidos por el check constraint ('Confirmado', 'Ausente', 'Pendiente')
+      let mappedEstadoAsistencia: 'Confirmado' | 'Ausente' | 'Pendiente' = 'Confirmado';
+      if (report.status === 'Ausente' || report.status === 'Justificado') {
+        mappedEstadoAsistencia = 'Ausente';
+      } else if (report.status === 'Pendiente') {
+        mappedEstadoAsistencia = 'Pendiente';
+      }
+
+      const payload = {
+        estado_asistencia: mappedEstadoAsistencia,
+        coach_rating: Number(report.rating) || 0,
+        actitud: Number(report.actitud) || 0,
+        goals: Number(report.goals) || 0,
+        goles: Number(report.goals) || 0,
+        assists: Number(report.assists) || 0,
+        asistencias: Number(report.assists) || 0,
+        yellow_cards: Number(report.yellows) || 0,
+        tarjetas_amarillas: Number(report.yellows) || 0,
+        red_cards: Number(report.reds) || 0,
+        tarjetas_rojas: Number(report.reds) || 0,
+        minutes_played: Number(report.minutes) || 0,
+        minutos_jugados: Number(report.minutes) || 0
+      };
+
+      if (existing) {
+        const { error: updErr } = await adminSupabase
+          .from('convocatorias')
+          .update(payload)
+          .eq('id', existing.id);
+
+        if (updErr) {
+          console.error(`[updateMatchFullReportBatch] Error updating convocatoria ${existing.id}:`, updErr.message);
+          return { success: false, error: `Error al guardar evaluación de jugadores: ${updErr.message}` };
+        }
+      } else {
+        const { error: insErr } = await adminSupabase
+          .from('convocatorias')
+          .insert({
+            partido_id: matchId,
+            player_id: report.playerId,
+            status: report.status === 'Ausente' || report.status === 'Justificado' ? 'no_convocado' : 'convocado',
+            titular: false,
+            ...payload
+          });
+
+        if (insErr) {
+          console.error(`[updateMatchFullReportBatch] Error inserting convocatoria:`, insErr.message);
+          return { success: false, error: `Error al crear convocatoria de jugador: ${insErr.message}` };
+        }
+      }
+    }
+
+    revalidatePath(`/dashboard`, 'layout');
+    revalidatePath(`/dashboard/matches`);
+    if (effectiveTeamId) {
+      revalidatePath(`/dashboard/equipos/${effectiveTeamId}/partidos`);
+      revalidatePath(`/dashboard/equipos/${effectiveTeamId}/partidos/${matchId}`);
+    }
+    return { success: true };
   } catch (err: any) {
     console.error("Error in updateMatchFullReportBatch:", err);
     return { success: false, error: err.message || "Unknown error" };
@@ -1464,6 +1559,20 @@ export async function updatePlayerCardsInMatch(matchId: string, playerId: string
 
 export async function getPublicMatchEvents(matchId: string) {
   const supabase = await createAdminClient()
+
+  try {
+    const [{ syncApuntameloLiveMatchesIfNeeded }, { syncFFCVLiveMatchesIfNeeded }] = await Promise.all([
+      import('@/lib/apuntamelo/sync'),
+      import('@/lib/ffcv/acta-sync')
+    ])
+    await Promise.all([
+      syncApuntameloLiveMatchesIfNeeded(supabase, matchId),
+      syncFFCVLiveMatchesIfNeeded(supabase, matchId)
+    ])
+  } catch (e) {
+    // Non-blocking fallback
+  }
+
   const { data, error } = await supabase
     .from('match_events')
     .select(`
@@ -1483,10 +1592,27 @@ export async function getPublicMatchEvents(matchId: string) {
 export async function getPublicMatches() {
   try {
     const supabase = await createAdminClient()
+
+    try {
+      const [{ syncApuntameloLiveMatchesIfNeeded }, { syncFFCVLiveMatchesIfNeeded }] = await Promise.all([
+        import('@/lib/apuntamelo/sync'),
+        import('@/lib/ffcv/acta-sync')
+      ])
+      await Promise.all([
+        syncApuntameloLiveMatchesIfNeeded(supabase),
+        syncFFCVLiveMatchesIfNeeded(supabase)
+      ])
+    } catch (e) {
+      // Non-blocking fallback
+    }
+
+    const activeSeasonId = '663ed6ef-1dab-4350-9489-ed50f9e9ac15'
+
     const { data, error } = await supabase
       .from('partidos')
-      .select('id, estado, resultado_propio, resultado_rival, live_timer_started_at, live_timer_elapsed_seconds, first_half_duration_seconds')
-      .neq('estado', 'Finalizado')
+      .select('id, estado, resultado_propio, resultado_rival, live_timer_started_at, live_timer_elapsed_seconds, first_half_duration_seconds, acta_oficial_url, coach_report')
+      .eq('season_id', activeSeasonId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
 
     if (error) {
       console.error("Error fetching public matches:", error);
@@ -1584,6 +1710,17 @@ export async function getClubMatchdayMatchesAction(teamId?: string) {
   try {
     const supabase = await createAdminClient();
     const activeSeasonId = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+    try {
+      const [{ syncApuntameloLiveMatchesIfNeeded }, { syncFFCVLiveMatchesIfNeeded }] = await Promise.all([
+        import('@/lib/apuntamelo/sync'),
+        import('@/lib/ffcv/acta-sync')
+      ]);
+      await Promise.all([
+        syncApuntameloLiveMatchesIfNeeded(supabase),
+        syncFFCVLiveMatchesIfNeeded(supabase)
+      ]);
+    } catch {}
 
     // 1. Fetch club matches for season 26/27 (excluding closed season 25/26)
     const { data: rawMatches, error } = await supabase

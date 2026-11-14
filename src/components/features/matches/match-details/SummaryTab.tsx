@@ -30,23 +30,6 @@ interface PlayerRow {
   status: string | null
 }
 
-const MOCK_SUMMARY_PLAYERS: PlayerRow[] = [
-  { id: "p1", number: 1, name: "David García", pos: "POR", titular: true, coachRating: 7.0, actitud: 8, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "DG", status: "convocado" },
-  { id: "p2", number: 2, name: "Jorge Ruiz", pos: "LD", titular: true, coachRating: 7.5, actitud: 7, assists: 1, goals: 0, yellowCards: 1, redCards: 0, avatar: "JR", status: "convocado" },
-  { id: "p3", number: 5, name: "Miguel Sanz", pos: "DFC", titular: true, coachRating: 8.0, actitud: 9, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "MS", status: "convocado" },
-  { id: "p4", number: 6, name: "Pablo Torres", pos: "DFC", titular: true, coachRating: 7.5, actitud: 8, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "PT", status: "convocado" },
-  { id: "p5", number: 3, name: "Luis Moreno", pos: "LI", titular: true, coachRating: 7.0, actitud: 7, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "LM", status: "convocado" },
-  { id: "p6", number: 8, name: "Rubén Díaz", pos: "MC", titular: true, coachRating: 7.5, actitud: 8, assists: 0, goals: 1, yellowCards: 0, redCards: 0, avatar: "RD", status: "convocado" },
-  { id: "p7", number: 4, name: "Andrés Gil", pos: "MC", titular: true, coachRating: 8.0, actitud: 9, assists: 0, goals: 1, yellowCards: 0, redCards: 0, avatar: "AG", status: "convocado" },
-  { id: "p8", number: 7, name: "Sergio López", pos: "MC", titular: true, coachRating: 7.5, actitud: 8, assists: 1, goals: 0, yellowCards: 0, redCards: 0, avatar: "SL", status: "convocado" },
-  { id: "p9", number: 10, name: "Carlos Pérez", pos: "MP", titular: true, coachRating: 9.5, actitud: 10, assists: 1, goals: 2, yellowCards: 0, redCards: 0, avatar: "CP", status: "convocado" },
-  { id: "p10", number: 9, name: "Álvaro Núñez", pos: "DC", titular: true, coachRating: 7.0, actitud: 7, assists: 1, goals: 0, yellowCards: 0, redCards: 0, avatar: "AN", status: "convocado" },
-  { id: "p11", number: 11, name: "Iván Castro", pos: "DC", titular: false, coachRating: 6.5, actitud: 6, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "IC", status: "convocado" },
-  { id: "p12", number: 12, name: "Mateo Ramos", pos: "SUPL", titular: false, coachRating: 6.0, actitud: 6, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "MR", status: "no_convocado" },
-  { id: "p13", number: 13, name: "Lucas Mendoza", pos: "SUPL", titular: false, coachRating: 6.5, actitud: 7, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "LM", status: "no_convocado" },
-  { id: "p14", number: 14, name: "Daniel Alonso", pos: "SUPL", titular: false, coachRating: 6.0, actitud: 6, assists: 0, goals: 0, yellowCards: 0, redCards: 0, avatar: "DA", status: "no_convocado" }
-]
-
 const FORMATIONS: Record<string, { id: string, label: string, x: number, y: number }[]> = {
   "4-3-3": [
     { id: "slot-0", label: "POR", x: 50, y: 88 },
@@ -167,7 +150,21 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
     };
   };
 
-  const mappedPlayers: PlayerRow[] = players.map(p => {
+  const parsedCoachReport = typeof match?.coach_report === 'string'
+    ? (() => { try { return JSON.parse(match.coach_report) } catch { return {} } })()
+    : (match?.coach_report || {});
+
+  const officialTactic: string = (() => {
+    const cand =
+      parsedCoachReport?.official_tactic ||
+      parsedCoachReport?.ffcv_live?.ourFormation ||
+      parsedCoachReport?.liga_brave_live?.ourFormation;
+    return cand && FORMATIONS[cand] ? cand : "4-3-3";
+  })();
+
+  const activeFormationSlots = FORMATIONS[officialTactic] || FORMATIONS["4-3-3"];
+
+  const mappedPlayers: (PlayerRow & { isConvocado?: boolean })[] = players.map(p => {
     const conv = convocatorias.find(c => c.player_id === p.id);
     const rawFirst = (p.first_name || p.nombre || '').trim();
     const rawLast = (p.last_name || p.apellidos || '').trim();
@@ -176,14 +173,31 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
     const init1 = (customNickname && customNickname[0]) || (rawFirst && rawFirst[0]) || 'J';
     const init2 = (rawLast && rawLast[0]) || '';
 
+    let inferredSlotLabel: string | null = null;
+    if (conv?.titular && conv?.tactical_x != null && conv?.tactical_y != null) {
+      let minDist = Infinity;
+      for (const s of activeFormationSlots) {
+        const d = Math.hypot(conv.tactical_x - s.x, conv.tactical_y - s.y);
+        if (d < minDist) {
+          minDist = d;
+          inferredSlotLabel = s.label;
+        }
+      }
+    }
+
+    const isConvocado = Boolean(
+      conv && (conv.titular || conv.status === 'convocado' || conv.status === 'titular' || conv.status === 'suplente')
+    );
+
     return {
       id: p.id,
       number: p.dorsal || conv?.dorsal || 0,
       name: customNickname || fullName,
       avatar: `${init1}${init2}`.toUpperCase(),
       avatarUrl: p.avatar_url || p.foto_url || p.photo_url || p.foto || null,
-      pos: conv?.slotLabel || p.posicion_principal || p.posicion || "JUG",
+      pos: conv?.slotLabel || inferredSlotLabel || p.posicion_principal || p.posicion || "JUG",
       titular: conv?.titular || false,
+      isConvocado,
       tactical_x: conv?.tactical_x,
       tactical_y: conv?.tactical_y,
       coachRating: conv?.coach_rating || 0,
@@ -197,28 +211,27 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
     };
   })
 
-  // Identificar titulares asignados por el entrenador
+  // Identificar titulares y suplentes convocados
+  const hasAnyConvocatoria = mappedPlayers.some(p => p.isConvocado || p.titular);
   const explicitStarters = mappedPlayers.filter(p => p.titular);
-  const explicitBench = mappedPlayers.filter(p => !p.titular);
+  const explicitBench = hasAnyConvocatoria
+    ? mappedPlayers.filter(p => !p.titular && p.isConvocado)
+    : mappedPlayers.filter(p => !p.titular);
 
-  // Si el entrenador ha guardado titulares, los usamos directamente; sino, fallback
+  // Si hay titulares (guardados o sincronizados del acta), los usamos directamente; sino, los convocados reales
   const startersList = explicitStarters.length > 0 
     ? explicitStarters 
-    : (mappedPlayers.length > 0 ? mappedPlayers.slice(0, 11) : MOCK_SUMMARY_PLAYERS.slice(0, 11));
+    : (mappedPlayers.length > 0 ? mappedPlayers.slice(0, 11) : []);
 
   const benchList = explicitStarters.length > 0 
     ? explicitBench 
-    : (mappedPlayers.length > 0 ? mappedPlayers.slice(11) : MOCK_SUMMARY_PLAYERS.slice(11));
+    : (mappedPlayers.length > 0 ? mappedPlayers.slice(11) : []);
 
   const playerList = [...startersList, ...benchList];
-  const [tactic, setTactic] = useState("4-3-3")
+  const [tactic, setTactic] = useState(officialTactic)
   const [isPrivate, setIsPrivate] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [isPending, startTransition] = useTransition()
-
-  const parsedCoachReport = typeof match?.coach_report === 'string'
-    ? (() => { try { return JSON.parse(match.coach_report) } catch { return {} } })()
-    : (match?.coach_report || {});
 
   const [teamPhotoUrl, setTeamPhotoUrl] = useState<string | null>(
     parsedCoachReport?.team_photo_url || match?.team_photo_url || null
@@ -439,9 +452,14 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
         <div className="bg-white rounded-xl border border-slate-150 p-4 sm:p-5 shadow-sm space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2.5">
             <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alineación Táctica</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Alineación Táctica</h3>
+                <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  {officialTactic}
+                </span>
+              </div>
               <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-                {isFamilyView ? "VISTA PREVIA TÁCTICA (MODO LECTURA)" : "ESQUEMA GUARDADO DEL PARTIDO"}
+                {isFamilyView ? "VISTA PREVIA TÁCTICA (MODO LECTURA)" : "SINCRONIZACIÓN AUTOMÁTICA · ACTA OFICIAL"}
               </p>
             </div>
             
@@ -504,7 +522,7 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
 
               {/* Titulares en el campo con coordenadas exactas guardadas */}
               {startersList.map((player, idx) => {
-                const fallbackSlot = FORMATIONS["4-3-3"][idx] || { x: 50, y: 50, label: "JUG" };
+                const fallbackSlot = activeFormationSlots[idx] || { x: 50, y: 50, label: "JUG" };
                 const posX = (player.tactical_x != null) ? player.tactical_x : fallbackSlot.x;
                 const posY = (player.tactical_y != null) ? player.tactical_y : fallbackSlot.y;
 
@@ -586,6 +604,119 @@ export function SummaryTab({ matchId, match, players = [], convocatorias = [] }:
             )}
           </div>
         </div>
+
+        {/* ── Ficha Oficial del Rival y Cuerpo Arbitral (FFCV / Liga Brave) ── */}
+        {(() => {
+          const officialLive = parsedCoachReport?.ffcv_live || parsedCoachReport?.liga_brave_live;
+          const rivalPlayers = Array.isArray(officialLive?.rivalPlayers) ? officialLive.rivalPlayers : [];
+          const arbitros: string[] = Array.isArray(officialLive?.arbitros) ? officialLive.arbitros : [];
+          const rivalCoach = typeof officialLive?.rivalCoach === 'string' ? officialLive.rivalCoach : officialLive?.rivalCoach?.name;
+          const rivalFormation = officialLive?.rivalFormation;
+
+          if (rivalPlayers.length === 0 && arbitros.length === 0) return null;
+
+          const rivalStarters = rivalPlayers.filter((rp: any) => rp.titular);
+          const rivalBench = rivalPlayers.filter((rp: any) => !rp.titular);
+
+          return (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider truncate">
+                      Rival: {match?.rival_nombre || "Equipo Rival"}
+                    </h3>
+                    {rivalFormation && (
+                      <span className="text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+                        {rivalFormation}
+                      </span>
+                    )}
+                  </div>
+                  {rivalCoach && (
+                    <p className="text-[11px] font-semibold text-slate-500 truncate mt-0.5">
+                      👔 Entrenador: <span className="text-slate-700 font-bold">{rivalCoach}</span>
+                    </p>
+                  )}
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+                  {rivalPlayers.length} convocados
+                </span>
+              </div>
+
+              {arbitros.length > 0 && (
+                <div className="bg-slate-50 border border-slate-150 rounded-lg px-3 py-2 text-[11px] text-slate-600 flex items-center gap-2">
+                  <span className="font-black text-slate-700 shrink-0">⚖️ Árbitro:</span>
+                  <span className="font-semibold truncate">{arbitros.join(" · ")}</span>
+                </div>
+              )}
+
+              {rivalStarters.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 mb-1.5">
+                    Once Titular Rival ({rivalStarters.length})
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {rivalStarters.map((rp: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="w-5 h-5 rounded bg-slate-800 text-white font-mono font-black text-[10px] flex items-center justify-center shrink-0">
+                            {rp.dorsal ?? "-"}
+                          </span>
+                          <span className="font-bold text-slate-700 truncate text-[11px]">{rp.nombre || rp.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {(rp.goles ?? rp.goals ?? 0) > 0 && (
+                            <span className="text-[10px] font-black text-emerald-700">⚽{rp.goles ?? rp.goals}</span>
+                          )}
+                          {(rp.amarillas ?? rp.yellowCards ?? 0) > 0 && (
+                            <span className="w-2.5 h-3.5 rounded-xs bg-amber-400 border border-amber-500 inline-block" />
+                          )}
+                          {(rp.rojas ?? rp.redCards ?? 0) > 0 && (
+                            <span className="w-2.5 h-3.5 rounded-xs bg-rose-600 border border-rose-700 inline-block" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {rivalBench.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                    Suplentes Rival ({rivalBench.length})
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {rivalBench.map((rp: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50/60 border border-slate-100 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="w-5 h-5 rounded bg-slate-600 text-white font-mono font-black text-[10px] flex items-center justify-center shrink-0">
+                            {rp.dorsal ?? "-"}
+                          </span>
+                          <span className="font-semibold text-slate-600 truncate text-[11px]">{rp.nombre || rp.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {rp.entroMinuto && (
+                            <span className="text-[9px] font-bold text-emerald-600">▲{rp.entroMinuto}'</span>
+                          )}
+                          {(rp.goles ?? rp.goals ?? 0) > 0 && (
+                            <span className="text-[10px] font-black text-emerald-700">⚽{rp.goles ?? rp.goals}</span>
+                          )}
+                          {(rp.amarillas ?? rp.yellowCards ?? 0) > 0 && (
+                            <span className="w-2.5 h-3.5 rounded-xs bg-amber-400 border border-amber-500 inline-block" />
+                          )}
+                          {(rp.rojas ?? rp.redCards ?? 0) > 0 && (
+                            <span className="w-2.5 h-3.5 rounded-xs bg-rose-600 border border-rose-700 inline-block" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
 

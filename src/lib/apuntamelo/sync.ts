@@ -8,6 +8,7 @@ import {
   FFCVSyncResult
 } from '../ffcv/types';
 import { matchPlayer } from '../ffcv/acta-sync';
+import { assignTacticalCoordinatesForStarters, StarterPositionInput } from '../ffcv/tactical-lineup';
 import { getOfficialMatchDuration } from '../utils';
 
 // Agent configured to bypass intermediate SSL certificate issue on apuntamelo.com
@@ -38,6 +39,28 @@ const apuntameloCache = new Map<string, CacheEntry>();
 const apuntameloErrorCooldown = new Map<string, { message: string; expiresAt: number }>();
 const apuntameloInFlight = new Map<string, Promise<any>>();
 
+/**
+ * Allows external callers (such as the GitHub Actions cron POST payload)
+ * to pre-populate the Apúntamelo memory cache so serverless runs don't get blocked by Cloudflare WAF.
+ */
+export function injectApuntameloCache(
+  entries: Record<string, any>,
+  ttlMs: number = 30 * 60 * 1000
+): void {
+  if (!entries || typeof entries !== 'object') return;
+  const now = Date.now();
+  for (const [url, data] of Object.entries(entries)) {
+    if (url && data !== undefined && data !== null) {
+      apuntameloCache.set(url, {
+        data,
+        expiresAt: now + ttlMs,
+        staleUntil: now + Math.max(ttlMs * 2, STALE_FALLBACK_TTL_MS)
+      });
+      apuntameloErrorCooldown.delete(url);
+    }
+  }
+}
+
 export function safeJsonParse<T = any>(raw: unknown, fallback: T): T {
   if (raw === null || raw === undefined || raw === '') return fallback;
   if (typeof raw !== 'string') return (raw as T) ?? fallback;
@@ -53,24 +76,37 @@ export function safeJsonParse<T = any>(raw: unknown, fallback: T): T {
 function performApuntameloRequest<T = any>(
   url: string,
   timeoutMs: number,
-  redirectCount = 0
+  redirectCount = 0,
+  useMobileUa = false
 ): Promise<T> {
   return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = useMobileUa
+      ? {
+          'User-Agent': 'Apuntamelo/2.4.1 (es.apuntamelo.app; build:42; iOS 17.4.0) Alamofire/5.8.1',
+          Accept: 'application/json, text/plain, */*',
+          'Accept-Language': 'es-ES,es;q=0.9'
+        }
+      : {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Sec-Fetch-Site': 'same-origin',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Dest': 'empty',
+          'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          Referer: 'https://apuntamelo.com/'
+        };
+
     const req = https.get(
       url,
       {
         agent: httpsAgent,
         timeout: timeoutMs,
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          Accept: 'application/json, text/javascript, text/plain, */*; q=0.01',
-          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-          'X-Requested-With': 'XMLHttpRequest',
-          Connection: 'close',
-          Referer: 'https://apuntamelo.com/',
-          Origin: 'https://apuntamelo.com'
-        }
+        headers
       },
       (res) => {
         const statusCode = res.statusCode || 0;
@@ -84,7 +120,7 @@ function performApuntameloRequest<T = any>(
           }
           try {
             const redirectUrl = new URL(location, url).toString();
-            return performApuntameloRequest<T>(redirectUrl, timeoutMs, redirectCount + 1).then(
+            return performApuntameloRequest<T>(redirectUrl, timeoutMs, redirectCount + 1, useMobileUa).then(
               resolve,
               reject
             );
@@ -103,6 +139,14 @@ function performApuntameloRequest<T = any>(
         });
 
         res.on('end', () => {
+          // If Cloudflare challenges the desktop UA with 403, retry once with mobile app headers
+          if (statusCode === 403 && !useMobileUa) {
+            return performApuntameloRequest<T>(url, timeoutMs, redirectCount, true).then(
+              resolve,
+              reject
+            );
+          }
+
           // 1. Validate HTTP status code before attempting JSON parse
           if (statusCode < 200 || statusCode >= 300) {
             return reject(
@@ -599,12 +643,12 @@ export async function syncApuntameloTeam(
     ] = await Promise.all([
       supabase
         .from('partidos')
-        .select('id, rival_nombre, fecha_hora, acta_oficial_url, lugar, highlight_jornada, estado, coach_summary')
+        .select('id, rival_nombre, fecha_hora, hora_citacion, acta_oficial_url, lugar, highlight_jornada, estado, coach_summary, coach_report')
         .eq('equipo_id', teamId)
         .eq('season_id', activeAppSeasonId),
       supabase
         .from('players')
-        .select('id, first_name, last_name, dorsal, team_id')
+        .select('id, first_name, last_name, dorsal, team_id, posicion')
         .eq('team_id', teamId),
       supabase
         .from('team_events')
@@ -616,12 +660,18 @@ export async function syncApuntameloTeam(
 
     const teamMatchEvents = initialTeamMatchEvents ? [...initialTeamMatchEvents] : [];
     const existingPartidoIds = (existingPartidos || []).map((ep: any) => ep.id);
-    const { data: allExistingConvs } = existingPartidoIds.length > 0
-      ? await supabase
-          .from('convocatorias')
-          .select('partido_id, player_id, minutos_jugados, minutes_played')
-          .in('partido_id', existingPartidoIds)
-      : { data: [] as any[] };
+    const [{ data: allExistingConvs }, { data: allExistingMatchEvents }] = existingPartidoIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from('convocatorias')
+            .select('partido_id, player_id, titular, tactical_x, tactical_y, minutos_jugados, minutes_played')
+            .in('partido_id', existingPartidoIds),
+          supabase
+            .from('match_events')
+            .select('id, partido_id, tipo_evento, notas')
+            .in('partido_id', existingPartidoIds)
+        ])
+      : [{ data: [] as any[] }, { data: [] as any[] }];
 
     const convsByPartidoMap = new Map<string, any[]>();
     for (const conv of allExistingConvs || []) {
@@ -630,7 +680,15 @@ export async function syncApuntameloTeam(
       convsByPartidoMap.set(conv.partido_id, list);
     }
 
+    const eventsByPartidoMap = new Map<string, any[]>();
+    for (const ev of allExistingMatchEvents || []) {
+      const list = eventsByPartidoMap.get(ev.partido_id) || [];
+      list.push(ev);
+      eventsByPartidoMap.set(ev.partido_id, list);
+    }
+
     const nowMs = Date.now();
+    const categoryDuration = getOfficialMatchDuration(config.category || team.name, 'Liga Brave');
 
     for (const sm of saladarMatches) {
       const isHome = Number(sm.FK_EquipoLiga_A) === config.teamApuntameloId;
@@ -641,6 +699,7 @@ export async function syncApuntameloTeam(
         : null;
       const isoDateTime = formatSpainDateTimeToIso(sm.Fecha, horaFormateada) || `${sm.Fecha}T10:00:00+02:00`;
       const hasScore = sm.Goles_A !== null && sm.Goles_B !== null && sm.Goles_A !== undefined && sm.Goles_B !== undefined;
+      const hasStartedOrPlayed = hasScore || sm.Tipo === 'jugado' || Boolean(sm.Inicio);
       
       const realScore = realScoresMap.get(String(sm.Id));
       const effectiveHomeScore = realScore ? realScore.homeScore : (hasScore ? Number(sm.Goles_A) : null);
@@ -656,45 +715,44 @@ export async function syncApuntameloTeam(
       const lugar = isHome ? 'Local' : 'Visitante';
 
       // Buscar si ya existe este partido en 'partidos'
-      const matchExact = (existingPartidos || []).find((ep: any) => {
-        if (ep.acta_oficial_url && ep.acta_oficial_url.includes(String(sm.Id))) return true;
-        // Si no tiene acta_oficial_url, buscar por rival y fecha cercana
-        if (ep.rival_nombre && ep.fecha_hora) {
-          const diffDays = Math.abs(
-            (new Date(ep.fecha_hora).getTime() - new Date(sm.Fecha).getTime()) / (1000 * 60 * 60 * 24)
-          );
-          const r1 = (ep.rival_nombre || '').toLowerCase();
-          const r2 = (rivalName || '').toLowerCase();
-          if (diffDays <= 7 && (r1.includes(r2) || r2.includes(r1))) return true;
-        }
-        return false;
-      });
+      const matchExact = findMatchingInternalPartido(existingPartidos || [], sm, rivalName);
 
-      const estado = hasScore
-        ? 'Finalizado'
+      const initialEstado = hasScore
+        ? (Number(sm.Validado) === 0 && sm.Inicio ? 'En Curso' : 'Finalizado')
         : (isPostponed || (matchExact && (matchExact.estado === 'Aplazado' || matchExact.estado === 'Suspendido' || matchExact.coach_summary?.includes('APLAZADO')))
           ? 'Aplazado'
           : 'Programado');
 
       let resolvedMatchId = matchExact ? matchExact.id : null;
+      const isoMs = new Date(isoDateTime).getTime();
+      const defaultCitacionIso = !isNaN(isoMs)
+        ? new Date(isoMs - 60 * 60 * 1000).toISOString()
+        : null;
 
       if (matchExact) {
-        // Actualizar datos del partido
+        const prevMs = matchExact.fecha_hora ? new Date(matchExact.fecha_hora).getTime() : NaN;
+        const scheduleChanged = isNaN(prevMs) || (!isNaN(isoMs) && Math.abs(prevMs - isoMs) > 60000);
+        const baseUpdate: Record<string, any> = {
+          rival_nombre: rivalName,
+          fecha_hora: isoDateTime,
+          lugar,
+          resultado_propio: scorePropio,
+          resultado_rival: scoreRival,
+          estado: initialEstado,
+          acta_oficial_url: matchUrl
+        };
+        if ((scheduleChanged || !matchExact.hora_citacion) && defaultCitacionIso) {
+          baseUpdate.hora_citacion = defaultCitacionIso;
+        }
+
+        // Actualizar datos base del partido
         await supabase
           .from('partidos')
-          .update({
-            rival_nombre: rivalName,
-            fecha_hora: isoDateTime,
-            lugar,
-            resultado_propio: scorePropio,
-            resultado_rival: scoreRival,
-            estado,
-            acta_oficial_url: matchUrl
-          })
+          .update(baseUpdate)
           .eq('id', matchExact.id);
 
-        // Si el partido no tiene resultado (ej. aplazado que tenía datos residuales), limpiar convocatorias
-        if (!hasScore) {
+        // Si el partido fue aplazado y tenía datos residuales de una disputa previa errónea, limpiar convocatorias
+        if (!hasStartedOrPlayed && isPostponed && matchExact.estado === 'Finalizado') {
           await supabase.from('convocatorias').delete().eq('partido_id', matchExact.id);
         }
       } else {
@@ -707,10 +765,11 @@ export async function syncApuntameloTeam(
             season_id: activeAppSeasonId,
             rival_nombre: rivalName,
             fecha_hora: isoDateTime,
+            hora_citacion: defaultCitacionIso,
             lugar,
             resultado_propio: scorePropio,
             resultado_rival: scoreRival,
-            estado,
+            estado: initialEstado,
             acta_oficial_url: matchUrl,
             highlight_jornada: false
           })
@@ -722,136 +781,44 @@ export async function syncApuntameloTeam(
         }
       }
 
-      // Si el partido está disputado, sincronizar goles y tarjetas a la tabla convocatorias
-      if (hasScore && resolvedMatchId) {
+      // Si el partido está en juego o disputado, sincronizar goles, tarjetas, cronómetro, alineación y narración en vivo
+      if (hasStartedOrPlayed && resolvedMatchId) {
         const existingConvs = convsByPartidoMap.get(resolvedMatchId) || [];
+        const existingEvs = eventsByPartidoMap.get(resolvedMatchId) || [];
+        const hasSyncedConvs = existingConvs.some((c: any) => (c.minutos_jugados ?? c.minutes_played ?? 0) > 0);
+        const hasTacticalCoords = existingConvs.some((c: any) => c.titular && c.tactical_x != null);
+        const hasBraveEvents = existingEvs.some((e: any) => e.notas && (e.notas.includes('[BRAVE') || e.notas.startsWith('[LOCAL]') || e.notas.startsWith('[VISITANTE]')));
         const matchDateMs = sm.Fecha ? new Date(sm.Fecha).getTime() : nowMs;
         const isOlderThan7Days = !isNaN(matchDateMs) && (nowMs - matchDateMs) > 7 * 24 * 60 * 60 * 1000;
         const alreadyFullySynced =
           matchExact?.estado === 'Finalizado' &&
-          existingConvs.length > 0 &&
+          Number(sm.Validado) === 1 &&
+          hasSyncedConvs &&
+          hasTacticalCoords &&
+          hasBraveEvents &&
           isOlderThan7Days;
 
         if (!alreadyFullySynced) {
           try {
+            const isRecentOrLive = !isOlderThan7Days || Number(sm.Validado) === 0;
             const matchInfoArr = await fetchApuntameloJson<any[]>(
-              `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`
+              `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`,
+              { ttlMs: isRecentOrLive ? 12 * 1000 : 10 * 60 * 1000 }
             );
 
             if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
               const mInfo = matchInfoArr[0];
-
-              // Reconciliar goles reales de los jugadores si difieren del marcador truncado por regla formativa de 5 goles
-              try {
-                const gList = safeJsonParse<any[]>(mInfo.Json_goles, []);
-                let cA = 0;
-                let cB = 0;
-                gList.forEach((g: any) => {
-                  if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_A)) cA++;
-                  if (Number(g.FK_EquipoLiga) === Number(sm.FK_EquipoLiga_B)) cB++;
-                });
-                if (cA + cB > 0) {
-                  const finalA = Math.max(Number(sm.Goles_A) || 0, cA);
-                  const finalB = Math.max(Number(sm.Goles_B) || 0, cB);
-                  const finalPropio = isHome ? finalA : finalB;
-                  const finalRival = isHome ? finalB : finalA;
-
-                  await supabase
-                    .from('partidos')
-                    .update({
-                      resultado_propio: finalPropio,
-                      resultado_rival: finalRival,
-                      estado: 'Finalizado'
-                    })
-                    .eq('id', resolvedMatchId);
-
-                  await supabase
-                    .from('ffcv_matches')
-                    .update({
-                      home_score: finalA,
-                      away_score: finalB,
-                      status: 'played',
-                      is_closed: true
-                    })
-                    .eq('ffcv_match_id', String(sm.Id));
-                }
-              } catch (errGoles) {
-                console.warn('[syncApuntameloTeam] Error reconciliando Json_goles:', errGoles);
-              }
-
-              if (teamPlayers && teamPlayers.length > 0) {
-                const puntuaciones = safeJsonParse<any[]>(mInfo.Json_puntuaciones, []);
-                const noticias = safeJsonParse<any[]>(mInfo.Json_noticias, []);
-
-                const teamPuntuaciones = puntuaciones.filter(
-                  (p: any) =>
-                    Number(p.FK_EquipoLiga) === config.teamApuntameloId ||
-                    Number(p.EquipoLiga) === config.teamApuntameloId
-                );
-
-                const existingConvMap = new Map(existingConvs.map((c: any) => [c.player_id, c.minutos_jugados ?? c.minutes_played]));
-
-                // Duración reglamentaria exacta: Infantil 70 mins (2x35'), Cadete 80 mins (2x40'), Juvenil 90 mins (2x45')
-                const categoryDuration = getOfficialMatchDuration(config.category || team.name, 'Liga Brave');
-
-                const convocatoriasToUpsert: any[] = [];
-                for (const pStats of teamPuntuaciones) {
-                  const matched = matchPlayer(pStats.Nombre || '', pStats.Dorsal, teamPlayers, teamPlayers);
-                  if (!matched) continue;
-
-                  let playerGoals = Number(pStats.Goles) || 0;
-                  let playerYellows = Number(pStats.Amarillas) || 0;
-                  let playerReds = Number(pStats.Rojas) || 0;
-
-                  // Verificar también en la crónica en vivo (Json_noticias)
-                  const cardNoticias = noticias.filter(
-                    (n: any) =>
-                      Number(n.FK_EquipoLiga) === config.teamApuntameloId &&
-                      (String(n.FK_JugadorLiga) === String(pStats.FK_JugadorLiga) ||
-                        (n.Nombre_Jugador &&
-                          matched.first_name &&
-                          matched.last_name &&
-                          n.Nombre_Jugador.toLowerCase().includes(matched.last_name.toLowerCase().trim())))
-                  );
-
-                  for (const cn of cardNoticias) {
-                    if (cn.Icono === 5 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.amarilla')) {
-                      playerYellows = Math.max(playerYellows, 1);
-                    }
-                    if (cn.Icono === 6 || (cn.Narraciones_Claves || []).includes('tarjetas.noticia.roja')) {
-                      playerReds = Math.max(playerReds, 1);
-                    }
-                  }
-
-                  const prevMins = existingConvMap.get(matched.id);
-                  const hasManualMins = typeof prevMins === 'number' && prevMins > 0 && prevMins <= categoryDuration;
-
-                  const calculatedMins = hasManualMins
-                    ? prevMins
-                    : (pStats.Suplente ? Math.round(categoryDuration / 2) : categoryDuration);
-
-                  convocatoriasToUpsert.push({
-                    partido_id: resolvedMatchId,
-                    player_id: matched.id,
-                    status: 'convocado',
-                    titular: !Boolean(pStats.Suplente),
-                    yellow_cards: playerYellows,
-                    tarjetas_amarillas: playerYellows,
-                    red_cards: playerReds,
-                    tarjetas_rojas: playerReds,
-                    goals: playerGoals,
-                    goles: playerGoals,
-                    minutes_played: calculatedMins,
-                    minutos_jugados: calculatedMins
-                  });
-                }
-
-                if (convocatoriasToUpsert.length > 0) {
-                  await supabase
-                    .from('convocatorias')
-                    .upsert(convocatoriasToUpsert, { onConflict: 'partido_id,player_id' });
-                }
-              }
+              await syncApuntameloMatchDetailToDb({
+                supabase,
+                config,
+                partidoId: resolvedMatchId,
+                existingCoachReport: matchExact?.coach_report,
+                existingConvs,
+                sm,
+                mInfo,
+                teamPlayers: teamPlayers || [],
+                categoryDuration
+              });
             }
           } catch (detailErr: any) {
             console.warn(`[syncApuntameloTeam] Error extrayendo estadísticas del partido ${sm.Id}:`, detailErr.message);
@@ -968,3 +935,947 @@ export async function syncApuntameloTeam(
     errors: errors.length > 0 ? errors : undefined
   };
 }
+
+function normalizeBraveRival(name?: string | null): string {
+  return (name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(c\.?d\.?|c\.?f\.?|u\.?d\.?|f\.?c\.?|a\.?d\.?|club|deportivo|futbol|e\.?d\.?m\.?|e\.?m\.?f\.?)\b/gi, '')
+    .replace(/['"“”‘’]/g, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+export function findMatchingInternalPartido(existingPartidos: any[], sm: any, rivalName: string): any | undefined {
+  // 1. Coincidencia exacta por ID de Apúntamelo en acta_oficial_url
+  const byId = (existingPartidos || []).find(
+    (ep: any) => ep.acta_oficial_url && ep.acta_oficial_url.includes(String(sm.Id))
+  );
+  if (byId) return byId;
+
+  // 2. Coincidencia por proximidad de fecha (<= 7 días, Regla 3.2) y nombre de rival normalizado
+  const smDateStr = sm.Fecha ? String(sm.Fecha).split(' ')[0] : '';
+  const smDateMs = smDateStr ? new Date(smDateStr).getTime() : NaN;
+  const r2Norm = normalizeBraveRival(rivalName);
+
+  return (existingPartidos || []).find((ep: any) => {
+    if (!ep.rival_nombre || !ep.fecha_hora || isNaN(smDateMs)) return false;
+    const epDateMs = new Date(ep.fecha_hora).getTime();
+    const diffDays = Math.abs((epDateMs - smDateMs) / (1000 * 60 * 60 * 24));
+    if (diffDays > 7) return false;
+
+    const r1Raw = (ep.rival_nombre || '').toLowerCase().trim();
+    const r2Raw = (rivalName || '').toLowerCase().trim();
+    if (r1Raw.includes(r2Raw) || r2Raw.includes(r1Raw)) return true;
+
+    const r1Norm = normalizeBraveRival(ep.rival_nombre);
+    if (r1Norm && r2Norm && (r1Norm === r2Norm || r1Norm.includes(r2Norm) || r2Norm.includes(r1Norm))) {
+      return true;
+    }
+    return false;
+  });
+}
+
+export function parseApuntameloInicioToIso(rawInicio?: string | null): string | null {
+  if (!rawInicio || typeof rawInicio !== 'string') return null;
+  const trimmed = rawInicio.trim();
+  if (!trimmed || trimmed.startsWith('0000')) return null;
+  const [datePart, timePart] = trimmed.split(/\s+/);
+  if (!datePart) return null;
+  return formatSpainDateTimeToIso(datePart, timePart || '10:00:00');
+}
+
+export function computeApuntameloLiveState(
+  sm: any,
+  mInfo: any,
+  categoryDurationMinutes: number
+): {
+  estado: 'Programado' | 'En Curso' | 'Descanso' | 'Finalizado';
+  live_timer_started_at: string | null;
+  live_timer_elapsed_seconds: number;
+  first_half_duration_seconds: number | null;
+  second_half_duration_seconds: number | null;
+  halfMinutes: number;
+} {
+  const halfMinutes = Number(mInfo?.Minutos_parte) || Math.round((categoryDurationMinutes || 70) / 2) || 35;
+  const halfSeconds = halfMinutes * 60;
+  const noticias = safeJsonParse<any[]>(mInfo?.Json_noticias, []);
+
+  const isValidated = Number(mInfo?.Validado ?? sm?.Validado) === 1;
+  const hasFinalWhistleNoticia = noticias.some((n: any) => {
+    const claves: string[] = Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : [];
+    const desc = String(n.Descripcion || '').toLowerCase();
+    return (
+      claves.some((k) => k.includes('fin_partido')) ||
+      desc.includes('finaaaaal') ||
+      desc.includes('final del partido')
+    );
+  });
+
+  const rawInicio = mInfo?.Inicio || sm?.Inicio || null;
+  const inicioIso = parseApuntameloInicioToIso(rawInicio);
+  const inicioMs = inicioIso ? new Date(inicioIso).getTime() : NaN;
+  const parte = Number(mInfo?.Parte ?? sm?.Parte) || 0;
+
+  const isTimedOutSecondHalf =
+    parte >= 2 && !isNaN(inicioMs) && Date.now() - inicioMs > (halfMinutes + 25) * 60 * 1000;
+
+  const smDateStr = sm?.Fecha ? String(sm.Fecha).split(' ')[0] : '';
+  const matchDateMs = smDateStr ? new Date(smDateStr).getTime() : NaN;
+  const hasScore =
+    (sm?.Goles_A !== null && sm?.Goles_A !== undefined) ||
+    (mInfo?.Goles_A !== null && mInfo?.Goles_A !== undefined);
+  const isOldMatchWithScore =
+    !isNaN(matchDateMs) && Date.now() - matchDateMs > 18 * 60 * 60 * 1000 && hasScore;
+
+  if (isValidated || hasFinalWhistleNoticia || isTimedOutSecondHalf || isOldMatchWithScore) {
+    return {
+      estado: 'Finalizado',
+      live_timer_started_at: null,
+      live_timer_elapsed_seconds: 0,
+      first_half_duration_seconds: halfSeconds,
+      second_half_duration_seconds: halfSeconds,
+      halfMinutes
+    };
+  }
+
+  const isDescansoFlag = Number(mInfo?.Descanso) === 1;
+  const hasDescansoNoticia = noticias.some((n: any) =>
+    (Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : []).includes('fin_parte_primera')
+  );
+  const hasParte2StartNoticia = noticias.some((n: any) =>
+    (Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : []).includes('inicio_parte2')
+  );
+
+  if (isDescansoFlag || (hasDescansoNoticia && !hasParte2StartNoticia && parte <= 1)) {
+    return {
+      estado: 'Descanso',
+      live_timer_started_at: null,
+      live_timer_elapsed_seconds: halfSeconds,
+      first_half_duration_seconds: halfSeconds,
+      second_half_duration_seconds: null,
+      halfMinutes
+    };
+  }
+
+  const hasStarted =
+    sm?.Tipo === 'jugado' ||
+    Boolean(rawInicio) ||
+    noticias.some((n: any) =>
+      (Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : []).includes('inicio_partido')
+    );
+
+  if (hasStarted) {
+    const isSecondHalf = parte >= 2 || hasParte2StartNoticia;
+    return {
+      estado: 'En Curso',
+      live_timer_started_at: inicioIso || new Date().toISOString(),
+      live_timer_elapsed_seconds: isSecondHalf ? halfSeconds : 0,
+      first_half_duration_seconds: isSecondHalf ? halfSeconds : null,
+      second_half_duration_seconds: null,
+      halfMinutes
+    };
+  }
+
+  return {
+    estado: 'Programado',
+    live_timer_started_at: null,
+    live_timer_elapsed_seconds: 0,
+    first_half_duration_seconds: null,
+    second_half_duration_seconds: null,
+    halfMinutes
+  };
+}
+
+export async function syncApuntameloMatchDetailToDb(params: {
+  supabase: any;
+  config: ApuntameloConfig;
+  partidoId: string;
+  existingCoachReport?: any;
+  existingConvs?: any[];
+  sm: any;
+  mInfo: any;
+  teamPlayers: any[];
+  categoryDuration: number;
+}): Promise<void> {
+  const {
+    supabase,
+    config,
+    partidoId,
+    existingCoachReport,
+    existingConvs = [],
+    sm,
+    mInfo,
+    teamPlayers,
+    categoryDuration
+  } = params;
+
+  const fkA = Number(mInfo?.FK_EquipoLiga_A ?? sm?.FK_EquipoLiga_A);
+  const fkB = Number(mInfo?.FK_EquipoLiga_B ?? sm?.FK_EquipoLiga_B);
+  const isHome = fkA === config.teamApuntameloId;
+  const matchApuntameloId = String(mInfo?.Id || sm?.Id);
+  const matchUrl = `https://apuntamelo.com/partido/${matchApuntameloId}`;
+
+  const gList = safeJsonParse<any[]>(mInfo?.Json_goles, []);
+  const puntuaciones = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []);
+  const noticias = safeJsonParse<any[]>(mInfo?.Json_noticias, []);
+
+  // 1. Calcular marcador real (conciliando Json_goles y goles de cabecera)
+  let cA = 0;
+  let cB = 0;
+  gList.forEach((g: any) => {
+    if (Number(g.FK_EquipoLiga) === fkA) cA++;
+    if (Number(g.FK_EquipoLiga) === fkB) cB++;
+  });
+
+  const headerA = mInfo?.Goles_A ?? sm?.Goles_A;
+  const headerB = mInfo?.Goles_B ?? sm?.Goles_B;
+  const liveState = computeApuntameloLiveState(sm, mInfo, categoryDuration);
+  const hasStartedOrScore =
+    liveState.estado !== 'Programado' ||
+    (headerA !== null && headerA !== undefined) ||
+    cA + cB > 0;
+
+  const finalA = hasStartedOrScore ? Math.max(Number(headerA) || 0, cA) : null;
+  const finalB = hasStartedOrScore ? Math.max(Number(headerB) || 0, cB) : null;
+  const finalPropio = isHome ? finalA : finalB;
+  const finalRival = isHome ? finalB : finalA;
+
+  // 2. Mapear jugadores de ambos equipos desde Json_puntuaciones (excluyendo Posicion 5 = Entrenador)
+  const jugadorFullNameMap = new Map<string, string>();
+  for (const p of puntuaciones) {
+    if (p.FK_JugadorLiga && p.Nombre) {
+      jugadorFullNameMap.set(String(p.FK_JugadorLiga), String(p.Nombre).trim());
+    }
+  }
+  for (const n of noticias) {
+    if (n.FK_JugadorLiga && n.Nombre_Jugador && !jugadorFullNameMap.has(String(n.FK_JugadorLiga))) {
+      jugadorFullNameMap.set(String(n.FK_JugadorLiga), String(n.Nombre_Jugador).trim());
+    }
+  }
+
+  const ourBravePlayers: any[] = [];
+  const rivalBravePlayers: any[] = [];
+  let ourCoachName: string | null = null;
+  let rivalCoachName: string | null = null;
+
+  for (const p of puntuaciones) {
+    const isOur =
+      Number(p.FK_EquipoLiga) === config.teamApuntameloId ||
+      Number(p.EquipoLiga) === config.teamApuntameloId;
+
+    if (Number(p.Posicion) === 5) {
+      if (isOur) ourCoachName = p.Nombre || null;
+      else rivalCoachName = p.Nombre || null;
+      continue;
+    }
+
+    const matchedInternal =
+      isOur && teamPlayers.length > 0
+        ? matchPlayer(p.Nombre || '', p.Dorsal, teamPlayers, teamPlayers)
+        : null;
+
+    const pFkEquipo = Number(p.FK_EquipoLiga || p.EquipoLiga);
+    const goalsFromGList = gList.filter(
+      (g: any) =>
+        Number(g.FK_EquipoLiga) === pFkEquipo &&
+        ((p.FK_JugadorLiga && String(g.FK_JugadorLiga) === String(p.FK_JugadorLiga)) ||
+          (!g.FK_JugadorLiga && Number(p.Dorsal) > 0 && Number(g.Dorsal) === Number(p.Dorsal)))
+    ).length;
+
+    const item = {
+      fkJugadorLiga: p.FK_JugadorLiga,
+      playerId: matchedInternal?.id || null,
+      nombre: p.Nombre || 'Jugador',
+      dorsal: Number(p.Dorsal) || 0,
+      posicion: Number(p.Posicion) || 0,
+      titular: !Boolean(p.Suplente),
+      sustituido: Boolean(p.Sustituido),
+      goles: Math.max(Number(p.Goles) || 0, goalsFromGList),
+      asistencias: Number(p.Asistencias) || 0,
+      amarillas: Number(p.Amarillas) || 0,
+      rojas: Number(p.Rojas) || 0,
+      azules: Number(p.Azules) || 0,
+      verdes: Number(p.Verdes) || 0,
+      puntuacion: Number(p.Puntuacion) || 0,
+      mvp: Boolean(p.Mvp || p.Mvp_auto)
+    };
+
+    if (isOur) ourBravePlayers.push(item);
+    else rivalBravePlayers.push(item);
+  }
+
+  // En Liga Brave F11, en ocasiones todos los convocados vienen con Suplente=false (ej. 2 porteros + 10 jugadores = 12 titulares).
+  // Garantizar máximo 1 portero titular y máximo 11 titulares en el once inicial (tanto para nuestro equipo como para el rival).
+  const normalizeElevenStarters = (playersArr: any[], existingConvRows: any[] = []) => {
+    const existingManualStarters = new Set(
+      existingConvRows
+        .filter((c: any) => c.titular && c.tactical_x != null && c.tactical_y != null)
+        .map((c: any) => c.player_id)
+    );
+
+    const candidateStarters = playersArr.filter((p) => p.titular);
+    if (candidateStarters.length <= 11 && candidateStarters.filter((p) => p.posicion === 1).length <= 1) {
+      return;
+    }
+
+    // Ordenar candidatos dando prioridad a jugadores emparejados en BD, luego titulares manuales previos, luego dorsal 1 para portero
+    const gks = candidateStarters
+      .filter((p) => p.posicion === 1)
+      .sort((a, b) => {
+        const aHasId = a.playerId ? 1 : 0;
+        const bHasId = b.playerId ? 1 : 0;
+        if (aHasId !== bHasId) return bHasId - aHasId;
+        const aMan = a.playerId && existingManualStarters.has(a.playerId) ? 1 : 0;
+        const bMan = b.playerId && existingManualStarters.has(b.playerId) ? 1 : 0;
+        if (aMan !== bMan) return bMan - aMan;
+        if (a.dorsal === 1 && b.dorsal !== 1) return -1;
+        if (b.dorsal === 1 && a.dorsal !== 1) return 1;
+        return (b.puntuacion || 0) - (a.puntuacion || 0);
+      });
+
+    const outfielders = candidateStarters
+      .filter((p) => p.posicion !== 1)
+      .sort((a, b) => {
+        const aHasId = a.playerId ? 1 : 0;
+        const bHasId = b.playerId ? 1 : 0;
+        if (aHasId !== bHasId) return bHasId - aHasId;
+        const aMan = a.playerId && existingManualStarters.has(a.playerId) ? 1 : 0;
+        const bMan = b.playerId && existingManualStarters.has(b.playerId) ? 1 : 0;
+        if (aMan !== bMan) return bMan - aMan;
+        if (a.sustituido !== b.sustituido) return a.sustituido ? 1 : -1;
+        return 0;
+      });
+
+    const chosenStarters = new Set<any>();
+    if (gks.length > 0) chosenStarters.add(gks[0]);
+    for (const out of outfielders) {
+      if (chosenStarters.size >= 11) break;
+      chosenStarters.add(out);
+    }
+
+    for (const p of playersArr) {
+      if (p.titular && !chosenStarters.has(p)) {
+        p.titular = false;
+        p.playedAsSub = true;
+      }
+    }
+  };
+
+  normalizeElevenStarters(ourBravePlayers, existingConvs);
+  normalizeElevenStarters(rivalBravePlayers, []);
+
+  // Calcular formación táctica y coordenadas en la pizarra para nuestros titulares
+  const existingConvByPlayerId = new Map<string, any>(
+    existingConvs.map((c: any) => [c.player_id, c])
+  );
+  const teamPlayerById = new Map<string, any>(
+    teamPlayers.map((tp: any) => [tp.id, tp])
+  );
+
+  const starterInputs: StarterPositionInput[] = ourBravePlayers
+    .filter((bp) => bp.titular && bp.playerId)
+    .map((bp) => {
+      const existingC = existingConvByPlayerId.get(bp.playerId);
+      const dbPl = teamPlayerById.get(bp.playerId);
+      return {
+        playerId: bp.playerId,
+        dorsal: bp.dorsal || dbPl?.dorsal,
+        isGoalkeeper: bp.posicion === 1,
+        bravePosCode: bp.posicion || null,
+        dbPosition: dbPl?.posicion || null,
+        existingTacticalX: existingC?.tactical_x ?? null,
+        existingTacticalY: existingC?.tactical_y ?? null,
+        wasAlreadyTitular: Boolean(existingC?.titular)
+      };
+    });
+
+  const { formation: ourFormation, coordinatesByPlayerId } = assignTacticalCoordinatesForStarters(
+    starterInputs
+  );
+
+  // Merge liga_brave_live dentro de coach_report sin perder el análisis táctico del entrenador
+  let parsedCoachReport: Record<string, any> = {};
+  if (typeof existingCoachReport === 'string') {
+    try {
+      parsedCoachReport = JSON.parse(existingCoachReport);
+    } catch {
+      parsedCoachReport = {};
+    }
+  } else if (existingCoachReport && typeof existingCoachReport === 'object') {
+    parsedCoachReport = { ...existingCoachReport };
+  }
+
+  parsedCoachReport.official_tactic = ourFormation;
+  parsedCoachReport.liga_brave_live = {
+    apuntameloId: Number(matchApuntameloId) || matchApuntameloId,
+    url: matchUrl,
+    minutosParte: liveState.halfMinutes,
+    parte: Number(mInfo?.Parte ?? sm?.Parte) || 1,
+    descanso: Number(mInfo?.Descanso) === 1,
+    validado: Number(mInfo?.Validado ?? sm?.Validado) === 1,
+    inicio: mInfo?.Inicio || sm?.Inicio || null,
+    campo: mInfo?.Nombre_campo || sm?.Nombre_campo || null,
+    ourFormation,
+    ourCoach: ourCoachName,
+    rivalCoach: rivalCoachName,
+    ourPlayers: ourBravePlayers,
+    rivalPlayers: rivalBravePlayers,
+    updatedAt: new Date().toISOString()
+  };
+
+  // 3. Actualizar tabla `partidos` y `ffcv_matches`
+  const partidoUpdatePayload: Record<string, any> = {
+    resultado_propio: finalPropio,
+    resultado_rival: finalRival,
+    estado: liveState.estado,
+    live_timer_started_at: liveState.live_timer_started_at,
+    live_timer_elapsed_seconds: liveState.live_timer_elapsed_seconds,
+    first_half_duration_seconds: liveState.first_half_duration_seconds,
+    second_half_duration_seconds: liveState.second_half_duration_seconds,
+    acta_oficial_url: matchUrl,
+    coach_report: JSON.stringify(parsedCoachReport)
+  };
+
+  await supabase.from('partidos').update(partidoUpdatePayload).eq('id', partidoId);
+
+  if (finalA !== null && finalB !== null) {
+    await supabase
+      .from('ffcv_matches')
+      .update({
+        home_score: finalA,
+        away_score: finalB,
+        status: liveState.estado === 'Finalizado' ? 'played' : 'scheduled',
+        is_closed: liveState.estado === 'Finalizado'
+      })
+      .eq('ffcv_match_id', matchApuntameloId);
+  }
+
+  // 4. Sincronizar `convocatorias` (excluyendo Posicion 5 = Entrenador y deduplicando por player_id)
+  if (teamPlayers.length > 0 && ourBravePlayers.length > 0) {
+    const existingConvMap = new Map(
+      existingConvs.map((c: any) => [c.player_id, c.minutos_jugados ?? c.minutes_played])
+    );
+
+    const dedupedConvsMap = new Map<string, any>();
+
+    for (const bp of ourBravePlayers) {
+      if (!bp.playerId) continue;
+
+      let playerYellows = bp.amarillas;
+      let playerReds = bp.rojas;
+
+      // Verificar también en la crónica en vivo (Json_noticias)
+      const cardNoticias = noticias.filter(
+        (n: any) =>
+          Number(n.FK_EquipoLiga) === config.teamApuntameloId &&
+          String(n.FK_JugadorLiga) === String(bp.fkJugadorLiga)
+      );
+
+      for (const cn of cardNoticias) {
+        const claves: string[] = Array.isArray(cn.Narraciones_Claves) ? cn.Narraciones_Claves : [];
+        if (cn.Icono === 5 || claves.includes('tarjetas.noticia.amarilla')) {
+          playerYellows = Math.max(playerYellows, 1);
+        }
+        if (cn.Icono === 6 || claves.includes('tarjetas.noticia.roja')) {
+          playerReds = Math.max(playerReds, 1);
+        }
+      }
+
+      const prevMins = existingConvMap.get(bp.playerId);
+      const hasManualMins =
+        typeof prevMins === 'number' && prevMins > 0 && prevMins <= categoryDuration;
+
+      const calculatedMins = !hasStartedOrScore
+        ? 0
+        : hasManualMins
+          ? prevMins
+          : !bp.titular
+            ? Math.round(categoryDuration / 2)
+            : bp.sustituido
+              ? Math.round(categoryDuration * 0.65)
+              : categoryDuration;
+
+      const tacticalCoords = bp.titular ? coordinatesByPlayerId.get(bp.playerId) : null;
+
+      const row = {
+        partido_id: partidoId,
+        player_id: bp.playerId,
+        status: 'convocado',
+        titular: bp.titular,
+        tactical_x: tacticalCoords ? tacticalCoords.x : null,
+        tactical_y: tacticalCoords ? tacticalCoords.y : null,
+        yellow_cards: playerYellows,
+        tarjetas_amarillas: playerYellows,
+        red_cards: playerReds,
+        tarjetas_rojas: playerReds,
+        goals: bp.goles,
+        goles: bp.goles,
+        assists: bp.asistencias,
+        asistencias: bp.asistencias,
+        minutes_played: calculatedMins,
+        minutos_jugados: calculatedMins
+      };
+
+      if (dedupedConvsMap.has(bp.playerId)) {
+        const prev = dedupedConvsMap.get(bp.playerId);
+        prev.titular = prev.titular || row.titular;
+        if (row.tactical_x != null) prev.tactical_x = row.tactical_x;
+        if (row.tactical_y != null) prev.tactical_y = row.tactical_y;
+        prev.yellow_cards = Math.max(prev.yellow_cards, row.yellow_cards);
+        prev.tarjetas_amarillas = Math.max(prev.tarjetas_amarillas, row.tarjetas_amarillas);
+        prev.red_cards = Math.max(prev.red_cards, row.red_cards);
+        prev.tarjetas_rojas = Math.max(prev.tarjetas_rojas, row.tarjetas_rojas);
+        prev.goals = Math.max(prev.goals, row.goals);
+        prev.goles = Math.max(prev.goles, row.goles);
+        prev.assists = Math.max(prev.assists, row.assists);
+        prev.asistencias = Math.max(prev.asistencias, row.asistencias);
+        prev.minutes_played = Math.max(prev.minutes_played, row.minutes_played);
+        prev.minutos_jugados = Math.max(prev.minutos_jugados, row.minutos_jugados);
+      } else {
+        dedupedConvsMap.set(bp.playerId, row);
+      }
+    }
+
+    const convocatoriasPayload = Array.from(dedupedConvsMap.values());
+    if (convocatoriasPayload.length > 0) {
+      const { error: convUpsertErr } = await supabase
+        .from('convocatorias')
+        .upsert(convocatoriasPayload, { onConflict: 'partido_id,player_id' });
+      if (convUpsertErr) {
+        console.warn('[syncApuntameloMatchDetailToDb] Error upserting convocatorias:', convUpsertErr.message);
+      }
+    }
+  }
+
+  // 5. Sincronizar `match_events` en tiempo real (Goles, Tarjetas, Fases y Narración Liga Brave)
+  try {
+    const { data: existingEvents } = await supabase
+      .from('match_events')
+      .select('id, player_id, tipo_evento, minuto, notas')
+      .eq('partido_id', partidoId)
+      .order('minuto', { ascending: true });
+
+    const currentEvents: any[] = existingEvents || [];
+
+    // 5a. Construir goles oficiales desde Json_goles
+    const officialGoals: Array<{
+      partido_id: string;
+      player_id: string | null;
+      tipo_evento: string;
+      minuto: number;
+      notas: string;
+    }> = [];
+
+    for (const g of gList) {
+      const min = Number(g.Minuto) || 0;
+      const gEquipo = Number(g.FK_EquipoLiga);
+      const isGoalLocal = gEquipo === fkA;
+      const isOurGoal = gEquipo === config.teamApuntameloId;
+      const fullScorer =
+        jugadorFullNameMap.get(String(g.FK_JugadorLiga)) || g.Nombre_Jugador || 'Gol';
+
+      // Buscar asistente en Json_noticias para ese gol
+      const goalNoticia = noticias.find(
+        (n: any) =>
+          Number(n.Minuto) === min &&
+          String(n.FK_JugadorLiga) === String(g.FK_JugadorLiga) &&
+          n.Nombre_Asistente
+      );
+      const assistantName = goalNoticia?.Nombre_Asistente
+        ? String(goalNoticia.Nombre_Asistente).trim()
+        : null;
+
+      const matchedScorer =
+        isOurGoal && teamPlayers.length > 0
+          ? matchPlayer(fullScorer, g.Dorsal, teamPlayers, teamPlayers)
+          : null;
+
+      const prefix = isGoalLocal ? '[LOCAL]' : '[VISITANTE]';
+      const assistSuffix = assistantName ? ` (Asist: ${assistantName})` : '';
+      officialGoals.push({
+        partido_id: partidoId,
+        player_id: matchedScorer?.id || null,
+        tipo_evento: 'Gol',
+        minuto: min,
+        notas: `${prefix} ${fullScorer}${assistSuffix}`
+      });
+    }
+
+    // Conciliar goles en match_events:
+    // Si los goles existentes no coinciden en cantidad o no tienen etiquetas [LOCAL]/[VISITANTE], sincronizarlos
+    const existingGoalEvents = currentEvents.filter(
+      (e: any) => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta'
+    );
+    const allExistingGoalsHaveTags =
+      existingGoalEvents.length === officialGoals.length &&
+      existingGoalEvents.every(
+        (e: any, idx: number) =>
+          e.notas === officialGoals[idx]?.notas &&
+          Number(e.minuto) === Number(officialGoals[idx]?.minuto) &&
+          e.player_id === officialGoals[idx]?.player_id
+      );
+
+    if (officialGoals.length > 0 && !allExistingGoalsHaveTags) {
+      // Si solo se ha añadido un nuevo gol en vivo y los anteriores ya coinciden, insertar únicamente los nuevos
+      const prefixMatches =
+        existingGoalEvents.length < officialGoals.length &&
+        existingGoalEvents.every(
+          (e: any, idx: number) =>
+            e.notas === officialGoals[idx]?.notas &&
+            Number(e.minuto) === Number(officialGoals[idx]?.minuto)
+        );
+
+      if (prefixMatches) {
+        const newGoalsToInsert = officialGoals.slice(existingGoalEvents.length);
+        if (newGoalsToInsert.length > 0) {
+          await supabase.from('match_events').insert(newGoalsToInsert);
+        }
+      } else {
+        // Reemplazar filas de gol previas (incluyendo goles manuales sin enriquecer) por los goles oficiales enriquecidos
+        if (existingGoalEvents.length > 0) {
+          await supabase
+            .from('match_events')
+            .delete()
+            .in(
+              'id',
+              existingGoalEvents.map((e: any) => e.id)
+            );
+        }
+        await supabase.from('match_events').insert(officialGoals);
+      }
+    }
+
+    // 5b. Construir tarjetas desde Json_noticias (con minuto exacto) y Json_puntuaciones
+    const officialCards: Array<{
+      partido_id: string;
+      player_id: string | null;
+      tipo_evento: string;
+      minuto: number;
+      notas: string;
+    }> = [];
+
+    for (const n of noticias) {
+      const claves: string[] = Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : [];
+      const isYellow = n.Icono === 5 || claves.includes('tarjetas.noticia.amarilla');
+      const isRed = n.Icono === 6 || claves.includes('tarjetas.noticia.roja');
+      if (!isYellow && !isRed) continue;
+
+      const cEquipo = Number(n.FK_EquipoLiga);
+      const isCardLocal = cEquipo === fkA;
+      const isOurCard = cEquipo === config.teamApuntameloId;
+      const pName =
+        n.Nombre_Jugador ||
+        jugadorFullNameMap.get(String(n.FK_JugadorLiga)) ||
+        'Tarjeta';
+      const matchedPlayer =
+        isOurCard && teamPlayers.length > 0
+          ? matchPlayer(pName, undefined, teamPlayers, teamPlayers)
+          : null;
+      const prefix = isCardLocal ? '[LOCAL]' : '[VISITANTE]';
+
+      officialCards.push({
+        partido_id: partidoId,
+        player_id: matchedPlayer?.id || null,
+        tipo_evento: isRed ? 'Tarjeta Roja' : 'Tarjeta Amarilla',
+        minuto: Number(n.Minuto) || liveState.halfMinutes,
+        notas: `${prefix} ${pName}`
+      });
+    }
+
+    const existingCardEvents = currentEvents.filter(
+      (e: any) => e.tipo_evento === 'Tarjeta Amarilla' || e.tipo_evento === 'Tarjeta Roja'
+    );
+    for (const oc of officialCards) {
+      const alreadyExists = existingCardEvents.some(
+        (ec: any) =>
+          ec.tipo_evento === oc.tipo_evento &&
+          Math.abs(Number(ec.minuto) - oc.minuto) <= 1 &&
+          (ec.player_id === oc.player_id || ec.notas === oc.notas)
+      );
+      if (!alreadyExists) {
+        await supabase.from('match_events').insert(oc);
+      }
+    }
+
+    // 5c. Fases del partido (Descanso y Fin de Partido) y Narración en vivo de Liga Brave (Json_noticias)
+    const existingBraveTags = new Set<string>();
+    for (const ev of currentEvents) {
+      const matchTag = String(ev.notas || '').match(/\[BRAVE:([^\]]+)\]/);
+      if (matchTag && matchTag[1]) {
+        existingBraveTags.add(matchTag[1]);
+      }
+    }
+
+    // Ordenar noticias cronológicamente (de más antigua a más reciente)
+    const sortedNoticias = [...noticias]
+      .filter((n: any) => Number(n.Tipo) === 0 && n.Descripcion && String(n.Descripcion).trim() !== '')
+      .sort((a: any, b: any) => (Number(a.Id) || 0) - (Number(b.Id) || 0));
+
+    const narrativeToInsert: any[] = [];
+
+    for (const n of sortedNoticias) {
+      const nId = String(n.Id);
+      const claves: string[] = Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : [];
+      const desc = String(n.Descripcion).trim();
+      const rawMin = Number(n.Minuto) || 0;
+      const nParte = Number(n.Parte) || 1;
+
+      // Omitir tarjetas (ya procesadas en 5b)
+      if (n.Icono === 5 || n.Icono === 6 || claves.some((k) => k.includes('tarjetas.noticia'))) {
+        continue;
+      }
+
+      // Caso Descanso (`fin_parte_primera`)
+      if (claves.includes('fin_parte_primera')) {
+        const existingDescanso = currentEvents.find((e: any) => e.tipo_evento === 'Descanso');
+        const htNotas = `[BRAVE:${nId}] ⏸️ ${desc}`;
+        if (existingDescanso) {
+          if (!String(existingDescanso.notas || '').includes('[BRAVE:')) {
+            await supabase
+              .from('match_events')
+              .update({ minuto: liveState.halfMinutes, notas: htNotas })
+              .eq('id', existingDescanso.id);
+          }
+        } else if (!existingBraveTags.has(nId)) {
+          narrativeToInsert.push({
+            partido_id: partidoId,
+            player_id: null,
+            tipo_evento: 'Descanso',
+            minuto: liveState.halfMinutes,
+            notas: htNotas
+          });
+          existingBraveTags.add(nId);
+        }
+        continue;
+      }
+
+      // Caso Final del Partido (`fin_partido_*`)
+      if (claves.some((k) => k.includes('fin_partido'))) {
+        const existingFin = currentEvents.find(
+          (e: any) => e.tipo_evento === 'Fin de Partido' || e.tipo_evento === 'Fin del Partido'
+        );
+        const ftNotas = `[BRAVE:${nId}] 🏁 ${desc}`;
+        const ftMin = Math.max(rawMin, liveState.halfMinutes * 2);
+        if (existingFin) {
+          if (!String(existingFin.notas || '').includes('[BRAVE:')) {
+            await supabase
+              .from('match_events')
+              .update({ minuto: ftMin, notas: ftNotas })
+              .eq('id', existingFin.id);
+          }
+        } else if (!existingBraveTags.has(nId)) {
+          narrativeToInsert.push({
+            partido_id: partidoId,
+            player_id: null,
+            tipo_evento: 'Fin de Partido',
+            minuto: ftMin,
+            notas: ftNotas
+          });
+          existingBraveTags.add(nId);
+        }
+        continue;
+      }
+
+      // Seleccionar narraciones relevantes para el directo minuto a minuto
+      const isGoalNarration = claves.includes('gol_resultado');
+      const isGoalStat = claves.includes('gol_estadisticas_base');
+      const isAssistStat = claves.includes('asistencia_estadisticas_base');
+      const isDuplaStat = claves.includes('goles.duplas.base');
+      const isKickoff1 = claves.includes('inicio_partido');
+      const isKickoff2 = claves.includes('inicio_parte2');
+      const isPreMatchContext = claves.includes('posiciones_equipos');
+
+      if (
+        !isGoalNarration &&
+        !isGoalStat &&
+        !isAssistStat &&
+        !isDuplaStat &&
+        !isKickoff1 &&
+        !isKickoff2 &&
+        !isPreMatchContext
+      ) {
+        continue;
+      }
+
+      if (existingBraveTags.has(nId)) continue;
+
+      let emoji = '🎙️';
+      if (isKickoff1 || isKickoff2) emoji = '⚡';
+      else if (isGoalNarration) emoji = '🔥';
+      else if (isGoalStat || isAssistStat || isDuplaStat) emoji = '📊';
+      else if (isPreMatchContext) emoji = '📋';
+
+      // Asegurar que los eventos de la 2ª parte tengan minuto > halfMinutes para ubicarse en la columna Segunda Parte
+      const effectiveMin =
+        nParte >= 2 && rawMin <= liveState.halfMinutes ? liveState.halfMinutes + 1 : rawMin;
+
+      narrativeToInsert.push({
+        partido_id: partidoId,
+        player_id: null,
+        tipo_evento: 'Comentario del Entrenador',
+        minuto: effectiveMin,
+        notas: `[BRAVE:${nId}] ${emoji} ${desc}`
+      });
+      existingBraveTags.add(nId);
+    }
+
+    if (narrativeToInsert.length > 0) {
+      await supabase.from('match_events').insert(narrativeToInsert);
+    }
+  } catch (evErr: any) {
+    console.warn('[syncApuntameloMatchDetailToDb] Error sincronizando match_events:', evErr.message);
+  }
+}
+
+let lastLivePollTimestampMs = 0;
+const lastMatchPollTimestampMap = new Map<string, number>();
+const LIVE_POLL_COOLDOWN_MS = 12 * 1000; // 12 seconds throttle
+
+/**
+ * Comprueba de forma ultraligera si hay partidos de Liga Brave (Infantil B / Cadete B)
+ * en ventana de día de partido o actualmente En Curso/Descanso, y replica al instante
+ * el estado en vivo, cronómetro, marcador, goles, tarjetas y narración desde Apúntamelo.
+ */
+export async function syncApuntameloLiveMatchesIfNeeded(
+  customSupabaseClient?: any,
+  specificMatchId?: string
+): Promise<void> {
+  const now = Date.now();
+
+  if (specificMatchId) {
+    const lastSpecific = lastMatchPollTimestampMap.get(specificMatchId) || 0;
+    if (now - lastSpecific < LIVE_POLL_COOLDOWN_MS) return;
+    lastMatchPollTimestampMap.set(specificMatchId, now);
+  } else {
+    if (now - lastLivePollTimestampMs < LIVE_POLL_COOLDOWN_MS) return;
+    lastLivePollTimestampMs = now;
+  }
+
+  try {
+    const supabase = customSupabaseClient || createAdminClient();
+    const activeSeasonId = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+    const braveTeamIds = Object.keys(APUNTAMELO_TEAMS_CONFIG);
+
+    const { data: braveMatches } = await supabase
+      .from('partidos')
+      .select(
+        'id, equipo_id, rival_nombre, fecha_hora, estado, resultado_propio, resultado_rival, acta_oficial_url, coach_report'
+      )
+      .eq('season_id', activeSeasonId)
+      .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .in('equipo_id', braveTeamIds);
+
+    if (!braveMatches || braveMatches.length === 0) return;
+
+    const playedOrLiveBraveDates = braveMatches
+      .filter((m: any) => m.estado === 'Finalizado' || m.estado === 'En Curso' || m.estado === 'En curso' || m.estado === 'Descanso')
+      .map((m: any) => (m.fecha_hora ? new Date(m.fecha_hora).getTime() : NaN))
+      .filter((ms: number) => !isNaN(ms));
+    const latestActiveBraveMs = playedOrLiveBraveDates.length > 0 ? Math.max(...playedOrLiveBraveDates) : NaN;
+
+    const candidates = braveMatches.filter((m: any) => {
+      if (specificMatchId && m.id === specificMatchId) return true;
+      const isLiveState =
+        m.estado === 'En Curso' || m.estado === 'En curso' || m.estado === 'Descanso';
+      if (isLiveState) return true;
+
+      if (!m.fecha_hora) return false;
+      const matchMs = new Date(m.fecha_hora).getTime();
+      const diffHours = (now - matchMs) / (1000 * 60 * 60);
+      // Ventana activa: desde 2h antes del inicio programado hasta 14h después
+      if (diffHours >= -2 && diffHours <= 14) return true;
+
+      // Fallback para el fin de semana / jornada activa en curso
+      if (!isNaN(latestActiveBraveMs)) {
+        const diffHoursCluster = Math.abs(matchMs - latestActiveBraveMs) / (1000 * 60 * 60);
+        if (diffHoursCluster <= 36) return true;
+      }
+      return false;
+    });
+
+    if (candidates.length === 0) return;
+
+    // Agrupar candidatos por equipo_id
+    const candidatesByTeam = new Map<string, any[]>();
+    for (const c of candidates) {
+      const list = candidatesByTeam.get(c.equipo_id) || [];
+      list.push(c);
+      candidatesByTeam.set(c.equipo_id, list);
+    }
+
+    for (const [teamId, teamCandidates] of Array.from(candidatesByTeam.entries())) {
+      const config = APUNTAMELO_TEAMS_CONFIG[teamId];
+      if (!config) continue;
+
+      const rawGroupMatches = await fetchApuntameloJson<any[]>(
+        `https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=${config.orgId}&grupo=${config.grupoId}`,
+        { ttlMs: 12 * 1000, timeoutMs: 5000 }
+      ).catch(() => null);
+
+      if (!Array.isArray(rawGroupMatches) || rawGroupMatches.length === 0) continue;
+
+      const saladarGroupMatches = rawGroupMatches.filter(
+        (m: any) =>
+          Number(m.FK_EquipoLiga_A) === config.teamApuntameloId ||
+          Number(m.FK_EquipoLiga_B) === config.teamApuntameloId
+      );
+
+      const { data: teamPlayers } = await supabase
+        .from('players')
+        .select('id, first_name, last_name, dorsal, team_id, posicion')
+        .eq('team_id', teamId);
+
+      const categoryDuration = getOfficialMatchDuration(config.category, 'Liga Brave');
+
+      for (const cand of teamCandidates) {
+        const sm = saladarGroupMatches.find((gm: any) => {
+          const isHome = Number(gm.FK_EquipoLiga_A) === config.teamApuntameloId;
+          const gmRival = isHome ? gm.Nombre_B : gm.Nombre_A;
+          return findMatchingInternalPartido([cand], gm, gmRival)?.id === cand.id;
+        });
+
+        if (!sm) continue;
+
+        const { data: existingConvs } = await supabase
+          .from('convocatorias')
+          .select('partido_id, player_id, titular, tactical_x, tactical_y, minutos_jugados, minutes_played')
+          .eq('partido_id', cand.id);
+
+        const matchInfoArr = await fetchApuntameloJson<any[]>(
+          `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`,
+          { ttlMs: 12 * 1000, timeoutMs: 5000 }
+        ).catch(() => null);
+
+        if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
+          const mInfo = matchInfoArr[0];
+          const hasStarted =
+            sm.Tipo === 'jugado' ||
+            Boolean(sm.Inicio) ||
+            Boolean(mInfo?.Inicio) ||
+            (sm.Goles_A !== null && sm.Goles_A !== undefined);
+          const hasPreMatchLineup = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []).length > 0;
+
+          if (!hasStarted && !hasPreMatchLineup) continue;
+
+          await syncApuntameloMatchDetailToDb({
+            supabase,
+            config,
+            partidoId: cand.id,
+            existingCoachReport: cand.coach_report,
+            existingConvs: existingConvs || [],
+            sm,
+            mInfo,
+            teamPlayers: teamPlayers || [],
+            categoryDuration
+          });
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[syncApuntameloLiveMatchesIfNeeded] Warning:', err.message);
+  }
+}
+

@@ -122,16 +122,51 @@ export function LiveMatchPanel({
   
   const matchDate = match?.fecha_hora ? new Date(match.fecha_hora) : new Date();
 
+  const parsedCoachReport = (() => {
+    if (!match?.coach_report) return null;
+    if (typeof match.coach_report === 'string') {
+      try {
+        return JSON.parse(match.coach_report);
+      } catch {
+        return null;
+      }
+    }
+    return match.coach_report;
+  })();
+
+  const ligaBraveLive = parsedCoachReport?.liga_brave_live || null;
+  const ffcvLive = parsedCoachReport?.ffcv_live || null;
+  const officialLive = ligaBraveLive || ffcvLive;
+  const isLigaBraveMatch = Boolean(
+    ligaBraveLive ||
+    match?.acta_oficial_url?.includes('apuntamelo.com') ||
+    match?.equipo?.name?.toLowerCase().includes('infantil b') ||
+    match?.equipo?.name?.toLowerCase().includes('cadete b')
+  );
+  const isFfcvOfficialMatch = Boolean(
+    ffcvLive || match?.acta_oficial_url?.includes('ffcv.es')
+  );
+
+  const isEventHomeGoal = (e: any): boolean => {
+    const notas = String(e.notas || '');
+    const isOwnGoal = e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia';
+    if (notas.includes('[LOCAL]')) return !isOwnGoal;
+    if (notas.includes('[VISITANTE]')) return isOwnGoal;
+    return isOwnGoal ? (isLocal ? !e.player_id : !!e.player_id) : (isLocal ? !!e.player_id : !e.player_id);
+  };
+
   // Goals calculations
   const localGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? !!e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : !!e.player_id;
+    if (e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') {
+      return isEventHomeGoal(e);
+    }
     return false;
   });
   
   const awayGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? !e.player_id : !!e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !!e.player_id : !e.player_id;
+    if (e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') {
+      return !isEventHomeGoal(e);
+    }
     return false;
   });
 
@@ -143,17 +178,11 @@ export function LiveMatchPanel({
     ? (match?.resultado_rival ?? awayGoalsList.length) 
     : (match?.resultado_propio ?? awayGoalsList.length);
 
-  const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta').sort((a, b) => a.minuto - b.minuto);
+  const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia').sort((a, b) => a.minuto - b.minuto);
   let runningLocal = 0;
   let runningAway = 0;
   const goalTimeline = allGoals.map((goal) => {
-    let isHomeGoal = false;
-    if (goal.tipo_evento === 'Gol') {
-      isHomeGoal = isLocal ? !!goal.player_id : !goal.player_id;
-    } else {
-      isHomeGoal = isLocal ? !goal.player_id : !!goal.player_id;
-    }
-    
+    const isHomeGoal = isEventHomeGoal(goal);
     if (isHomeGoal) runningLocal++;
     else runningAway++;
     return {
@@ -165,7 +194,7 @@ export function LiveMatchPanel({
 
   // Split Timeline Data (by explicit event or by half duration / 45m threshold)
   const descansoIndex = matchEvents.findIndex(e => e.tipo_evento === 'Descanso');
-  const firstHalfDurationMinutes = match?.first_half_duration_seconds ? Math.floor(match.first_half_duration_seconds / 60) : 45;
+  const firstHalfDurationMinutes = match?.first_half_duration_seconds ? Math.floor(match.first_half_duration_seconds / 60) : (ligaBraveLive?.minutosParte || 45);
   
   let firstHalfEvents: any[] = [];
   let secondHalfEvents: any[] = [];
@@ -175,7 +204,7 @@ export function LiveMatchPanel({
     secondHalfEvents = matchEvents.slice(descansoIndex + 1);
   } else {
     // If no explicit 'Descanso' event yet, split by timer / minute threshold if 2nd half started
-    const hasSecondHalfStarted = match?.first_half_duration_seconds && match?.live_timer_started_at;
+    const hasSecondHalfStarted = (match?.first_half_duration_seconds && match?.live_timer_started_at) || matchEvents.some(e => e.minuto > firstHalfDurationMinutes);
     if (hasSecondHalfStarted) {
       firstHalfEvents = matchEvents.filter(e => e.minuto <= firstHalfDurationMinutes);
       secondHalfEvents = matchEvents.filter(e => e.minuto > firstHalfDurationMinutes);
@@ -185,47 +214,67 @@ export function LiveMatchPanel({
     }
   }
 
+  const cleanEventNotas = (raw?: string | null) => {
+    if (!raw) return '';
+    return raw
+      .replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '')
+      .replace(/\[BRAVE:[^\]]+\]\s*/gi, '')
+      .trim();
+  };
+
   const renderEventRow = (event: any, idx: number) => {
     let icon = "⏱️";
     let bgColor = "bg-slate-50";
     let textColor = "text-slate-800";
-    const isComment = event.tipo_evento === 'Comentario del Entrenador' || (event.notas && (event.notas.includes('🎮') || event.notas.includes('⚡') || event.notas.includes('🛡️') || event.notas.includes('⚠️') || event.notas.includes('💬') || event.notas.includes('🔥') || event.notas.includes('⚖️')));
+    const rawNotas = String(event.notas || '');
+    const cleanNotas = cleanEventNotas(rawNotas);
+    const isBraveSynced = rawNotas.includes('[BRAVE:') || rawNotas.startsWith('[LOCAL]') || rawNotas.startsWith('[VISITANTE]');
+    const isComment = event.tipo_evento === 'Comentario del Entrenador' || (cleanNotas && (cleanNotas.includes('🎮') || cleanNotas.includes('⚡') || cleanNotas.includes('🛡️') || cleanNotas.includes('⚠️') || cleanNotas.includes('💬') || cleanNotas.includes('🔥') || cleanNotas.includes('⚖️') || cleanNotas.includes('🎙️') || cleanNotas.includes('📊') || cleanNotas.includes('📋')));
 
-    if (isComment) {
-      icon = "💬";
-      bgColor = "bg-indigo-50/80 border-indigo-100";
-      textColor = "text-indigo-900";
-    } else if (event.tipo_evento === 'Gol') { icon = "⚽"; bgColor = "bg-emerald-50"; textColor = "text-emerald-700"; }
+    if (isComment && event.tipo_evento !== 'Descanso' && event.tipo_evento !== 'Fin de Partido') {
+      icon = cleanNotas.includes('🔥') ? "🔥" : cleanNotas.includes('📊') ? "📊" : cleanNotas.includes('⚡') ? "⚡" : cleanNotas.includes('🎙️') ? "🎙️" : "💬";
+      bgColor = isBraveSynced ? "bg-indigo-50/70 border-indigo-200/80" : "bg-indigo-50/80 border-indigo-100";
+      textColor = "text-indigo-950";
+    } else if (event.tipo_evento === 'Gol') { icon = "⚽"; bgColor = "bg-emerald-50 border-emerald-200"; textColor = "text-emerald-800"; }
     else if (event.tipo_evento === 'Gol en propia puerta') { icon = "🤦‍♂️"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
-    else if (event.tipo_evento === 'Tarjeta Amarilla') { icon = "🟨"; bgColor = "bg-amber-50"; textColor = "text-amber-700"; }
-    else if (event.tipo_evento === 'Tarjeta Roja') { icon = "🟥"; bgColor = "bg-red-50"; textColor = "text-red-700"; }
+    else if (event.tipo_evento === 'Tarjeta Amarilla') { icon = "🟨"; bgColor = "bg-amber-50 border-amber-200"; textColor = "text-amber-800"; }
+    else if (event.tipo_evento === 'Tarjeta Roja') { icon = "🟥"; bgColor = "bg-red-50 border-red-200"; textColor = "text-red-800"; }
     else if (event.tipo_evento === 'Cambio') { icon = "🔄"; bgColor = "bg-blue-50"; textColor = "text-blue-700"; }
     else if (event.tipo_evento === 'Lesión') { icon = "🚑"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
     else if (event.tipo_evento === 'Ocasión Peligrosa') { icon = "⚠️"; bgColor = "bg-amber-50"; textColor = "text-amber-700"; }
     else if (event.tipo_evento === 'Penalti') { icon = "🎯"; bgColor = "bg-purple-50"; textColor = "text-purple-700"; }
     else if (event.tipo_evento === 'Parada') { icon = "🧤"; bgColor = "bg-sky-50"; textColor = "text-sky-700"; }
-    else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = "📌"; bgColor = "bg-slate-100/50"; textColor = "text-slate-500"; }
+    else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = event.tipo_evento === 'Descanso' ? "⏸️" : "🏁"; bgColor = "bg-slate-100/80 border-slate-200"; textColor = "text-slate-700"; }
+
+    const isCommentRow = isComment && event.tipo_evento !== 'Descanso' && event.tipo_evento !== 'Fin de Partido';
 
     return (
-      <div key={event.id ? `${event.id}-${idx}` : idx} className={`flex items-center gap-3 p-2.5 rounded-xl border ${bgColor} transition-all`}>
+      <div key={event.id ? `${event.id}-${idx}` : idx} className={`flex items-start gap-3 p-2.5 rounded-xl border ${bgColor} transition-all`}>
         <div className="w-10 h-10 shrink-0 bg-white rounded-lg border border-slate-200 flex flex-col items-center justify-center shadow-sm">
           <span className="text-[11px] font-black text-slate-800 leading-none">{event.minuto}'</span>
         </div>
         
-        <div className="flex-1 flex items-center gap-3">
-          <div className="text-lg">{icon}</div>
-          <div>
-            <p className={`text-xs font-bold ${textColor}`}>
-              {isComment ? (event.notas || 'En vivo') : event.tipo_evento}
-            </p>
+        <div className="flex-1 flex items-start gap-2.5 min-w-0">
+          <div className="text-lg leading-none mt-0.5 shrink-0">{icon}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center flex-wrap gap-1.5">
+              <p className={`text-xs font-bold leading-snug ${textColor}`}>
+                {isCommentRow ? (cleanNotas || 'En vivo') : event.tipo_evento}
+              </p>
+              {isBraveSynced && (
+                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0">
+                  Liga Brave
+                </span>
+              )}
+            </div>
             {event.player ? (
-              <p className="text-[10px] font-semibold text-slate-600">
-                {event.player.first_name} {event.player.last_name}
+              <p className="text-[11px] font-bold text-slate-700 mt-0.5">
+                {event.player.dorsal ? `#${event.player.dorsal} ` : ''}{event.player.first_name} {event.player.last_name}
               </p>
             ) : null}
-            {event.notas && !isComment && (
-              <p className="text-[10px] text-slate-500 italic mt-0.5">
-                {event.notas}
+            {cleanNotas && !isCommentRow && (
+              <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-snug">
+                {cleanNotas}
               </p>
             )}
           </div>
@@ -240,10 +289,43 @@ export function LiveMatchPanel({
       <div className="bg-white">
         {/* Header */}
         <div className="bg-indigo-600 text-white px-6 py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 text-xs font-bold tracking-wide">
-          <span className="uppercase">{match.competicion_nombre || 'Liga'}</span>
-          <div className="flex items-center gap-4 opacity-90 text-[11px]">
+          <div className="flex items-center flex-wrap gap-2">
+            <span className="uppercase">
+              {isLigaBraveMatch
+                ? 'Liga Brave · Seguimiento Oficial'
+                : isFfcvOfficialMatch
+                ? 'FFCV · Competición Oficial'
+                : (match.competicion_nombre || 'Liga')}
+            </span>
+            {(isLigaBraveMatch || isFfcvOfficialMatch) && (
+              <span className="bg-amber-400 text-slate-950 text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider">
+                ⚡ Tiempo Real
+              </span>
+            )}
+          </div>
+          <div className="flex items-center flex-wrap gap-4 opacity-95 text-[11px]">
             <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {matchDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-            <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {match?.lugar || 'Por definir'}</span>
+            <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {officialLive?.campo || match?.lugar || 'Por definir'}</span>
+            {match?.acta_oficial_url?.includes('apuntamelo.com') && (
+              <a
+                href={match.acta_oficial_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-lg border border-white/20 text-[10px] font-black uppercase tracking-wider transition-colors"
+              >
+                Acta Liga Brave ↗
+              </a>
+            )}
+            {match?.acta_oficial_url?.includes('ffcv.es') && (
+              <a
+                href={match.acta_oficial_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-lg border border-white/20 text-[10px] font-black uppercase tracking-wider transition-colors"
+              >
+                Acta Oficial FFCV ↗
+              </a>
+            )}
           </div>
         </div>
 
@@ -368,9 +450,26 @@ export function LiveMatchPanel({
                 const targetTeamName = goal.isHomeGoal ? localName : awayName;
                 const ownGoalScorerTeamName = goal.isHomeGoal ? awayName : localName;
 
+                const rawNotas = String(goal.notas || '');
+                const assistMatch = rawNotas.match(/\(Asist:\s*([^)]+)\)/i);
+                const assistName = assistMatch ? assistMatch[1].trim() : '';
+
+                let extractedFromNotas = rawNotas
+                  .replace(/\[LOCAL\]|\[VISITANTE\]|\[BRAVE:[^\]]+\]/gi, '')
+                  .replace(/\(Asist:[^)]*\)/gi, '')
+                  .replace(/⚽/g, '')
+                  .trim();
+                const golDeMatch = extractedFromNotas.match(/Gol(?:\s+en\s+propia\s+puerta)?\s+de\s+(?:#\d+\s+)?(.+)/i);
+                if (golDeMatch && golDeMatch[1]) {
+                  extractedFromNotas = golDeMatch[1].trim();
+                } else if (/Gol del equipo rival/i.test(extractedFromNotas)) {
+                  extractedFromNotas = '';
+                }
+
+                const baseScorerName = fullPlayerName || extractedFromNotas || targetTeamName;
                 const playerName = isPP 
-                  ? (fullPlayerName ? `${fullPlayerName} (p.p.)` : `${ownGoalScorerTeamName} (p.p.)`) 
-                  : (fullPlayerName || targetTeamName);
+                  ? (fullPlayerName || extractedFromNotas ? `${fullPlayerName || extractedFromNotas} (p.p.)` : `${ownGoalScorerTeamName} (p.p.)`) 
+                  : baseScorerName;
 
                 return (
                   <div key={goal.id || Math.random()} className="grid grid-cols-12 items-center gap-1 sm:gap-2 text-xs font-bold">
@@ -378,7 +477,14 @@ export function LiveMatchPanel({
                     <div className="col-span-4 sm:col-span-5 text-right flex items-center justify-end gap-1.5 pr-1 sm:pr-2 min-w-0">
                       {goal.isHomeGoal ? (
                         <>
-                          <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs">{playerName}</span>
+                          <div className="min-w-0 flex flex-col items-end">
+                            <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs max-w-full">{playerName}</span>
+                            {assistName && (
+                              <span className="text-[10px] font-semibold text-slate-400 truncate max-w-full">
+                                👟 Asist: {assistName}
+                              </span>
+                            )}
+                          </div>
                           <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-black tabular-nums shrink-0">
                             {displayMinuto}'
                           </span>
@@ -398,7 +504,14 @@ export function LiveMatchPanel({
                           <span className="bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-black tabular-nums shrink-0">
                             {displayMinuto}'
                           </span>
-                          <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs">{playerName}</span>
+                          <div className="min-w-0 flex flex-col items-start">
+                            <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs max-w-full">{playerName}</span>
+                            {assistName && (
+                              <span className="text-[10px] font-semibold text-slate-400 truncate max-w-full">
+                                👟 Asist: {assistName}
+                              </span>
+                            )}
+                          </div>
                         </>
                       ) : null}
                     </div>
@@ -409,6 +522,182 @@ export function LiveMatchPanel({
           </div>
         )}
       </div>
+
+      {/* ─── OFFICIAL LIVE LINEUPS & STATS (FFCV & LIGA BRAVE) ─── */}
+      {officialLive && (Array.isArray(officialLive.ourPlayers) || Array.isArray(officialLive.rivalPlayers)) && (
+        <div className="p-5 lg:p-8 bg-white border-t border-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-orange-100 text-orange-600 text-xs">⚡</span>
+              {isLigaBraveMatch
+                ? 'Alineaciones, Estadísticas y Puntuaciones en Vivo (Liga Brave)'
+                : 'Alineaciones Oficiales y Ficha del Partido (FFCV)'}
+            </h3>
+            <div className="flex items-center flex-wrap gap-2">
+              {Array.isArray(officialLive.arbitros) && officialLive.arbitros.length > 0 && (
+                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                  ⚖️ Árbitro: {officialLive.arbitros.join(' · ')}
+                </span>
+              )}
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {isLigaBraveMatch ? 'Titulares · Suplentes · Fantasy Rating' : 'Titulares · Suplentes · Esquema Oficial'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[
+              {
+                title: isLocal ? localName : awayName,
+                badge: 'Sporting Saladar',
+                accent: 'emerald',
+                formation: officialLive.ourFormation,
+                coach: officialLive.ourCoach,
+                players: Array.isArray(officialLive.ourPlayers) ? officialLive.ourPlayers : [],
+              },
+              {
+                title: isLocal ? awayName : localName,
+                badge: 'Rival',
+                accent: 'amber',
+                formation: officialLive.rivalFormation,
+                coach: officialLive.rivalCoach,
+                players: Array.isArray(officialLive.rivalPlayers) ? officialLive.rivalPlayers : [],
+              },
+            ].map((side, idx) => {
+              const starters = side.players.filter((p: any) => p.titular);
+              const bench = side.players.filter((p: any) => !p.titular);
+              const coachName = typeof side.coach === 'string' ? side.coach : side.coach?.name;
+              const posMap: Record<number, string> = { 1: 'POR', 2: 'DEF', 3: 'MED', 4: 'DEL' };
+              const renderPlayerItem = (p: any, pIdx: number) => {
+                const pName = p.nombre || p.name || 'Jugador';
+                const pPos = p.positionLabel || posMap[Number(p.posicion)] || '';
+                const pGoals = p.goles ?? p.goals ?? 0;
+                const pAssists = p.asistencias ?? p.assists ?? 0;
+                const pYellows = p.amarillas ?? p.yellowCards ?? 0;
+                const pReds = p.rojas ?? p.redCards ?? 0;
+                const pRating = p.puntuacion ?? p.rating ?? 0;
+
+                return (
+                  <div
+                    key={`${p.fkJugadorLiga || p.codjugador || p.apuntamelo_user_id || pIdx}`}
+                    className="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-slate-50/80 hover:bg-slate-100/80 border border-slate-100 text-xs transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-6 h-6 rounded-md bg-slate-900 text-white font-black text-[10px] flex items-center justify-center shrink-0 tabular-nums">
+                        {p.dorsal ?? '-'}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-800 truncate flex items-center gap-1.5">
+                          <span className="truncate">{pName}</span>
+                          {p.capitan && (
+                            <span className="px-1 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black uppercase shrink-0" title="Capitán">
+                              C
+                            </span>
+                          )}
+                          {p.mvp && (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black uppercase shrink-0">
+                              ⭐ MVP
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {pPos && <span className="text-[10px] font-semibold text-slate-400">{pPos}</span>}
+                          {p.sustituidoMinuto && (
+                            <span className="text-[9px] font-bold text-rose-600" title="Sustituido">
+                              ▼ {p.sustituidoMinuto}'
+                            </span>
+                          )}
+                          {p.entroMinuto && (
+                            <span className="text-[9px] font-bold text-emerald-600" title="Entró al campo">
+                              ▲ {p.entroMinuto}'
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {pGoals > 0 && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-black text-[10px]" title="Goles">
+                          ⚽ {pGoals}
+                        </span>
+                      )}
+                      {pAssists > 0 && (
+                        <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 font-black text-[10px]" title="Asistencias">
+                          👟 {pAssists}
+                        </span>
+                      )}
+                      {pYellows > 0 && (
+                        <span className="w-3 h-4 rounded-xs bg-amber-400 border border-amber-500 inline-block" title="Tarjeta Amarilla" />
+                      )}
+                      {pReds > 0 && (
+                        <span className="w-3 h-4 rounded-xs bg-rose-600 border border-rose-700 inline-block" title="Tarjeta Roja" />
+                      )}
+                      {typeof pRating === 'number' && pRating > 0 && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-black text-[10px] tabular-nums border ${
+                            pRating >= 80
+                              ? 'bg-emerald-600 text-white border-emerald-700'
+                              : pRating >= 65
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                          title="Puntuación Fantasy Liga Brave"
+                        >
+                          {pRating} pts
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-slate-900 text-sm truncate">{side.title}</h4>
+                        {side.formation && (
+                          <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full shrink-0">
+                            {side.formation}
+                          </span>
+                        )}
+                      </div>
+                      {coachName && (
+                        <p className="text-[11px] font-semibold text-slate-500 truncate mt-0.5">
+                          👔 Entrenador: <span className="text-slate-700 font-bold">{coachName}</span>
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+                      {side.players.length} convocados
+                    </span>
+                  </div>
+
+                  {starters.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 mb-1.5">
+                        Titulares ({starters.length})
+                      </p>
+                      <div className="space-y-1">{starters.map(renderPlayerItem)}</div>
+                    </div>
+                  )}
+
+                  {bench.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                        Suplentes ({bench.length})
+                      </p>
+                      <div className="space-y-1">{bench.map(renderPlayerItem)}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ─── EVENTS TIMELINE ─── */}
       <div className="p-6 lg:p-8 bg-slate-50 border-t border-slate-200">

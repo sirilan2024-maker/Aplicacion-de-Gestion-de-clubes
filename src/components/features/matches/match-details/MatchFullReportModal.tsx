@@ -95,9 +95,15 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
 
   playerList.forEach(p => {
     const conv = convocatorias.find(c => c.player_id === p.id);
-    const initialStatus = (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado')
-      ? conv.estado_asistencia
-      : 'Presente';
+    const rawAsistencia = conv?.estado_asistencia;
+    const initialStatus =
+      rawAsistencia === 'Confirmado' || rawAsistencia === 'Presente'
+        ? 'Presente'
+        : rawAsistencia === 'Justificado'
+        ? 'Justificado'
+        : rawAsistencia === 'Ausente'
+        ? (conv?.notes || conv?.motivo ? 'Justificado' : 'Ausente')
+        : 'Pendiente';
     const hasRating = conv?.coach_rating !== null && conv?.coach_rating !== undefined && conv.coach_rating > 0;
     const hasActitud = conv?.actitud !== null && conv?.actitud !== undefined && conv.actitud > 0;
 
@@ -176,7 +182,14 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
   };
 
   const handleMinutesChange = (playerId: string, value: string) => {
-    const num = parseInt(value);
+    if (value === '' || value === null || value === undefined) {
+      setReports(prev => ({
+        ...prev,
+        [playerId]: { ...prev[playerId], minutes: 0 }
+      }));
+      return;
+    }
+    const num = parseInt(value, 10);
     if (isNaN(num) || num < 0) return;
     setReports(prev => ({
       ...prev,

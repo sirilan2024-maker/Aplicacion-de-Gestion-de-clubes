@@ -1445,11 +1445,11 @@ export async function updateMatchFullReportBatch(
       const existing = existingRows?.[0];
 
       // Mapear estado_asistencia a los valores permitidos por el check constraint ('Confirmado', 'Ausente', 'Pendiente')
-      let mappedEstadoAsistencia: 'Confirmado' | 'Ausente' | 'Pendiente' = 'Confirmado';
-      if (report.status === 'Ausente' || report.status === 'Justificado') {
+      let mappedEstadoAsistencia: 'Confirmado' | 'Ausente' | 'Pendiente' = 'Pendiente';
+      if (report.status === 'Presente' || report.status === 'Confirmado') {
+        mappedEstadoAsistencia = 'Confirmado';
+      } else if (report.status === 'Ausente' || report.status === 'Justificado') {
         mappedEstadoAsistencia = 'Ausente';
-      } else if (report.status === 'Pendiente') {
-        mappedEstadoAsistencia = 'Pendiente';
       }
 
       const payload = {

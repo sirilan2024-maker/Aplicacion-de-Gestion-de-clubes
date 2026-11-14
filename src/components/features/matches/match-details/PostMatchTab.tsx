@@ -26,6 +26,16 @@ const ATTENDANCE_OPTIONS = [
   { value: 'Justificado', label: 'Justificado', color: 'text-amber-700 bg-amber-50 border-amber-200' }
 ];
 
+function resolveInitialAttendanceStatus(conv?: any): string {
+  const raw = conv?.estado_asistencia;
+  if (raw === 'Confirmado' || raw === 'Presente') return 'Presente';
+  if (raw === 'Justificado') return 'Justificado';
+  if (raw === 'Ausente') {
+    return (conv?.notes || conv?.motivo) ? 'Justificado' : 'Ausente';
+  }
+  return 'Pendiente';
+}
+
 export function PostMatchTab({ 
   matchId, 
   initialData, 
@@ -111,9 +121,7 @@ export function PostMatchTab({
     const initial: Record<string, any> = {};
     playerList.forEach(p => {
       const conv = convocatorias.find(c => c.player_id === p.id);
-      const initialStatus = (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado')
-        ? conv.estado_asistencia
-        : 'Presente';
+      const initialStatus = resolveInitialAttendanceStatus(conv);
 
       const hasCoachRating = conv?.coach_rating !== null && conv?.coach_rating !== undefined && conv.coach_rating > 0;
       const hasActitud = conv?.actitud !== null && conv?.actitud !== undefined && conv.actitud > 0;
@@ -132,6 +140,35 @@ export function PostMatchTab({
     });
     return initial;
   });
+
+  // Sincronizar estado si las convocatorias del servidor se actualizan tras guardar o refrescar
+  useEffect(() => {
+    if (!convocatorias || convocatorias.length === 0) return;
+    setPlayerReports(prev => {
+      const next = { ...prev };
+      playerList.forEach(p => {
+        const conv = convocatorias.find(c => c.player_id === p.id);
+        if (!conv) return;
+        const initialStatus = resolveInitialAttendanceStatus(conv);
+
+        const hasCoachRating = conv.coach_rating !== null && conv.coach_rating !== undefined && Number(conv.coach_rating) > 0;
+        const hasActitud = conv.actitud !== null && conv.actitud !== undefined && Number(conv.actitud) > 0;
+
+        next[p.id] = {
+          status: initialStatus,
+          rating: hasCoachRating ? Number(conv.coach_rating) : (next[p.id]?.rating ?? null),
+          actitud: hasActitud ? Number(conv.actitud) : (next[p.id]?.actitud ?? null),
+          goals: conv.goals ?? conv.goles ?? (next[p.id]?.goals ?? 0),
+          assists: conv.assists ?? conv.asistencias ?? (next[p.id]?.assists ?? 0),
+          yellows: conv.yellow_cards ?? conv.tarjetas_amarillas ?? (next[p.id]?.yellows ?? 0),
+          reds: conv.red_cards ?? conv.tarjetas_rojas ?? (next[p.id]?.reds ?? 0),
+          minutes: conv.minutes_played ?? conv.minutos_jugados ?? (next[p.id]?.minutes ?? 0),
+          motive: conv.notes || conv.motivo || (next[p.id]?.motive ?? '')
+        };
+      });
+      return next;
+    });
+  }, [convocatorias, playerList]);
 
   // Manejadores de cambios en jugadores
   const handlePlayerStatusChange = (playerId: string, status: string) => {
@@ -233,7 +270,17 @@ export function PostMatchTab({
   };
 
   const handlePlayerMinutesChange = (playerId: string, value: string) => {
-    const num = parseInt(value);
+    if (value === '' || value === null || value === undefined) {
+      setPlayerReports(prev => ({
+        ...prev,
+        [playerId]: {
+          ...(prev[playerId] || { status: 'Presente', rating: null, actitud: null, goals: 0, assists: 0, yellows: 0, reds: 0, minutes: 0 }),
+          minutes: 0
+        }
+      }));
+      return;
+    }
+    const num = parseInt(value, 10);
     if (isNaN(num) || num < 0) return;
     setPlayerReports(prev => {
       const current = prev[playerId] || {
@@ -293,6 +340,14 @@ export function PostMatchTab({
       );
     }
 
+    if (rep.status !== 'Presente') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-black text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+          Sin marcar
+        </span>
+      );
+    }
+
     const hasBothScores = rep.rating !== null && rep.rating !== undefined && rep.actitud !== null && rep.actitud !== undefined;
 
     if (hasBothScores) {
@@ -312,8 +367,10 @@ export function PostMatchTab({
     );
   };
 
-  // Campos tácticos del informe del entrenador
-  const [rating, setRating] = useState<string>(initialData?.coach_rating?.toString() || "7");
+  // Campos tácticos del informe del entrenador (nunca valores por defecto inventados; solo el míster los define)
+  const [rating, setRating] = useState<string>(
+    initialData?.coach_rating && initialData.coach_rating > 0 ? String(initialData.coach_rating) : ""
+  );
   const [summary, setSummary] = useState(initialData?.coach_summary || "");
   const [positive, setPositive] = useState(initialData?.positive_aspects || "");
   const [improvement, setImprovement] = useState(initialData?.improvement_aspects || "");
@@ -327,6 +384,34 @@ export function PostMatchTab({
   const [rivalGoalsDesc, setRivalGoalsDesc] = useState(initialRival.goals_description || "");
   const [rivalKeyPlayers, setRivalKeyPlayers] = useState(initialRival.key_players || "");
   const [rivalNotableData, setRivalNotableData] = useState(initialRival.notable_data || "");
+
+  // Sincronizar datos de partido cuando initialData se actualice tras refresco del servidor
+  useEffect(() => {
+    if (!initialData) return;
+    if (initialData.coach_rating !== undefined) {
+      setRating(initialData.coach_rating && initialData.coach_rating > 0 ? String(initialData.coach_rating) : "");
+    }
+    if (initialData.coach_summary !== undefined) {
+      setSummary(initialData.coach_summary || "");
+    }
+    if (initialData.positive_aspects !== undefined) {
+      setPositive(initialData.positive_aspects || "");
+    }
+    if (initialData.improvement_aspects !== undefined) {
+      setImprovement(initialData.improvement_aspects || "");
+    }
+    if (initialData.attitude_notes !== undefined) {
+      setAttitude(initialData.attitude_notes || "");
+    }
+    const parsed = typeof initialData.coach_report === 'string'
+      ? (() => { try { return JSON.parse(initialData.coach_report) } catch { return {} } })()
+      : (initialData.coach_report || {});
+    const r = parsed?.rival_analysis || {};
+    if (r.system !== undefined) setRivalSystem(r.system || "");
+    if (r.goals_description !== undefined) setRivalGoalsDesc(r.goals_description || "");
+    if (r.key_players !== undefined) setRivalKeyPlayers(r.key_players || "");
+    if (r.notable_data !== undefined) setRivalNotableData(r.notable_data || "");
+  }, [initialData]);
 
   // Dictado por Voz (SpeechRecognition API)
   const [isRecording, setIsRecording] = useState(false);
@@ -390,15 +475,11 @@ export function PostMatchTab({
 
   // Guardado unificado: Jugadores (Paso 1) + Informe Táctico (Paso 2)
   const handleSave = () => {
-    if (!isEvaluationComplete || pendingPlayers.length > 0) {
-      setIsPlayerSectionOpen(true);
-      const names = pendingPlayers.slice(0, 3).map(p => `${p.first_name} ${p.last_name}`).join(', ');
-      const more = pendingPlayers.length > 3 ? ` y ${pendingPlayers.length - 3} más` : '';
-      toast.error(`No se puede guardar el informe: faltan por evaluar ${pendingPlayers.length} jugador(es) convocados (${names}${more}).`, {
-        duration: 5000,
-        icon: "⚠️"
+    if (pendingPlayers.length > 0) {
+      toast(`Guardando informe (${pendingPlayers.length} jugador(es) quedan pendientes de nota/actitud).`, {
+        duration: 4000,
+        icon: "ℹ️"
       });
-      return;
     }
 
     startTransition(async () => {
@@ -428,9 +509,10 @@ export function PostMatchTab({
         return;
       }
 
-      // 2. Guardar informe táctico del entrenador
+      // 2. Guardar informe táctico del entrenador (nota y actitud exclusivas del míster)
+      const parsedRating = rating && !isNaN(parseInt(rating, 10)) ? parseInt(rating, 10) : null;
       const res = await saveMatchReport(matchId, {
-        coach_rating: parseInt(rating),
+        coach_rating: parsedRating,
         coach_summary: summary,
         positive_aspects: positive,
         improvement_aspects: improvement,
@@ -471,15 +553,10 @@ export function PostMatchTab({
     try {
       const res = await generateMatchAIReportAction(matchId);
       if (res.success && res.data) {
-        setRating(res.data.coach_rating.toString());
-        if (res.data.coach_summary) {
-          setAttitude(res.data.coach_summary);
-        } else if (res.data.attitude_notes) {
-          setAttitude(res.data.attitude_notes);
-        }
+        // La nota del partido y la actitud son exclusivas del entrenador; la IA solo sugiere puntos positivos y de mejora
         setPositive(res.data.positive_aspects);
         setImprovement(res.data.improvement_aspects);
-        toast.success("¡Informe generado con éxito!", { id: toastId });
+        toast.success("¡Análisis táctico de apoyo generado con éxito!", { id: toastId });
         setHasConfirmedAiWarning(false);
       } else {
         toast.error(res.error || "No se pudo generar el informe.", { id: toastId });
@@ -645,7 +722,7 @@ export function PostMatchTab({
               <div className="p-3 sm:p-5 bg-slate-50/60 rounded-b-2xl pb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {playerList.map((player, idx) => {
-                    const rep = playerReports[player.id] || { status: 'Presente', rating: null, actitud: null, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0, motive: '' };
+                    const rep = playerReports[player.id] || { status: 'Pendiente', rating: null, actitud: null, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0, motive: '' };
                     const isPresent = rep.status === 'Presente';
                     const isEvaluated = isPlayerEvaluated(player.id);
                     const isNearBottom = idx >= playerList.length - 2;
@@ -862,7 +939,7 @@ export function PostMatchTab({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {playerList.map((player, idx) => {
-                      const rep = playerReports[player.id] || { status: 'Presente', rating: null, actitud: null, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0, motive: '' };
+                      const rep = playerReports[player.id] || { status: 'Pendiente', rating: null, actitud: null, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0, motive: '' };
                       const isPresent = rep.status === 'Presente';
                       const isNearBottom = idx >= playerList.length - 2;
                       const conv = convocatorias.find(c => c.player_id === player.id);

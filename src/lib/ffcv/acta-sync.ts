@@ -775,6 +775,14 @@ export async function syncFFCVActaToConvocatorias(
     };
 
     // 6. Update partido status, score, live timer and coach_report
+    const matchStartMs = partido.fecha_hora ? new Date(partido.fecha_hora).getTime() : NaN;
+    const isTimedOutAfterMatch =
+      !isClosed &&
+      isInPlay &&
+      !isNaN(matchStartMs) &&
+      Date.now() - matchStartMs > (maxMatchMinutes + 40) * 60 * 1000;
+    const effectiveIsInPlay = isInPlay && !isTimedOutAfterMatch;
+
     const hasRecordedEvents =
       ourGoals.length > 0 ||
       rivalGoals.length > 0 ||
@@ -782,7 +790,10 @@ export async function syncFFCVActaToConvocatorias(
       rivalSubs.length > 0 ||
       ourCards.length > 0 ||
       rivalCards.length > 0;
-    const shouldMarkFinished = isClosed || (!isInPlay && hasScores && hasRecordedEvents);
+    const shouldMarkFinished =
+      isClosed ||
+      isTimedOutAfterMatch ||
+      (!effectiveIsInPlay && hasScores && hasRecordedEvents);
 
     const partidoUpdate: Record<string, any> = {
       acta_oficial_url: `https://ffcv.es/dep/actas?CodPartido=${codacta}`,
@@ -797,7 +808,7 @@ export async function syncFFCVActaToConvocatorias(
       partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
       partidoUpdate.live_timer_started_at = null;
       partidoUpdate.live_timer_elapsed_seconds = 0;
-    } else if (isInPlay) {
+    } else if (effectiveIsInPlay) {
       partidoUpdate.estado = 'En Curso';
       if (hasScores) {
         const homeScore = Number(details.goles_local) || 0;

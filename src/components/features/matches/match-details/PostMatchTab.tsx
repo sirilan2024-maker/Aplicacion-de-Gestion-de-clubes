@@ -141,34 +141,33 @@ export function PostMatchTab({
     return initial;
   });
 
-  // Sincronizar estado si las convocatorias del servidor se actualizan tras guardar o refrescar
+  // Sincronizar estado únicamente cuando las convocatorias del servidor cambian
   useEffect(() => {
     if (!convocatorias || convocatorias.length === 0) return;
     setPlayerReports(prev => {
       const next = { ...prev };
-      playerList.forEach(p => {
-        const conv = convocatorias.find(c => c.player_id === p.id);
-        if (!conv) return;
+      convocatorias.forEach(conv => {
+        if (!conv?.player_id || conv.status === 'no_convocado') return;
         const initialStatus = resolveInitialAttendanceStatus(conv);
 
         const hasCoachRating = conv.coach_rating !== null && conv.coach_rating !== undefined && Number(conv.coach_rating) > 0;
         const hasActitud = conv.actitud !== null && conv.actitud !== undefined && Number(conv.actitud) > 0;
 
-        next[p.id] = {
+        next[conv.player_id] = {
           status: initialStatus,
-          rating: hasCoachRating ? Number(conv.coach_rating) : (next[p.id]?.rating ?? null),
-          actitud: hasActitud ? Number(conv.actitud) : (next[p.id]?.actitud ?? null),
-          goals: conv.goals ?? conv.goles ?? (next[p.id]?.goals ?? 0),
-          assists: conv.assists ?? conv.asistencias ?? (next[p.id]?.assists ?? 0),
-          yellows: conv.yellow_cards ?? conv.tarjetas_amarillas ?? (next[p.id]?.yellows ?? 0),
-          reds: conv.red_cards ?? conv.tarjetas_rojas ?? (next[p.id]?.reds ?? 0),
-          minutes: conv.minutes_played ?? conv.minutos_jugados ?? (next[p.id]?.minutes ?? 0),
-          motive: conv.notes || conv.motivo || (next[p.id]?.motive ?? '')
+          rating: hasCoachRating ? Number(conv.coach_rating) : (next[conv.player_id]?.rating ?? null),
+          actitud: hasActitud ? Number(conv.actitud) : (next[conv.player_id]?.actitud ?? null),
+          goals: conv.goals ?? conv.goles ?? (next[conv.player_id]?.goals ?? 0),
+          assists: conv.assists ?? conv.asistencias ?? (next[conv.player_id]?.assists ?? 0),
+          yellows: conv.yellow_cards ?? conv.tarjetas_amarillas ?? (next[conv.player_id]?.yellows ?? 0),
+          reds: conv.red_cards ?? conv.tarjetas_rojas ?? (next[conv.player_id]?.reds ?? 0),
+          minutes: conv.minutes_played ?? conv.minutos_jugados ?? (next[conv.player_id]?.minutes ?? 0),
+          motive: conv.notes || conv.motivo || (next[conv.player_id]?.motive ?? '')
         };
       });
       return next;
     });
-  }, [convocatorias, playerList]);
+  }, [convocatorias]);
 
   // Manejadores de cambios en jugadores
   const handlePlayerStatusChange = (playerId: string, status: string) => {

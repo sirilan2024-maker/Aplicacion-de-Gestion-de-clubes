@@ -63,20 +63,33 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
   }
 
   // Regla de Oro: Filtrar estrictamente datos de la temporada activa 26/27 y excluir la 25/26
-  const validCardEvents = cardEvents.filter(ev => {
-    if (!ev.match) return false;
-    if (ev.match.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
-    if (ev.match.season_id && ev.match.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
-    if (ev.match.fecha_hora && new Date(ev.match.fecha_hora) < new Date('2026-07-01')) return false;
-    return true;
-  });
+  // Ordenar cronológicamente de fecha más lejana (antigua) a más cercana (reciente)
+  const validCardEvents = cardEvents
+    .filter(ev => {
+      if (!ev.match) return false;
+      if (ev.match.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+      if (ev.match.season_id && ev.match.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+      if (ev.match.fecha_hora && new Date(ev.match.fecha_hora) < new Date('2026-07-01')) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const tA = a.match?.fecha_hora ? new Date(a.match.fecha_hora).getTime() : 0;
+      const tB = b.match?.fecha_hora ? new Date(b.match.fecha_hora).getTime() : 0;
+      return tA - tB;
+    });
 
-  const validSeasonMatches = recentMatches.filter(m => {
-    if (m.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
-    if (m.season_id && m.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
-    if (m.fecha_hora && new Date(m.fecha_hora) < new Date('2026-07-01')) return false;
-    return true;
-  });
+  const validSeasonMatches = recentMatches
+    .filter(m => {
+      if (m.season_id === '584f508a-fc1a-4339-b5b2-4296ffde2f4c') return false;
+      if (m.season_id && m.season_id !== '663ed6ef-1dab-4350-9489-ed50f9e9ac15') return false;
+      if (m.fecha_hora && new Date(m.fecha_hora) < new Date('2026-07-01')) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const tA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+      const tB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+      return tA - tB;
+    });
 
   // Calculate cycle status and sanctions based on official FFCV rules
   const evalResult = evaluatePlayerDiscipline(validCardEvents);

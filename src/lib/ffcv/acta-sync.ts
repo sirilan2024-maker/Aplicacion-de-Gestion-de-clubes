@@ -458,32 +458,42 @@ export async function syncFFCVActaToConvocatorias(
 
       minutes = Math.max(0, Math.min(minutes, maxMatchMinutes));
 
-      // Las tarjetas del acta oficial FFCV son la fuente de verdad federativa
-      const finalYellows = yellows;
-      const finalReds = reds;
       const tacticalCoords = isTitular ? coordinatesByPlayerId.get(matched.id) : null;
 
-      rowsToUpsert.push({
-        partido_id: partido.id,
-        player_id: matched.id,
-        status: 'convocado',
-        titular: isTitular,
-        tactical_x: tacticalCoords ? tacticalCoords.x : null,
-        tactical_y: tacticalCoords ? tacticalCoords.y : null,
-        yellow_cards: finalYellows,
-        tarjetas_amarillas: finalYellows,
-        red_cards: finalReds,
-        tarjetas_rojas: finalReds,
-        minutes_played: minutes,
-        minutos_jugados: minutes,
-        goals: goals,
-        goles: goals
-      });
+      if (isClosed) {
+        rowsToUpsert.push({
+          partido_id: partido.id,
+          player_id: matched.id,
+          status: 'convocado',
+          titular: isTitular,
+          tactical_x: tacticalCoords ? tacticalCoords.x : null,
+          tactical_y: tacticalCoords ? tacticalCoords.y : null,
+          yellow_cards: yellows,
+          tarjetas_amarillas: yellows,
+          red_cards: reds,
+          tarjetas_rojas: reds,
+          minutes_played: minutes,
+          minutos_jugados: minutes,
+          goals: goals,
+          goles: goals
+        });
+      } else {
+        // Mientras el acta FFCV no esté cerrada, sincronizar únicamente la alineación y coordenadas tácticas
+        // para respetar los goles, tarjetas y minutos que el entrenador registre en directo.
+        rowsToUpsert.push({
+          partido_id: partido.id,
+          player_id: matched.id,
+          status: 'convocado',
+          titular: isTitular,
+          tactical_x: tacticalCoords ? tacticalCoords.x : null,
+          tactical_y: tacticalCoords ? tacticalCoords.y : null
+        });
+      }
     }
 
-    // 3.2 Process any cards shown to coaching / technical staff (entrenadores, delegados, etc.)
+    // 3.2 Process any cards shown to coaching / technical staff only when the official acta is closed
     const processedStaffIds = new Set<string>();
-    ourCards.forEach((c: any, cIdx: number) => {
+    if (isClosed) ourCards.forEach((c: any, cIdx: number) => {
       if (matchedCardIndices.has(cIdx)) return;
       if (!c.nombre_jugador) return;
 
@@ -538,14 +548,22 @@ export async function syncFFCVActaToConvocatorias(
     for (const r of rowsToUpsert) {
       if (dedupedMap.has(r.player_id)) {
         const existing = dedupedMap.get(r.player_id);
-        existing.yellow_cards = Math.max(existing.yellow_cards, r.yellow_cards);
-        existing.tarjetas_amarillas = Math.max(existing.tarjetas_amarillas, r.tarjetas_amarillas);
-        existing.red_cards = Math.max(existing.red_cards, r.red_cards);
-        existing.tarjetas_rojas = Math.max(existing.tarjetas_rojas, r.tarjetas_rojas);
-        existing.minutes_played = Math.max(existing.minutes_played, r.minutes_played);
-        existing.minutos_jugados = Math.max(existing.minutos_jugados, r.minutos_jugados);
-        existing.goals = Math.max(existing.goals, r.goals);
-        existing.goles = Math.max(existing.goles, r.goles);
+        if (r.yellow_cards !== undefined) {
+          existing.yellow_cards = Math.max(existing.yellow_cards || 0, r.yellow_cards);
+          existing.tarjetas_amarillas = Math.max(existing.tarjetas_amarillas || 0, r.tarjetas_amarillas);
+        }
+        if (r.red_cards !== undefined) {
+          existing.red_cards = Math.max(existing.red_cards || 0, r.red_cards);
+          existing.tarjetas_rojas = Math.max(existing.tarjetas_rojas || 0, r.tarjetas_rojas);
+        }
+        if (r.minutes_played !== undefined) {
+          existing.minutes_played = Math.max(existing.minutes_played || 0, r.minutes_played);
+          existing.minutos_jugados = Math.max(existing.minutos_jugados || 0, r.minutos_jugados);
+        }
+        if (r.goals !== undefined) {
+          existing.goals = Math.max(existing.goals || 0, r.goals);
+          existing.goles = Math.max(existing.goles || 0, r.goles);
+        }
       } else {
         dedupedMap.set(r.player_id, r);
       }
@@ -599,8 +617,8 @@ export async function syncFFCVActaToConvocatorias(
       }
     }
 
-    // 4. Synchronize match_events (goals and cards for both local and visitante teams)
-    try {
+    // 4. Synchronize match_events only when the FFCV official acta is closed (coach controls live events manually)
+    if (isClosed) try {
       const newEvents: any[] = [];
 
       // Helper to find player ID for Saladar players
@@ -759,7 +777,7 @@ export async function syncFFCVActaToConvocatorias(
     parsedCoachReport.ffcv_live = {
       codPartido: String(codacta),
       url: `https://ffcv.es/dep/actas?CodPartido=${codacta}`,
-      partidoEnJuego: isInPlay,
+      partidoEnJuego: false,
       actaCerrada: isClosed,
       campo: details.campo || (details as any).instalacion || null,
       arbitros: Array.isArray(details.arbitros_partido)
@@ -774,33 +792,15 @@ export async function syncFFCVActaToConvocatorias(
       updatedAt: new Date().toISOString()
     };
 
-    // 6. Update partido status, score, live timer and coach_report
-    const matchStartMs = partido.fecha_hora ? new Date(partido.fecha_hora).getTime() : NaN;
-    const isTimedOutAfterMatch =
-      !isClosed &&
-      isInPlay &&
-      !isNaN(matchStartMs) &&
-      Date.now() - matchStartMs > (maxMatchMinutes + 40) * 60 * 1000;
-    const effectiveIsInPlay = isInPlay && !isTimedOutAfterMatch;
-
-    const hasRecordedEvents =
-      ourGoals.length > 0 ||
-      rivalGoals.length > 0 ||
-      ourSubs.length > 0 ||
-      rivalSubs.length > 0 ||
-      ourCards.length > 0 ||
-      rivalCards.length > 0;
-    const shouldMarkFinished =
-      isClosed ||
-      isTimedOutAfterMatch ||
-      (!effectiveIsInPlay && hasScores && hasRecordedEvents);
-
+    // 6. Update partido: while FFCV acta is NOT closed, only persist lineups/coach_report
+    // so the coach controls live score, timer, and status manually.
+    // Once acta_cerrada === '1', finalize and sync official FFCV score.
     const partidoUpdate: Record<string, any> = {
       acta_oficial_url: `https://ffcv.es/dep/actas?CodPartido=${codacta}`,
       coach_report: JSON.stringify(parsedCoachReport)
     };
 
-    if (shouldMarkFinished) {
+    if (isClosed) {
       const homeScore = Number(details.goles_local) || 0;
       const awayScore = Number(details.goles_visitante) || 0;
       partidoUpdate.estado = 'Finalizado';
@@ -808,25 +808,6 @@ export async function syncFFCVActaToConvocatorias(
       partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
       partidoUpdate.live_timer_started_at = null;
       partidoUpdate.live_timer_elapsed_seconds = 0;
-    } else if (effectiveIsInPlay) {
-      partidoUpdate.estado = 'En Curso';
-      if (hasScores) {
-        const homeScore = Number(details.goles_local) || 0;
-        const awayScore = Number(details.goles_visitante) || 0;
-        partidoUpdate.resultado_propio = isSaladarHome ? homeScore : awayScore;
-        partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
-      } else {
-        partidoUpdate.resultado_propio = ourGoals.length;
-        partidoUpdate.resultado_rival = rivalGoals.length;
-      }
-      if (!partido.live_timer_started_at) {
-        partidoUpdate.live_timer_started_at = new Date().toISOString();
-      }
-    } else if (hasScores) {
-      const homeScore = Number(details.goles_local) || 0;
-      const awayScore = Number(details.goles_visitante) || 0;
-      partidoUpdate.resultado_propio = isSaladarHome ? homeScore : awayScore;
-      partidoUpdate.resultado_rival = isSaladarHome ? awayScore : homeScore;
     }
 
     await supabase

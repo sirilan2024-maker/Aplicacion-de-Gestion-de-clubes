@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const partidoId = searchParams.get("partidoId");
+    const force = searchParams.get("force") === "1";
 
     if (!partidoId) {
       return NextResponse.json({ error: "Falta el parámetro partidoId" }, { status: 400 });
@@ -55,8 +56,25 @@ export async function GET(req: NextRequest) {
       : null;
     // Un PDF oficial CTA FFCV de 3 páginas (subido o generado con logo oficial) ocupa > 15 KB.
     // Si tiene menos de 12 KB era la versión antigua de 1 página y se regenera al formato CTA de 3 páginas.
+    // Si el PDF fue generado antes de que terminara el partido (< fecha_hora + 2h) y existe codacta, se regenera con los datos finales.
     const fileSize = Number(matchedFile?.metadata?.size || 0);
-    const fileExistsInStorage = Boolean(matchedFile && (fileSize === 0 || fileSize >= 12000));
+    const fileUpdatedMs = matchedFile
+      ? new Date((matchedFile as any).updated_at || (matchedFile as any).created_at || 0).getTime()
+      : 0;
+    const matchStartMs = match.fecha_hora ? new Date(match.fecha_hora).getTime() : NaN;
+    const isStalePreOrLivePdf = Boolean(
+      codacta &&
+      matchedFile &&
+      !isNaN(matchStartMs) &&
+      fileUpdatedMs > 0 &&
+      fileUpdatedMs < matchStartMs + 2 * 60 * 60 * 1000
+    );
+    const fileExistsInStorage = Boolean(
+      !force &&
+      !isStalePreOrLivePdf &&
+      matchedFile &&
+      (fileSize === 0 || fileSize >= 12000)
+    );
 
     if (fileExistsInStorage) {
       // Si además tiene codacta FFCV, sincronizar en segundo plano las convocatorias para asegurar coherencia de tarjetas

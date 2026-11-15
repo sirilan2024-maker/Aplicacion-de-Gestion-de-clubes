@@ -112,8 +112,19 @@ export async function GET(req: NextRequest) {
         ? existingFiles.find((f: any) => f.name === "acta_oficial.pdf")
         : null;
       const existingSize = Number(existing?.metadata?.size || 0);
+      const existingUpdatedMs = existing
+        ? new Date((existing as any).updated_at || (existing as any).created_at || 0).getTime()
+        : 0;
+      const matchStartMs = partido.fecha_hora ? new Date(partido.fecha_hora).getTime() : NaN;
+      const isStalePreOrLivePdf = Boolean(
+        codacta &&
+        existing &&
+        !isNaN(matchStartMs) &&
+        existingUpdatedMs > 0 &&
+        existingUpdatedMs < matchStartMs + 2 * 60 * 60 * 1000
+      );
 
-      if (existing && existingSize >= 25000) {
+      if (existing && existingSize >= 25000 && !isStalePreOrLivePdf) {
         const storagePath = `${folderPath}/acta_oficial.pdf`;
         if (download) {
           const { data: fileBlob } = await supabase.storage

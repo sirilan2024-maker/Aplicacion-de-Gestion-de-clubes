@@ -5,10 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { 
   Sparkles, Save, CheckCircle2, AlertCircle, Users, Star, BarChart2, 
   FileText, Loader2, Mic, MicOff, Send, MessageSquare, TrendingUp, Shield,
-  Plus, Minus, ChevronDown, ChevronUp, LayoutGrid, Table
+  Plus, Minus, ChevronDown, ChevronUp, LayoutGrid, Table, Download
 } from "lucide-react"
 import { saveMatchReport, sendMatchSummaryToCoordinatorsAction, updateMatchFullReportBatch } from "@/app/actions/match-actions"
 import { generateMatchAIReportAction } from "@/app/actions/match-ai-report-actions"
+import { generatePostMatchReportPdfBuffer } from "@/lib/pdf/post-match-pdf-generator"
 import { Button } from "@/components/ui/button"
 import { MatchFullReportModal } from "./MatchFullReportModal"
 import { MatchTrendsModal } from "./MatchTrendsModal"
@@ -54,6 +55,10 @@ export function PostMatchTab({
   const [isPending, startTransition] = useTransition();
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [hasSavedReport, setHasSavedReport] = useState<boolean>(() =>
+    Boolean(initialData?.coach_summary || initialData?.coach_rating)
+  );
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [showFullReportModal, setShowFullReportModal] = useState(() => searchParams.get("action") === "pasar-lista");
   const [showTrendsModal, setShowTrendsModal] = useState(false);
   const [hasConfirmedAiWarning, setHasConfirmedAiWarning] = useState(false);
@@ -528,6 +533,7 @@ export function PostMatchTab({
 
       if (res?.success) {
         setSuccess(true);
+        setHasSavedReport(true);
         toast.success("¡Informe completo y evaluación de jugadores guardados con éxito!");
         router.refresh();
         setTimeout(() => setSuccess(false), 3000);
@@ -535,6 +541,75 @@ export function PostMatchTab({
         toast.error(res?.error || "Error al guardar el informe post-partido");
       }
     });
+  };
+
+  const handleDownloadReportPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const teamName = initialData?.equipo?.name || initialData?.team?.name || "Sporting Saladar";
+      const pdfBytes = await generatePostMatchReportPdfBuffer({
+        teamName,
+        rivalName: initialData?.rival_nombre || "Rival",
+        fechaHora: initialData?.fecha_hora || null,
+        lugar: initialData?.lugar || null,
+        resultadoPropio: initialData?.resultado_propio ?? null,
+        resultadoRival: initialData?.resultado_rival ?? null,
+        coachRating: rating || null,
+        coachSummary: summary,
+        positiveAspects: positive,
+        improvementAspects: improvement,
+        attitudeNotes: attitude,
+        rivalAnalysis: {
+          system: rivalSystem,
+          goals_description: rivalGoalsDesc,
+          key_players: rivalKeyPlayers,
+          notable_data: rivalNotableData
+        },
+        players: playerList.map((p) => {
+          const rep = playerReports[p.id] || {
+            status: "Pendiente",
+            rating: null,
+            actitud: null,
+            goals: 0,
+            yellows: 0,
+            reds: 0,
+            minutes: 0,
+            motive: ""
+          };
+          const conv = convocatorias.find((c) => c.player_id === p.id);
+          return {
+            dorsal: conv?.dorsal ?? p.dorsal,
+            name: `${p.first_name || ""} ${p.last_name || ""}`.trim(),
+            titular: conv?.titular === true || conv?.titular === 1 || String(conv?.titular) === "1",
+            status: rep.status,
+            minutes: rep.minutes || 0,
+            rating: rep.rating,
+            actitud: rep.actitud,
+            goals: rep.goals || 0,
+            yellows: rep.yellows || 0,
+            reds: rep.reds || 0,
+            motive: rep.motive
+          };
+        })
+      });
+
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const rivalSlug = (initialData?.rival_nombre || "partido")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 40);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Informe_Post_Partido_${rivalSlug}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error(err?.message || "No se pudo generar el PDF del informe.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   const handleGenerateAIReport = async () => {
@@ -1369,6 +1444,29 @@ export function PostMatchTab({
               : `Faltan ${pendingPlayers.length} jugador(es) por evaluar`}
           </Button>
         </div>
+
+        {hasSavedReport && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-4 animate-in fade-in duration-300">
+            <div className="flex items-center gap-2.5 text-xs font-bold text-emerald-900">
+              <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Informe guardado. Si lo deseas, puedes descargar ahora el informe completo del partido en PDF.</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadReportPdf}
+              disabled={isDownloadingPdf}
+              className="w-full sm:w-auto gap-2 font-bold bg-white hover:bg-emerald-600 hover:text-white text-emerald-700 border-emerald-300 px-5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer shrink-0"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {isDownloadingPdf ? "Generando PDF..." : "Descargar Informe Completo (PDF)"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Modal para Añadir Motivo de Justificación */}

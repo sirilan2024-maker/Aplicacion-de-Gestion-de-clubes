@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useRef } from "react"
+import { useState, useTransition, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { 
   Sparkles, Save, CheckCircle2, AlertCircle, Users, Star, BarChart2, 
@@ -510,7 +510,7 @@ export function PostMatchTab({
       }
 
       // 2. Guardar informe táctico del entrenador (nota y actitud exclusivas del míster)
-      const parsedRating = rating && !isNaN(parseInt(rating, 10)) ? parseInt(rating, 10) : null;
+      const parsedRating = rating && !isNaN(parseInt(rating, 10)) ? parseInt(rating, 10) : undefined;
       const res = await saveMatchReport(matchId, {
         coach_rating: parsedRating,
         coach_summary: summary,

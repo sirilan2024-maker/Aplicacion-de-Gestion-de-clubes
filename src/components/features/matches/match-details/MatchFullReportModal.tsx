@@ -15,6 +15,7 @@ interface Player {
   id: string
   first_name: string
   last_name: string
+  dorsal?: string | number
   status?: string
   posicion?: string
   posicion_principal?: string
@@ -232,6 +233,52 @@ export function MatchFullReportModal({ matchId, matchDate, teamId, players, conv
   const pendingPlayers = playerList.filter(p => !isPlayerEvaluated(p.id));
   const evaluatedCount = totalPlayers - pendingPlayers.length;
   const isEvaluationComplete = totalPlayers > 0 ? pendingPlayers.length === 0 : true;
+
+  const renderPlayerStatusPill = (playerId: string) => {
+    const rep = reports[playerId];
+    if (!rep) return null;
+
+    if (rep.status === 'Ausente') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+          No Asiste
+        </span>
+      );
+    }
+
+    if (rep.status === 'Justificado') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+          Justificado
+        </span>
+      );
+    }
+
+    if (rep.status !== 'Presente') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-black text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+          Sin marcar
+        </span>
+      );
+    }
+
+    const hasBothScores = rep.rating !== null && rep.rating !== undefined && rep.actitud !== null && rep.actitud !== undefined;
+    if (hasBothScores) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          Listo
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+        <AlertCircle className="w-3 h-3 text-amber-600" />
+        Puntuar
+      </span>
+    );
+  };
 
   const handleSave = () => {
     if (!isEvaluationComplete || pendingPlayers.length > 0) {

@@ -202,8 +202,13 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   let runningLocal = 0;
   let runningAway = 0;
   const goalTimeline = allGoals.map((goal) => {
+    const notasStr = String(goal.notas || '');
     let isHomeGoal = false;
-    if (goal.tipo_evento === 'Gol') {
+    if (notasStr.startsWith('[LOCAL]')) {
+      isHomeGoal = true;
+    } else if (notasStr.startsWith('[VISITANTE]')) {
+      isHomeGoal = false;
+    } else if (goal.tipo_evento === 'Gol') {
       isHomeGoal = isLocal ? !!goal.player_id : !goal.player_id;
     } else {
       isHomeGoal = isLocal ? !goal.player_id : !!goal.player_id;

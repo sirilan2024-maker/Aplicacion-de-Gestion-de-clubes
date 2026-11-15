@@ -119,6 +119,92 @@ function findMatchingFfcvMatch(partido: any, ffcvMatches: any[], teamsList: any[
   return bestMatch;
 }
 
+/**
+ * Determina si un partido ya ha sido disputado o pertenece al pasado cronológico.
+ * Se considera jugado/pasado si:
+ * 1. Su estado es 'Finalizado' o tiene el acta cerrada.
+ * 2. Tiene resultado registrado (propio y rival).
+ * 3. En la FFCV / Liga Brave figura como jugado ('played') o con marcador oficial.
+ * 4. Su fecha de inicio estimada + 105 minutos ya ha pasado, salvo que esté 'En Curso' o 'Descanso'.
+ */
+function isMatchPlayedOrPast(match: any, ffcvMatch?: any): boolean {
+  if (!match) return false;
+
+  // Si está en vivo ahora mismo, NO es pasado
+  if (match.estado === 'En Curso' || match.estado === 'Descanso') {
+    return false;
+  }
+
+  // 1. Estado explícito de finalización o acta cerrada
+  if (match.estado === 'Finalizado' || match.acta_cerrada) {
+    return true;
+  }
+
+  // 2. Marcador interno registrado (y no en Programado sin resultado)
+  const hasInternalScore = 
+    match.resultado_propio !== null && match.resultado_propio !== undefined &&
+    match.resultado_rival !== null && match.resultado_rival !== undefined &&
+    match.estado !== 'Programado';
+  if (hasInternalScore) {
+    return true;
+  }
+
+  // 3. Marcador o estado oficial FFCV / Liga Brave
+  const hasFfcvScore = ffcvMatch && (
+    ffcvMatch.status === 'played' ||
+    (ffcvMatch.home_score !== null && ffcvMatch.away_score !== null)
+  );
+  if (hasFfcvScore) {
+    return true;
+  }
+
+  // 4. Criterio temporal: si la fecha y hora de inicio + 105 min ya han transcurrido
+  if (match.fecha_hora) {
+    const matchTime = new Date(match.fecha_hora).getTime();
+    if (!isNaN(matchTime)) {
+      const estimatedEndTime = matchTime + (105 * 60 * 1000);
+      if (Date.now() > estimatedEndTime) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Determina si un partido realmente fue jugado (para seleccionarlo como "último disputado").
+ * Excluye partidos suspendidos o aplazados que no llegaron a jugarse.
+ */
+function isMatchActuallyPlayed(match: any, ffcvMatch?: any): boolean {
+  if (!match) return false;
+  if (match.estado === 'Finalizado' || match.acta_cerrada) return true;
+
+  const hasInternalScore = 
+    match.resultado_propio !== null && match.resultado_propio !== undefined &&
+    match.resultado_rival !== null && match.resultado_rival !== undefined &&
+    match.estado !== 'Programado';
+  if (hasInternalScore) return true;
+
+  const hasFfcvScore = ffcvMatch && (
+    ffcvMatch.status === 'played' ||
+    (ffcvMatch.home_score !== null && ffcvMatch.away_score !== null)
+  );
+  if (hasFfcvScore) return true;
+
+  if (match.estado === 'Aplazado' || match.estado === 'Suspendido') return false;
+  if (ffcvMatch?.status === 'postponed' || ffcvMatch?.status === 'suspended') return false;
+
+  if (match.fecha_hora) {
+    const matchTime = new Date(match.fecha_hora).getTime();
+    if (!isNaN(matchTime)) {
+      return Date.now() > (matchTime + 105 * 60 * 1000);
+    }
+  }
+
+  return false;
+}
+
 export function GlobalMatchesView({ initialMatches, teams: initialTeams, players: initialPlayers = [], convocatorias: initialConvocatorias = [], fixedTeamId, isReadOnly = false, userRole = '', userTeamIds = [] }: GlobalMatchesViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -480,48 +566,81 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
     // Filter Result
     let matchesResult = true;
     if (filterResult !== 'all') {
-      if (m.estado !== 'Finalizado') {
+      const ffcvM = findMatchingFfcvMatch(m, ffcvMatches, teams);
+      const isPast = isMatchPlayedOrPast(m, ffcvM);
+      if (!isPast) {
         matchesResult = false;
       } else {
-        const gP = m.resultado_propio ?? 0;
-        const gR = m.resultado_rival ?? 0;
-        if (filterResult === 'ganado') matchesResult = gP > gR;
-        else if (filterResult === 'perdido') matchesResult = gP < gR;
-        else if (filterResult === 'empatado') matchesResult = gP === gR;
+        let gP = m.resultado_propio;
+        let gR = m.resultado_rival;
+        if ((gP === null || gP === undefined) && ffcvM && ffcvM.home_score !== null && ffcvM.away_score !== null) {
+          gP = isLocal ? ffcvM.home_score : ffcvM.away_score;
+          gR = isLocal ? ffcvM.away_score : ffcvM.home_score;
+        }
+        const finalGP = gP ?? 0;
+        const finalGR = gR ?? 0;
+        if (filterResult === 'ganado') matchesResult = finalGP > finalGR;
+        else if (filterResult === 'perdido') matchesResult = finalGP < finalGR;
+        else if (filterResult === 'empatado') matchesResult = finalGP === finalGR;
       }
     }
       
     return matchesTeam && matchesSearch && matchesLocation && matchesResult
-  }), [matches, selectedTeamId, searchQuery, filterLocation, filterResult]);
+  }), [matches, selectedTeamId, searchQuery, filterLocation, filterResult, ffcvMatches, teams]);
 
   const { filteredMatches, hiddenPlayedCount, upcomingCount } = useMemo(() => {
     if (matchTimeFilter === 'all' || filterResult !== 'all') {
-      const upcoming = baseFilteredMatches.filter(m => m.estado !== 'Finalizado').length;
+      const upcoming = baseFilteredMatches.filter(m => {
+        const ffcvM = findMatchingFfcvMatch(m, ffcvMatches, teams);
+        return !isMatchPlayedOrPast(m, ffcvM);
+      }).length;
       return { filteredMatches: baseFilteredMatches, hiddenPlayedCount: 0, upcomingCount: upcoming };
     }
 
-    // Por cada equipo, identificar su partido Finalizado más reciente (por fecha_hora)
+    // Por cada equipo, identificar su partido jugado más reciente (por fecha_hora)
     const latestPlayedByTeam = new Map<string, { id: string; time: number }>();
+    const nowWithBuffer = Date.now() + (2 * 60 * 60 * 1000);
+
     for (const m of baseFilteredMatches) {
-      if (m.estado !== 'Finalizado') continue;
+      const ffcvM = findMatchingFfcvMatch(m, ffcvMatches, teams);
+      if (!isMatchActuallyPlayed(m, ffcvM)) continue;
+
       const tKey = m.equipo_id || 'default';
-      const time = m.fecha_hora ? new Date(m.fecha_hora).getTime() : 0;
+      const mDate = m.fecha_hora ? new Date(m.fecha_hora).getTime() : 0;
+      const time = isNaN(mDate) ? 0 : mDate;
+
+      // Descartar fechas anómalas en el futuro
+      if (time > nowWithBuffer) continue;
+
       const prev = latestPlayedByTeam.get(tKey);
       if (!prev || time >= prev.time) {
         latestPlayedByTeam.set(tKey, { id: m.id, time });
       }
     }
 
+    // Solo conservar:
+    // 1) Partidos próximos o en curso (!isPast)
+    // 2) El partido jugado más reciente de cada equipo
     const kept = baseFilteredMatches.filter(m => {
-      if (m.estado !== 'Finalizado') return true;
+      const ffcvM = findMatchingFfcvMatch(m, ffcvMatches, teams);
+      const isPast = isMatchPlayedOrPast(m, ffcvM);
+
+      // Si no es pasado/jugado (es futuro o en curso), lo conservamos
+      if (!isPast) return true;
+
+      // Si es pasado o jugado, SOLO conservamos el más reciente de su equipo
       const tKey = m.equipo_id || 'default';
       return latestPlayedByTeam.get(tKey)?.id === m.id;
     });
 
     const hidden = baseFilteredMatches.length - kept.length;
-    const upcoming = kept.filter(m => m.estado !== 'Finalizado').length;
+    const upcoming = kept.filter(m => {
+      const ffcvM = findMatchingFfcvMatch(m, ffcvMatches, teams);
+      return !isMatchPlayedOrPast(m, ffcvM);
+    }).length;
+
     return { filteredMatches: kept, hiddenPlayedCount: hidden, upcomingCount: upcoming };
-  }, [baseFilteredMatches, matchTimeFilter, filterResult]);
+  }, [baseFilteredMatches, matchTimeFilter, filterResult, ffcvMatches, teams]);
 
   const handleDelete = async (e: React.MouseEvent, matchId: string, teamId: string) => {
     e.stopPropagation()
@@ -907,7 +1026,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  Último y Próximos
+                  {selectedTeamId === 'all' ? 'Últimos y Próximos' : 'Último y Próximos'}
                 </button>
                 <button
                   type="button"
@@ -923,7 +1042,9 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
               </div>
               {matchTimeFilter === 'recent' && hiddenPlayedCount > 0 && (
                 <span className="text-xs text-slate-500 font-medium">
-                  Mostrando el último disputado y {upcomingCount} posteriores ({hiddenPlayedCount} disputados ocultos)
+                  {selectedTeamId === 'all'
+                    ? `Mostrando los más recientes y ${upcomingCount} próximos (${hiddenPlayedCount} disputados anteriores ocultos)`
+                    : `Mostrando el más reciente y ${upcomingCount} próximos (${hiddenPlayedCount} disputados anteriores ocultos)`}
                 </span>
               )}
             </div>
@@ -1252,8 +1373,9 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
 
                       {/* Botonera de acciones (iconos encuadrados y proporcionales) */}
                       <div className="flex items-center gap-1.5 w-full justify-end">
-                        {/* Botón Ver Acta Oficial FFCV */}
+                        {/* Botón Ver Acta Oficial FFCV (solo equipos FFCV, nunca Liga Brave) */}
                         {(() => {
+                          if (isBraveMatch) return null;
                           let cardCodacta = ffcvMatch?.codacta || null;
                           if (!cardCodacta && match.ffcv_match_id) {
                             cardCodacta = String(match.ffcv_match_id);
@@ -1286,19 +1408,28 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                         })()}
 
                         {/* Botón Ver Ficha en Apúntamelo (Liga Brave) */}
-                        {match.acta_oficial_url && match.acta_oficial_url.includes('apuntamelo.com') && (
-                          <a
-                            href={match.acta_oficial_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-8 w-8 sm:w-auto px-0 sm:px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
-                            title="Ver Ficha oficial en Apúntamelo (Liga Brave)"
-                          >
-                            <ExternalLink className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span className="hidden sm:inline">Apúntamelo</span>
-                          </a>
-                        )}
+                        {(() => {
+                          const braveUrl =
+                            match.acta_oficial_url && match.acta_oficial_url.includes('apuntamelo.com')
+                              ? match.acta_oficial_url
+                              : isBraveMatch && ffcvMatch?.ffcv_match_id
+                                ? `https://apuntamelo.com/partido/${ffcvMatch.ffcv_match_id}`
+                                : null;
+                          if (!braveUrl) return null;
+                          return (
+                            <a
+                              href={braveUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-8 w-8 sm:w-auto px-0 sm:px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-200 shadow-2xs flex items-center justify-center gap-1 text-[11px] font-bold shrink-0"
+                              title="Ver Ficha oficial en Apúntamelo (Liga Brave)"
+                            >
+                              <ExternalLink className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span className="hidden sm:inline">Apúntamelo</span>
+                            </a>
+                          );
+                        })()}
 
                         <button 
                           onClick={(e) => { e.stopPropagation(); setConciliatingMatch(match) }}

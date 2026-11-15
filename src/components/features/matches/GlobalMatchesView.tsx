@@ -272,6 +272,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
   const [showFilters, setShowFilters] = useState(false)
   const [filterLocation, setFilterLocation] = useState("all")
   const [filterResult, setFilterResult] = useState("all")
+  const [matchTimeFilter, setMatchTimeFilter] = useState<'recent' | 'all'>("recent")
 
   const [ffcvMatches, setFfcvMatches] = useState<any[]>([])
   const [ffcvStandings, setFfcvStandings] = useState<any[]>([])
@@ -463,7 +464,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
 
   const hasLiveMatches = useMemo(() => matches.some(m => m.estado === 'En Curso'), [matches]);
 
-  const filteredMatches = matches.filter(m => {
+  const baseFilteredMatches = useMemo(() => matches.filter(m => {
     const matchesTeam = selectedTeamId === "all" || m.equipo_id === selectedTeamId
     const searchLower = searchQuery.toLowerCase()
     const matchesSearch = !searchLower || 
@@ -491,7 +492,36 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
     }
       
     return matchesTeam && matchesSearch && matchesLocation && matchesResult
-  })
+  }), [matches, selectedTeamId, searchQuery, filterLocation, filterResult]);
+
+  const { filteredMatches, hiddenPlayedCount, upcomingCount } = useMemo(() => {
+    if (matchTimeFilter === 'all' || filterResult !== 'all') {
+      const upcoming = baseFilteredMatches.filter(m => m.estado !== 'Finalizado').length;
+      return { filteredMatches: baseFilteredMatches, hiddenPlayedCount: 0, upcomingCount: upcoming };
+    }
+
+    // Por cada equipo, identificar su partido Finalizado más reciente (por fecha_hora)
+    const latestPlayedByTeam = new Map<string, { id: string; time: number }>();
+    for (const m of baseFilteredMatches) {
+      if (m.estado !== 'Finalizado') continue;
+      const tKey = m.equipo_id || 'default';
+      const time = m.fecha_hora ? new Date(m.fecha_hora).getTime() : 0;
+      const prev = latestPlayedByTeam.get(tKey);
+      if (!prev || time >= prev.time) {
+        latestPlayedByTeam.set(tKey, { id: m.id, time });
+      }
+    }
+
+    const kept = baseFilteredMatches.filter(m => {
+      if (m.estado !== 'Finalizado') return true;
+      const tKey = m.equipo_id || 'default';
+      return latestPlayedByTeam.get(tKey)?.id === m.id;
+    });
+
+    const hidden = baseFilteredMatches.length - kept.length;
+    const upcoming = kept.filter(m => m.estado !== 'Finalizado').length;
+    return { filteredMatches: kept, hiddenPlayedCount: hidden, upcomingCount: upcoming };
+  }, [baseFilteredMatches, matchTimeFilter, filterResult]);
 
   const handleDelete = async (e: React.MouseEvent, matchId: string, teamId: string) => {
     e.stopPropagation()
@@ -864,7 +894,41 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
           );
         })()
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="space-y-4">
+          {filterResult === 'all' && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/70">
+                <button
+                  type="button"
+                  onClick={() => setMatchTimeFilter('recent')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    matchTimeFilter === 'recent'
+                      ? 'bg-white text-blue-600 shadow-xs ring-1 ring-slate-200/60'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Último y Próximos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchTimeFilter('all')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    matchTimeFilter === 'all'
+                      ? 'bg-white text-blue-600 shadow-xs ring-1 ring-slate-200/60'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Todos los Partidos ({baseFilteredMatches.length})
+                </button>
+              </div>
+              {matchTimeFilter === 'recent' && hiddenPlayedCount > 0 && (
+                <span className="text-xs text-slate-500 font-medium">
+                  Mostrando el último disputado y {upcomingCount} posteriores ({hiddenPlayedCount} disputados ocultos)
+                </span>
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredMatches.length === 0 ? (
           <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
             <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -1280,7 +1344,8 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
             );
           })
         )}
-      </div>
+          </div>
+        </div>
       )}
 
       {/* Modals */}

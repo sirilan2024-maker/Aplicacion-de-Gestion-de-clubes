@@ -276,10 +276,10 @@ export function UtilleroMatchKitPlanner() {
 
       {/* ── 3. CONTROLES Y FILTROS ── */}
       <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold overflow-x-auto max-w-full scrollbar-none gap-1">
+        <div className="grid grid-cols-2 sm:flex sm:items-center bg-slate-100 p-1 rounded-xl text-xs font-bold gap-1">
           <button
             onClick={() => setFilter("all")}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center ${
               filter === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -287,7 +287,7 @@ export function UtilleroMatchKitPlanner() {
           </button>
           <button
             onClick={() => setFilter("pending")}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center ${
               filter === "pending" ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -295,7 +295,7 @@ export function UtilleroMatchKitPlanner() {
           </button>
           <button
             onClick={() => setFilter("conflicts")}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center ${
               filter === "conflicts" ? "bg-white text-rose-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -303,7 +303,7 @@ export function UtilleroMatchKitPlanner() {
           </button>
           <button
             onClick={() => setFilter("prepared")}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-lg transition-all shrink-0 ${
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center ${
               filter === "prepared" ? "bg-white text-emerald-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >

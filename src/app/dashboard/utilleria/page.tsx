@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Loader2, Search, Shirt, CheckSquare, BarChart3, AlertCircle, ShoppingBag, ClipboardList, X } from "lucide-react"
+import { Loader2, Search, Shirt, CheckSquare, BarChart3, AlertCircle, ShoppingBag, ClipboardList, X, ChevronDown } from "lucide-react"
 import toast from "react-hot-toast"
 import { 
   getApparelDashboardDataAction, 
@@ -100,6 +100,11 @@ export default function UtilleriaDashboardPage() {
 
   // Clickable Summary Modal State
   const [summaryModal, setSummaryModal] = useState<'total' | 'delivered' | 'pending' | null>(null)
+  const [expandedPlayerIds, setExpandedPlayerIds] = useState<Record<string, boolean>>({})
+
+  const togglePlayerExpanded = (playerId: string) => {
+    setExpandedPlayerIds(prev => ({ ...prev, [playerId]: !prev[playerId] }))
+  }
 
   useEffect(() => {
     loadTeams()
@@ -470,37 +475,37 @@ export default function UtilleriaDashboardPage() {
           </div>
         </div>
 
-        {/* CONTROLES TABS (Scroll horizontal en móvil para evitar desbordamientos) */}
-        <div className="flex items-center overflow-x-auto max-w-full bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0 scrollbar-none gap-1">
+        {/* CONTROLES TABS (Sin scroll horizontal en móvil) */}
+        <div className="grid grid-cols-3 sm:flex sm:items-center w-full sm:w-auto bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0 gap-1">
           <button
             onClick={() => setActiveTab('matches')}
-            className={`flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg transition-all whitespace-nowrap shrink-0 ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-2 font-bold text-[11px] sm:text-xs leading-tight text-center rounded-lg transition-all sm:whitespace-nowrap ${
               activeTab === 'matches'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Shirt size={14} className="shrink-0" /> Partidos (Equipaciones)
+            <Shirt size={14} className="shrink-0" /> <span>Partidos (Equipaciones)</span>
           </button>
           <button
             onClick={() => setActiveTab('deliveries')}
-            className={`flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg transition-all whitespace-nowrap shrink-0 ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-2 font-bold text-[11px] sm:text-xs leading-tight text-center rounded-lg transition-all sm:whitespace-nowrap ${
               activeTab === 'deliveries'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <ClipboardList size={14} className="shrink-0" /> Entrega de Ropa
+            <ClipboardList size={14} className="shrink-0" /> <span>Entrega de Ropa</span>
           </button>
           <button
             onClick={() => setActiveTab('report')}
-            className={`flex items-center gap-1.5 px-3 py-2 font-bold text-xs rounded-lg transition-all whitespace-nowrap shrink-0 ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-2 font-bold text-[11px] sm:text-xs leading-tight text-center rounded-lg transition-all sm:whitespace-nowrap ${
               activeTab === 'report'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <BarChart3 size={14} className="shrink-0" /> Informe de Pedidos
+            <BarChart3 size={14} className="shrink-0" /> <span>Informe de Pedidos</span>
           </button>
         </div>
       </div>
@@ -781,34 +786,67 @@ export default function UtilleriaDashboardPage() {
                   No se encontraron jugadores que coincidan con la búsqueda.
                 </div>
               ) : (
-                filteredPlayers.map(p => (
-                  <div key={p.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-                    {/* Header de Ficha */}
-                    <div className="flex justify-between items-start border-b border-slate-100 pb-3 gap-3">
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 text-sm">{p.first_name} {p.last_name}</h4>
-                        <span className="text-[10px] text-slate-500 font-bold uppercase mt-0.5 block">
+                filteredPlayers.map(p => {
+                  const isExpanded = !!expandedPlayerIds[p.id]
+                  const sizedCount = APPAREL_ITEMS.filter(item => p.apparel[item.key]?.size).length
+                  const deliveredCount = APPAREL_ITEMS.filter(item => p.apparel[item.key]?.delivered).length
+
+                  return (
+                  <div key={p.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+                    {/* Header de Ficha (Pulsar para desplegar tallas y entregas) */}
+                    <div
+                      onClick={() => togglePlayerExpanded(p.id)}
+                      className={`flex justify-between items-center p-3.5 gap-2.5 cursor-pointer select-none transition-colors ${
+                        isExpanded ? 'border-b border-slate-100 bg-slate-50/40' : 'hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-extrabold text-slate-900 text-sm truncate">{p.first_name} {p.last_name}</h4>
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                              deliveredCount === APPAREL_ITEMS.length
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : sizedCount > 0 && deliveredCount < sizedCount
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {deliveredCount}/{sizedCount || APPAREL_ITEMS.length}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase mt-0.5 block truncate">
                           🛡️ {p.team_name} ({p.category})
                         </span>
                       </div>
 
-                      {/* Dorsal */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">🔢 Dorsal:</span>
-                        <input
-                          type="text"
-                          maxLength={3}
-                          value={p.dorsal || ''}
-                          onChange={(e) => handleDorsalInputChange(p.id, e.target.value)}
-                          onBlur={(e) => handleDorsalBlur(p.id, e.target.value)}
-                          placeholder="-"
-                          className="w-14 px-2 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm"
+                      {/* Dorsal + Chevron */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1"
+                        >
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">🔢</span>
+                          <input
+                            type="text"
+                            maxLength={3}
+                            value={p.dorsal || ''}
+                            onChange={(e) => handleDorsalInputChange(p.id, e.target.value)}
+                            onBlur={(e) => handleDorsalBlur(p.id, e.target.value)}
+                            placeholder="-"
+                            className="w-12 px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm"
+                          />
+                        </div>
+                        <ChevronDown
+                          size={18}
+                          className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-600' : ''}`}
                         />
                       </div>
                     </div>
 
-                    {/* Lista de prendas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Lista de prendas (Desplegable) */}
+                    {isExpanded && (
+                    <div className="p-3.5 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {APPAREL_ITEMS.map(item => {
                         const info = p.apparel[item.key] || { size: '', delivered: false, delivered_at: null }
                         const isDelivered = info.delivered
@@ -891,8 +929,10 @@ export default function UtilleriaDashboardPage() {
                         )
                       })}
                     </div>
+                    )}
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           </>

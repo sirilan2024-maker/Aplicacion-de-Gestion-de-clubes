@@ -76,17 +76,18 @@ export default function EntrenamientosListPage() {
     if (!evError && evData) {
       setSessions(evData);
 
-      // Comprobar sesiones con lista ya pasada
+      // Comprobar sesiones con lista ya pasada por el entrenador (descartar pre-confirmaciones RSVP de familias sin date/season_id)
       const sessionIds = evData.map(e => e.id);
       if (sessionIds.length > 0) {
         const { data: attList } = await supabase
           .from('attendance')
-          .select('event_id, session_id')
+          .select('event_id, session_id, date, season_id')
           .or(`event_id.in.(${sessionIds.join(',')}),session_id.in.(${sessionIds.join(',')})`);
 
         const recordedSet = new Set<string>();
         if (attList) {
           attList.forEach((a: any) => {
+            if (!a.date || !a.season_id) return;
             if (a.event_id) recordedSet.add(a.event_id);
             if (a.session_id) recordedSet.add(a.session_id);
           });

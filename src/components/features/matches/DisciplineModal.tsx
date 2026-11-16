@@ -122,7 +122,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
           </button>
         </div>
         
-        <div className="p-0 overflow-y-auto flex-1">
+        <div className="p-0 overflow-y-auto overflow-x-hidden flex-1">
           {!isEditing && (
             <div className="bg-white border-b border-slate-100 p-5">
               <div className="flex items-center justify-between mb-3">
@@ -155,7 +155,48 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                 <p className="text-slate-500 text-sm">Este miembro no ha recibido ninguna tarjeta en los partidos registrados.</p>
               </div>
             ) : (
-              <table className="w-full text-left text-sm text-slate-600">
+              <>
+                {/* Mobile Card List (sin scroll horizontal) */}
+                <div className="sm:hidden divide-y divide-slate-100">
+                  {validCardEvents.map((ev: any, idx: number) => {
+                    const cls = classifyMatchCards(ev.yellow || 0, ev.red || 0);
+                    const isWarnOrRed = cls.isDoubleYellow || cls.isYellowPlusDirectRed || cls.isDirectRedOnly;
+                    return (
+                      <div key={idx} className="p-4 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-bold text-slate-400">
+                            {new Date(ev.match.fecha_hora).toLocaleDateString('es-ES')} · <span className="capitalize">{ev.match.lugar || 'Visitante'}</span>
+                          </div>
+                          <div className="font-bold text-sm text-slate-900 mt-0.5 break-words">{ev.match.rival_nombre}</div>
+                          {cls.badgeLabel && (
+                            <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded border ${
+                              isWarnOrRed
+                                ? 'text-red-700 bg-red-100 border-red-200'
+                                : 'text-amber-800 bg-amber-50 border-amber-200'
+                            }`}>
+                              {cls.badgeLabel}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 pt-1">
+                          {ev.yellow > 0 && (
+                            <div className="flex items-center gap-1 font-bold text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                              <div className="w-2 h-3 bg-amber-400 rounded-xs"></div> {ev.yellow}
+                            </div>
+                          )}
+                          {ev.red > 0 && (
+                            <div className="flex items-center gap-1 font-bold text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
+                              <div className="w-2 h-3 bg-red-500 rounded-xs"></div> {ev.red}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table */}
+                <table className="hidden sm:table w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500 sticky top-0">
                   <tr>
                     <th className="px-6 py-3">Fecha</th>
@@ -207,10 +248,44 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                   ))}
                 </tbody>
               </table>
+              </>
             )
           ) : (
             // MODO EDICIÓN
-            <table className="w-full text-left text-sm text-slate-600">
+            <>
+              {/* Mobile Edit Cards (sin scroll horizontal) */}
+              <div className="sm:hidden divide-y divide-slate-100">
+                {validSeasonMatches.map(m => {
+                  const conv = localConvs.find(c => c.partido_id === m.id && c.player_id === player.id)
+                  const currentYellow = conv?.yellow_cards || 0
+                  const currentRed = conv?.red_cards || 0
+                  const isSaving = savingCards === m.id
+                  return (
+                    <div key={m.id} className="p-4 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-400">{new Date(m.fecha_hora).toLocaleDateString('es-ES')}</span>
+                        <span className="text-sm font-bold text-slate-900 truncate">{m.rival_nombre}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-amber-700">🟨</span>
+                          <button onClick={() => handleUpdateCard(m.id, Math.max(0, currentYellow - 1), currentRed)} disabled={currentYellow === 0 || isSaving} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 font-bold disabled:opacity-40">-</button>
+                          <span className="w-5 text-center font-black text-amber-600 text-sm">{isSaving ? <Loader2 size={14} className="animate-spin text-blue-500 mx-auto" /> : currentYellow}</span>
+                          <button onClick={() => handleUpdateCard(m.id, currentYellow + 1, currentRed)} disabled={isSaving} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 font-bold disabled:opacity-40">+</button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-red-700">🟥</span>
+                          <button onClick={() => handleUpdateCard(m.id, currentYellow, Math.max(0, currentRed - 1))} disabled={currentRed === 0 || isSaving} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 font-bold disabled:opacity-40">-</button>
+                          <span className="w-5 text-center font-black text-red-600 text-sm">{isSaving ? <Loader2 size={14} className="animate-spin text-blue-500 mx-auto" /> : currentRed}</span>
+                          <button onClick={() => handleUpdateCard(m.id, currentYellow, currentRed + 1)} disabled={isSaving} className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 font-bold disabled:opacity-40">+</button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <table className="hidden sm:table w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase font-bold text-slate-500 sticky top-0">
                 <tr>
                   <th className="px-6 py-3">Fecha</th>
@@ -288,6 +363,7 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
                 )}
               </tbody>
             </table>
+            </>
           )}
         </div>
         

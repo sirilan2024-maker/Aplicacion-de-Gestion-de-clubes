@@ -404,9 +404,15 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
                     )}
                   </td>
                   <td className="px-5 py-4 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[11px] font-bold text-slate-600">
-                        Ciclo #{d.cyclesCompleted + 1} ({d.cycleCards}/5)
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black border shadow-2xs ${
+                        d.cycleCards === 4
+                          ? 'bg-orange-100 text-orange-800 border-orange-300'
+                          : d.cycleCards > 0
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                        Ciclo #{d.cyclesCompleted + 1} · {d.cycleCards}/5
                       </span>
                       <div className="flex gap-1">
                         {[1, 2, 3, 4, 5].map(slot => (
@@ -524,9 +530,23 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
                   </div>
                 </div>
 
-                <div className="bg-white p-2 rounded-lg text-center border border-slate-200 flex flex-col items-center justify-center">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase mb-1">Ciclo #{d.cyclesCompleted + 1}</span>
-                  <div className="font-black text-slate-800 text-sm">
+                <div className={`p-2 rounded-lg text-center border flex flex-col items-center justify-center ${
+                  d.cycleCards === 4
+                    ? 'bg-orange-50 border-orange-300 ring-1 ring-orange-200'
+                    : d.cycleCards > 0
+                      ? 'bg-amber-50 border-amber-300'
+                      : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <span className={`text-[10px] font-black uppercase mb-0.5 px-1.5 py-0.5 rounded ${
+                    d.cycleCards === 4
+                      ? 'bg-orange-200/70 text-orange-900'
+                      : d.cycleCards > 0
+                        ? 'bg-amber-200/70 text-amber-900'
+                        : 'bg-slate-200/70 text-slate-700'
+                  }`}>Ciclo #{d.cyclesCompleted + 1}</span>
+                  <div className={`font-black text-base ${
+                    d.cycleCards === 4 ? 'text-orange-700' : d.cycleCards > 0 ? 'text-amber-800' : 'text-slate-800'
+                  }`}>
                     {d.cycleCards}/5
                   </div>
                 </div>

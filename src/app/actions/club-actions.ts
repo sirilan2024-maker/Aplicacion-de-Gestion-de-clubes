@@ -809,17 +809,35 @@ export async function getExecutiveDashboardAction(targetSeasonId?: string): Prom
       isActive: resolvedIsActive,
     };
 
-    // Obtenemos los player_id pertenecientes a la temporada consultada
+    // Obtenemos los player_id pertenecientes a la temporada consultada y activos/pendientes en el club (igual que Miembros)
     let seasonalPlayerIds: string[] = [];
     if (resolvedSeasonId) {
       const { data: pshRows } = await adminClient
         .from('player_season_history')
         .select('player_id')
         .eq('season_id', resolvedSeasonId);
-      seasonalPlayerIds = (pshRows || []).map(r => r.player_id).filter(Boolean);
+      const rawSeasonalIds = Array.from(new Set((pshRows || []).map(r => r.player_id).filter(Boolean)));
+
+      if (rawSeasonalIds.length > 0) {
+        const CHUNK_SIZE = 100;
+        const activeIds: string[] = [];
+        for (let i = 0; i < rawSeasonalIds.length; i += CHUNK_SIZE) {
+          const chunk = rawSeasonalIds.slice(i, i + CHUNK_SIZE);
+          const { data: activePlayersRows } = await adminClient
+            .from('players')
+            .select('id')
+            .eq('club_id', clubId)
+            .in('id', chunk)
+            .in('status', ['active', 'activo', 'pending']);
+          if (activePlayersRows) {
+            activeIds.push(...activePlayersRows.map(p => p.id));
+          }
+        }
+        seasonalPlayerIds = activeIds;
+      }
     }
 
-    // 3. Total active players (federados / activos en la temporada elegida)
+    // 3. Total active players (activos / pendientes en la temporada elegida)
     const activePlayersCount = seasonalPlayerIds.length;
 
     // 4. Equipos del club asignados a esta temporada

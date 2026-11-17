@@ -270,6 +270,8 @@ export async function getApparelDashboardDataAction(teamId?: string) {
         last_name,
         status,
         dorsal,
+        was_in_club,
+        is_senior,
         team_id,
         teams (
           id,
@@ -293,8 +295,46 @@ export async function getApparelDashboardDataAction(teamId?: string) {
     const { data: playersData, error } = await query
     if (error) throw error
 
+    // Consultar cuotas y temporadas previas de los jugadores filtrados (solo del club activo)
+    const playerIds = (playersData || []).map((p: any) => p.id).filter(Boolean)
+    const feesByPlayerId = new Map<string, any[]>()
+    const seasonCountByPlayerId = new Map<string, number>()
 
-    // Formatear jugadores con su mapa de ropa
+    if (playerIds.length > 0) {
+      const [{ data: feesRows, error: feesError }, { data: pshCounts }] = await Promise.all([
+        adminClient
+          .from('fees')
+          .select('id, player_id, concept, amount_cents, amount_paid_cents, estado, creado_en')
+          .eq('club_id', context.profile.club_id)
+          .in('player_id', playerIds),
+        adminClient
+          .from('player_season_history')
+          .select('player_id')
+          .in('player_id', playerIds)
+      ])
+
+      if (feesError) {
+        console.error('Error fetching fees in getApparelDashboardDataAction:', feesError.message)
+      } else if (feesRows) {
+        feesRows.forEach((f: any) => {
+          if (f.player_id) {
+            const list = feesByPlayerId.get(f.player_id) || []
+            list.push(f)
+            feesByPlayerId.set(f.player_id, list)
+          }
+        })
+      }
+
+      if (pshCounts) {
+        pshCounts.forEach((row: any) => {
+          if (row.player_id) {
+            seasonCountByPlayerId.set(row.player_id, (seasonCountByPlayerId.get(row.player_id) || 0) + 1)
+          }
+        })
+      }
+    }
+
+    // Formatear jugadores con su mapa de ropa y resumen de cuotas
     const formattedPlayers = playersData?.map((p: any) => {
       const apparelMap: { [itemName: string]: { size: string, delivered: boolean, delivered_at: string | null } } = {}
       
@@ -320,6 +360,35 @@ export async function getApparelDashboardDataAction(teamId?: string) {
         }
       })
 
+      const playerFees = feesByPlayerId.get(p.id) || []
+      const isSenior = Boolean(p.is_senior) || (p.teams?.category || '').toLowerCase() === 'senior'
+      const isRenewal = Boolean(p.was_in_club) || (seasonCountByPlayerId.get(p.id) || 0) > 1
+      const baseRegistrationCents = isSenior ? 0 : (isRenewal ? 19500 : 25000)
+
+      let feesSumCents = 0
+      let totalPaidCents = 0
+      const feesItems = playerFees.map((f: any) => {
+        const amountCents = f.amount_cents || 0
+        let paidCents = f.amount_paid_cents || 0
+        if (f.estado === 'pagado' && paidCents === 0) {
+          paidCents = amountCents
+        }
+        const pendingCents = Math.max(0, amountCents - paidCents)
+        feesSumCents += amountCents
+        totalPaidCents += paidCents
+        return {
+          id: f.id,
+          concept: f.concept || 'Cuota',
+          amountCents,
+          paidCents,
+          pendingCents,
+          isPaid: f.estado === 'pagado' || (amountCents > 0 && pendingCents === 0)
+        }
+      })
+
+      const totalAmountCents = isSenior ? 0 : (feesSumCents > 0 ? feesSumCents : baseRegistrationCents)
+      const totalPendingCents = isSenior ? 0 : Math.max(0, totalAmountCents - totalPaidCents)
+
       return {
         id: p.id,
         first_name: p.first_name,
@@ -327,7 +396,15 @@ export async function getApparelDashboardDataAction(teamId?: string) {
         dorsal: p.dorsal || '',
         team_name: p.teams?.name || 'Sin equipo',
         category: p.teams?.category || 'Sin categoría',
-        apparel: apparelMap
+        apparel: apparelMap,
+        fees: {
+          isSenior,
+          totalAmountCents,
+          totalPaidCents,
+          totalPendingCents,
+          count: feesItems.length,
+          items: feesItems
+        }
       }
     })
 

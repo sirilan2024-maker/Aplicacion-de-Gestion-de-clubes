@@ -394,6 +394,13 @@ export default function UtilleriaDashboardPage() {
     toast.success("Excel del resumen descargado");
   }
 
+  const formatEuros = (cents: number) => {
+    return `${((cents || 0) / 100).toLocaleString('es-ES', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    })}€`
+  }
+
   const filteredPlayers = players.filter(p => {
     const fullName = `${p.first_name} ${p.last_name}`.toLowerCase()
     if (!fullName.includes(search.toLowerCase())) return false
@@ -411,6 +418,10 @@ export default function UtilleriaDashboardPage() {
         })
       } else if (deliveryFilter === "missing_all_sizes") {
         return !Object.values(p.apparel).some((info: any) => info && info.size)
+      } else if (deliveryFilter === "fees_pending") {
+        return !p.fees?.isSenior && (p.fees?.totalPendingCents || 0) > 0
+      } else if (deliveryFilter === "fees_paid") {
+        return !p.fees?.isSenior && (p.fees?.totalAmountCents || 0) > 0 && (p.fees?.totalPendingCents || 0) === 0
       } else if (deliveryFilter.startsWith("missing_")) {
         const itemKey = deliveryFilter.replace("missing_", "")
         const info = p.apparel[itemKey]
@@ -591,6 +602,9 @@ export default function UtilleriaDashboardPage() {
                   <option value="pending_any">⚠️ Con alguna prenda pendiente</option>
                   <option value="missing_all_sizes">❌ Sin tallas registradas</option>
                   <option disabled>─────────────────────────</option>
+                  <option value="fees_pending">💳 Con deuda pendiente</option>
+                  <option value="fees_paid">✅ Cuotas al día</option>
+                  <option disabled>─────────────────────────</option>
                   {APPAREL_ITEMS.map(item => {
                     const cleanLabel = item.label.split(' ').slice(1).join(' ') || item.key;
                     return (
@@ -675,7 +689,7 @@ export default function UtilleriaDashboardPage() {
                             <div className="flex flex-col">
                               <span>{p.first_name} {p.last_name}</span>
                               <span className="text-[9px] text-slate-500 font-bold uppercase mt-0.5">
-                                🛡️ {p.team_name} ({p.category})
+                                🛡️ {p.team_name}
                               </span>
                             </div>
                           </td>
@@ -790,21 +804,34 @@ export default function UtilleriaDashboardPage() {
                   const isExpanded = !!expandedPlayerIds[p.id]
                   const sizedCount = APPAREL_ITEMS.filter(item => p.apparel[item.key]?.size).length
                   const deliveredCount = APPAREL_ITEMS.filter(item => p.apparel[item.key]?.delivered).length
+                  const fees = p.fees || { totalAmountCents: 0, totalPaidCents: 0, totalPendingCents: 0, count: 0, items: [] }
 
                   return (
                   <div key={p.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all">
-                    {/* Header de Ficha (Pulsar para desplegar tallas y entregas) */}
+                    {/* Header de Ficha (Nombre completo arriba y badge de ropa siempre centrado) */}
                     <div
                       onClick={() => togglePlayerExpanded(p.id)}
-                      className={`flex justify-between items-center p-3.5 gap-2.5 cursor-pointer select-none transition-colors ${
+                      className={`p-3 sm:p-3.5 space-y-2 cursor-pointer select-none transition-colors ${
                         isExpanded ? 'border-b border-slate-100 bg-slate-50/40' : 'hover:bg-slate-50/60'
                       }`}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-extrabold text-slate-900 text-sm truncate">{p.first_name} {p.last_name}</h4>
+                      {/* Nombre completo sin recortar */}
+                      <h4 className="font-extrabold text-slate-900 text-sm leading-snug break-words">
+                        {p.first_name} {p.last_name}
+                      </h4>
+
+                      {/* Fila central: Solo nombre del equipo | Badge ropa centrado | Dorsal + Chevron */}
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[11px] text-slate-600 font-bold uppercase block leading-tight break-words">
+                            🛡️ {p.team_name}
+                          </span>
+                        </div>
+
+                        {/* Número de ropa entregada siempre centrado */}
+                        <div className="flex justify-center">
                           <span
-                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                            className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md tabular-nums ${
                               deliveredCount === APPAREL_ITEMS.length
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : sizedCount > 0 && deliveredCount < sizedCount
@@ -815,38 +842,101 @@ export default function UtilleriaDashboardPage() {
                             {deliveredCount}/{sizedCount || APPAREL_ITEMS.length}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-bold uppercase mt-0.5 block truncate">
-                          🛡️ {p.team_name} ({p.category})
-                        </span>
-                      </div>
 
-                      {/* Dorsal + Chevron */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1"
-                        >
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">🔢</span>
-                          <input
-                            type="text"
-                            maxLength={3}
-                            value={p.dorsal || ''}
-                            onChange={(e) => handleDorsalInputChange(p.id, e.target.value)}
-                            onBlur={(e) => handleDorsalBlur(p.id, e.target.value)}
-                            placeholder="-"
-                            className="w-12 px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm"
+                        {/* Dorsal + Chevron */}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1"
+                          >
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">🔢</span>
+                            <input
+                              type="text"
+                              maxLength={3}
+                              value={p.dorsal || ''}
+                              onChange={(e) => handleDorsalInputChange(p.id, e.target.value)}
+                              onBlur={(e) => handleDorsalBlur(p.id, e.target.value)}
+                              placeholder="-"
+                              className="w-11 px-1 py-1 text-center bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm"
+                            />
+                          </div>
+                          <ChevronDown
+                            size={18}
+                            className={`text-slate-400 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-600' : ''}`}
                           />
                         </div>
-                        <ChevronDown
-                          size={18}
-                          className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-indigo-600' : ''}`}
-                        />
+                      </div>
+
+                      {/* Fila inferior a ancho completo: Cuota · Pagado · Falta */}
+                      <div className="text-[11px] font-bold pt-1.5 border-t border-slate-100 leading-tight">
+                        {fees.isSenior ? (
+                          <span className="text-slate-400">Sin cuota (Senior)</span>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-600 tabular-nums">
+                            <span>Cuota: <span className="text-slate-900 font-extrabold">{formatEuros(fees.totalAmountCents)}</span></span>
+                            <span className="text-slate-300">|</span>
+                            <span>Pagado: <span className="text-emerald-700 font-extrabold">{formatEuros(fees.totalPaidCents)}</span></span>
+                            <span className="text-slate-300">|</span>
+                            {fees.totalPendingCents > 0 ? (
+                              <span>Falta: <span className="text-rose-600 font-extrabold">{formatEuros(fees.totalPendingCents)}</span></span>
+                            ) : (
+                              <span className="text-emerald-700 font-extrabold">✓ Al día</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Lista de prendas (Desplegable) */}
+                    {/* Contenido Desplegable */}
                     {isExpanded && (
-                    <div className="p-3.5 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="p-3.5 pt-3 space-y-3">
+                      {/* Desglose de cuotas del jugador */}
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700">
+                          <span>💳 Cuota de inscripción</span>
+                        </div>
+                        {!fees.isSenior ? (
+                          <div className="grid grid-cols-3 gap-1.5 text-center">
+                            <div className="bg-white rounded-lg border border-slate-200 py-1 px-1.5">
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">Cuota</span>
+                              <span className="text-[11px] font-black text-slate-800 tabular-nums">{formatEuros(fees.totalAmountCents)}</span>
+                            </div>
+                            <div className="bg-white rounded-lg border border-emerald-200 py-1 px-1.5">
+                              <span className="block text-[9px] font-bold text-emerald-600 uppercase">Pagado</span>
+                              <span className="text-[11px] font-black text-emerald-700 tabular-nums">{formatEuros(fees.totalPaidCents)}</span>
+                            </div>
+                            <div className={`bg-white rounded-lg border py-1 px-1.5 ${fees.totalPendingCents > 0 ? 'border-rose-200' : 'border-emerald-200'}`}>
+                              <span className={`block text-[9px] font-bold uppercase ${fees.totalPendingCents > 0 ? 'text-rose-500' : 'text-emerald-600'}`}>Falta</span>
+                              <span className={`text-[11px] font-black tabular-nums ${fees.totalPendingCents > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                {formatEuros(fees.totalPendingCents)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 font-medium">Sin cuota de inscripción (Senior).</p>
+                        )}
+                        {!fees.isSenior && fees.count > 0 && (
+                          <div className="divide-y divide-slate-200/70">
+                            {fees.items.map((fee: any) => (
+                              <div key={fee.id} className="py-1 flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-slate-700 font-semibold truncate">{fee.concept}</span>
+                                <span className="shrink-0 font-bold tabular-nums">
+                                  {fee.isPaid ? (
+                                    <span className="text-emerald-700">✓ {formatEuros(fee.paidCents)}</span>
+                                  ) : (
+                                    <span className="text-slate-600">
+                                      {formatEuros(fee.paidCents)} / <span className="text-rose-600">Falta {formatEuros(fee.pendingCents)}</span>
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lista de prendas */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {APPAREL_ITEMS.map(item => {
                         const info = p.apparel[item.key] || { size: '', delivered: false, delivered_at: null }
                         const isDelivered = info.delivered
@@ -928,6 +1018,7 @@ export default function UtilleriaDashboardPage() {
                           </div>
                         )
                       })}
+                      </div>
                     </div>
                     )}
                   </div>

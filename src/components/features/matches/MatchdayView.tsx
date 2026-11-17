@@ -61,36 +61,63 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     return combined.sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime())
   }, [matches])
 
-  // Subscribe to realtime updates and fallback to polling
+  // Subscribe to realtime updates and fallback to low-frequency polling only when live & visible
   useEffect(() => {
     let mounted = true;
-    
-    // Polling fallback
-    const intervalId = setInterval(async () => {
-      const liveData = await getPublicMatches();
-      if (mounted && liveData.length > 0) {
-        setMatches(prev => {
-          let hasChanges = false;
-          const next = [...prev];
-          for (const liveMatch of liveData) {
-            const idx = next.findIndex(m => m.id === liveMatch.id);
-            if (idx >= 0) {
-              const current = next[idx];
-              if (current.estado !== liveMatch.estado ||
-                  current.live_timer_started_at !== liveMatch.live_timer_started_at ||
-                  current.live_timer_elapsed_seconds !== liveMatch.live_timer_elapsed_seconds ||
-                  current.resultado_propio !== liveMatch.resultado_propio ||
-                  current.resultado_rival !== liveMatch.resultado_rival ||
-                  current.first_half_duration_seconds !== liveMatch.first_half_duration_seconds) {
-                next[idx] = { ...current, ...liveMatch };
-                hasChanges = true;
+    let isFetching = false;
+    let hadRealtimeDisconnect = false;
+
+    const hasActiveLiveMatch = () =>
+      matchesRef.current.some((m) =>
+        ['en_juego', 'En Curso', 'Descanso', 'descanso'].includes(m.estado)
+      );
+
+    const syncMatchesFromServer = async () => {
+      if (!mounted || isFetching) return;
+      isFetching = true;
+      try {
+        const liveData = await getPublicMatches();
+        if (mounted && liveData.length > 0) {
+          setMatches(prev => {
+            let hasChanges = false;
+            const next = [...prev];
+            for (const liveMatch of liveData) {
+              const idx = next.findIndex(m => m.id === liveMatch.id);
+              if (idx >= 0) {
+                const current = next[idx];
+                if (current.estado !== liveMatch.estado ||
+                    current.live_timer_started_at !== liveMatch.live_timer_started_at ||
+                    current.live_timer_elapsed_seconds !== liveMatch.live_timer_elapsed_seconds ||
+                    current.resultado_propio !== liveMatch.resultado_propio ||
+                    current.resultado_rival !== liveMatch.resultado_rival ||
+                    current.first_half_duration_seconds !== liveMatch.first_half_duration_seconds) {
+                  next[idx] = { ...current, ...liveMatch };
+                  hasChanges = true;
+                }
               }
             }
-          }
-          return hasChanges ? next : prev;
-        });
+            return hasChanges ? next : prev;
+          });
+        }
+      } catch {
+        // Silent fallback catch
+      } finally {
+        isFetching = false;
       }
-    }, 5000);
+    };
+
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (!hasActiveLiveMatch()) return;
+      syncMatchesFromServer();
+    }, 90_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && hasActiveLiveMatch()) {
+        syncMatchesFromServer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const channel = supabase
       .channel('matchday-partidos')
@@ -205,11 +232,19 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          hadRealtimeDisconnect = true;
+        } else if (status === 'SUBSCRIBED' && hadRealtimeDisconnect) {
+          hadRealtimeDisconnect = false;
+          syncMatchesFromServer();
+        }
+      })
 
     return () => { 
       mounted = false;
       clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel) 
     }
   }, [teams, supabase])

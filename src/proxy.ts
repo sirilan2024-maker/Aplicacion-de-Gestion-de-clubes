@@ -29,16 +29,23 @@ export async function proxy(request: NextRequest) {
     }
   )
 
+  const pathname = request.nextUrl.pathname
+  const isAuthRoute = pathname.startsWith('/auth')
+  const isDashboardRoute = pathname.startsWith('/dashboard')
+  const isAdminRoute = pathname.startsWith('/admin')
+  const hasSupabaseCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'))
+
+  // Skip Supabase Auth roundtrip on public routes when the visitor has no session cookie
+  if (!hasSupabaseCookie && !isDashboardRoute && !isAdminRoute && !isAuthRoute) {
+    return supabaseResponse
+  }
+
   // IMPORTANT: Avoid writing any logic between createServerClient and
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with cross-site tracking and missing cookies.
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
-  const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard')
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/admin')
 
   // 1. Redirect unauthenticated users trying to access protected routes
   if (!user && (isDashboardRoute || isAdminRoute)) {
@@ -133,12 +140,11 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * Match all request paths except:
+     * - _next/static, _next/image, favicon.ico, static assets
+     * - PWA files (sw.js, manifest.json, robots.txt, sitemap.xml, icons/)
+     * - Public/secret-authenticated endpoints (ffcv-image-proxy, cron jobs, webhooks)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|robots\\.txt|sitemap\\.xml|icons/|api/ffcv-image-proxy|api/ffcv/cron|api/cron/|api/events/send-reminders|api/webhooks/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

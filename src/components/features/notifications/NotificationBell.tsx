@@ -19,10 +19,90 @@ export function NotificationBell() {
 
   useEffect(() => {
     setMounted(true)
-    fetchNotifications()
-    fetchUserContext()
-    const interval = setInterval(fetchNotifications, 12000)
-    return () => clearInterval(interval)
+    let isMounted = true
+    let isFetching = false
+    const supabase = createClient()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    const loadNotifications = async () => {
+      if (!isMounted || isFetching) return
+      isFetching = true
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || !isMounted) return
+
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('id, title, message, type, link, is_read, created_at')
+          .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
+          .eq('is_read', false)
+          .order('created_at', { ascending: false })
+          .limit(25)
+
+        if (!error && data && isMounted) {
+          setNotifications(data)
+        }
+      } catch {
+        // Safe silent catch: best-effort polling should never throw or trigger reloads
+      } finally {
+        isFetching = false
+      }
+    }
+
+    const setupRealtimeAndLoad = async () => {
+      await loadNotifications()
+      fetchUserContext()
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || !isMounted) return
+
+        channel = supabase
+          .channel(`notifications-bell-${user.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+            () => {
+              loadNotifications()
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'notifications', filter: `profile_id=eq.${user.id}` },
+            () => {
+              loadNotifications()
+            }
+          )
+          .subscribe()
+      } catch {
+        // Fallback polling remains active
+      }
+    }
+
+    setupRealtimeAndLoad()
+
+    // Fallback polling at 60s only when tab is visible
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications()
+      }
+    }, 60000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
   }, [])
 
   const fetchNotifications = async () => {
@@ -33,7 +113,7 @@ export function NotificationBell() {
 
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id, title, message, type, link, is_read, created_at')
         .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
         .eq('is_read', false)
         .order('created_at', { ascending: false })

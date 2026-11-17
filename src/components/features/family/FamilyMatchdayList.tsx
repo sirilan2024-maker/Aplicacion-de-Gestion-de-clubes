@@ -45,12 +45,18 @@ export function FamilyMatchdayList({ playerTeamId, clubLogoUrl = "/logo.png" }: 
   };
 
   useEffect(() => {
+    let mounted = true;
+    let isPolling = false;
+    let hadRealtimeDisconnect = false;
+
     loadMatches();
 
-    const interval = setInterval(async () => {
+    const syncMatchesFallback = async () => {
+      if (!mounted || isPolling || document.visibilityState !== 'visible') return;
+      isPolling = true;
       try {
         const fresh = await getClubMatchdayMatchesAction(playerTeamId);
-        if (fresh && fresh.length > 0) {
+        if (mounted && fresh && fresh.length > 0) {
           setMatches(prev => {
             let changed = false;
             const updated = fresh.map(f => {
@@ -64,18 +70,40 @@ export function FamilyMatchdayList({ playerTeamId, clubLogoUrl = "/logo.png" }: 
             return changed ? updated : prev;
           });
         }
-      } catch {}
-    }, 10000);
+      } catch {} finally {
+        isPolling = false;
+      }
+    };
+
+    const interval = setInterval(() => {
+      syncMatchesFallback();
+    }, 90_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncMatchesFallback();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     const channel = supabase
-      .channel(`family-matchday-list-${Math.random().toString(36).substring(7)}`)
+      .channel(`family-matchday-list-${playerTeamId || 'all'}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "partidos" }, () => {
         loadMatches();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          hadRealtimeDisconnect = true;
+        } else if (status === 'SUBSCRIBED' && hadRealtimeDisconnect) {
+          hadRealtimeDisconnect = false;
+          loadMatches();
+        }
+      });
 
     return () => {
+      mounted = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [playerTeamId]);

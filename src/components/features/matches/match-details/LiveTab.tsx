@@ -147,9 +147,9 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
   const supabase = createClient();
   
   // Hook usage (pass matchId and DB initial state)
-  const initialElapsed = match?.live_timer_elapsed_seconds || 0;
-  const initialStarted = match?.live_timer_started_at || null;
-  const { seconds, start, pause, running } = useLiveTimer(matchId, initialElapsed, initialStarted);
+  const [timerElapsed, setTimerElapsed] = useState<number>(match?.live_timer_elapsed_seconds || 0);
+  const [timerStartedAt, setTimerStartedAt] = useState<string | null>(match?.live_timer_started_at || null);
+  const { seconds, start, pause, running } = useLiveTimer(matchId, timerElapsed, timerStartedAt);
 
   // Match State Sync
   const [partidoEstado, setPartidoEstado] = useState(match?.estado || "Programado");
@@ -449,6 +449,7 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
 
   // Realtime subscription for events and timer
   useEffect(() => {
+    let hadDisconnect = false;
     const channel = supabase.channel(`match-${matchId}-live-${Math.random().toString(36).substring(7)}`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `partido_id=eq.${matchId}` }, (payload) => {
@@ -470,8 +471,27 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidos', filter: `id=eq.${matchId}` }, (payload) => {
         setPartidoEstado(payload.new.estado);
         setFirstHalfDuration(payload.new.first_half_duration_seconds);
+        setTimerElapsed(payload.new.live_timer_elapsed_seconds || 0);
+        setTimerStartedAt(payload.new.live_timer_started_at || null);
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          hadDisconnect = true;
+        } else if (status === 'SUBSCRIBED' && hadDisconnect) {
+          hadDisconnect = false;
+          const { data } = await supabase
+            .from('partidos')
+            .select('estado, first_half_duration_seconds, live_timer_elapsed_seconds, live_timer_started_at')
+            .eq('id', matchId)
+            .single();
+          if (data) {
+            setPartidoEstado(data.estado);
+            setFirstHalfDuration(data.first_half_duration_seconds);
+            setTimerElapsed(data.live_timer_elapsed_seconds || 0);
+            setTimerStartedAt(data.live_timer_started_at || null);
+          }
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };

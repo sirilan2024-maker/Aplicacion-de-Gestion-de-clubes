@@ -2,25 +2,93 @@ name: Sincronizacion Horaria FFCV y Liga Brave Sporting Saladar
 
 on:
   schedule:
-    # Fines de semana (sábados y domingos de 08:00 a 20:00 UTC): cada hora en punto para captar resultados y actas en jornada
-    - cron: '0 8-20 * * 6,0'
-    # Días laborables (lunes a viernes): mantenimiento matutino, mediodía y noche (20:00 y 22:00 UTC) para partidos entre semana
-    - cron: '0 8,14,20,22 * * 1-5'
+    # Fines de semana (sábados y domingos de 07:00 a 21:00 UTC / 09:00 a 23:00 España): cada 60 min para reducir consumo en Vercel manteniendo resultados y actas al día
+    - cron: '0 7-21 * * 6,0'
+    # Días laborables (lunes a viernes): 3 ejecuciones diarias (mañana, tarde y noche)
+    - cron: '0 9,15,21 * * 1-5'
   workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub Actions
+
+# Evita ejecuciones simultáneas si una sincronización previa tarda más de lo esperado
+concurrency:
+  group: ffcv-sync-cron
+  cancel-in-progress: false
 
 jobs:
   sync-ffcv:
     name: Sincronizar FFCV y Liga Brave (Partidos, Actas y Clasificaciones)
     runs-on: ubuntu-latest
     steps:
-      - name: Disparar endpoint de sincronizacion FFCV y Liga Brave
+      - name: Pre-capturar datos de Liga Brave (Apuntamelo) y disparar sincronizacion
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET || '1c2116fd25f2d9b436b10705daae6f053a84dea1957d9effaee3dd5238d8c081' }}
         run: |
-          echo "Iniciando sincronizacion horaria FFCV y Liga Brave para Sporting Saladar..."
+          echo "Instalando curl_cffi para bypass de Cloudflare en Apuntamelo..."
+          pip install --quiet curl_cffi || true
+
+          python3 - << 'EOF' > /tmp/apuntamelo_payload.json
+          import json
+          try:
+              from curl_cffi import requests as creq
+              def fetch_json(url):
+                  r = creq.get(url, impersonate="chrome120", verify=False, timeout=15, headers={
+                      "Accept": "application/json, text/javascript, */*; q=0.01",
+                      "X-Requested-With": "XMLHttpRequest",
+                      "Referer": "https://apuntamelo.com/"
+                  })
+                  if r.status_code == 200:
+                      return r.json()
+                  return None
+          except Exception:
+              import urllib.request, ssl
+              ctx = ssl._create_unverified_context()
+              def fetch_json(url):
+                  req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "X-Requested-With": "XMLHttpRequest"})
+                  with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+                      return json.loads(resp.read().decode("utf-8"))
+
+          cache = {}
+          base_urls = [
+              "https://apuntamelo.com/obtenerClasificacion?id=4660",
+              "https://apuntamelo.com/obtenerInfoEquipo?equipo=33431",
+              "https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=29&grupo=4624",
+              "https://apuntamelo.com/obtenerClasificacion?id=4659",
+              "https://apuntamelo.com/obtenerInfoEquipo?equipo=33383",
+              "https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=29&grupo=4623",
+          ]
+          match_ids = set()
+          for u in base_urls:
+              try:
+                  data = fetch_json(u)
+                  if data is not None:
+                      cache[u] = data
+                      if "obtenerPartidosPorJornada" in u and isinstance(data, list):
+                          for m in data:
+                              if m.get("Goles_A") is not None and m.get("Goles_B") is not None:
+                                  fk_a = int(m.get("FK_EquipoLiga_A") or 0)
+                                  fk_b = int(m.get("FK_EquipoLiga_B") or 0)
+                                  if fk_a in (33431, 33383) or fk_b in (33431, 33383):
+                                      match_ids.add(str(m.get("Id")))
+              except Exception:
+                  pass
+
+          for mid in match_ids:
+              u = f"https://apuntamelo.com/obtenerInfoPartido?id={mid}"
+              try:
+                  data = fetch_json(u)
+                  if data is not None:
+                      cache[u] = data
+              except Exception:
+                  pass
+
+          print(json.dumps({"apuntameloCache": cache}))
+          EOF
+
+          echo "Enviando sincronizacion FFCV + Liga Brave..."
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            -X GET "https://app.clubsportingsaladar.com/api/ffcv/cron?secret=$CRON_SECRET")
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/apuntamelo_payload.json \
+            -X POST "https://app.clubsportingsaladar.com/api/ffcv/cron?secret=$CRON_SECRET")
           echo "$RESPONSE"
           HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
           if [ "$HTTP_STATUS" -ne 200 ]; then

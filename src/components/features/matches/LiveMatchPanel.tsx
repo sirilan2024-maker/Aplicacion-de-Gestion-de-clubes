@@ -70,6 +70,18 @@ export function LiveMatchPanel({
     fetchEvents();
     fetchMatch();
 
+    let isPolling = false;
+    let hadDisconnect = false;
+    const syncAll = async () => {
+      if (!mounted || isPolling || document.visibilityState !== 'visible') return;
+      isPolling = true;
+      try {
+        await Promise.all([fetchEvents(), fetchMatch()]);
+      } finally {
+        isPolling = false;
+      }
+    };
+
     const channel = supabase.channel(`live-panel-${matchId}-${Math.random().toString(36).substring(7)}`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_events', filter: `partido_id=eq.${matchId}` }, (payload) => {
@@ -95,17 +107,29 @@ export function LiveMatchPanel({
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidos', filter: `id=eq.${matchId}` }, (payload) => {
         setMatch((prev: any) => ({ ...prev, ...payload.new }));
       })
-      .subscribe();
-      
-    // Polling fallback: refresca eventos Y datos del partido cada 4s
-    const intervalId = setInterval(() => {
-      fetchEvents();
-      fetchMatch();
-    }, 4000);
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          hadDisconnect = true;
+        } else if (status === 'SUBSCRIBED' && hadDisconnect) {
+          hadDisconnect = false;
+          syncAll();
+        }
+      });
+
+    // Low-frequency fallback polling (90s) only when tab is visible
+    const intervalId = setInterval(syncAll, 90_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncAll();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
       
     return () => {
       mounted = false;
       clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [matchId]);
@@ -137,14 +161,17 @@ export function LiveMatchPanel({
   const ligaBraveLive = parsedCoachReport?.liga_brave_live || null;
   const ffcvLive = parsedCoachReport?.ffcv_live || null;
   const officialLive = ligaBraveLive || ffcvLive;
-  const isLigaBraveMatch = Boolean(
+  const isFfcvOfficialMatch = Boolean(
+    ffcvLive ||
+    match?.acta_oficial_url?.includes('ffcv.es') ||
+    match?.acta_oficial_url?.includes('CodPartido') ||
+    match?.ffcv_group_id ||
+    (match?.equipo?.category && !match?.equipo?.category.toLowerCase().includes('brave'))
+  );
+  const isLigaBraveMatch = !isFfcvOfficialMatch && Boolean(
     ligaBraveLive ||
     match?.acta_oficial_url?.includes('apuntamelo.com') ||
-    match?.equipo?.name?.toLowerCase().includes('infantil b') ||
-    match?.equipo?.name?.toLowerCase().includes('cadete b')
-  );
-  const isFfcvOfficialMatch = Boolean(
-    ffcvLive || match?.acta_oficial_url?.includes('ffcv.es')
+    match?.equipo?.category?.toLowerCase().includes('brave')
   );
 
   const isEventHomeGoal = (e: any): boolean => {
@@ -228,8 +255,11 @@ export function LiveMatchPanel({
     let textColor = "text-slate-800";
     const rawNotas = String(event.notas || '');
     const cleanNotas = cleanEventNotas(rawNotas);
-    const isBraveSynced = rawNotas.includes('[BRAVE:') || rawNotas.startsWith('[LOCAL]') || rawNotas.startsWith('[VISITANTE]');
+    // Solo marcar como Liga Brave si el partido pertenece formalmente a dicha competición
+    const isBraveSynced = isLigaBraveMatch && (rawNotas.includes('[BRAVE:') || rawNotas.includes('apuntamelo'));
     const isComment = event.tipo_evento === 'Comentario del Entrenador' || (cleanNotas && (cleanNotas.includes('🎮') || cleanNotas.includes('⚡') || cleanNotas.includes('🛡️') || cleanNotas.includes('⚠️') || cleanNotas.includes('💬') || cleanNotas.includes('🔥') || cleanNotas.includes('⚖️') || cleanNotas.includes('🎙️') || cleanNotas.includes('📊') || cleanNotas.includes('📋')));
+
+    const isRivalEvent = isLocal ? rawNotas.includes('[VISITANTE]') : rawNotas.includes('[LOCAL]');
 
     if (isComment && event.tipo_evento !== 'Descanso' && event.tipo_evento !== 'Fin de Partido') {
       icon = cleanNotas.includes('🔥') ? "🔥" : cleanNotas.includes('📊') ? "📊" : cleanNotas.includes('⚡') ? "⚡" : cleanNotas.includes('🎙️') ? "🎙️" : "💬";
@@ -247,6 +277,15 @@ export function LiveMatchPanel({
     else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = event.tipo_evento === 'Descanso' ? "⏸️" : "🏁"; bgColor = "bg-slate-100/80 border-slate-200"; textColor = "text-slate-700"; }
 
     const isCommentRow = isComment && event.tipo_evento !== 'Descanso' && event.tipo_evento !== 'Fin de Partido';
+
+    // Evitar duplicar el nombre del jugador si ya viene en event.player
+    const isDuplicatePlayerName = Boolean(
+      event.player && cleanNotas && (
+        cleanNotas.toLowerCase().trim() === `${event.player.first_name || ''} ${event.player.last_name || ''}`.toLowerCase().trim() ||
+        cleanNotas.toLowerCase().trim() === `${event.player.last_name || ''}, ${event.player.first_name || ''}`.toLowerCase().trim() ||
+        (event.player.last_name && cleanNotas.toLowerCase().includes(event.player.last_name.toLowerCase()))
+      )
+    );
 
     return (
       <div key={event.id ? `${event.id}-${idx}` : idx} className={`flex items-start gap-3 p-2.5 rounded-xl border ${bgColor} transition-all`}>
@@ -266,13 +305,18 @@ export function LiveMatchPanel({
                   Liga Brave
                 </span>
               )}
+              {isRivalEvent && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 border border-slate-300/60 shrink-0 truncate max-w-[130px]">
+                  {rivalName}
+                </span>
+              )}
             </div>
             {event.player ? (
               <p className="text-[11px] font-bold text-slate-700 mt-0.5">
                 {event.player.dorsal ? `#${event.player.dorsal} ` : ''}{event.player.first_name} {event.player.last_name}
               </p>
             ) : null}
-            {cleanNotas && !isCommentRow && (
+            {cleanNotas && !isCommentRow && !isDuplicatePlayerName && (
               <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-snug">
                 {cleanNotas}
               </p>

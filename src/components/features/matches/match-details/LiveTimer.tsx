@@ -4,8 +4,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { updateLiveTimer } from "@/lib/match-actions";
 
-
-
 export interface LiveTimerProps {
   /** ID of the match (used by the server action) */
   matchId: string;
@@ -15,30 +13,54 @@ export interface LiveTimerProps {
 
 /**
  * Sticky timer bar with play/pause controls and a "En vivo" badge.
- * Premium dark design: background #1e3a8a (blue‑900), white text, rounded‑xl,
- * subtle shadow and micro‑animations.
+ * Uses timestamp-based calculation in the client and persists only on state transitions.
  */
 export function LiveTimer({ matchId, initialSeconds = 0 }: LiveTimerProps) {
   const [seconds, setSeconds] = useState(initialSeconds);
+  const [baseSeconds, setBaseSeconds] = useState(initialSeconds);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
 
-  // Sync state with the server – debounced every 5 s
-
-
-  // Increment each second when running
-  const sync = useCallback(() => {
-    // Update timer state on the server
-    updateLiveTimer(matchId, seconds, running);
-  }, [matchId, seconds, running]);
-
-  // Auto‑sync every 5 s while the timer is active
+  // Recalculate elapsed time from timestamp so background tab throttling cannot cause drift
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(sync, 5_000);
-    return () => clearInterval(id);
-  }, [running, sync]);
+    if (!running || startedAt === null) {
+      setSeconds(baseSeconds);
+      return;
+    }
 
-  const toggle = () => setRunning((v) => !v);
+    const updateFromTimestamp = () => {
+      const diff = Math.floor((Date.now() - startedAt) / 1000);
+      setSeconds(baseSeconds + Math.max(0, diff));
+    };
+
+    updateFromTimestamp();
+    const interval = setInterval(updateFromTimestamp, 1000);
+    document.addEventListener("visibilitychange", updateFromTimestamp);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", updateFromTimestamp);
+    };
+  }, [running, startedAt, baseSeconds]);
+
+  // Persist to server ONLY on state transitions (play/pause), never every 5s
+  const toggle = useCallback(async () => {
+    if (running) {
+      const current = startedAt !== null
+        ? baseSeconds + Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+        : seconds;
+      setRunning(false);
+      setStartedAt(null);
+      setBaseSeconds(current);
+      setSeconds(current);
+      await updateLiveTimer(matchId, current, false);
+    } else {
+      const now = Date.now();
+      setStartedAt(now);
+      setRunning(true);
+      await updateLiveTimer(matchId, baseSeconds, true);
+    }
+  }, [running, startedAt, baseSeconds, seconds, matchId]);
 
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const secs = String(seconds % 60).padStart(2, "0");
@@ -48,7 +70,7 @@ export function LiveTimer({ matchId, initialSeconds = 0 }: LiveTimerProps) {
       {/* Timer display */}
       <span className="font-mono text-lg">{`${mins}:${secs}`}</span>
 
-      {/* En‑vivo badge */}
+      {/* En-vivo badge */}
       <span className="ml-2 inline-flex items-center rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold text-white shadow">
         En vivo
       </span>
@@ -85,4 +107,3 @@ export function LiveTimer({ matchId, initialSeconds = 0 }: LiveTimerProps) {
     </div>
   );
 }
-

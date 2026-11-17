@@ -6,7 +6,7 @@ import { getLiveAds } from "@/app/actions/ad-actions"
 
 import { LiveBackButton, ShareLiveButton } from "@/components/features/matches/LiveBackButton"
 
-export const revalidate = 0 // Opt out of caching for live route
+export const revalidate = 30 // ISR 30s for public live page; client hydrates live updates via Supabase Realtime
 
 export default async function PublicLivePage() {
   const supabase = await createAdminClient()

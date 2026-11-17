@@ -94,10 +94,16 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     // Carga inicial siempre
     loadEvents()
 
-    // Polling cada 3s mientras el partido esté activo (live o descanso)
+    // Fallback polling de baja frecuencia (90s) solo cuando está en directo y la pestaña es visible
     let intervalId: NodeJS.Timeout | null = null;
+    const syncIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadEvents();
+      }
+    };
     if (isLive || isDescanso) {
-      intervalId = setInterval(loadEvents, 3000);
+      intervalId = setInterval(syncIfVisible, 90_000);
+      document.addEventListener('visibilitychange', syncIfVisible);
     }
 
     // Realtime: INSERT y DELETE de eventos para el partido
@@ -130,7 +136,10 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
 
     return () => {
       supabase.removeChannel(channel)
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) {
+        clearInterval(intervalId);
+        document.removeEventListener('visibilitychange', syncIfVisible);
+      }
     }
   }, [match.id, isLive, isDescanso])
 
@@ -232,10 +241,18 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
           
           let name = '';
           const getCleanNameFromNotas = (rawNotes: string) => {
-            let clean = rawNotes.replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '').trim();
+            let clean = rawNotes
+              .replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '')
+              .replace(/\[BRAVE:[^\]]+\]\s*/gi, '')
+              .replace(/\s*\(Asist:[^)]*\)/gi, '')
+              .trim();
             if (clean.includes(',')) {
               const parts = clean.split(',').map(p => p.trim());
               clean = `${parts[1]} ${parts[0]}`;
+            }
+            const words = clean.split(/\s+/).filter(Boolean);
+            if (words.length > 2) {
+              clean = `${words[0]} ${words[1]}`;
             }
             return clean.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
           };
@@ -460,7 +477,9 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
                           </div>
                         )}
                         {ev.notas && (
-                          <p className="text-xs text-slate-400 italic mt-2 bg-slate-50 p-2 rounded-lg">"{ev.notas}"</p>
+                          <p className="text-xs text-slate-500 italic mt-2 bg-slate-50 p-2 rounded-lg">
+                            "{ev.notas.replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '').replace(/\[BRAVE:[^\]]+\]\s*/gi, '').trim()}"
+                          </p>
                         )}
                       </div>
                     </div>

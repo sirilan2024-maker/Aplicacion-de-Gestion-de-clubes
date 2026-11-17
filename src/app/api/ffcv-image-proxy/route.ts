@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
@@ -9,7 +8,10 @@ export async function GET(req: Request) {
     const imageUrl = searchParams.get('url');
 
     if (!imageUrl) {
-      return new NextResponse('Missing url parameter', { status: 400 });
+      return new NextResponse('Missing url parameter', {
+        status: 400,
+        headers: { 'Cache-Control': 'no-store' },
+      });
     }
 
     // Only allow fetching from official novanet / ffcv image domains
@@ -20,7 +22,10 @@ export async function GET(req: Request) {
       imageUrl.startsWith('http://ffcv.es/pnfg/');
 
     if (!isAllowedDomain) {
-      return new NextResponse('Forbidden domain', { status: 403 });
+      return new NextResponse('Forbidden domain', {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store' },
+      });
     }
 
     // Ensure it targets appwebffcv.novanet.es
@@ -30,11 +35,14 @@ export async function GET(req: Request) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      cache: 'force-cache'
+      next: { revalidate: 2592000 },
     });
 
     if (!res.ok) {
-      return new NextResponse('Image not found', { status: res.status });
+      return new NextResponse('Image not found', {
+        status: res.status,
+        headers: { 'Cache-Control': 'no-store' },
+      });
     }
 
     const contentType = res.headers.get('content-type') || 'image/png';
@@ -44,13 +52,16 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=604800, immutable',
+        'Cache-Control': 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
       }
     });
   } catch (err: any) {
     console.error('[ffcv-image-proxy] Error:', err);
-    return new NextResponse('Internal error', { status: 500 });
+    return new NextResponse('Internal error', {
+      status: 500,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   }
 }

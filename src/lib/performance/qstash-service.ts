@@ -145,6 +145,14 @@ function safeEqualUtf8(a: string, b: string): boolean {
 }
 
 /**
+ * Limpia posibles comillas envolventes o líneas adicionales pegadas accidentalmente en variables de entorno.
+ */
+function sanitizeEnvSecret(raw?: string | null): string {
+  if (!raw) return '';
+  return raw.trim().split(/\r?\n/)[0].trim().replace(/^['"]+|['"]+$/g, '').trim();
+}
+
+/**
  * Valida URLs de QStash/destino en producción mediante el parser estándar URL.
  * Exige HTTPS y rechaza hosts loopback/no enrutables (localhost, 127.0.0.1, ::1, [::1], 0.0.0.0).
  */
@@ -210,7 +218,7 @@ export function verifyQStashSignature(params: {
 
   const isProduction = process.env.NODE_ENV === 'production';
   const isDevMode = !isProduction && (process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1');
-  let keys = [currentSigningKey, nextSigningKey].filter(Boolean) as string[];
+  let keys = [sanitizeEnvSecret(currentSigningKey), sanitizeEnvSecret(nextSigningKey)].filter(Boolean) as string[];
   if (keys.length === 0) {
     if (isProduction) {
       return {
@@ -440,7 +448,7 @@ export async function publishDelayedQStashWebhook(params: {
 
   const defaultUrl = isDevMode ? 'http://127.0.0.1:8080/v2' : 'https://qstash.upstash.io/v2';
   const qstashUrl = process.env.QSTASH_URL || defaultUrl;
-  const token = process.env.QSTASH_TOKEN?.trim() || (isDevMode ? 'local_dev_token' : '');
+  const token = sanitizeEnvSecret(process.env.QSTASH_TOKEN) || (isDevMode ? 'local_dev_token' : '');
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
@@ -509,7 +517,7 @@ export async function cancelQStashMessage(messageId: string): Promise<{ success:
 
   const defaultUrl = isDevMode ? 'http://127.0.0.1:8080/v2' : 'https://qstash.upstash.io/v2';
   const qstashUrl = process.env.QSTASH_URL || defaultUrl;
-  const token = process.env.QSTASH_TOKEN?.trim() || (isDevMode ? 'local_dev_token' : '');
+  const token = sanitizeEnvSecret(process.env.QSTASH_TOKEN) || (isDevMode ? 'local_dev_token' : '');
 
   try {
     const res = await fetch(`${qstashUrl}/messages/${messageId}`, {

@@ -26,7 +26,12 @@ export async function triggerBraveGitHubWorkflow(reason: string = 'post-match'):
   reason?: string;
   error?: string;
 }> {
-  const token = process.env.GITHUB_ACTIONS_TOKEN?.trim();
+  const token = (process.env.GITHUB_ACTIONS_TOKEN || '')
+    .trim()
+    .split(/\r?\n/)[0]
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .trim();
   if (!token) {
     return {
       triggered: false,

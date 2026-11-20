@@ -20,6 +20,7 @@ import {
 import { syncFFCVActaToConvocatorias } from './acta-sync';
 import { getOfficialMatchDuration } from '../utils';
 import { NotificationService } from '../notifications/notification-service';
+import { isApuntameloTeam } from '../apuntamelo/sync';
 
 /**
  * Synchronizes FFCV group data (calendar, standings, matches) into Supabase
@@ -327,7 +328,7 @@ export async function syncTeamFFCV(
  * Groups by unique FFCV group (season + competition + group) to avoid redundant requests.
  */
 export async function syncAllConfiguredFFCVTeams(
-  options: { syncAllMatchdays?: boolean; specificMatchday?: number } = {},
+  options: { syncAllMatchdays?: boolean; specificMatchday?: number; braveOnly?: boolean } = {},
   customSupabaseClient?: any
 ): Promise<FFCVBatchSyncResult> {
   const supabase = customSupabaseClient || createAdminClient();
@@ -374,13 +375,19 @@ export async function syncAllConfiguredFFCVTeams(
 
   // 2. Process each unique group once (prioritizing ultra-fast Apúntamelo groups first)
   const { isApuntameloTeam, syncApuntameloTeam } = await import('../apuntamelo/sync');
-  const sortedGroupEntries = Array.from(groupMap.entries()).sort((a, b) => {
-    const teamA = configuredTeams.find((t: any) => t.id === a[1].teamIds[0]);
-    const teamB = configuredTeams.find((t: any) => t.id === b[1].teamIds[0]);
-    const aIsAp = teamA && isApuntameloTeam(teamA) ? 1 : 0;
-    const bIsAp = teamB && isApuntameloTeam(teamB) ? 1 : 0;
-    return bIsAp - aIsAp;
-  });
+  const sortedGroupEntries = Array.from(groupMap.entries())
+    .filter(([, groupInfo]) => {
+      if (!options.braveOnly) return true;
+      const sampleTeam = configuredTeams.find((t: any) => t.id === groupInfo.teamIds[0]);
+      return Boolean(sampleTeam && isApuntameloTeam(sampleTeam));
+    })
+    .sort((a, b) => {
+      const teamA = configuredTeams.find((t: any) => t.id === a[1].teamIds[0]);
+      const teamB = configuredTeams.find((t: any) => t.id === b[1].teamIds[0]);
+      const aIsAp = teamA && isApuntameloTeam(teamA) ? 1 : 0;
+      const bIsAp = teamB && isApuntameloTeam(teamB) ? 1 : 0;
+      return bIsAp - aIsAp;
+    });
 
   for (const [key, groupInfo] of sortedGroupEntries) {
     try {
@@ -548,9 +555,10 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       return isHome || isAway;
     };
 
-    // A. Match by acta_oficial_url containing ffcv_match_id (STRICT: must involve our club)
+    // A. Match by acta_oficial_url containing ffcv_match_id (STRICT: must involve our club and group)
     let fm = ffcvMatches.find((f: any) => {
       if (!isOurMatch(f)) return false;
+      if (teamGroupId && f.ffcv_group_id && f.ffcv_group_id !== teamGroupId) return false;
       return pm.acta_oficial_url && (
         pm.acta_oficial_url.includes(String(f.ffcv_match_id)) ||
         pm.acta_oficial_url.includes(`CodPartido=${f.ffcv_match_id}`)
@@ -626,9 +634,13 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
         if (pRivalNorm === fRivalNorm) return true;
         if (pRivalNorm.includes(fRivalNorm) || fRivalNorm.includes(pRivalNorm)) return true;
 
-        const wordsA = pRivalNorm.split(' ').filter((w: string) => w.length > 2 && !['del', 'los', 'las', 'san'].includes(w));
-        const wordsB = fRivalNorm.split(' ').filter((w: string) => w.length > 2 && !['del', 'los', 'las', 'san'].includes(w));
-        return wordsA.some((w: string) => wordsB.includes(w));
+        const GENERIC_RIVAL_WORDS = [
+          'del', 'los', 'las', 'san', 'orihuela', 'torrevieja', 'almoradi', 'elche',
+          'alicante', 'vega', 'baja', 'playas', 'racing', 'atletic', 'union', 'promesas', 'sporting'
+        ];
+        const wordsA = pRivalNorm.split(' ').filter((w: string) => w.length > 2 && !GENERIC_RIVAL_WORDS.includes(w));
+        const wordsB = fRivalNorm.split(' ').filter((w: string) => w.length > 2 && !GENERIC_RIVAL_WORDS.includes(w));
+        return wordsA.length > 0 && wordsA.some((w: string) => wordsB.includes(w));
       });
     }
 
@@ -730,7 +742,14 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
     // Set or update acta_oficial_url if missing OR if a replacement match has a newer ffcv_match_id
     const isNewCodPartido = Boolean(fm.ffcv_match_id && pm.acta_oficial_url && !pm.acta_oficial_url.includes(String(fm.ffcv_match_id)));
     if ((!pm.acta_oficial_url || isNewCodPartido) && fm.ffcv_match_id) {
-      updates.acta_oficial_url = `https://ffcv.es/dep/actas?CodPartido=${fm.ffcv_match_id}`;
+      const isBraveMatch =
+        isApuntameloTeam(team) ||
+        teamGroupId === '4623' ||
+        teamGroupId === '4624' ||
+        (pm.acta_oficial_url && pm.acta_oficial_url.includes('apuntamelo.com'));
+      updates.acta_oficial_url = isBraveMatch
+        ? `https://apuntamelo.com/partido/${fm.ffcv_match_id}`
+        : `https://ffcv.es/dep/actas?CodPartido=${fm.ffcv_match_id}`;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -805,16 +824,44 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
       }
     }
 
-    // Auto-sync acta details (cards, minutes, lineup) if match is played
-    if (isPlayed && fm.ffcv_match_id) {
-      try {
-        const { count } = await supabase
-          .from('convocatorias')
-          .select('id', { count: 'exact', head: true })
-          .eq('partido_id', pm.id);
+    // Auto-sync acta details (cards, minutes, goals, lineup, match_events) if FFCV match is played
+    const isBraveTeamMatch =
+      isApuntameloTeam(team) ||
+      teamGroupId === '4623' ||
+      teamGroupId === '4624' ||
+      (pm.acta_oficial_url && pm.acta_oficial_url.includes('apuntamelo.com'));
 
-        const rivalHasSporting = (pm.rival_nombre || '').toLowerCase().includes('sporting');
-        if (!count || count === 0 || rivalHasSporting) {
+    if (isPlayed && fm.ffcv_match_id && !isBraveTeamMatch) {
+      try {
+        const [{ data: existingConvs }, { count: officialEventsCount }] = await Promise.all([
+          supabase
+            .from('convocatorias')
+            .select('id, goals, goles, minutes_played, minutos_jugados')
+            .eq('partido_id', pm.id),
+          supabase
+            .from('match_events')
+            .select('id', { count: 'exact', head: true })
+            .eq('partido_id', pm.id)
+            .or('notas.ilike.[LOCAL]%,notas.ilike.[VISITANTE]%')
+        ]);
+
+        const convList = existingConvs || [];
+        const hasAnyMinutes = convList.some(
+          (c: any) => (Number(c.minutes_played) || Number(c.minutos_jugados) || 0) > 0
+        );
+        const totalConvGoals = convList.reduce(
+          (sum: number, c: any) => sum + (Number(c.goals ?? c.goles) || 0),
+          0
+        );
+        const expectedOwnGoals = Number(sportingScore) || 0;
+        const expectedTotalGoals = expectedOwnGoals + (Number(rivalScore) || 0);
+
+        const justFinalized = updates.estado === 'Finalizado';
+        const missingMinutes = convList.length === 0 || !hasAnyMinutes;
+        const missingOwnGoals = expectedOwnGoals > 0 && totalConvGoals === 0;
+        const missingOfficialEvents = expectedTotalGoals > 0 && (!officialEventsCount || officialEventsCount === 0);
+
+        if (justFinalized || missingMinutes || missingOwnGoals || missingOfficialEvents) {
           await syncFFCVActaToConvocatorias(String(fm.ffcv_match_id), undefined, supabase);
         }
       } catch (actaErr) {

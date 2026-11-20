@@ -907,17 +907,22 @@ export async function syncApuntameloTeam(
   }
 
   // 6. Actualizar metadatos del equipo en la tabla `teams`
+  // Solo actualizar ffcv_last_synced_at si no hubo errores (evita falsos "sincronizados" si Cloudflare bloqueó la petición)
+  const teamUpdatePayload: Record<string, any> = {
+    ffcv_season_id: seasonId,
+    ffcv_competition_id: competitionIdStr,
+    ffcv_group_id: groupIdStr,
+    ffcv_team_id: String(config.teamApuntameloId),
+    ffcv_url: config.urlEquipo,
+    category: config.category
+  };
+  if (errors.length === 0) {
+    teamUpdatePayload.ffcv_last_synced_at = new Date().toISOString();
+  }
+
   await supabase
     .from('teams')
-    .update({
-      ffcv_season_id: seasonId,
-      ffcv_competition_id: competitionIdStr,
-      ffcv_group_id: groupIdStr,
-      ffcv_team_id: String(config.teamApuntameloId),
-      ffcv_url: config.urlEquipo,
-      category: config.category,
-      ffcv_last_synced_at: new Date().toISOString()
-    })
+    .update(teamUpdatePayload)
     .eq('id', teamId);
 
   return {

@@ -37,7 +37,7 @@ export async function syncTeamFFCVAction(
     // Verify team belongs to the user's club (unless superadmin)
     const { data: team } = await supabase
       .from('teams')
-      .select('id, club_id, name')
+      .select('id, club_id, name, ffcv_group_id, ffcv_team_id, ffcv_url')
       .eq('id', teamId)
       .single();
 
@@ -58,6 +58,25 @@ export async function syncTeamFFCVAction(
     revalidatePath('/dashboard/equipos');
     revalidatePath('/admin/partidos');
     revalidatePath('/dashboard', 'layout');
+    if (!result.success) {
+      const { isApuntameloTeam } = await import('@/lib/apuntamelo/sync');
+      if (isApuntameloTeam(team)) {
+        const { triggerBraveGitHubWorkflow } = await import('@/lib/ffcv/post-match-scheduler');
+        const dispatchRes = await triggerBraveGitHubWorkflow(`manual:${team.name}`);
+        if (dispatchRes.triggered) {
+          return {
+            success: true,
+            data: result,
+            error: undefined
+          };
+        }
+      }
+      return {
+        success: false,
+        data: result,
+        error: result.errors?.join('; ') || 'Error durante la sincronización del equipo'
+      };
+    }
     return { success: true, data: result };
   } catch (err: any) {
     console.error('[syncTeamFFCVAction] Error:', err);

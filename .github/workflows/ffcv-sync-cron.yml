@@ -2,11 +2,19 @@ name: Sincronizacion Horaria FFCV y Liga Brave Sporting Saladar
 
 on:
   schedule:
-    # Fines de semana (sábados y domingos de 07:00 a 21:00 UTC / 09:00 a 23:00 España): cada 60 min para reducir consumo en Vercel manteniendo resultados y actas al día
-    - cron: '0 7-21 * * 6,0'
-    # Días laborables (lunes a viernes): 3 ejecuciones diarias (mañana, tarde y noche)
-    - cron: '0 9,15,21 * * 1-5'
-  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub Actions
+    # Solo entre semana: martes, miércoles y viernes a las 13:00 UTC (~14:00 invierno / 15:00 verano España)
+    # Los fines de semana se disparan automáticamente por Upstash QStash al acabar cada partido (+30 min y +90 min)
+    - cron: '0 13 * * 2,3,5'
+  workflow_dispatch: # Permite ejecutarlo manualmente o vía API (post-partido Liga Brave)
+    inputs:
+      mode:
+        description: 'Modo de sincronización (all = FFCV + Liga Brave, brave_only = solo Liga Brave)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - brave_only
 
 # Evita ejecuciones simultáneas si una sincronización previa tarda más de lo esperado
 concurrency:
@@ -83,12 +91,16 @@ jobs:
           print(json.dumps({"apuntameloCache": cache}))
           EOF
 
-          echo "Enviando sincronizacion FFCV + Liga Brave..."
+          echo "Enviando sincronizacion (mode=${{ inputs.mode || 'all' }})..."
+          EXTRA_QUERY=""
+          if [ "${{ inputs.mode }}" = "brave_only" ]; then
+            EXTRA_QUERY="?braveOnly=true"
+          fi
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data-binary @/tmp/apuntamelo_payload.json \
-            -X POST "https://app.clubsportingsaladar.com/api/ffcv/cron?secret=$CRON_SECRET")
+            -X POST "https://app.clubsportingsaladar.com/api/ffcv/cron$EXTRA_QUERY")
           echo "$RESPONSE"
           HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
           if [ "$HTTP_STATUS" -ne 200 ]; then

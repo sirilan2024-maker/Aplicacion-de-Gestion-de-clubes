@@ -135,6 +135,56 @@ export function calculateQStashSchedule(
 }
 
 /**
+ * Compara dos cadenas UTF-8 en tiempo constante mediante crypto.timingSafeEqual.
+ */
+function safeEqualUtf8(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Valida URLs de QStash/destino en producción mediante el parser estándar URL.
+ * Exige HTTPS y rechaza hosts loopback/no enrutables (localhost, 127.0.0.1, ::1, [::1], 0.0.0.0).
+ */
+export function validateProductionQStashUrl(
+  rawUrl: string,
+  label: string = 'URL'
+): { valid: boolean; reason?: string } {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) {
+    return { valid: false, reason: `${label} vacía en producción [QSTASH_URL_INVALID]` };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { valid: false, reason: `${label} mal formada en producción [QSTASH_URL_INVALID]` };
+  }
+  if (parsed.protocol !== 'https:') {
+    return {
+      valid: false,
+      reason: `${label} debe usar HTTPS en producción [QSTASH_URL_INVALID]`,
+    };
+  }
+  const normalizedHost = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (
+    normalizedHost === 'localhost' ||
+    normalizedHost.endsWith('.localhost') ||
+    normalizedHost === '127.0.0.1' ||
+    normalizedHost === '::1' ||
+    normalizedHost === '0.0.0.0'
+  ) {
+    return {
+      valid: false,
+      reason: `${label} apunta a destino loopback/local no permitido en producción (${normalizedHost}) [QSTASH_URL_INVALID]`,
+    };
+  }
+  return { valid: true };
+}
+
+/**
  * Verifica la firma criptográfica (JWT HS256) emitida por Upstash QStash en la cabecera `upstash-signature`.
  */
 export function verifyQStashSignature(params: {
@@ -148,6 +198,7 @@ export function verifyQStashSignature(params: {
   const {
     signature,
     body,
+    url,
     currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY,
     nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY,
     clockToleranceSeconds = 300, // 5 min de tolerancia
@@ -157,13 +208,20 @@ export function verifyQStashSignature(params: {
     return { isValid: false, reason: 'Cabecera de firma upstash-signature ausente.' };
   }
 
-  const isDevMode = process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isDevMode = !isProduction && (process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1');
   let keys = [currentSigningKey, nextSigningKey].filter(Boolean) as string[];
   if (keys.length === 0) {
+    if (isProduction) {
+      return {
+        isValid: false,
+        reason: 'Claves QSTASH_CURRENT_SIGNING_KEY / QSTASH_NEXT_SIGNING_KEY obligatorias en producción.',
+      };
+    }
     if (isDevMode) {
       keys = [QSTASH_DEV_SIGNING_KEY];
     } else if (process.env.QSTASH_MOCK === 'true') {
-      return { isValid: true, reason: 'Validación omitida en modo QSTASH_MOCK' };
+      return { isValid: true, reason: 'Validación omitida en modo QSTASH_MOCK (solo fuera de producción)' };
     } else {
       return { isValid: false, reason: 'No hay claves QSTASH_CURRENT_SIGNING_KEY ni QSTASH_NEXT_SIGNING_KEY configuradas.' };
     }
@@ -176,7 +234,7 @@ export function verifyQStashSignature(params: {
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
-  // 1. Verificar firma criptográfica HMAC-SHA256
+  // 1. Verificar firma criptográfica HMAC-SHA256 (soporta rotación current/next)
   let keyMatched = false;
   for (const key of keys) {
     try {
@@ -200,7 +258,7 @@ export function verifyQStashSignature(params: {
     return { isValid: false, reason: 'Firma HMAC-SHA256 no coincide con ninguna clave configurada.' };
   }
 
-  // 2. Parsear y verificar claims del payload
+  // 2. Parsear y verificar claims obligatorios del payload
   try {
     const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
     const payload = JSON.parse(payloadJson);
@@ -211,20 +269,56 @@ export function verifyQStashSignature(params: {
 
     const nowSec = Math.floor(Date.now() / 1000);
 
-    if (payload.exp && nowSec > payload.exp + clockToleranceSeconds) {
+    // Exigir exp numérico y válido (rechazar tokens sin expiración o expirados)
+    if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp) || payload.exp <= 0) {
+      return { isValid: false, reason: 'Firma QStash sin expiración válida (exp claim obligatorio).' };
+    }
+    if (nowSec > payload.exp + clockToleranceSeconds) {
       return { isValid: false, reason: 'Firma QStash expirada (exp claim superado).' };
     }
 
-    if (payload.nbf && nowSec < payload.nbf - clockToleranceSeconds) {
-      return { isValid: false, reason: 'Firma QStash aún no activa (nbf claim futuro).' };
+    if (payload.nbf !== undefined) {
+      if (typeof payload.nbf !== 'number' || !Number.isFinite(payload.nbf)) {
+        return { isValid: false, reason: 'Claim nbf de firma QStash no válido.' };
+      }
+      if (nowSec < payload.nbf - clockToleranceSeconds) {
+        return { isValid: false, reason: 'Firma QStash aún no activa (nbf claim futuro).' };
+      }
     }
 
-    // 3. Verificar hash del cuerpo (body claim)
-    if (payload.body) {
-      const sha256Base64url = crypto.createHash('sha256').update(body, 'utf8').digest('base64url');
-      const sha256Hex = crypto.createHash('sha256').update(body, 'utf8').digest('hex');
+    // 3. Verificar correspondencia de sub con params.url si se proporcionó
+    if (url && url.trim().length > 0) {
+      if (typeof payload.sub !== 'string' || payload.sub.trim().length === 0) {
+        return { isValid: false, reason: 'Firma QStash sin claim sub para verificar URL de destino.' };
+      }
+      try {
+        const expectedUrl = new URL(url.trim());
+        const subUrl = new URL(payload.sub.trim());
+        const matches =
+          expectedUrl.origin === subUrl.origin &&
+          expectedUrl.pathname === subUrl.pathname &&
+          expectedUrl.search === subUrl.search;
+        if (!matches) {
+          return { isValid: false, reason: 'El claim sub de la firma QStash no coincide con la URL de destino.' };
+        }
+      } catch {
+        if (payload.sub.trim() !== url.trim()) {
+          return { isValid: false, reason: 'El claim sub de la firma QStash no coincide con la URL de destino.' };
+        }
+      }
+    }
 
-      if (payload.body !== sha256Base64url && payload.body !== sha256Hex) {
+    // 4. Verificar hash del cuerpo (body claim obligatorio si el cuerpo no está vacío)
+    const bodyText = typeof body === 'string' ? body : '';
+    const hasBodyClaim = typeof payload.body === 'string' && payload.body.length > 0;
+    if (bodyText.length > 0 && !hasBodyClaim) {
+      return { isValid: false, reason: 'Cuerpo no vacío sin claim body en la firma QStash.' };
+    }
+    if (hasBodyClaim) {
+      const sha256Base64url = crypto.createHash('sha256').update(bodyText, 'utf8').digest('base64url');
+      const sha256Hex = crypto.createHash('sha256').update(bodyText, 'utf8').digest('hex');
+
+      if (!safeEqualUtf8(payload.body, sha256Base64url) && !safeEqualUtf8(payload.body, sha256Hex)) {
         return { isValid: false, reason: 'El hash del cuerpo (body hash) no coincide con el payload firmado.' };
       }
     }
@@ -302,35 +396,65 @@ async function saveStoredQStashRegistry(
  * Realiza la llamada HTTP a Upstash QStash para publicar un mensaje diferido,
  * o simula el envío si estamos en entorno local / modo simulación.
  */
-async function publishToQStash(params: {
+export async function publishDelayedQStashWebhook(params: {
   destinationUrl: string;
-  payload: QStashPayload;
+  payload: Record<string, any>;
   notBeforeEpochSeconds: number;
+  deduplicationId?: string;
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  const isDevMode = process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1';
-  const isMock = !isDevMode && (process.env.QSTASH_MOCK === 'true' || !process.env.QSTASH_TOKEN);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isDevMode = !isProduction && (process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1');
+  const isMock = !isProduction && !isDevMode && (process.env.QSTASH_MOCK === 'true' || !process.env.QSTASH_TOKEN);
+
+  if (isProduction) {
+    if (!process.env.QSTASH_TOKEN?.trim()) {
+      console.error('[QStash] QSTASH_TOKEN ausente en producción; se rechaza simulación silenciosa.');
+      return {
+        success: false,
+        error: 'QSTASH_TOKEN no configurado en producción [QSTASH_CONFIG_MISSING]',
+      };
+    }
+    const configuredUrl = process.env.QSTASH_URL?.trim();
+    if (configuredUrl) {
+      const qstashUrlCheck = validateProductionQStashUrl(configuredUrl, 'QSTASH_URL');
+      if (!qstashUrlCheck.valid) {
+        console.error('[QStash]', qstashUrlCheck.reason);
+        return { success: false, error: qstashUrlCheck.reason };
+      }
+    }
+    const destUrlCheck = validateProductionQStashUrl(params.destinationUrl, 'destinationUrl');
+    if (!destUrlCheck.valid) {
+      console.error('[QStash]', destUrlCheck.reason);
+      return { success: false, error: destUrlCheck.reason };
+    }
+  }
 
   if (isMock) {
     const mockId = `mock_msg_${crypto.randomUUID()}`;
     const delaySec = Math.max(0, params.notBeforeEpochSeconds - Math.floor(Date.now() / 1000));
     console.log(
-      `[QStash Mock] Programado aviso ${params.payload.type} para evento ${params.payload.eventId} en +${delaySec}s (Epoch ${params.notBeforeEpochSeconds}, Relay=${Boolean(params.payload.relay)}) -> ${mockId}`
+      `[QStash Mock] Programado webhook hacia ${params.destinationUrl} en +${delaySec}s (Epoch ${params.notBeforeEpochSeconds}) -> ${mockId}`
     );
     return { success: true, messageId: mockId };
   }
 
   const defaultUrl = isDevMode ? 'http://127.0.0.1:8080/v2' : 'https://qstash.upstash.io/v2';
   const qstashUrl = process.env.QSTASH_URL || defaultUrl;
-  const token = process.env.QSTASH_TOKEN || (isDevMode ? 'local_dev_token' : '');
+  const token = process.env.QSTASH_TOKEN?.trim() || (isDevMode ? 'local_dev_token' : '');
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Upstash-Not-Before': String(params.notBeforeEpochSeconds),
+  };
+  if (params.deduplicationId) {
+    headers['Upstash-Deduplication-Id'] = params.deduplicationId;
+  }
 
   try {
     const res = await fetch(`${qstashUrl}/publish/${params.destinationUrl}`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Upstash-Not-Before': String(params.notBeforeEpochSeconds),
-      },
+      headers,
       body: JSON.stringify(params.payload),
     });
 
@@ -346,22 +470,46 @@ async function publishToQStash(params: {
   }
 }
 
+async function publishToQStash(params: {
+  destinationUrl: string;
+  payload: QStashPayload;
+  notBeforeEpochSeconds: number;
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  return publishDelayedQStashWebhook(params);
+}
+
 /**
  * Cancela un mensaje previamente programado en QStash mediante su `messageId`.
  */
 export async function cancelQStashMessage(messageId: string): Promise<{ success: boolean; error?: string }> {
   if (!messageId) return { success: true };
 
-  const isDevMode = process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1';
-  const isMock = !isDevMode && (process.env.QSTASH_MOCK === 'true' || !process.env.QSTASH_TOKEN);
-  if (isMock || messageId.startsWith('mock_msg_')) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isDevMode = !isProduction && (process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1');
+  const isMock = !isProduction && !isDevMode && (process.env.QSTASH_MOCK === 'true' || !process.env.QSTASH_TOKEN);
+
+  if (isProduction) {
+    if (!process.env.QSTASH_TOKEN?.trim()) {
+      console.error('[QStash] QSTASH_TOKEN ausente en producción al cancelar mensaje.');
+      return { success: false, error: 'QSTASH_TOKEN no configurado en producción [QSTASH_CONFIG_MISSING]' };
+    }
+    const configuredUrl = process.env.QSTASH_URL?.trim();
+    if (configuredUrl) {
+      const qstashUrlCheck = validateProductionQStashUrl(configuredUrl, 'QSTASH_URL');
+      if (!qstashUrlCheck.valid) {
+        return { success: false, error: qstashUrlCheck.reason };
+      }
+    }
+  }
+
+  if (isMock || (!isProduction && messageId.startsWith('mock_msg_'))) {
     console.log(`[QStash Mock] Cancelado mensaje ${messageId}`);
     return { success: true };
   }
 
   const defaultUrl = isDevMode ? 'http://127.0.0.1:8080/v2' : 'https://qstash.upstash.io/v2';
   const qstashUrl = process.env.QSTASH_URL || defaultUrl;
-  const token = process.env.QSTASH_TOKEN || (isDevMode ? 'local_dev_token' : '');
+  const token = process.env.QSTASH_TOKEN?.trim() || (isDevMode ? 'local_dev_token' : '');
 
   try {
     const res = await fetch(`${qstashUrl}/messages/${messageId}`, {
@@ -434,20 +582,30 @@ export async function scheduleSessionQStashReminders(
 
   const { wellness, feedback } = calcResult.schedule;
 
-  // 3. Cancelar avisos previos si existían para esta sesión
+  // 3. Cargar registro previo sin cancelar todavía (evita perder IDs válidos si falla el nuevo envío)
   const registry = await getStoredQStashRegistry(clubId, supabase);
   const existing = registry[session.id];
-  if (existing) {
-    if (existing.wellnessMessageId) await cancelQStashMessage(existing.wellnessMessageId);
-    if (existing.feedbackMessageId) await cancelQStashMessage(existing.feedbackMessageId);
-  }
 
   // 4. URL de destino del webhook (únicamente enviará { eventId, type })
-  const isDevMode = process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isDevMode = !isProduction && (process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1');
   const defaultWebhook = isDevMode
     ? 'http://localhost:3000/api/events/send-reminders'
     : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app-gestiondeclubes.vercel.app'}/api/events/send-reminders`;
   const webhookBase = process.env.QSTASH_WEBHOOK_URL || defaultWebhook;
+
+  if (isProduction) {
+    const webhookUrlCheck = validateProductionQStashUrl(webhookBase, 'QSTASH_WEBHOOK_URL');
+    if (!webhookUrlCheck.valid) {
+      return {
+        success: false,
+        wellnessMessageId: existing?.wellnessMessageId,
+        feedbackMessageId: existing?.feedbackMessageId,
+        schedule: calcResult.schedule,
+        error: webhookUrlCheck.reason,
+      };
+    }
+  }
 
   // 5. Programar Hooper (-180 min)
   const wellnessRes = await publishToQStash({
@@ -471,23 +629,59 @@ export async function scheduleSessionQStashReminders(
     notBeforeEpochSeconds: feedback.scheduledEpochSeconds,
   });
 
-  // 7. Guardar en registro persistente para permitir cancelaciones y reprogramaciones posteriores
-  registry[session.id] = {
-    wellnessMessageId: wellnessRes.messageId,
-    feedbackMessageId: feedbackRes.messageId,
-    wellnessScheduledEpoch: wellness.scheduledEpochSeconds,
-    feedbackScheduledEpoch: feedback.scheduledEpochSeconds,
-    sessionDate: session.date,
-    sessionStartTime: session.startTime,
-    updatedAt: new Date().toISOString(),
-  };
+  const wellnessOk = Boolean(wellnessRes.success && wellnessRes.messageId);
+  const feedbackOk = Boolean(feedbackRes.success && feedbackRes.messageId);
 
-  await saveStoredQStashRegistry(clubId, registry, supabase);
+  // 7. Cancelar solo los mensajes previos que fueron reemplazados con éxito
+  if (wellnessOk && existing?.wellnessMessageId && existing.wellnessMessageId !== wellnessRes.messageId) {
+    await cancelQStashMessage(existing.wellnessMessageId);
+  }
+  if (feedbackOk && existing?.feedbackMessageId && existing.feedbackMessageId !== feedbackRes.messageId) {
+    await cancelQStashMessage(existing.feedbackMessageId);
+  }
+
+  // 8. Persistir únicamente resultados válidos (nunca sobrescribir un ID válido existente con undefined)
+  const nextWellnessId = wellnessOk ? wellnessRes.messageId : existing?.wellnessMessageId;
+  const nextFeedbackId = feedbackOk ? feedbackRes.messageId : existing?.feedbackMessageId;
+
+  if (wellnessOk || feedbackOk) {
+    registry[session.id] = {
+      wellnessMessageId: nextWellnessId,
+      feedbackMessageId: nextFeedbackId,
+      wellnessScheduledEpoch: wellnessOk
+        ? wellness.scheduledEpochSeconds
+        : (existing?.wellnessScheduledEpoch ?? wellness.scheduledEpochSeconds),
+      feedbackScheduledEpoch: feedbackOk
+        ? feedback.scheduledEpochSeconds
+        : (existing?.feedbackScheduledEpoch ?? feedback.scheduledEpochSeconds),
+      sessionDate: session.date,
+      sessionStartTime: session.startTime,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveStoredQStashRegistry(clubId, registry, supabase);
+  }
+
+  if (!wellnessOk || !feedbackOk) {
+    const errorCode = (wellnessOk || feedbackOk)
+      ? 'QSTASH_PARTIAL_SCHEDULE_FAILURE'
+      : 'QSTASH_SCHEDULE_FAILED';
+    const reasons: string[] = [];
+    if (!wellnessOk) reasons.push(`wellness: ${wellnessRes.error || 'error desconocido'}`);
+    if (!feedbackOk) reasons.push(`feedback: ${feedbackRes.error || 'error desconocido'}`);
+
+    return {
+      success: false,
+      wellnessMessageId: nextWellnessId,
+      feedbackMessageId: nextFeedbackId,
+      schedule: calcResult.schedule,
+      error: `[${errorCode}] ${reasons.join(' | ')}`,
+    };
+  }
 
   return {
     success: true,
-    wellnessMessageId: wellnessRes.messageId,
-    feedbackMessageId: feedbackRes.messageId,
+    wellnessMessageId: nextWellnessId,
+    feedbackMessageId: nextFeedbackId,
     schedule: calcResult.schedule,
   };
 }

@@ -1067,7 +1067,7 @@ export function computeApuntameloLiveState(
     extractNarracionesClaves(n).includes('inicio_parte2')
   );
 
-  if (isDescansoFlag || (hasDescansoNoticia && !hasParte2StartNoticia && parte <= 1)) {
+  if (!hasParte2StartNoticia && (isDescansoFlag || (hasDescansoNoticia && parte <= 1))) {
     return {
       estado: 'Descanso',
       live_timer_started_at: null,

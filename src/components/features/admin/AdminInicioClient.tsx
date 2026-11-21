@@ -98,6 +98,31 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
     }
   };
 
+  // Equipos organizados por posición en su liga (1º, 2º, 3º...)
+  const sortedTeamStats = useMemo(() => {
+    const stats = data?.sports?.teamStats;
+    if (!stats) return [];
+    return [...stats].sort((a, b) => {
+      const posA = a.currentPosition && a.currentPosition > 0 ? a.currentPosition : null;
+      const posB = b.currentPosition && b.currentPosition > 0 ? b.currentPosition : null;
+
+      // 1. Equipos con posición oficial en su liga primero (1º, 2º, 3º...)
+      if (posA !== null && posB !== null) {
+        if (posA !== posB) return posA - posB;
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+        return b.goalsFor - a.goalsFor;
+      }
+      if (posA !== null) return -1;
+      if (posB !== null) return 1;
+
+      // 2. Desempate secundario para formativos / pendientes
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+      return b.goalsFor - a.goalsFor;
+    });
+  }, [data?.sports?.teamStats]);
+
   if (isSeasonMismatch && refreshing) {
     return (
       <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[400px] space-y-4">
@@ -130,30 +155,6 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
   }
 
   const { club, kpis, alerts, sports, economy, agenda, communications, upcomingMatches } = data;
-
-  // Equipos organizados por posición en su liga (1º, 2º, 3º...)
-  const sortedTeamStats = useMemo(() => {
-    if (!sports?.teamStats) return [];
-    return [...sports.teamStats].sort((a, b) => {
-      const posA = a.currentPosition && a.currentPosition > 0 ? a.currentPosition : null;
-      const posB = b.currentPosition && b.currentPosition > 0 ? b.currentPosition : null;
-
-      // 1. Equipos con posición oficial en su liga primero (1º, 2º, 3º...)
-      if (posA !== null && posB !== null) {
-        if (posA !== posB) return posA - posB;
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
-        return b.goalsFor - a.goalsFor;
-      }
-      if (posA !== null) return -1;
-      if (posB !== null) return 1;
-
-      // 2. Desempate secundario para formativos / pendientes
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
-      return b.goalsFor - a.goalsFor;
-    });
-  }, [sports?.teamStats]);
 
   const quickLinks = [
     {
@@ -594,6 +595,7 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                           const isFinished = m.estado === "Finalizado" && hasScores;
                           const isSuspended = m.estado === "Suspendido";
                           const isPostponed = m.estado === "Aplazado";
+                          const isDescanso = m.estado === "Descanso";
                           const homeScore = m.esLocal ? (m.resultadoPropio ?? 0) : (m.resultadoRival ?? 0);
                           const awayScore = m.esLocal ? (m.resultadoRival ?? 0) : (m.resultadoPropio ?? 0);
 
@@ -633,6 +635,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   ) : isPostponed ? (
                                     <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
                                       Aplazado
+                                    </span>
+                                  ) : isDescanso ? (
+                                    <span className="text-[11px] font-black text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-lg uppercase">
+                                      Jornada de descanso
                                     </span>
                                   ) : (
                                     <>
@@ -690,6 +696,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                     ) : isPostponed ? (
                                       <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                                         APLAZADO
+                                      </span>
+                                    ) : isDescanso ? (
+                                      <span className="text-[10px] font-black uppercase text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
+                                        DESCANSO (RIVAL RETIRADO)
                                       </span>
                                     ) : (
                                       <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
@@ -767,6 +777,11 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                         <span className={`text-xs font-extrabold ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
                                           {m.esLocal ? m.rivalNombre : m.teamName}
                                         </span>
+                                        {isDescanso && (
+                                          <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
+                                            Retirado
+                                          </span>
+                                        )}
                                         {m.awayPosition && (
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
                                             {m.awayPosition}º
@@ -809,6 +824,10 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                   ) : isPostponed ? (
                                     <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
                                       Aplazado
+                                    </span>
+                                  ) : isDescanso ? (
+                                    <span className="text-[11px] font-black text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-lg uppercase">
+                                      Jornada de descanso
                                     </span>
                                   ) : (
                                     <div className="flex items-center gap-1.5">

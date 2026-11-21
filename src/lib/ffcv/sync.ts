@@ -524,7 +524,7 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
   let ffcvQuery = supabase
     .from('ffcv_matches')
-    .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status, pitch_name')
+    .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status, pitch_name, raw_data')
     .neq('ffcv_season_id', '21')
     .eq('ffcv_season_id', '22')
     .limit(5000);
@@ -647,6 +647,10 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
     if (!fm) continue;
 
     const isSaladarHome = (teamFfcvId && String(fm.home_team_ffcv_id) === String(teamFfcvId)) || (fm.home_team_name || '').toLowerCase().includes('saladar');
+    const isOpponentRetired = fm.raw_data && (
+      (isSaladarHome && (String(fm.raw_data.retirado_visitante) === '1' || fm.raw_data.retirado_visitante === 1)) ||
+      (!isSaladarHome && (String(fm.raw_data.retirado_local) === '1' || fm.raw_data.retirado_local === 1))
+    );
     const isPlayed = fm.status === 'played' || (fm.home_score !== null && fm.away_score !== null);
     const isSuspended = fm.status === 'suspended';
     const isPostponed = fm.status === 'postponed';
@@ -659,8 +663,16 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
 
     const updates: Record<string, any> = {};
 
+    // 0. Caso RIVAL RETIRADO DE LA COMPETICIÓN (Jornada de descanso)
+    if (isOpponentRetired && !isPlayed) {
+      if (pm.estado !== 'Descanso' || pm.resultado_propio !== null || pm.resultado_rival !== null) {
+        updates.estado = 'Descanso';
+        updates.resultado_propio = null;
+        updates.resultado_rival = null;
+      }
+    }
     // 1. Caso PARTIDO JUGADO / FINALIZADO
-    if (isPlayed) {
+    else if (isPlayed) {
       if (pm.estado !== 'Finalizado' || pm.resultado_propio !== sportingScore || pm.resultado_rival !== rivalScore) {
         updates.estado = 'Finalizado';
         updates.resultado_propio = sportingScore;

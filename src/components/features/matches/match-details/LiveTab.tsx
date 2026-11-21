@@ -155,16 +155,24 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
   const [partidoEstado, setPartidoEstado] = useState(match?.estado || "Programado");
   const [firstHalfDuration, setFirstHalfDuration] = useState<number | null>(match?.first_half_duration_seconds || null);
 
-  // Category-based half length
+  // Category-based half length: Infantil = 35', Cadete = 40', Juvenil/Senior = 45'
   const getHalfLengthMinutes = () => {
-    const category = (match?.equipo?.category || match?.equipo?.name || "").toLowerCase();
-    if (category.includes("infantil") || category.includes("alevin") || category.includes("benjamin") || category.includes("prebenjamin")) return 35;
-    if (category.includes("cadete")) return 40;
+    const teamObj = Array.isArray(match?.equipo) ? match?.equipo[0] : match?.equipo;
+    const category = `${teamObj?.category || ""} ${teamObj?.name || ""} ${match?.competicion_nombre || ""}`
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    if (category.includes("prebenjamin") || category.includes("benjamin")) return 25;
+    if (category.includes("alevin")) return 30;
+    if (category.includes("infantil")) return 35;
+    if (category.includes("cadete") || category.includes("cadet")) return 40;
     return 45; // Juvenil, Senior, and default
   };
   const halfLengthMinutes = getHalfLengthMinutes();
 
-  const isDescansoActive = firstHalfDuration !== null && seconds === firstHalfDuration && !running;
+  const isDescansoActive =
+    partidoEstado === "Descanso" ||
+    (firstHalfDuration !== null && Math.abs(seconds - firstHalfDuration) <= 2 && !running && partidoEstado !== "Finalizado");
 
   // Is it injury time?
   const isFirstHalfDescuento = seconds >= halfLengthMinutes * 60 && !firstHalfDuration && !isDescansoActive;
@@ -560,18 +568,26 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
       return;
     }
 
-    await pause(); // always pause the timer (await to prevent DB race condition)
+    const pausedAtSeconds = await pause(); // always pause the timer and get exact frozen seconds
+    const effectiveSeconds = typeof pausedAtSeconds === "number" ? pausedAtSeconds : seconds;
     
-    const secondHalfDuration = firstHalfDuration !== null ? seconds - (halfLengthMinutes * 60) : seconds;
+    const secondHalfDuration = firstHalfDuration !== null ? effectiveSeconds - (halfLengthMinutes * 60) : effectiveSeconds;
     
+    const actualMins = Math.floor(effectiveSeconds / 60);
+    const extraFirstHalfMins = Math.max(0, actualMins - halfLengthMinutes);
+    const eventMinute = phase === "Descanso" ? Math.min(halfLengthMinutes, actualMins) : actualMins;
+    const descansoDesc = extraFirstHalfMins > 0
+      ? `--- DESCANSO (${halfLengthMinutes}'+${extraFirstHalfMins}' · Duración 1ª Parte: ${formatTime(effectiveSeconds)}) ---`
+      : `--- DESCANSO (Duración 1ª Parte: ${formatTime(effectiveSeconds)}) ---`;
+
     // Guardar evento visual (intentamos guardarlo, pero no bloqueamos si falla)
     await addLiveEvent(matchId, {
       player_id: null,
       tipo: phase,
-      minuto: Math.floor(seconds / 60),
+      minuto: eventMinute,
       descripcion: phase === "Descanso" 
-        ? `--- DESCANSO (Duración 1ª Parte: ${formatTime(seconds)}) ---` 
-        : `--- FINAL DEL PARTIDO (Duración 2ª Parte: ${formatTime(secondHalfDuration > 0 ? secondHalfDuration : seconds)}) ---`
+        ? descansoDesc 
+        : `--- FINAL DEL PARTIDO (Duración 2ª Parte: ${formatTime(secondHalfDuration > 0 ? secondHalfDuration : effectiveSeconds)}) ---`
     });
 
     // Actualizar el estado del partido sin importar si el evento se insertó o no
@@ -587,13 +603,15 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
       }
     } else {
       const res = await updateMatchState(matchId, "Descanso", { 
-        first_half_duration_seconds: seconds 
+        first_half_duration_seconds: effectiveSeconds,
+        live_timer_elapsed_seconds: effectiveSeconds
       });
       if (!res.success) {
         toast.error(`Error registrando el descanso: ${res.error}`);
       } else {
         setPartidoEstado("Descanso");
-        setFirstHalfDuration(seconds);
+        setFirstHalfDuration(effectiveSeconds);
+        setTimerElapsed(effectiveSeconds);
         toast.success("Descanso registrado");
       }
     }
@@ -605,14 +623,21 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
       return;
     }
     const targetSeconds = halfLengthMinutes * 60;
-    const res = await updateMatchState(matchId, "En curso");
+    const nowIso = new Date().toISOString();
+    // Atomic update so Realtime never overwrites live_timer_elapsed_seconds with the 1st-half duration
+    const res = await updateMatchState(matchId, "En curso", {
+      live_timer_elapsed_seconds: targetSeconds,
+      live_timer_started_at: nowIso
+    });
     if (!res.success) {
       toast.error(`Error al iniciar la segunda parte: ${res.error}`);
       return;
     }
     setPartidoEstado("En curso");
-    start(targetSeconds);
-    toast.success("Segunda parte iniciada");
+    setTimerElapsed(targetSeconds);
+    setTimerStartedAt(nowIso);
+    await start(targetSeconds);
+    toast.success(`Segunda parte iniciada desde el minuto ${halfLengthMinutes}:00`);
   };
 
   const handleAddEvent = async (e: React.FormEvent) => {
@@ -797,8 +822,8 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
                     toast.error("El partido ha finalizado. El cronómetro no puede reanudarse.");
                     return;
                   }
-                  if (isDescansoActive) {
-                    toast.error("Estás en el descanso. Usa el botón 'Iniciar 2ª Parte' para reanudar el partido.");
+                  if (partidoEstado === "Descanso" || isDescansoActive) {
+                    await handleStartSecondHalf();
                     return;
                   }
                   

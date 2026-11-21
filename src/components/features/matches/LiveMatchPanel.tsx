@@ -88,7 +88,7 @@ export function LiveMatchPanel({
         if (payload.eventType === 'INSERT') {
           // Fetch player details if there's a player_id
           if (payload.new.player_id) {
-            supabase.from('players').select('first_name, last_name, dorsal').eq('id', payload.new.player_id).single().then(({ data }) => {
+            supabase.from('players').select('first_name, last_name, dorsal, avatar_url').eq('id', payload.new.player_id).single().then(({ data }) => {
               setMatchEvents(prev => {
                 if (prev.some(e => e.id === payload.new.id)) return prev;
                 return [...prev, { ...payload.new, player: data }].sort((a, b) => a.minuto - b.minuto);
@@ -219,14 +219,27 @@ export function LiveMatchPanel({
     };
   });
 
-  // Split Timeline Data (by explicit event or by half duration / 45m threshold)
+  // Split Timeline Data: if there is an explicit 'Descanso' event, split strictly by whether the event happened before or after Descanso (by created_at or position)
+  const descansoEvent = matchEvents.find(e => e.tipo_evento === 'Descanso');
+  const descansoTimeMs = descansoEvent?.created_at ? new Date(descansoEvent.created_at).getTime() : null;
   const descansoIndex = matchEvents.findIndex(e => e.tipo_evento === 'Descanso');
   const firstHalfDurationMinutes = match?.first_half_duration_seconds ? Math.floor(match.first_half_duration_seconds / 60) : (ligaBraveLive?.minutosParte || 45);
   
   let firstHalfEvents: any[] = [];
   let secondHalfEvents: any[] = [];
 
-  if (descansoIndex !== -1) {
+  if (descansoEvent && descansoTimeMs) {
+    firstHalfEvents = matchEvents
+      .filter(e => e.id === descansoEvent.id || (e.created_at && new Date(e.created_at).getTime() <= descansoTimeMs))
+      .sort((a, b) => {
+        if (a.tipo_evento === 'Descanso') return 1;
+        if (b.tipo_evento === 'Descanso') return -1;
+        return (a.minuto || 0) - (b.minuto || 0);
+      });
+    secondHalfEvents = matchEvents
+      .filter(e => e.id !== descansoEvent.id && (!e.created_at || new Date(e.created_at).getTime() > descansoTimeMs))
+      .sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
+  } else if (descansoIndex !== -1) {
     firstHalfEvents = matchEvents.slice(0, descansoIndex + 1);
     secondHalfEvents = matchEvents.slice(descansoIndex + 1);
   } else {
@@ -312,9 +325,37 @@ export function LiveMatchPanel({
               )}
             </div>
             {event.player ? (
-              <p className="text-[11px] font-bold text-slate-700 mt-0.5">
-                {event.player.dorsal ? `#${event.player.dorsal} ` : ''}{event.player.first_name} {event.player.last_name}
-              </p>
+              <div className="flex flex-col gap-1 mt-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {event.player.avatar_url ? (
+                    <img src={event.player.avatar_url} alt={`${event.player.first_name} ${event.player.last_name}`} className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                  ) : null}
+                  {event.player.dorsal ? (
+                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0">
+                      #{event.player.dorsal}
+                    </span>
+                  ) : null}
+                  <p className="text-xs font-bold text-slate-800 leading-snug break-words">
+                    {event.player.first_name} {event.player.last_name}
+                  </p>
+                </div>
+                {Array.isArray(event.goal_insights) && event.goal_insights.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {event.goal_insights.map((ins: string, iIdx: number) => (
+                      <span
+                        key={iIdx}
+                        className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
+                          ins.includes('rápido')
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}
+                      >
+                        {ins.includes('rápido') ? `⚡ ${ins}` : `⚽ ${ins}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : null}
             {cleanNotas && !isCommentRow && !isDuplicatePlayerName && (
               <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-snug">
@@ -441,6 +482,11 @@ export function LiveMatchPanel({
                     <span className={`text-[9px] sm:text-[10px] font-black mt-1.5 uppercase tracking-widest px-2.5 py-0.5 rounded-md border ${isDescanso ? 'bg-amber-500 text-white border-amber-600 shadow-sm animate-pulse' : (match?.live_timer_started_at != null || (match?.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0)) ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'text-slate-400 border-slate-200'}`}>
                       {isDescanso ? 'DESCANSO' : (match?.live_timer_started_at != null ? (match?.first_half_duration_seconds ? '2ª Parte' : '1ª Parte') : (match?.estado || 'Programado'))}
                     </span>
+                    {match?.first_half_duration_seconds ? (
+                      <span className="text-[9px] font-bold text-slate-500 mt-1 tabular-nums">
+                        1ª Parte: {formatTime(match.first_half_duration_seconds)}
+                      </span>
+                    ) : null}
                   </>
                 );
               })()}
@@ -514,50 +560,163 @@ export function LiveMatchPanel({
                 const playerName = isPP 
                   ? (fullPlayerName || extractedFromNotas ? `${fullPlayerName || extractedFromNotas} (p.p.)` : `${ownGoalScorerTeamName} (p.p.)`) 
                   : baseScorerName;
+                const dorsalFromNotas = rawNotas.match(/#(\d+)/)?.[1] || null;
+                const playerDorsal = goal.player?.dorsal ?? dorsalFromNotas;
+                const avatarUrl = goal.player?.avatar_url || null;
+                const goalInsights: string[] = Array.isArray((goal as any).goal_insights) ? (goal as any).goal_insights : [];
 
                 return (
-                  <div key={goal.id || Math.random()} className="grid grid-cols-12 items-center gap-1 sm:gap-2 text-xs font-bold">
-                    {/* Columna Goles Local (Alineada a la Izquierda) */}
-                    <div className="col-span-4 sm:col-span-5 text-right flex items-center justify-end gap-1.5 pr-1 sm:pr-2 min-w-0">
-                      {goal.isHomeGoal ? (
-                        <>
-                          <div className="min-w-0 flex flex-col items-end">
-                            <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs max-w-full">{playerName}</span>
-                            {assistName && (
-                              <span className="text-[10px] font-semibold text-slate-400 truncate max-w-full">
-                                👟 Asist: {assistName}
+                  <div key={goal.id || Math.random()}>
+                    {/* Vista Móvil: Tarjeta de ancho completo para que el nombre entero, dorsal, avatar y estadísticas nunca se corten */}
+                    <div className="flex sm:hidden items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={playerName} className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0 shadow-xs" />
+                        ) : (
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 border ${goal.isHomeGoal ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                            {playerDorsal && !isPP ? `#${playerDorsal}` : '⚽'}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {playerDorsal && !isPP && (
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0">
+                                #{playerDorsal}
                               </span>
                             )}
+                            <span className="text-slate-900 font-black text-xs leading-snug break-words">
+                              {playerName}
+                            </span>
                           </div>
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-black tabular-nums shrink-0">
-                            {displayMinuto}'
-                          </span>
-                        </>
-                      ) : null}
+                          {goalInsights.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {goalInsights.map((ins, iIdx) => (
+                                <span
+                                  key={iIdx}
+                                  className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                                    ins.includes('rápido')
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}
+                                >
+                                  {ins.includes('rápido') ? `⚡ ${ins}` : `⚽ ${ins}`}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {assistName && (
+                            <span className="block text-[10px] font-semibold text-slate-400 mt-0.5 break-words">
+                              👟 Asist: {assistName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="bg-slate-900 text-white py-0.5 px-2 rounded-md font-black text-[11px] tracking-wider whitespace-nowrap">
+                          {goal.score}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black tabular-nums border ${goal.isHomeGoal ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                          {displayMinuto}'
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Marcador Acumulado Central */}
-                    <div className="col-span-4 sm:col-span-2 text-center bg-white py-1 px-2 rounded-lg border border-slate-200 shadow-xs font-black text-slate-800 text-[11px] sm:text-xs tracking-wider shrink-0 mx-auto whitespace-nowrap">
-                      {goal.score}
-                    </div>
+                    {/* Vista Escritorio / Tablet */}
+                    <div className="hidden sm:grid sm:grid-cols-12 items-center gap-2 text-xs font-bold">
+                      {/* Columna Goles Local */}
+                      <div className="col-span-5 text-right flex items-center justify-end gap-2 pr-2 min-w-0">
+                        {goal.isHomeGoal ? (
+                          <>
+                            <div className="min-w-0 flex flex-col items-end">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {avatarUrl && (
+                                  <img src={avatarUrl} alt={playerName} className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                                )}
+                                {playerDorsal && !isPP && (
+                                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0">
+                                    #{playerDorsal}
+                                  </span>
+                                )}
+                                <span className="text-slate-800 font-bold text-xs leading-tight break-words text-right">{playerName}</span>
+                              </div>
+                              {goalInsights.length > 0 && (
+                                <div className="flex flex-wrap items-center justify-end gap-1 mt-1">
+                                  {goalInsights.map((ins, iIdx) => (
+                                    <span
+                                      key={iIdx}
+                                      className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                                        ins.includes('rápido')
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}
+                                    >
+                                      {ins.includes('rápido') ? `⚡ ${ins}` : `⚽ ${ins}`}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {assistName && (
+                                <span className="text-[10px] font-semibold text-slate-400 break-words max-w-full mt-0.5">
+                                  👟 Asist: {assistName}
+                                </span>
+                              )}
+                            </div>
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px] font-black tabular-nums shrink-0">
+                              {displayMinuto}'
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
 
-                    {/* Columna Goles Visitante (Alineada a la Derecha) */}
-                    <div className="col-span-4 sm:col-span-5 text-left flex items-center justify-start gap-1.5 pl-1 sm:pl-2 min-w-0">
-                      {!goal.isHomeGoal ? (
-                        <>
-                          <span className="bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-black tabular-nums shrink-0">
-                            {displayMinuto}'
-                          </span>
-                          <div className="min-w-0 flex flex-col items-start">
-                            <span className="text-slate-800 font-bold truncate text-[11px] sm:text-xs max-w-full">{playerName}</span>
-                            {assistName && (
-                              <span className="text-[10px] font-semibold text-slate-400 truncate max-w-full">
-                                👟 Asist: {assistName}
-                              </span>
-                            )}
-                          </div>
-                        </>
-                      ) : null}
+                      {/* Marcador Acumulado Central */}
+                      <div className="col-span-2 text-center bg-white py-1 px-2 rounded-lg border border-slate-200 shadow-xs font-black text-slate-800 text-xs tracking-wider shrink-0 mx-auto whitespace-nowrap">
+                        {goal.score}
+                      </div>
+
+                      {/* Columna Goles Visitante */}
+                      <div className="col-span-5 text-left flex items-center justify-start gap-2 pl-2 min-w-0">
+                        {!goal.isHomeGoal ? (
+                          <>
+                            <span className="bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[11px] font-black tabular-nums shrink-0">
+                              {displayMinuto}'
+                            </span>
+                            <div className="min-w-0 flex flex-col items-start">
+                              <div className="flex items-center justify-start gap-1.5 flex-wrap">
+                                {avatarUrl && (
+                                  <img src={avatarUrl} alt={playerName} className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                                )}
+                                {playerDorsal && !isPP && (
+                                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-black shrink-0">
+                                    #{playerDorsal}
+                                  </span>
+                                )}
+                                <span className="text-slate-800 font-bold text-xs leading-tight break-words text-left">{playerName}</span>
+                              </div>
+                              {goalInsights.length > 0 && (
+                                <div className="flex flex-wrap items-center justify-start gap-1 mt-1">
+                                  {goalInsights.map((ins, iIdx) => (
+                                    <span
+                                      key={iIdx}
+                                      className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                                        ins.includes('rápido')
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}
+                                    >
+                                      {ins.includes('rápido') ? `⚡ ${ins}` : `⚽ ${ins}`}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {assistName && (
+                                <span className="text-[10px] font-semibold text-slate-400 break-words max-w-full mt-0.5">
+                                  👟 Asist: {assistName}
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );

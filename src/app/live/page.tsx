@@ -52,7 +52,9 @@ export default async function PublicLivePage() {
         tipo_evento,
         minuto,
         player_id,
-        player:players (first_name, last_name, nickname)
+        notas,
+        created_at,
+        player:players (first_name, last_name, nickname, dorsal, avatar_url)
       )
     `)
     .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')

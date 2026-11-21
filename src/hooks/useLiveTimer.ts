@@ -60,7 +60,7 @@ export function useLiveTimer(
     await toggleMatchTimer(matchId, true, newElapsed);
   };
 
-  const pause = async () => {
+  const pause = async (): Promise<number> => {
     const currentSeconds = startedAt
       ? baseElapsed + Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
       : seconds;
@@ -69,6 +69,7 @@ export function useLiveTimer(
     setBaseElapsed(currentSeconds);
     setSeconds(currentSeconds);
     await toggleMatchTimer(matchId, false, currentSeconds);
+    return currentSeconds;
   };
 
   const reset = async (to = 0) => {

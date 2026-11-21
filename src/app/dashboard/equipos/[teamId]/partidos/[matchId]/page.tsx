@@ -31,7 +31,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
     .select(`
       *,
       equipo:teams(id, name, category, color, season_id),
-      match_events(*, player:players(id, first_name, last_name, dorsal))
+      match_events(*, player:players(id, first_name, last_name, dorsal, avatar_url))
     `)
     .eq("id", matchId)
     .single()
@@ -82,7 +82,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
 
   const { data: eventsData } = await supabase
     .from("match_events")
-    .select("*, player:players(id, first_name, last_name, dorsal)")
+    .select("*, player:players(id, first_name, last_name, dorsal, avatar_url)")
     .eq("partido_id", matchId)
     .order("minuto", { ascending: true })
     .order("created_at", { ascending: true })

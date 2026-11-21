@@ -85,7 +85,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     const loadEvents = async () => {
       const { data } = await supabase
         .from('match_events')
-        .select('*, player:players(first_name, last_name)')
+        .select('*, player:players(first_name, last_name, dorsal, avatar_url)')
         .eq('partido_id', match.id)
         .order('minuto', { ascending: true })
       if (data) setEvents(data)
@@ -116,7 +116,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
         let player = null
         if (payload.new.player_id) {
           const { data: p } = await supabase
-            .from('players').select('first_name, last_name')
+            .from('players').select('first_name, last_name, dorsal, avatar_url')
             .eq('id', payload.new.player_id).single()
           player = p
         }
@@ -222,7 +222,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
     }
 
     return (
-      <div className={`flex flex-col text-[11px] md:text-xs text-slate-700 mt-2.5 w-full space-y-1 ${isHomeTeam ? 'items-start text-left pl-2' : 'items-end text-right pr-2'}`}>
+      <div className={`flex flex-col text-[11px] md:text-xs text-slate-700 mt-2 w-full space-y-1.5 ${isHomeTeam ? 'items-start text-left pl-1' : 'items-end text-right pr-1'}`}>
         {displayItems.map((g, i) => {
           if (g.isSynthetic) {
             return (
@@ -245,32 +245,53 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
               .replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '')
               .replace(/\[BRAVE:[^\]]+\]\s*/gi, '')
               .replace(/\s*\(Asist:[^)]*\)/gi, '')
+              .replace(/^Gol(?:\s+en\s+propia\s+puerta)?\s+de\s+(?:#\d+\s+)?/i, '')
               .trim();
             if (clean.includes(',')) {
               const parts = clean.split(',').map(p => p.trim());
               clean = `${parts[1]} ${parts[0]}`;
             }
-            const words = clean.split(/\s+/).filter(Boolean);
-            if (words.length > 2) {
-              clean = `${words[0]} ${words[1]}`;
-            }
             return clean.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
           };
 
+          const fullPlayerName = g.player
+            ? `${g.player.first_name || ''} ${g.player.last_name || ''}`.trim()
+            : '';
+          const rawNotas = String(g.notas || '');
+          const dorsalFromNotas = rawNotas.match(/#(\d+)/)?.[1] || null;
+          const playerDorsal = g.player?.dorsal ?? dorsalFromNotas;
+          const avatarUrl = g.player?.avatar_url || null;
+
           if (isSporting) {
             if (isOwnGoal) name = 'Rival (PP)';
-            else name = g.player?.first_name ? g.player.first_name.trim() : (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador');
+            else name = fullPlayerName || (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador');
           } else {
-            if (isOwnGoal) name = g.player?.first_name ? `${g.player.first_name} (PP)` : 'Sporting (PP)';
+            if (isOwnGoal) name = fullPlayerName ? `${fullPlayerName} (PP)` : 'Sporting (PP)';
             else name = g.notas ? getCleanNameFromNotas(g.notas) : 'Rival';
           }
           
           const icon = (tipo.includes('penal') || tipo.includes('penalty')) ? '🎯' : '⚽';
           return (
-            <div key={g.id || i} className="flex items-center gap-1.5 font-bold text-slate-800">
+            <div key={g.id || i} className={`flex items-center gap-1.5 font-bold text-slate-800 max-w-full ${isHomeTeam ? 'justify-start' : 'justify-end'}`}>
               {isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
-              <span>{name}</span> 
-              {displayMin > 0 && <span className="text-slate-400 text-[10px] font-normal">({displayMin}')</span>}
+              {isHomeTeam && avatarUrl && (
+                <img src={avatarUrl} alt={name} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+              )}
+              {isHomeTeam && playerDorsal && !isOwnGoal && (
+                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-black shrink-0">
+                  #{playerDorsal}
+                </span>
+              )}
+              <span className="leading-snug break-words">{name}</span>
+              {!isHomeTeam && playerDorsal && !isOwnGoal && (
+                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-black shrink-0">
+                  #{playerDorsal}
+                </span>
+              )}
+              {!isHomeTeam && avatarUrl && (
+                <img src={avatarUrl} alt={name} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+              )}
+              {displayMin > 0 && <span className="text-slate-400 text-[10px] font-normal shrink-0">({displayMin}')</span>}
               {!isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
             </div>
           );
@@ -402,10 +423,9 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
 
         {/* Goals List Row */}
         {(getGoalsForTeam(true) || getGoalsForTeam(false)) && (
-          <div className="px-4 pb-4 flex justify-between items-start gap-4">
-            <div className="flex-1 w-1/3 flex flex-col items-center">{getGoalsForTeam(true)}</div>
-            <div className="w-1/3 shrink-0"></div>
-            <div className="flex-1 w-1/3 flex flex-col items-center">{getGoalsForTeam(false)}</div>
+          <div className="px-4 pb-4 grid grid-cols-2 items-start gap-3">
+            <div className="flex flex-col items-start w-full min-w-0">{getGoalsForTeam(true)}</div>
+            <div className="flex flex-col items-end w-full min-w-0">{getGoalsForTeam(false)}</div>
           </div>
         )}
 

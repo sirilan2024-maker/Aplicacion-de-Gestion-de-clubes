@@ -268,7 +268,10 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
           }).sort((a: any, b: any) => (a.minuto || 0) - (b.minuto || 0));
 
           const getCleanNameFromNotas = (rawNotes: string) => {
-            let clean = rawNotes.replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '').trim();
+            let clean = rawNotes
+              .replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '')
+              .replace(/^Gol(?:\s+en\s+propia\s+puerta)?\s+de\s+(?:#\d+\s+)?/i, '')
+              .trim();
             if (clean.includes(',')) {
               const parts = clean.split(',').map(p => p.trim());
               clean = `${parts[1]} ${parts[0]}`;
@@ -276,59 +279,71 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
             return clean.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
           };
 
+          const renderScorerItem = (g: any, i: number, alignRight: boolean) => {
+            const tipo = (g.tipo_evento || g.tipo || '').toLowerCase();
+            const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
+            const isSportingPlayer = Boolean(g.player_id);
+            const fullPlayerName = g.player
+              ? `${g.player.first_name || ''} ${g.player.last_name || ''}`.trim()
+              : '';
+            const rawNotas = String(g.notas || '');
+            const dorsalFromNotas = rawNotas.match(/#(\d+)/)?.[1] || null;
+            const playerDorsal = g.player?.dorsal ?? dorsalFromNotas;
+            const avatarUrl = g.player?.avatar_url || null;
+
+            let pName = '';
+            if (isSportingPlayer) {
+              pName = isOwnGoal ? `${fullPlayerName || 'Sporting'} (p.p.)` : (fullPlayerName || (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador'));
+            } else {
+              pName = isOwnGoal ? 'Rival (p.p.)' : (g.notas ? getCleanNameFromNotas(g.notas) : 'Rival');
+            }
+
+            return (
+              <div key={i} className={`flex items-center gap-1.5 text-slate-700 font-medium flex-wrap ${alignRight ? 'justify-end text-right' : 'justify-start text-left'}`}>
+                {!alignRight && avatarUrl && (
+                  <img src={avatarUrl} alt={pName} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                )}
+                {!alignRight && playerDorsal && !isOwnGoal && (
+                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-black shrink-0">
+                    #{playerDorsal}
+                  </span>
+                )}
+                {alignRight && <span className="text-slate-400 font-semibold text-[11px] shrink-0">({g.minuto}')</span>}
+                <span className="font-bold leading-snug break-words">{pName}</span>
+                {!alignRight && <span className="text-slate-400 font-semibold text-[11px] shrink-0">({g.minuto}')</span>}
+                {alignRight && playerDorsal && !isOwnGoal && (
+                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-black shrink-0">
+                    #{playerDorsal}
+                  </span>
+                )}
+                {alignRight && avatarUrl && (
+                  <img src={avatarUrl} alt={pName} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                )}
+              </div>
+            );
+          };
+
           return (
-            <div className="bg-slate-50/80 px-6 py-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-xs text-slate-700">
+            <div className="bg-slate-50/80 px-4 sm:px-6 py-4 border-t border-slate-100 grid grid-cols-2 gap-3 sm:gap-4 text-xs text-slate-700">
               {/* Columna Goles Local */}
-              <div className="flex flex-col items-start gap-1">
+              <div className="flex flex-col items-start gap-1.5 min-w-0">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-0.5">
                   <span>⚽ {localName}</span>
                 </div>
                 {localGoalEvents.length > 0 ? (
-                  localGoalEvents.map((g: any, i: number) => {
-                    const tipo = (g.tipo_evento || g.tipo || '').toLowerCase();
-                    const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
-                    const isSportingPlayer = Boolean(g.player_id);
-                    let pName = '';
-                    if (isSportingPlayer) {
-                      pName = isOwnGoal ? 'Sporting (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador'));
-                    } else {
-                      pName = isOwnGoal ? 'Rival (p.p.)' : (g.notas ? getCleanNameFromNotas(g.notas) : 'Rival');
-                    }
-                    return (
-                      <div key={i} className="flex items-center gap-1.5 text-slate-700 font-medium">
-                        <span className="font-bold">{pName}</span>
-                        <span className="text-slate-400 font-semibold text-[11px]">({g.minuto}')</span>
-                      </div>
-                    );
-                  })
+                  localGoalEvents.map((g: any, i: number) => renderScorerItem(g, i, false))
                 ) : (
                   <span className="text-slate-400 italic text-[11px]">Sin goles</span>
                 )}
               </div>
 
               {/* Columna Goles Visitante */}
-              <div className="flex flex-col items-end gap-1 text-right border-l border-slate-200/60 pl-4">
+              <div className="flex flex-col items-end gap-1.5 text-right border-l border-slate-200/60 pl-3 sm:pl-4 min-w-0">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-0.5 justify-end">
                   <span>{awayName} ⚽</span>
                 </div>
                 {awayGoalEvents.length > 0 ? (
-                  awayGoalEvents.map((g: any, i: number) => {
-                    const tipo = (g.tipo_evento || g.tipo || '').toLowerCase();
-                    const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
-                    const isSportingPlayer = Boolean(g.player_id);
-                    let pName = '';
-                    if (isSportingPlayer) {
-                      pName = isOwnGoal ? 'Sporting (p.p.)' : (g.player?.first_name ? g.player.first_name.trim() : (g.notas ? getCleanNameFromNotas(g.notas) : 'Jugador'));
-                    } else {
-                      pName = isOwnGoal ? 'Rival (p.p.)' : (g.notas ? getCleanNameFromNotas(g.notas) : 'Rival');
-                    }
-                    return (
-                      <div key={i} className="flex items-center gap-1.5 text-slate-700 font-medium justify-end">
-                        <span className="text-slate-400 font-semibold text-[11px]">({g.minuto}')</span>
-                        <span className="font-bold">{pName}</span>
-                      </div>
-                    );
-                  })
+                  awayGoalEvents.map((g: any, i: number) => renderScorerItem(g, i, true))
                 ) : (
                   <span className="text-slate-400 italic text-[11px]">Sin goles</span>
                 )}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { MatchdayCard } from "./MatchdayCard"
 import { LiveMatchPanel } from "./LiveMatchPanel"
-import { getPublicMatches, deleteMatchAction } from "@/app/actions/match-actions"
+import { getPublicMatches, hideMatchFromLiveAction } from "@/app/actions/match-actions"
 import { CalendarDays, X, ChevronLeft, ChevronRight, Settings, Trash2 } from "lucide-react"
 import { LiveAdManager } from "@/components/features/admin/LiveAdManager"
 import toast from "react-hot-toast"
@@ -38,22 +38,31 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     setIsMounted(true)
   }, [])
 
-  // Compute the ±72h window matches + highlighted matches
+  // Compute the ±72h window matches + highlighted matches (excluding matches older than 72h)
   const jornada = React.useMemo(() => {
     const now = Date.now()
     const h72 = 72 * 60 * 60 * 1000 // 72 hours in ms
+    const h12 = 12 * 60 * 60 * 1000 // 12 hours max duration for an unclosed live timer
     const windowStart = now - h72
     const windowEnd = now + h72
 
     const inWindow = matches.filter(m => {
-      if (m.estado !== 'Finalizado' && (m.estado === 'Descanso' || m.estado === 'En Curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)) return true;
       const t = new Date(m.fecha_hora).getTime()
+      const isActivelyLive =
+        m.estado !== 'Finalizado' &&
+        (now - t) <= h12 &&
+        (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)
+      if (isActivelyLive) return true
       return t >= windowStart && t <= windowEnd
     })
 
-    // Add admin-highlighted matches that are not already in window
+    // Add admin-highlighted matches that are not already in window and haven't expired (>72h old)
     const inWindowIds = new Set(inWindow.map(m => m.id))
-    const highlighted = matches.filter(m => m.highlight_jornada && !inWindowIds.has(m.id))
+    const highlighted = matches.filter(m => {
+      if (!m.highlight_jornada || inWindowIds.has(m.id)) return false
+      const t = new Date(m.fecha_hora).getTime()
+      return t >= windowStart
+    })
 
     const combined = [...inWindow, ...highlighted]
 
@@ -271,8 +280,16 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     )
   }
 
-  // Separate live
-  const live = jornada.filter(m => m.estado !== 'Finalizado' && (m.estado === 'Descanso' || m.estado === 'En Curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0))
+  // Separate live (only if match date is within the last 12 hours so old unclosed matches don't stay pinned as live)
+  const isMatchActivelyLive = (m: any) => {
+    const t = new Date(m.fecha_hora).getTime()
+    return (
+      m.estado !== 'Finalizado' &&
+      (Date.now() - t) <= 12 * 60 * 60 * 1000 &&
+      (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)
+    )
+  }
+  const live = jornada.filter(isMatchActivelyLive)
   const selectedMatch = isClosedByUser 
     ? (selectedLiveMatchId ? matches.find(m => m.id === selectedLiveMatchId) : null)
     : ((selectedLiveMatchId ? matches.find(m => m.id === selectedLiveMatchId) : null) || (live.length > 0 ? live[0] : null));
@@ -400,25 +417,31 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
                             type="button"
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (window.confirm(`¿Estás seguro de eliminar el partido de ${match.equipo?.name || 'Sporting'} vs ${match.rival_nombre}?`)) {
+                              if (window.confirm(`¿Ocultar el partido de ${match.equipo?.name || 'Sporting'} vs ${match.rival_nombre} de la vista en directo? (El partido NO se borrará de la base de datos)`)) {
                                 try {
-                                  const res = await deleteMatchAction(match.id, match.equipo_id);
+                                  const res = await hideMatchFromLiveAction(match.id, match.equipo_id);
                                   if (res && res.success === false) {
-                                    toast.error(res.error || "No se pudo eliminar el partido.");
+                                    toast.error(res.error || "No se pudo ocultar el partido.");
                                     return;
                                   }
                                   setMatches(prev => prev.filter(m => m.id !== match.id));
-                                  toast.success("Partido eliminado correctamente");
+                                  toast.success("Partido quitado de la vista en directo");
                                 } catch (err: any) {
-                                  toast.error("Error al eliminar el partido: " + (err.message || "Error desconocido"));
+                                  const msg = err?.message || "";
+                                  if (msg.includes("Server Action") || msg.includes("not found on the server")) {
+                                    toast.error("La página se ha actualizado. Recargando...");
+                                    setTimeout(() => window.location.reload(), 1000);
+                                  } else {
+                                    toast.error("Error al quitar el partido de Live: " + (msg || "Error desconocido"));
+                                  }
                                 }
                               }
                             }}
                             className="absolute top-3 right-3 p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 shadow-sm opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 flex items-center gap-1 text-[10px] font-bold"
-                            title="Eliminar partido de la vista en vivo"
+                            title="Quitar partido de la vista en vivo (sin borrarlo de la base de datos)"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            <span>Eliminar</span>
+                            <span>Quitar de Live</span>
                           </button>
                         )}
                         

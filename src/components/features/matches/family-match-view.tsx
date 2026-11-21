@@ -643,35 +643,62 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
 
           {/* Chronological Goals Footer */}
           {goalTimeline.length > 0 && (
-            <div className="bg-slate-50/80 px-6 py-5 border-t border-slate-100 flex flex-col items-center gap-2.5">
+            <div className="bg-slate-50/80 px-3 sm:px-6 py-5 border-t border-slate-100 flex flex-col items-center gap-2.5">
               {goalTimeline.map((goal, idx) => {
                 const displayMinuto = goal.minuto > 120 ? Math.floor(goal.minuto / 60) : (goal.minuto || 0);
                 const isOwnGoal = goal.tipo_evento === 'Gol en propia puerta';
                 const nameSuffix = isOwnGoal ? ' (p.p.)' : '';
+                const fullPlayerName = goal.player?.first_name
+                  ? `${goal.player.first_name} ${goal.player.last_name || ''}`.trim()
+                  : '';
+                const rawNotas = String(goal.notas || '');
+                const dorsalFromNotas = rawNotas.match(/#(\d+)/)?.[1] || null;
+                const playerDorsal = goal.player?.dorsal ?? dorsalFromNotas;
+                const avatarUrl = goal.player?.avatar_url || null;
                 return (
-                  <div key={idx} className="flex items-center w-full max-w-md text-[13px] font-bold">
+                  <div key={idx} className="flex items-center w-full max-w-lg text-xs sm:text-[13px] font-bold gap-2">
                     {/* Home Side */}
-                    <div className="flex-1 text-right pr-4 text-slate-700">
+                    <div className="flex-1 text-right pr-1 sm:pr-3 text-slate-700 min-w-0">
                       {goal.isHomeGoal && (
-                        <span>
-                          {goal.player?.first_name ? `${goal.player.first_name} ${goal.player.last_name || ''}${nameSuffix}` : `Local${nameSuffix}`} 
-                          <span className="text-slate-400 font-medium ml-1">({displayMinuto}')</span>
-                        </span>
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {avatarUrl && (
+                            <img src={avatarUrl} alt={fullPlayerName} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                          )}
+                          {playerDorsal && !isOwnGoal && (
+                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-black shrink-0">
+                              #{playerDorsal}
+                            </span>
+                          )}
+                          <span className="leading-snug break-words">
+                            {fullPlayerName ? `${fullPlayerName}${nameSuffix}` : `Local${nameSuffix}`}
+                          </span>
+                          <span className="text-slate-400 font-medium shrink-0">({displayMinuto}')</span>
+                        </div>
                       )}
                     </div>
                     
                     {/* Score Center */}
-                    <div className="w-16 text-center text-amber-600 font-black text-[15px] tracking-[0.2em] shrink-0">
+                    <div className="w-12 sm:w-16 text-center text-amber-600 font-black text-xs sm:text-[15px] tracking-wider sm:tracking-[0.2em] shrink-0">
                       {goal.score}
                     </div>
                     
                     {/* Away Side */}
-                    <div className="flex-1 text-left pl-4 text-slate-700">
+                    <div className="flex-1 text-left pl-1 sm:pl-3 text-slate-700 min-w-0">
                       {!goal.isHomeGoal && (
-                        <span>
-                          <span className="text-slate-400 font-medium mr-1">({displayMinuto}')</span> 
-                          {goal.player?.first_name ? `${goal.player.first_name} ${goal.player.last_name || ''}${nameSuffix}` : `Visitante${nameSuffix}`}
-                        </span>
+                        <div className="flex items-center justify-start gap-1.5 flex-wrap">
+                          <span className="text-slate-400 font-medium shrink-0">({displayMinuto}')</span>
+                          {avatarUrl && (
+                            <img src={avatarUrl} alt={fullPlayerName} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
+                          )}
+                          {playerDorsal && !isOwnGoal && (
+                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-black shrink-0">
+                              #{playerDorsal}
+                            </span>
+                          )}
+                          <span className="leading-snug break-words">
+                            {fullPlayerName ? `${fullPlayerName}${nameSuffix}` : `Visitante${nameSuffix}`}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

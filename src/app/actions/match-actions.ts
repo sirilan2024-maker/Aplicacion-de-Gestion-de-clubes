@@ -877,6 +877,65 @@ export async function sendMatchSummaryToCoordinatorsAction(matchId: string, summ
   }
 }
 
+export async function hideMatchFromLiveAction(matchId: string, teamId?: string) {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (!context || authError) {
+      return { success: false, error: authError || "No autenticado" };
+    }
+
+    const userRoles = getUserAllRoles(context);
+    if (!userRoles.some((r) => ADMIN_ROLES.includes(r))) {
+      return { success: false, error: "Solo los administradores pueden ocultar partidos de Live" };
+    }
+
+    const adminClient = await createAdminClient();
+    const matchAccess = await canUserAccessMatch(adminClient, context, matchId);
+    if (!matchAccess.allowed || !matchAccess.match) {
+      return { success: false, error: matchAccess.reason || "No tienes permisos sobre este partido" };
+    }
+
+    const match = matchAccess.match;
+    const matchTime = match.fecha_hora ? new Date(match.fecha_hora).getTime() : 0;
+    const isPastOrStarted =
+      (matchTime > 0 && matchTime < Date.now()) ||
+      match.estado === 'En curso' ||
+      match.estado === 'En Curso' ||
+      match.estado === 'Descanso' ||
+      match.live_timer_started_at !== null ||
+      (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0);
+
+    const updates: Record<string, any> = {
+      highlight_jornada: false,
+      live_timer_started_at: null,
+    };
+
+    if (isPastOrStarted && match.estado !== 'Finalizado') {
+      updates.estado = 'Finalizado';
+    }
+
+    const { error } = await adminClient
+      .from("partidos")
+      .update(updates)
+      .eq("id", matchId)
+      .eq("club_id", context.profile.club_id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath(`/live`);
+    revalidatePath(`/dashboard/matches`);
+    if (teamId) {
+      revalidatePath(`/dashboard/equipos/${teamId}/partidos`);
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error("hideMatchFromLiveAction exception:", err);
+    return { success: false, error: err.message || "Error inesperado al ocultar el partido de Live" };
+  }
+}
+
 export async function deleteMatchAction(matchId: string, teamId: string) {
   try {
     const { context, error: authError } = await getAuthenticatedContext();
@@ -1577,7 +1636,7 @@ export async function getPublicMatchEvents(matchId: string) {
     .from('match_events')
     .select(`
       *,
-      player:players(first_name, last_name, dorsal)
+      player:players(first_name, last_name, dorsal, avatar_url)
     `)
     .eq('partido_id', matchId)
     .order('minuto', { ascending: true })
@@ -1586,7 +1645,112 @@ export async function getPublicMatchEvents(matchId: string) {
     console.error("Error fetching match events:", error)
     return []
   }
-  return data || []
+
+  const events = data || [];
+
+  // Enrich goal events with season 26/27 scorer insights (league goal count, fastest goal of the team, brace/hat-trick)
+  try {
+    const ACTIVE_SEASON_ID = '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+    const CLOSED_SEASON_ID = '584f508a-fc1a-4339-b5b2-4296ffde2f4c';
+    const hasPlayerGoals = events.some((e: any) => e.player_id && (e.tipo_evento === 'Gol' || e.tipo_evento === 'Penalti'));
+
+    if (hasPlayerGoals) {
+      const { data: currentMatch } = await supabase
+        .from('partidos')
+        .select('id, equipo_id, fecha_hora, season_id, equipo:teams(name)')
+        .eq('id', matchId)
+        .maybeSingle();
+
+      if (currentMatch?.equipo_id && currentMatch.season_id !== CLOSED_SEASON_ID) {
+        const teamRel = currentMatch.equipo as any;
+        const rawTeamName = (Array.isArray(teamRel) ? teamRel[0]?.name : teamRel?.name) || 'Equipo';
+        const cleanTeamName = rawTeamName.replace(/Sporting Saladar\s*/i, '').trim() || rawTeamName;
+
+        const { data: teamMatches } = await supabase
+          .from('partidos')
+          .select('id, fecha_hora')
+          .eq('equipo_id', currentMatch.equipo_id)
+          .eq('season_id', ACTIVE_SEASON_ID)
+          .neq('season_id', CLOSED_SEASON_ID);
+
+        const allTeamMatchIds = (teamMatches || []).map((m: any) => m.id);
+        const currentMatchMs = currentMatch.fecha_hora ? new Date(currentMatch.fecha_hora).getTime() : Date.now();
+        const priorMatchIds = (teamMatches || [])
+          .filter((m: any) => m.id !== matchId && (!m.fecha_hora || new Date(m.fecha_hora).getTime() <= currentMatchMs))
+          .map((m: any) => m.id);
+
+        const [priorConvsRes, allTeamGoalEventsRes] = await Promise.all([
+          priorMatchIds.length > 0
+            ? supabase
+                .from('convocatorias')
+                .select('partido_id, player_id, goals, goles')
+                .in('partido_id', priorMatchIds)
+            : Promise.resolve({ data: [] as any[] }),
+          allTeamMatchIds.length > 0
+            ? supabase
+                .from('match_events')
+                .select('id, partido_id, player_id, minuto, tipo_evento')
+                .in('partido_id', allTeamMatchIds)
+                .in('tipo_evento', ['Gol', 'Penalti'])
+                .not('player_id', 'is', null)
+            : Promise.resolve({ data: [] as any[] })
+        ]);
+
+        const priorGoalsByPlayer = new Map<string, number>();
+        for (const c of (priorConvsRes.data || [])) {
+          if (!c.player_id) continue;
+          const g = Math.max(Number(c.goals || 0), Number(c.goles || 0));
+          if (g > 0) {
+            priorGoalsByPlayer.set(c.player_id, (priorGoalsByPlayer.get(c.player_id) || 0) + g);
+          }
+        }
+
+        // Determine fastest goal minute for this team in season 26/27
+        let fastestTeamMinute = Infinity;
+        for (const ge of (allTeamGoalEventsRes.data || [])) {
+          const m = Number(ge.minuto || 0);
+          if (m > 0 && m < fastestTeamMinute) {
+            fastestTeamMinute = m;
+          }
+        }
+
+        const inMatchGoalsByPlayer = new Map<string, number>();
+        for (const ev of events) {
+          if (ev.player_id && (ev.tipo_evento === 'Gol' || ev.tipo_evento === 'Penalti')) {
+            const inMatchCount = (inMatchGoalsByPlayer.get(ev.player_id) || 0) + 1;
+            inMatchGoalsByPlayer.set(ev.player_id, inMatchCount);
+
+            const priorCount = priorGoalsByPlayer.get(ev.player_id) || 0;
+            const totalSeasonGoals = priorCount + inMatchCount;
+
+            const insights: string[] = [];
+            if (totalSeasonGoals === 1) {
+              insights.push('1º gol en la liga');
+            } else if (totalSeasonGoals > 1) {
+              insights.push(`${totalSeasonGoals}º gol en la liga`);
+            }
+
+            if (inMatchCount === 2) {
+              insights.push('Doblete en el partido');
+            } else if (inMatchCount >= 3) {
+              insights.push('Hat-trick en el partido');
+            }
+
+            const evMin = Number(ev.minuto || 0);
+            if (evMin > 0 && evMin === fastestTeamMinute) {
+              insights.push(`Gol más rápido del ${cleanTeamName}`);
+            }
+
+            (ev as any).goal_insights = insights;
+          }
+        }
+      }
+    }
+  } catch (insightErr) {
+    console.warn('[getPublicMatchEvents] Non-blocking goal insights error:', insightErr);
+  }
+
+  return events;
 }
 
 export async function getPublicMatches() {
@@ -1747,11 +1911,15 @@ export async function getClubMatchdayMatchesAction(teamId?: string) {
     const windowStart = now - h84;
     const windowEnd = now + h84;
 
+    const h12 = 12 * 60 * 60 * 1000;
     const candidates = rawMatches.filter(m => {
-      const isLive = m.estado === 'En curso' || m.estado === 'En Curso' || m.estado === 'Descanso' ||
-                     m.live_timer_started_at !== null || (m.live_timer_elapsed_seconds && m.live_timer_elapsed_seconds > 0);
-      if (isLive || m.highlight_jornada) return true;
       const t = new Date(m.fecha_hora).getTime();
+      const isRecentEnoughForLive = (now - t) <= h12;
+      const isLive = m.estado !== 'Finalizado' && isRecentEnoughForLive && (
+                     m.estado === 'En curso' || m.estado === 'En Curso' || m.estado === 'Descanso' ||
+                     m.live_timer_started_at !== null || (m.live_timer_elapsed_seconds && m.live_timer_elapsed_seconds > 0));
+      if (isLive) return true;
+      if (m.highlight_jornada && t >= windowStart) return true;
       return t >= windowStart && t <= windowEnd;
     });
 

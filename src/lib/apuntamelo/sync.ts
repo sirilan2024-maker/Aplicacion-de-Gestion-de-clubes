@@ -812,6 +812,7 @@ export async function syncApuntameloTeam(
                 supabase,
                 config,
                 partidoId: resolvedMatchId,
+                existingPartido: matchExact,
                 existingCoachReport: matchExact?.coach_report,
                 existingConvs,
                 sm,
@@ -1005,7 +1006,8 @@ export function computeApuntameloLiveState(
   sm: any,
   mInfo: any,
   categoryDurationMinutes: number,
-  explicitNoticias?: any[]
+  explicitNoticias?: any[],
+  existingPartido?: any
 ): {
   estado: 'Programado' | 'En Curso' | 'Descanso' | 'Finalizado';
   live_timer_started_at: string | null;
@@ -1031,6 +1033,8 @@ export function computeApuntameloLiveState(
     );
   });
 
+  const hasFinTime = Boolean(mInfo?.Fin || sm?.Fin);
+
   const rawInicio = mInfo?.Inicio || sm?.Inicio || null;
   const inicioIso = parseApuntameloInicioToIso(rawInicio);
   const inicioMs = inicioIso ? new Date(inicioIso).getTime() : NaN;
@@ -1047,11 +1051,11 @@ export function computeApuntameloLiveState(
   const isOldMatchWithScore =
     !isNaN(matchDateMs) && Date.now() - matchDateMs > 18 * 60 * 60 * 1000 && hasScore;
 
-  if (isValidated || hasFinalWhistleNoticia || isTimedOutSecondHalf || isOldMatchWithScore) {
+  if (isValidated || hasFinalWhistleNoticia || hasFinTime || isTimedOutSecondHalf || isOldMatchWithScore) {
     return {
       estado: 'Finalizado',
       live_timer_started_at: null,
-      live_timer_elapsed_seconds: 0,
+      live_timer_elapsed_seconds: halfSeconds * 2,
       first_half_duration_seconds: halfSeconds,
       second_half_duration_seconds: halfSeconds,
       halfMinutes
@@ -1078,19 +1082,25 @@ export function computeApuntameloLiveState(
     };
   }
 
-  const hasStarted =
+  const hasStartedInApuntamelo =
     sm?.Tipo === 'jugado' ||
     Boolean(rawInicio) ||
     noticias.some((n: any) =>
       extractNarracionesClaves(n).includes('inicio_partido')
     );
 
-  if (hasStarted) {
+  const isCoachStarted =
+    existingPartido &&
+    (existingPartido.estado === 'En Curso' || existingPartido.estado === 'En curso') &&
+    existingPartido.live_timer_started_at != null;
+
+  if (hasStartedInApuntamelo || isCoachStarted) {
     const isSecondHalf = parte >= 2 || hasParte2StartNoticia;
+    const timerStart = inicioIso || existingPartido?.live_timer_started_at || new Date().toISOString();
     return {
       estado: 'En Curso',
-      live_timer_started_at: inicioIso || new Date().toISOString(),
-      live_timer_elapsed_seconds: isSecondHalf ? halfSeconds : 0,
+      live_timer_started_at: timerStart,
+      live_timer_elapsed_seconds: isSecondHalf ? halfSeconds : (existingPartido?.live_timer_elapsed_seconds || 0),
       first_half_duration_seconds: isSecondHalf ? halfSeconds : null,
       second_half_duration_seconds: null,
       halfMinutes
@@ -1111,6 +1121,7 @@ export async function syncApuntameloMatchDetailToDb(params: {
   supabase: any;
   config: ApuntameloConfig;
   partidoId: string;
+  existingPartido?: any;
   existingCoachReport?: any;
   existingConvs?: any[];
   sm: any;
@@ -1122,6 +1133,7 @@ export async function syncApuntameloMatchDetailToDb(params: {
     supabase,
     config,
     partidoId,
+    existingPartido,
     existingCoachReport,
     existingConvs = [],
     sm,
@@ -1209,7 +1221,7 @@ export async function syncApuntameloMatchDetailToDb(params: {
 
   const headerA = mInfo?.Goles_A ?? sm?.Goles_A;
   const headerB = mInfo?.Goles_B ?? sm?.Goles_B;
-  const liveState = computeApuntameloLiveState(sm, mInfo, categoryDuration, noticias);
+  const liveState = computeApuntameloLiveState(sm, mInfo, categoryDuration, noticias, existingPartido);
   const hasStartedOrScore =
     liveState.estado !== 'Programado' ||
     (headerA !== null && headerA !== undefined) ||
@@ -1383,6 +1395,11 @@ export async function syncApuntameloMatchDetailToDb(params: {
     }
   } else if (existingCoachReport && typeof existingCoachReport === 'object') {
     parsedCoachReport = { ...existingCoachReport };
+  }
+
+  if (liveState.estado === 'Finalizado') {
+    parsedCoachReport.duracion_primera_parte_segundos = liveState.halfMinutes * 60;
+    parsedCoachReport.duracion_segunda_parte_segundos = liveState.halfMinutes * 60;
   }
 
   parsedCoachReport.official_tactic = ourFormation;
@@ -1839,7 +1856,7 @@ export async function syncApuntameloMatchDetailToDb(params: {
 
 let lastLivePollTimestampMs = 0;
 const lastMatchPollTimestampMap = new Map<string, number>();
-const LIVE_POLL_COOLDOWN_MS = 12 * 1000; // 12 seconds throttle
+const LIVE_POLL_COOLDOWN_MS = 8 * 1000; // 8 seconds throttle
 
 /**
  * Comprueba de forma ultraligera si hay partidos de Liga Brave (Infantil B / Cadete B)
@@ -1993,7 +2010,11 @@ export async function syncApuntameloLiveMatchesIfNeeded(
           Boolean(sm.Inicio) ||
           Boolean(mInfo?.Inicio) ||
           (sm.Goles_A !== null && sm.Goles_A !== undefined) ||
-          (mInfo?.Goles_A !== null && mInfo?.Goles_A !== undefined);
+          (mInfo?.Goles_A !== null && mInfo?.Goles_A !== undefined) ||
+          cand.estado === 'En Curso' ||
+          cand.estado === 'En curso' ||
+          cand.estado === 'Descanso' ||
+          cand.live_timer_started_at != null;
         const hasPreMatchLineup = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []).length > 0;
 
         if (!hasStarted && !hasPreMatchLineup) continue;
@@ -2002,6 +2023,7 @@ export async function syncApuntameloLiveMatchesIfNeeded(
           supabase,
           config,
           partidoId: cand.id,
+          existingPartido: cand,
           existingCoachReport: cand.coach_report,
           existingConvs: existingConvs || [],
           sm,

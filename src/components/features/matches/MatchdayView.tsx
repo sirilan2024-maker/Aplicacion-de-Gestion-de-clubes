@@ -79,10 +79,19 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     let isFetching = false;
     let hadRealtimeDisconnect = false;
 
-    const hasActiveLiveMatch = () =>
-      matchesRef.current.some((m) =>
-        ['en_juego', 'En Curso', 'Descanso', 'descanso'].includes(m.estado)
-      );
+    const hasActiveLiveOrUpcomingMatch = () => {
+      const now = Date.now();
+      return matchesRef.current.some((m) => {
+        if (['en_juego', 'En Curso', 'Descanso', 'descanso'].includes(m.estado)) return true;
+        if (m.estado === 'Programado' && m.fecha_hora) {
+          const matchMs = new Date(m.fecha_hora).getTime();
+          const diffMinutes = (now - matchMs) / (1000 * 60);
+          // Polling activo si el partido está en ventana de inicio (desde 30 min antes hasta 2.5h después)
+          if (diffMinutes >= -30 && diffMinutes <= 150) return true;
+        }
+        return false;
+      });
+    };
 
     const syncMatchesFromServer = async () => {
       if (!mounted || isFetching) return;
@@ -120,12 +129,12 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
 
     const intervalId = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      if (!hasActiveLiveMatch()) return;
+      if (!hasActiveLiveOrUpcomingMatch()) return;
       syncMatchesFromServer();
-    }, 30_000);
+    }, 25_000);
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && hasActiveLiveMatch()) {
+      if (document.visibilityState === 'visible' && hasActiveLiveOrUpcomingMatch()) {
         syncMatchesFromServer();
       }
     };

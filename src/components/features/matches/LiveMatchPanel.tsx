@@ -117,8 +117,9 @@ export function LiveMatchPanel({
         }
       });
 
-    // Low-frequency fallback polling (90s) only when tab is visible
-    const intervalId = setInterval(syncAll, 90_000);
+    // Polling adaptativo en segundo plano cuando la pestaña está visible (25s si está en directo/descanso, 60s si no)
+    const isLiveActive = match?.estado === 'En Curso' || match?.estado === 'Descanso' || match?.live_timer_started_at != null;
+    const intervalId = setInterval(syncAll, isLiveActive ? 25_000 : 60_000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -267,6 +268,8 @@ export function LiveMatchPanel({
     return raw
       .replace(/^\[(LOCAL|VISITANTE)\]\s*/i, '')
       .replace(/\[BRAVE:[^\]]+\]\s*/gi, '')
+      .replace(/\[out:[^\]]+\]\s*/gi, '')
+      .replace(/\[in:[^\]]+\]\s*/gi, '')
       .trim();
   };
 

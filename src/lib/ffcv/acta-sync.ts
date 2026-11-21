@@ -680,11 +680,13 @@ export async function syncFFCVActaToConvocatorias(
       });
 
       if (newEvents.length > 0) {
+        // When the official FFCV acta is closed, replace manual live goal/card events with the official closed-acta goals/cards
+        // so goals and cards are never duplicated, while preserving Descanso, Fin de Partido, Cambio, Comentarios, Ocasiones, etc.
         await supabase
           .from('match_events')
           .delete()
           .eq('partido_id', partido.id)
-          .or('notas.ilike.[LOCAL]%,notas.ilike.[VISITANTE]%');
+          .or('notas.ilike.[LOCAL]%,notas.ilike.[VISITANTE]%,tipo_evento.in.("Gol","Penalti","Penalty","Gol en propia puerta","Gol en Propia","Tarjeta Amarilla","Amarilla","Tarjeta Roja","Roja")');
 
         await supabase.from('match_events').insert(newEvents);
       }

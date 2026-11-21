@@ -229,15 +229,27 @@ export function LiveMatchPanel({
   let secondHalfEvents: any[] = [];
 
   if (descansoEvent && descansoTimeMs) {
+    const descansoMin = Number(descansoEvent.minuto || 35);
+    const isFirstHalfEvent = (e: any) => {
+      if (e.id === descansoEvent.id) return true;
+      const eMin = Number(e.minuto || 0);
+      const isPostMatchActaSync = /^\[(LOCAL|VISITANTE)\]/i.test(String(e.notas || ''));
+      if (isPostMatchActaSync) {
+        return eMin <= descansoMin;
+      }
+      if (eMin < descansoMin) return true;
+      return Boolean(e.created_at && new Date(e.created_at).getTime() <= descansoTimeMs);
+    };
+
     firstHalfEvents = matchEvents
-      .filter(e => e.id === descansoEvent.id || (e.created_at && new Date(e.created_at).getTime() <= descansoTimeMs))
+      .filter(isFirstHalfEvent)
       .sort((a, b) => {
         if (a.tipo_evento === 'Descanso') return 1;
         if (b.tipo_evento === 'Descanso') return -1;
         return (a.minuto || 0) - (b.minuto || 0);
       });
     secondHalfEvents = matchEvents
-      .filter(e => e.id !== descansoEvent.id && (!e.created_at || new Date(e.created_at).getTime() > descansoTimeMs))
+      .filter(e => !isFirstHalfEvent(e))
       .sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
   } else if (descansoIndex !== -1) {
     firstHalfEvents = matchEvents.slice(0, descansoIndex + 1);

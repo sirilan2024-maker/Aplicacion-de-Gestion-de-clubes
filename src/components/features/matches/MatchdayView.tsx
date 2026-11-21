@@ -122,7 +122,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
       if (document.visibilityState !== 'visible') return;
       if (!hasActiveLiveMatch()) return;
       syncMatchesFromServer();
-    }, 90_000);
+    }, 30_000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && hasActiveLiveMatch()) {

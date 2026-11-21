@@ -6,7 +6,8 @@ import { getLiveAds } from "@/app/actions/ad-actions"
 
 import { LiveBackButton, ShareLiveButton } from "@/components/features/matches/LiveBackButton"
 
-export const revalidate = 30 // ISR 30s for public live page; client hydrates live updates via Supabase Realtime
+export const dynamic = 'force-dynamic'
+export const revalidate = 0 // Never cache the live page; always query fresh database state and trigger live sync check
 
 export default async function PublicLivePage() {
   const supabase = await createAdminClient()

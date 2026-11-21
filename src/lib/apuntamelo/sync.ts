@@ -992,10 +992,20 @@ export function parseApuntameloInicioToIso(rawInicio?: string | null): string | 
   return formatSpainDateTimeToIso(datePart, timePart || '10:00:00');
 }
 
+export function extractNarracionesClaves(n: any): string[] {
+  if (!n) return [];
+  if (Array.isArray(n.Narraciones_Claves)) return n.Narraciones_Claves;
+  if (typeof n.Narraciones_Claves === 'string') {
+    return safeJsonParse<string[]>(n.Narraciones_Claves, []);
+  }
+  return [];
+}
+
 export function computeApuntameloLiveState(
   sm: any,
   mInfo: any,
-  categoryDurationMinutes: number
+  categoryDurationMinutes: number,
+  explicitNoticias?: any[]
 ): {
   estado: 'Programado' | 'En Curso' | 'Descanso' | 'Finalizado';
   live_timer_started_at: string | null;
@@ -1006,11 +1016,13 @@ export function computeApuntameloLiveState(
 } {
   const halfMinutes = Number(mInfo?.Minutos_parte) || Math.round((categoryDurationMinutes || 70) / 2) || 35;
   const halfSeconds = halfMinutes * 60;
-  const noticias = safeJsonParse<any[]>(mInfo?.Json_noticias, []);
+  const noticias = explicitNoticias && explicitNoticias.length > 0
+    ? explicitNoticias
+    : safeJsonParse<any[]>(mInfo?.Json_noticias, []);
 
   const isValidated = Number(mInfo?.Validado ?? sm?.Validado) === 1;
   const hasFinalWhistleNoticia = noticias.some((n: any) => {
-    const claves: string[] = Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : [];
+    const claves = extractNarracionesClaves(n);
     const desc = String(n.Descripcion || '').toLowerCase();
     return (
       claves.some((k) => k.includes('fin_partido')) ||
@@ -1048,10 +1060,11 @@ export function computeApuntameloLiveState(
 
   const isDescansoFlag = Number(mInfo?.Descanso) === 1;
   const hasDescansoNoticia = noticias.some((n: any) =>
-    (Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : []).includes('fin_parte_primera')
+    extractNarracionesClaves(n).includes('fin_parte_primera') ||
+    String(n.Descripcion || '').toLowerCase().includes('descansooo')
   );
   const hasParte2StartNoticia = noticias.some((n: any) =>
-    (Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : []).includes('inicio_parte2')
+    extractNarracionesClaves(n).includes('inicio_parte2')
   );
 
   if (isDescansoFlag || (hasDescansoNoticia && !hasParte2StartNoticia && parte <= 1)) {
@@ -1069,7 +1082,7 @@ export function computeApuntameloLiveState(
     sm?.Tipo === 'jugado' ||
     Boolean(rawInicio) ||
     noticias.some((n: any) =>
-      (Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : []).includes('inicio_partido')
+      extractNarracionesClaves(n).includes('inicio_partido')
     );
 
   if (hasStarted) {
@@ -1123,9 +1136,68 @@ export async function syncApuntameloMatchDetailToDb(params: {
   const matchApuntameloId = String(mInfo?.Id || sm?.Id);
   const matchUrl = `https://apuntamelo.com/partido/${matchApuntameloId}`;
 
-  const gList = safeJsonParse<any[]>(mInfo?.Json_goles, []);
-  const puntuaciones = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []);
-  const noticias = safeJsonParse<any[]>(mInfo?.Json_noticias, []);
+  let gList = safeJsonParse<any[]>(mInfo?.Json_goles, []);
+  let puntuaciones = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []);
+  let noticias = safeJsonParse<any[]>(mInfo?.Json_noticias, []);
+
+  // Si estamos en un partido y los campos JSON de cabecera vienen vacíos (caso estándar durante partidos en directo en Apúntamelo),
+  // consultar los 4 endpoints oficiales en tiempo real que utiliza el frontend de apuntamelo.com
+  if (matchApuntameloId) {
+    const fetchPromises: Promise<any>[] = [];
+
+    if (noticias.length === 0) {
+      fetchPromises.push(
+        fetchApuntameloJson<any[]>(
+          `https://apuntamelo.com/obtenerNoticiasPartido?id=${matchApuntameloId}`,
+          { ttlMs: 6 * 1000, timeoutMs: 5000 }
+        )
+          .then((res) => {
+            if (Array.isArray(res) && res.length > 0) noticias = res;
+          })
+          .catch(() => null)
+      );
+    }
+
+    if (puntuaciones.length === 0) {
+      fetchPromises.push(
+        fetchApuntameloJson<any[]>(
+          `https://apuntamelo.com/obtenerPuntuacionesPartido?id=${matchApuntameloId}`,
+          { ttlMs: 12 * 1000, timeoutMs: 5000 }
+        )
+          .then((res) => {
+            if (Array.isArray(res) && res.length > 0) puntuaciones = res;
+          })
+          .catch(() => null)
+      );
+    }
+
+    if (gList.length === 0) {
+      fetchPromises.push(
+        Promise.all([
+          fetchApuntameloJson<any[]>(
+            `https://apuntamelo.com/obtenerGolesPartidoA?id=${matchApuntameloId}`,
+            { ttlMs: 6 * 1000, timeoutMs: 5000 }
+          ).catch(() => null),
+          fetchApuntameloJson<any[]>(
+            `https://apuntamelo.com/obtenerGolesPartidoB?id=${matchApuntameloId}`,
+            { ttlMs: 6 * 1000, timeoutMs: 5000 }
+          ).catch(() => null),
+        ])
+          .then(([gA, gB]) => {
+            const combined = [
+              ...(Array.isArray(gA) ? gA : []),
+              ...(Array.isArray(gB) ? gB : []),
+            ];
+            if (combined.length > 0) gList = combined;
+          })
+          .catch(() => null)
+      );
+    }
+
+    if (fetchPromises.length > 0) {
+      await Promise.all(fetchPromises);
+    }
+  }
 
   // 1. Calcular marcador real (conciliando Json_goles y goles de cabecera)
   let cA = 0;
@@ -1137,7 +1209,7 @@ export async function syncApuntameloMatchDetailToDb(params: {
 
   const headerA = mInfo?.Goles_A ?? sm?.Goles_A;
   const headerB = mInfo?.Goles_B ?? sm?.Goles_B;
-  const liveState = computeApuntameloLiveState(sm, mInfo, categoryDuration);
+  const liveState = computeApuntameloLiveState(sm, mInfo, categoryDuration, noticias);
   const hasStartedOrScore =
     liveState.estado !== 'Programado' ||
     (headerA !== null && headerA !== undefined) ||
@@ -1380,13 +1452,17 @@ export async function syncApuntameloMatchDetailToDb(params: {
       );
 
       for (const cn of cardNoticias) {
-        const claves: string[] = Array.isArray(cn.Narraciones_Claves) ? cn.Narraciones_Claves : [];
-        if (cn.Icono === 5 || claves.includes('tarjetas.noticia.amarilla')) {
-          playerYellows = Math.max(playerYellows, 1);
-        }
-        if (cn.Icono === 6 || claves.includes('tarjetas.noticia.roja')) {
-          playerReds = Math.max(playerReds, 1);
-        }
+        const claves = extractNarracionesClaves(cn);
+        const isY =
+          cn.Icono === 5 ||
+          claves.includes('tarjetas.noticia.amarilla') ||
+          String(cn.Descripcion || '').toUpperCase().includes('TARJETA AMARILL');
+        const isR =
+          cn.Icono === 6 ||
+          claves.includes('tarjetas.noticia.roja') ||
+          String(cn.Descripcion || '').toUpperCase().includes('TARJETA ROJA');
+        if (isY) playerYellows = Math.max(playerYellows, 1);
+        if (isR) playerReds = Math.max(playerReds, 1);
       }
 
       const prevMins = existingConvMap.get(bp.playerId);
@@ -1587,9 +1663,15 @@ export async function syncApuntameloMatchDetailToDb(params: {
     }> = [];
 
     for (const n of noticias) {
-      const claves: string[] = Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : [];
-      const isYellow = n.Icono === 5 || claves.includes('tarjetas.noticia.amarilla');
-      const isRed = n.Icono === 6 || claves.includes('tarjetas.noticia.roja');
+      const claves = extractNarracionesClaves(n);
+      const isYellow =
+        n.Icono === 5 ||
+        claves.includes('tarjetas.noticia.amarilla') ||
+        String(n.Descripcion || '').toUpperCase().includes('TARJETA AMARILL');
+      const isRed =
+        n.Icono === 6 ||
+        claves.includes('tarjetas.noticia.roja') ||
+        String(n.Descripcion || '').toUpperCase().includes('TARJETA ROJA');
       if (!isYellow && !isRed) continue;
 
       const cEquipo = Number(n.FK_EquipoLiga);
@@ -1647,13 +1729,19 @@ export async function syncApuntameloMatchDetailToDb(params: {
 
     for (const n of sortedNoticias) {
       const nId = String(n.Id);
-      const claves: string[] = Array.isArray(n.Narraciones_Claves) ? n.Narraciones_Claves : [];
+      const claves = extractNarracionesClaves(n);
       const desc = String(n.Descripcion).trim();
       const rawMin = Number(n.Minuto) || 0;
       const nParte = Number(n.Parte) || 1;
 
       // Omitir tarjetas (ya procesadas en 5b)
-      if (n.Icono === 5 || n.Icono === 6 || claves.some((k) => k.includes('tarjetas.noticia'))) {
+      if (
+        n.Icono === 5 ||
+        n.Icono === 6 ||
+        claves.some((k) => k.includes('tarjetas.noticia')) ||
+        desc.toUpperCase().includes('TARJETA AMARILL') ||
+        desc.toUpperCase().includes('TARJETA ROJA')
+      ) {
         continue;
       }
 

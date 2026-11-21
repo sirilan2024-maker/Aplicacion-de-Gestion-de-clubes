@@ -183,22 +183,35 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
   const playerEvents = matchEvents.filter(e => e.player_id === playerId);
 
   // Goals calculations
+  const isGoalEvent = (e: any) => {
+    const t = (e.tipo_evento || e.tipo || '').toLowerCase();
+    return t.includes('gol') || t.includes('penalti') || t.includes('penalty');
+  };
+  const isOwnGoalEvent = (e: any) => {
+    const t = (e.tipo_evento || e.tipo || '').toLowerCase();
+    return t.includes('propia') || t.includes('pp');
+  };
+
   const localGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta') return isLocal ? !e.player_id : e.player_id;
+    if (isGoalEvent(e)) {
+      if (isOwnGoalEvent(e)) return isLocal ? !e.player_id : !!e.player_id;
+      return isLocal ? !!e.player_id : !e.player_id;
+    }
     return false;
   });
   
   const awayGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol') return !isLocal ? e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta') return !isLocal ? !e.player_id : e.player_id;
+    if (isGoalEvent(e)) {
+      if (isOwnGoalEvent(e)) return isLocal ? !!e.player_id : !e.player_id;
+      return isLocal ? !e.player_id : !!e.player_id;
+    }
     return false;
   });
 
   const displayLocalGoals = isLocal ? (match?.resultado_propio ?? localGoalsList.length) : (match?.resultado_rival ?? awayGoalsList.length);
   const displayAwayGoals = isLocal ? (match?.resultado_rival ?? awayGoalsList.length) : (match?.resultado_propio ?? localGoalsList.length);
 
-  const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta').sort((a, b) => a.minuto - b.minuto);
+  const allGoals = [...matchEvents].filter(isGoalEvent).sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
   let runningLocal = 0;
   let runningAway = 0;
   const goalTimeline = allGoals.map((goal) => {
@@ -208,7 +221,7 @@ export function FamilyMatchView({ match: initialMatch, playerId, matchEvents: in
       isHomeGoal = true;
     } else if (notasStr.startsWith('[VISITANTE]')) {
       isHomeGoal = false;
-    } else if (goal.tipo_evento === 'Gol') {
+    } else if (!isOwnGoalEvent(goal)) {
       isHomeGoal = isLocal ? !!goal.player_id : !goal.player_id;
     } else {
       isHomeGoal = isLocal ? !goal.player_id : !!goal.player_id;

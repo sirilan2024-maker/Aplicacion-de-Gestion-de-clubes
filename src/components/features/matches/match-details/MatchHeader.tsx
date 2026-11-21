@@ -238,13 +238,13 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
           const matchEvents = match?.match_events || [];
           const goalEvents = matchEvents.filter((e: any) => {
             const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
-            return tipo.includes('gol');
+            return tipo.includes('gol') || tipo.includes('penalti') || tipo.includes('penalty');
           });
 
           const localGoalEvents = goalEvents.filter((e: any) => {
             const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
-            const isGol = tipo.includes('gol') && !tipo.includes('propia');
             const isAutogol = tipo.includes('propia') || tipo.includes('pp');
+            const isGol = !isAutogol && (tipo.includes('gol') || tipo.includes('penalti') || tipo.includes('penalty'));
             const notas = e.notas || '';
             
             if (notas.includes('[LOCAL]')) return isGol ? true : false;
@@ -256,8 +256,8 @@ export function MatchHeader({ localGoals, awayGoals, goalsList, match, allMatche
 
           const awayGoalEvents = goalEvents.filter((e: any) => {
             const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
-            const isGol = tipo.includes('gol') && !tipo.includes('propia');
             const isAutogol = tipo.includes('propia') || tipo.includes('pp');
+            const isGol = !isAutogol && (tipo.includes('gol') || tipo.includes('penalti') || tipo.includes('penalty'));
             const notas = e.notas || '';
             
             if (notas.includes('[VISITANTE]')) return isGol ? true : false;

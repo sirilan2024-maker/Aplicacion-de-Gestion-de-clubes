@@ -156,15 +156,28 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   }
 
   // Calculate live scores from events
+  const isGoalType = (tipo: string) => {
+    const t = (tipo || '').toLowerCase();
+    return t.includes('gol') || t.includes('penalti') || t.includes('penalty');
+  };
+  const isOwnGoalType = (tipo: string) => {
+    const t = (tipo || '').toLowerCase();
+    return t.includes('propia') || t.includes('pp');
+  };
+
   const liveLocalGoalsComputed = events.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? !!e.player_id : !e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : !!e.player_id;
+    if (isGoalType(e.tipo_evento)) {
+      if (isOwnGoalType(e.tipo_evento)) return isLocal ? !e.player_id : !!e.player_id;
+      return isLocal ? !!e.player_id : !e.player_id;
+    }
     return false;
   }).length;
   
   const liveAwayGoalsComputed = events.filter(e => {
-    if (e.tipo_evento === 'Gol') return isLocal ? !e.player_id : !!e.player_id;
-    if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !!e.player_id : !e.player_id;
+    if (isGoalType(e.tipo_evento)) {
+      if (isOwnGoalType(e.tipo_evento)) return isLocal ? !!e.player_id : !e.player_id;
+      return isLocal ? !e.player_id : !!e.player_id;
+    }
     return false;
   }).length;
 
@@ -186,8 +199,8 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
 
     const goalEvents = events.filter(e => {
       const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
-      const isGol = tipo.includes('gol') && !tipo.includes('propia');
       const isAutogol = tipo.includes('propia') || tipo.includes('pp');
+      const isGol = !isAutogol && (tipo.includes('gol') || tipo.includes('penalti') || tipo.includes('penalty'));
       
       if (!isGol && !isAutogol) return false;
 
@@ -270,7 +283,8 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
             else name = g.notas ? getCleanNameFromNotas(g.notas) : 'Rival';
           }
           
-          const icon = (tipo.includes('penal') || tipo.includes('penalty')) ? '🎯' : '⚽';
+          const isPen = tipo.includes('penal') || tipo.includes('penalty');
+          const icon = isPen ? '🎯' : '⚽';
           return (
             <div key={g.id || i} className={`flex items-center gap-1.5 font-bold text-slate-800 max-w-full ${isHomeTeam ? 'justify-start' : 'justify-end'}`}>
               {isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
@@ -291,7 +305,7 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
               {!isHomeTeam && avatarUrl && (
                 <img src={avatarUrl} alt={name} className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs" />
               )}
-              {displayMin > 0 && <span className="text-slate-400 text-[10px] font-normal shrink-0">({displayMin}')</span>}
+              {displayMin > 0 && <span className="text-slate-400 text-[10px] font-normal shrink-0">({displayMin}'{isPen ? ' p.' : ''})</span>}
               {!isHomeTeam && <span className="text-slate-400 text-[10px] shrink-0">{icon}</span>}
             </div>
           );

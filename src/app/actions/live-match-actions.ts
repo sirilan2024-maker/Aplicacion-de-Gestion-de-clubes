@@ -105,7 +105,8 @@ export async function addLiveEvent(matchId: string, eventData: any) {
   // Restore original tipo for UI consumer
   const resultData = { ...data, tipo_evento: eventData.tipo };
 
-  if (eventData.tipo === "Gol" || eventData.tipo === "Gol en propia puerta") {
+  const isGoal = ["Gol", "Gol en propia puerta", "Gol en Propia", "Penalti", "Penalty"].includes(eventData.tipo);
+  if (isGoal) {
     await recalculateScore(matchId, supabase);
   }
 
@@ -139,7 +140,7 @@ async function recalculateScore(matchId: string, supabase: any) {
     .from("match_events")
     .select("*")
     .eq("partido_id", matchId)
-    .in("tipo_evento", ["Gol", "Gol en propia puerta"])
+    .in("tipo_evento", ["Gol", "Gol en propia puerta", "Gol en Propia", "Penalti", "Penalty"])
 
   if (!events) return;
 
@@ -147,10 +148,11 @@ async function recalculateScore(matchId: string, supabase: any) {
   let awayGoals = 0;
 
   events.forEach((e: any) => {
-    if (e.tipo_evento === "Gol") {
+    const isPP = e.tipo_evento === "Gol en propia puerta" || e.tipo_evento === "Gol en Propia";
+    if (!isPP) {
       if (e.player_id) localGoals++;
       else awayGoals++;
-    } else if (e.tipo_evento === "Gol en propia puerta") {
+    } else {
       if (e.player_id) awayGoals++;
       else localGoals++;
     }
@@ -262,7 +264,7 @@ async function syncMatchEventsToConvocatorias(matchId: string, supabase: any) {
     const eventMin = Math.min(totalMatchMinutes, Math.max(0, e.minuto || 0));
 
     if (e.player_id && playerStats[e.player_id]) {
-      if (e.tipo_evento === "Gol") {
+      if (e.tipo_evento === "Gol" || e.tipo_evento === "Penalti" || e.tipo_evento === "Penalty") {
         playerStats[e.player_id].goals++;
       } else if (e.tipo_evento === "Tarjeta Amarilla" || e.tipo_evento === "Amarilla") {
         playerStats[e.player_id].yellow_cards++;

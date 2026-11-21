@@ -516,15 +516,28 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
     const localName = isLocal ? teamName : rivalName;
     const awayName = isLocal ? rivalName : teamName;
 
+    const isGoalType = (tipo: string) => {
+      const t = (tipo || '').toLowerCase();
+      return t.includes('gol') || t.includes('penalti') || t.includes('penalty');
+    };
+    const isOwnGoalType = (tipo: string) => {
+      const t = (tipo || '').toLowerCase();
+      return t.includes('propia') || t.includes('pp');
+    };
+
     const localEvents = updatedEvents.filter(e => {
-      if (e.tipo_evento === 'Gol') return isLocal ? !!e.player_id : !e.player_id;
-      if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !e.player_id : !!e.player_id;
+      if (isGoalType(e.tipo_evento)) {
+        if (isOwnGoalType(e.tipo_evento)) return isLocal ? !e.player_id : !!e.player_id;
+        return isLocal ? !!e.player_id : !e.player_id;
+      }
       return false;
     });
 
     const awayEvents = updatedEvents.filter(e => {
-      if (e.tipo_evento === 'Gol') return isLocal ? !e.player_id : !!e.player_id;
-      if (e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') return isLocal ? !!e.player_id : !e.player_id;
+      if (isGoalType(e.tipo_evento)) {
+        if (isOwnGoalType(e.tipo_evento)) return isLocal ? !!e.player_id : !e.player_id;
+        return isLocal ? !e.player_id : !!e.player_id;
+      }
       return false;
     });
 
@@ -536,8 +549,10 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
       .map(e => {
         const player = players.find((p: any) => p.id === e.player_id);
         const isPP = e.tipo_evento === "Gol en propia puerta" || e.tipo_evento === "Gol en Propia";
+        const isPen = (e.tipo_evento || '').toLowerCase().includes('penalt');
+        const penSuffix = isPen ? ' p.' : '';
         if (isPP) return `${awayName} PP (${e.minuto}')`;
-        return player ? `${player.first_name} (${e.minuto}')` : `${localName} (${e.minuto}')`;
+        return player ? `${player.first_name} (${e.minuto}'${penSuffix})` : `${localName} (${e.minuto}'${penSuffix})`;
       })
       .join(", ");
 
@@ -545,8 +560,10 @@ export function LiveTab({ matchId, match, players = [], convocatorias = [], matc
       .map(e => {
         const player = players.find((p: any) => p.id === e.player_id);
         const isPP = e.tipo_evento === "Gol en propia puerta" || e.tipo_evento === "Gol en Propia";
+        const isPen = (e.tipo_evento || '').toLowerCase().includes('penalt');
+        const penSuffix = isPen ? ' p.' : '';
         if (isPP) return `${localName} PP (${e.minuto}')`;
-        return player ? `${player.first_name} (${e.minuto}')` : `${awayName} (${e.minuto}')`;
+        return player ? `${player.first_name} (${e.minuto}'${penSuffix})` : `${awayName} (${e.minuto}'${penSuffix})`;
       })
       .join(", ");
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock, MapPin, Activity, Calendar, Trophy } from "lucide-react";
+import { Clock, MapPin, Activity, Calendar, Trophy, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useLiveTimer } from "@/hooks/useLiveTimer";
 import { getPublicMatchEvents } from "@/app/actions/match-actions";
@@ -30,6 +30,7 @@ export function LiveMatchPanel({
   const [match, setMatch] = useState<any>(initialMatch || (partidoId ? { id: partidoId } : null));
   const [matchEvents, setMatchEvents] = useState<any[]>(initialEvents || []);
   const [loadingEvents, setLoadingEvents] = useState(!initialEvents);
+  const [showLineups, setShowLineups] = useState(false);
 
   const supabase = createClient();
   const matchId = match?.id || partidoId;
@@ -174,28 +175,23 @@ export function LiveMatchPanel({
     match?.equipo?.category?.toLowerCase().includes('brave')
   );
 
+  const isGoalEvent = (e: any): boolean => {
+    const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
+    return tipo.includes('gol') || tipo.includes('penalti') || tipo.includes('penalty');
+  };
+
   const isEventHomeGoal = (e: any): boolean => {
     const notas = String(e.notas || '');
-    const isOwnGoal = e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia';
+    const tipo = (e.tipo_evento || e.tipo || '').toLowerCase();
+    const isOwnGoal = tipo.includes('propia') || tipo.includes('pp');
     if (notas.includes('[LOCAL]')) return !isOwnGoal;
     if (notas.includes('[VISITANTE]')) return isOwnGoal;
     return isOwnGoal ? (isLocal ? !e.player_id : !!e.player_id) : (isLocal ? !!e.player_id : !e.player_id);
   };
 
   // Goals calculations
-  const localGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') {
-      return isEventHomeGoal(e);
-    }
-    return false;
-  });
-  
-  const awayGoalsList = matchEvents.filter(e => {
-    if (e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia') {
-      return !isEventHomeGoal(e);
-    }
-    return false;
-  });
+  const localGoalsList = matchEvents.filter(e => isGoalEvent(e) && isEventHomeGoal(e));
+  const awayGoalsList = matchEvents.filter(e => isGoalEvent(e) && !isEventHomeGoal(e));
 
   const localGoals = isLocal 
     ? (match?.resultado_propio ?? localGoalsList.length) 
@@ -205,7 +201,7 @@ export function LiveMatchPanel({
     ? (match?.resultado_rival ?? awayGoalsList.length) 
     : (match?.resultado_propio ?? awayGoalsList.length);
 
-  const allGoals = [...matchEvents].filter(e => e.tipo_evento === 'Gol' || e.tipo_evento === 'Gol en propia puerta' || e.tipo_evento === 'Gol en Propia').sort((a, b) => a.minuto - b.minuto);
+  const allGoals = [...matchEvents].filter(isGoalEvent).sort((a, b) => (a.minuto || 0) - (b.minuto || 0));
   let runningLocal = 0;
   let runningAway = 0;
   const goalTimeline = allGoals.map((goal) => {
@@ -290,14 +286,18 @@ export function LiveMatchPanel({
       icon = cleanNotas.includes('🔥') ? "🔥" : cleanNotas.includes('📊') ? "📊" : cleanNotas.includes('⚡') ? "⚡" : cleanNotas.includes('🎙️') ? "🎙️" : "💬";
       bgColor = isBraveSynced ? "bg-indigo-50/70 border-indigo-200/80" : "bg-indigo-50/80 border-indigo-100";
       textColor = "text-indigo-950";
-    } else if (event.tipo_evento === 'Gol') { icon = "⚽"; bgColor = "bg-emerald-50 border-emerald-200"; textColor = "text-emerald-800"; }
+    } else if (event.tipo_evento === 'Gol' || event.tipo_evento === 'Penalti' || event.tipo_evento === 'Penalty') {
+      const isPen = event.tipo_evento === 'Penalti' || event.tipo_evento === 'Penalty';
+      icon = isPen ? "🎯" : "⚽";
+      bgColor = isPen ? "bg-emerald-50/90 border-emerald-300" : "bg-emerald-50 border-emerald-200";
+      textColor = "text-emerald-800";
+    }
     else if (event.tipo_evento === 'Gol en propia puerta') { icon = "🤦‍♂️"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
     else if (event.tipo_evento === 'Tarjeta Amarilla') { icon = "🟨"; bgColor = "bg-amber-50 border-amber-200"; textColor = "text-amber-800"; }
     else if (event.tipo_evento === 'Tarjeta Roja') { icon = "🟥"; bgColor = "bg-red-50 border-red-200"; textColor = "text-red-800"; }
     else if (event.tipo_evento === 'Cambio') { icon = "🔄"; bgColor = "bg-blue-50"; textColor = "text-blue-700"; }
     else if (event.tipo_evento === 'Lesión') { icon = "🚑"; bgColor = "bg-rose-50"; textColor = "text-rose-700"; }
     else if (event.tipo_evento === 'Ocasión Peligrosa') { icon = "⚠️"; bgColor = "bg-amber-50"; textColor = "text-amber-700"; }
-    else if (event.tipo_evento === 'Penalti') { icon = "🎯"; bgColor = "bg-purple-50"; textColor = "text-purple-700"; }
     else if (event.tipo_evento === 'Parada') { icon = "🧤"; bgColor = "bg-sky-50"; textColor = "text-sky-700"; }
     else if (event.tipo_evento === 'Descanso' || event.tipo_evento === 'Fin de Partido') { icon = event.tipo_evento === 'Descanso' ? "⏸️" : "🏁"; bgColor = "bg-slate-100/80 border-slate-200"; textColor = "text-slate-700"; }
 
@@ -323,7 +323,7 @@ export function LiveMatchPanel({
           <div className="min-w-0 flex-1">
             <div className="flex items-center flex-wrap gap-1.5">
               <p className={`text-xs font-bold leading-snug ${textColor}`}>
-                {isCommentRow ? (cleanNotas || 'En vivo') : event.tipo_evento}
+                {isCommentRow ? (cleanNotas || 'En vivo') : (event.tipo_evento === 'Penalti' || event.tipo_evento === 'Penalty' ? 'Gol de Penalti' : event.tipo_evento)}
               </p>
               {isBraveSynced && (
                 <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0">
@@ -546,6 +546,7 @@ export function LiveMatchPanel({
               {goalTimeline.map((goal) => {
                 const displayMinuto = goal.minuto > 120 ? Math.floor(goal.minuto / 60) : (goal.minuto || 0);
                 const isPP = goal.tipo_evento === 'Gol en propia puerta' || goal.tipo_evento === 'Gol en Propia';
+                const isPenalty = (goal.tipo_evento || goal.tipo || '').toLowerCase().includes('penalt');
                 const pFirstName = goal.player?.first_name || '';
                 const pLastName = goal.player?.last_name || '';
                 const fullPlayerName = `${pFirstName} ${pLastName}`.trim();
@@ -569,13 +570,17 @@ export function LiveMatchPanel({
                 }
 
                 const baseScorerName = fullPlayerName || extractedFromNotas || targetTeamName;
+                const goalTypeSuffix = isPP ? ' (p.p.)' : isPenalty ? ' (p.)' : '';
                 const playerName = isPP 
-                  ? (fullPlayerName || extractedFromNotas ? `${fullPlayerName || extractedFromNotas} (p.p.)` : `${ownGoalScorerTeamName} (p.p.)`) 
-                  : baseScorerName;
+                  ? (fullPlayerName || extractedFromNotas ? `${fullPlayerName || extractedFromNotas}${goalTypeSuffix}` : `${ownGoalScorerTeamName}${goalTypeSuffix}`) 
+                  : (baseScorerName ? `${baseScorerName}${goalTypeSuffix}` : targetTeamName);
                 const dorsalFromNotas = rawNotas.match(/#(\d+)/)?.[1] || null;
                 const playerDorsal = goal.player?.dorsal ?? dorsalFromNotas;
                 const avatarUrl = goal.player?.avatar_url || null;
-                const goalInsights: string[] = Array.isArray((goal as any).goal_insights) ? (goal as any).goal_insights : [];
+                const goalInsights: string[] = Array.isArray((goal as any).goal_insights) ? [...(goal as any).goal_insights] : [];
+                if (isPenalty && !goalInsights.some((ins: string) => ins.toLowerCase().includes('penalt'))) {
+                  goalInsights.unshift('Penalti');
+                }
 
                 return (
                   <div key={goal.id || Math.random()}>
@@ -739,28 +744,76 @@ export function LiveMatchPanel({
       </div>
 
       {/* ─── OFFICIAL LIVE LINEUPS & STATS (FFCV & LIGA BRAVE) ─── */}
-      {officialLive && (Array.isArray(officialLive.ourPlayers) || Array.isArray(officialLive.rivalPlayers)) && (
-        <div className="p-5 lg:p-8 bg-white border-t border-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-orange-100 text-orange-600 text-xs">⚡</span>
-              {isLigaBraveMatch
-                ? 'Alineaciones, Estadísticas y Puntuaciones en Vivo (Liga Brave)'
-                : 'Alineaciones Oficiales y Ficha del Partido (FFCV)'}
-            </h3>
-            <div className="flex items-center flex-wrap gap-2">
-              {Array.isArray(officialLive.arbitros) && officialLive.arbitros.length > 0 && (
-                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                  ⚖️ Árbitro: {officialLive.arbitros.join(' · ')}
-                </span>
-              )}
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                {isLigaBraveMatch ? 'Titulares · Suplentes · Fantasy Rating' : 'Titulares · Suplentes · Esquema Oficial'}
-              </span>
-            </div>
-          </div>
+      {officialLive && (Array.isArray(officialLive.ourPlayers) || Array.isArray(officialLive.rivalPlayers)) && (() => {
+        const ourCount = Array.isArray(officialLive.ourPlayers) ? officialLive.ourPlayers.length : 0;
+        const rivalCount = Array.isArray(officialLive.rivalPlayers) ? officialLive.rivalPlayers.length : 0;
+        const totalCount = ourCount + rivalCount;
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        return (
+          <div className="bg-white border-t border-slate-200">
+            {/* Header / Desplegable Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowLineups(!showLineups)}
+              className="w-full p-4 sm:p-5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${showLineups ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 text-indigo-600'}`}>
+                  <Users className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                      {isLigaBraveMatch
+                        ? 'Alineaciones Oficiales (Liga Brave)'
+                        : 'Alineaciones Oficiales (FFCV)'}
+                    </h3>
+                    {totalCount > 0 && (
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                        {totalCount} Jugadores
+                      </span>
+                    )}
+                    {Array.isArray(officialLive.arbitros) && officialLive.arbitros.length > 0 && (
+                      <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full hidden sm:inline-block">
+                        ⚖️ {officialLive.arbitros.join(' · ')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                    {showLineups
+                      ? 'Haz clic para ocultar las alineaciones'
+                      : 'Consulta titulares, suplentes, dorsales y esquema táctico'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
+                  showLineups
+                    ? 'bg-slate-100 text-slate-700 border-slate-300'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                }`}>
+                  <span>{showLineups ? 'Ocultar' : 'Ver alineaciones'}</span>
+                  {showLineups ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </span>
+              </div>
+            </button>
+
+            {/* Contenido Desplegable */}
+            {showLineups && (
+              <div className="p-5 lg:p-8 pt-0 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 my-4">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    {isLigaBraveMatch ? 'Titulares · Suplentes · Fantasy Rating' : 'Titulares · Suplentes · Esquema Oficial'}
+                  </span>
+                  {Array.isArray(officialLive.arbitros) && officialLive.arbitros.length > 0 && (
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full sm:hidden">
+                      ⚖️ Árbitro: {officialLive.arbitros.join(' · ')}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {[
               {
                 title: isLocal ? localName : awayName,
@@ -913,6 +966,9 @@ export function LiveMatchPanel({
           </div>
         </div>
       )}
+    </div>
+  );
+})()}
 
       {/* ─── EVENTS TIMELINE ─── */}
       <div className="p-6 lg:p-8 bg-slate-50 border-t border-slate-200">

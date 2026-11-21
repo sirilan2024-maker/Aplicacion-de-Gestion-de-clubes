@@ -637,8 +637,8 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                       Aplazado
                                     </span>
                                   ) : isDescanso ? (
-                                    <span className="text-[11px] font-black text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-lg uppercase">
-                                      Jornada de descanso
+                                    <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
+                                      DESCANSA
                                     </span>
                                   ) : (
                                     <>
@@ -698,8 +698,8 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                         APLAZADO
                                       </span>
                                     ) : isDescanso ? (
-                                      <span className="text-[10px] font-black uppercase text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
-                                        DESCANSO (RIVAL RETIRADO)
+                                      <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                                        DESCANSA
                                       </span>
                                     ) : (
                                       <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
@@ -772,14 +772,16 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                           </span>
                                         )}
                                       </span>
-                                      <span className="text-[10px] text-slate-400 font-bold shrink-0">vs</span>
+                                      <span className="text-[10px] text-slate-400 font-bold shrink-0">
+                                        {isDescanso ? "·" : "vs"}
+                                      </span>
                                       <span className="inline-flex items-center gap-1.5">
                                         <span className={`text-xs font-extrabold ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
                                           {m.esLocal ? m.rivalNombre : m.teamName}
                                         </span>
                                         {isDescanso && (
-                                          <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
-                                            Retirado
+                                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                            Rival Retirado
                                           </span>
                                         )}
                                         {m.awayPosition && (
@@ -826,8 +828,8 @@ export function AdminInicioClient({ initialResult }: AdminInicioClientProps) {
                                       Aplazado
                                     </span>
                                   ) : isDescanso ? (
-                                    <span className="text-[11px] font-black text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-lg uppercase">
-                                      Jornada de descanso
+                                    <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
+                                      DESCANSA
                                     </span>
                                   ) : (
                                     <div className="flex items-center gap-1.5">

@@ -401,9 +401,10 @@ export default function FamilyMatchesPage() {
               match.estado !== 'En Curso' &&
               match.estado !== 'Finalizado'
             );
+            const isDescansoMatch = match.estado === 'Descanso';
             const statusReason = ffcvMatch?.status_reason || (match as any).motivo_suspension || null;
 
-            const showScore = (hasInternalScore || hasFfcvScore) && !isSuspendedMatch && !isPostponedMatch;
+            const showScore = (hasInternalScore || hasFfcvScore) && !isSuspendedMatch && !isPostponedMatch && !isDescansoMatch;
 
             // Extraer codacta para ver si hay acta oficial FFCV disponible
             let codacta = ffcvMatch?.codacta || null;
@@ -432,13 +433,15 @@ export default function FamilyMatchesPage() {
                           ? "bg-red-100 text-red-700 border border-red-300 font-black"
                           : isPostponedMatch
                           ? "bg-orange-100 text-orange-700 border border-orange-300 font-black"
+                          : isDescansoMatch
+                          ? "bg-amber-100 text-amber-800 border border-amber-300 font-black"
                           : match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : match.estado === 'En Curso'
                           ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : "bg-slate-100 text-slate-500 border border-slate-200"
                       }`}>
-                        {isSuspendedMatch ? 'Suspendido' : isPostponedMatch ? 'Aplazado' : (match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
+                        {isSuspendedMatch ? 'Suspendido' : isPostponedMatch ? 'Aplazado' : isDescansoMatch ? 'DESCANSA' : (match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
                       </div>
 
                       {isDifferentTeam && (
@@ -546,6 +549,15 @@ export default function FamilyMatchesPage() {
                               {statusReason}
                             </span>
                           )}
+                        </div>
+                      ) : isDescansoMatch ? (
+                        <div className="flex flex-col items-center text-center max-w-[140px]">
+                          <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-amber-500 text-white shadow-xs">
+                            DESCANSA
+                          </span>
+                          <span className="text-[9px] text-amber-800 font-bold mt-1">
+                            Rival Retirado
+                          </span>
                         </div>
                       ) : !showScore ? (
                         <span className="text-slate-300 font-black text-xl italic">VS</span>

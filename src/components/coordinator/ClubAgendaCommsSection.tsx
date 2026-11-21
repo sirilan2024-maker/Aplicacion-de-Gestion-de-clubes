@@ -339,6 +339,7 @@ export function ClubAgendaCommsSection({
                   const isFinished = m.estado === "Finalizado";
                   const isSuspended = m.estado?.toLowerCase() === "suspendido";
                   const isPostponed = m.estado?.toLowerCase() === "aplazado";
+                  const isDescanso = m.estado?.toLowerCase() === "descanso";
                   const homeScore = m.esLocal ? (m.resultadoPropio ?? 0) : (m.resultadoRival ?? 0);
                   const awayScore = m.esLocal ? (m.resultadoRival ?? 0) : (m.resultadoPropio ?? 0);
 
@@ -378,6 +379,10 @@ export function ClubAgendaCommsSection({
                           ) : isPostponed ? (
                             <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
                               Aplazado
+                            </span>
+                          ) : isDescanso ? (
+                            <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
+                              DESCANSA
                             </span>
                           ) : (
                             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
@@ -425,6 +430,10 @@ export function ClubAgendaCommsSection({
                             ) : isPostponed ? (
                               <span className="text-xs font-black px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-lg border border-amber-200 uppercase">
                                 Aplazado
+                              </span>
+                            ) : isDescanso ? (
+                              <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                                DESCANSA
                               </span>
                             ) : (
                               <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
@@ -497,11 +506,18 @@ export function ClubAgendaCommsSection({
                                   </span>
                                 )}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-bold shrink-0">vs</span>
+                              <span className="text-[10px] text-slate-400 font-bold shrink-0">
+                                {isDescanso ? "·" : "vs"}
+                              </span>
                               <span className="inline-flex items-center gap-1.5">
                                 <span className={`text-xs font-extrabold ${!m.esLocal ? "text-indigo-950 font-black" : "text-slate-800"}`}>
                                   {m.esLocal ? m.rivalNombre : m.teamName}
                                 </span>
+                                {isDescanso && (
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                    Rival Retirado
+                                  </span>
+                                )}
                                 {m.awayPosition && (
                                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200/70 shadow-2xs">
                                     {m.awayPosition}º
@@ -544,6 +560,10 @@ export function ClubAgendaCommsSection({
                           ) : isPostponed ? (
                             <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg uppercase">
                               Aplazado
+                            </span>
+                          ) : isDescanso ? (
+                            <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
+                              DESCANSA
                             </span>
                           ) : (
                             <div className="flex items-center gap-1.5">

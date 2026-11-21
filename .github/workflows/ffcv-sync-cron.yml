@@ -30,10 +30,30 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET || '1c2116fd25f2d9b436b10705daae6f053a84dea1957d9effaee3dd5238d8c081' }}
         run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::El secreto CRON_SECRET no está configurado."
+            exit 1
+          fi
+
+          TMP_WORK_DIR=$(mktemp -d)
+          chmod 700 "$TMP_WORK_DIR"
+          cleanup() {
+            rm -rf "$TMP_WORK_DIR"
+          }
+          trap cleanup EXIT
+          trap 'cleanup; trap - INT; kill -INT $$' INT
+          trap 'cleanup; trap - TERM; kill -TERM $$' TERM
+
+          AUTH_HEADER_FILE="$TMP_WORK_DIR/auth.header"
+          touch "$AUTH_HEADER_FILE"
+          chmod 600 "$AUTH_HEADER_FILE"
+          printf "Authorization: Bearer %s\n" "$CRON_SECRET" > "$AUTH_HEADER_FILE"
+
           echo "Instalando curl_cffi para bypass de Cloudflare en Apuntamelo..."
           pip install --quiet curl_cffi || true
 
-          python3 - << 'EOF' > /tmp/apuntamelo_payload.json
+          python3 - << 'EOF' > "$TMP_WORK_DIR/apuntamelo_payload.json"
           import json
           try:
               from curl_cffi import requests as creq
@@ -96,15 +116,20 @@ jobs:
           if [ "${{ inputs.mode }}" = "brave_only" ]; then
             EXTRA_QUERY="?braveOnly=true"
           fi
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-            -H "Authorization: Bearer $CRON_SECRET" \
+          set +e
+          HTTP_STATUS=$(curl -s -S --connect-timeout 15 --max-time 120 -o "$TMP_WORK_DIR/response.body" -w "%{http_code}" \
+            -H "@$AUTH_HEADER_FILE" \
             -H "Content-Type: application/json" \
-            --data-binary @/tmp/apuntamelo_payload.json \
+            --data-binary "@$TMP_WORK_DIR/apuntamelo_payload.json" \
             -X POST "https://app.clubsportingsaladar.com/api/ffcv/cron$EXTRA_QUERY")
-          echo "$RESPONSE"
-          HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -e 's/.*HTTP_STATUS://')
+          CURL_EXIT=$?
+          set -e
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::error::Error de conexión al invocar el endpoint FFCV (curl exit: $CURL_EXIT)"
+            exit "$CURL_EXIT"
+          fi
           if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "Error en la sincronizacion: Codigo HTTP $HTTP_STATUS"
+            echo "::error::Error en la sincronizacion: Codigo HTTP $HTTP_STATUS"
             exit 1
           fi
           echo "Sincronizacion completada exitosamente."

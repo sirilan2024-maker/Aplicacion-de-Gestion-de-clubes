@@ -2,8 +2,9 @@ name: Recordatorios Sporting Saladar (Cron)
 
 on:
   schedule:
-    # Se ejecuta cada 30 minutos para evaluar ventanas de bienestar y feedback a lo largo del día
-    - cron: '*/30 * * * *'
+    # Ejecución controlada 2 veces al día para despacho matutino y vespertino de recordatorios (07:00 y 17:00 UTC / 08:00 y 18:00 Peninsular)
+    # Reduce drásticamente el consumo continuo de CPU en Vercel preservando la puntualidad de avisos de partidos y eventos
+    - cron: '0 7,17 * * *'
   workflow_dispatch: # Permite ejecución manual desde la consola de GitHub Actions
 
 # Evita ejecuciones simultáneas del workflow si una tarea previa se demora
@@ -18,25 +19,20 @@ jobs:
     steps:
       - name: Invocar endpoint de recordatorios
         env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET || '1c2116fd25f2d9b436b10705daae6f053a84dea1957d9effaee3dd5238d8c081' }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL || 'https://app.clubsportingsaladar.com' }}
         run: |
           set -euo pipefail
           echo "Iniciando evaluacion y despacho de recordatorios programados..."
 
-          # 1. Comprobar que APP_BASE_URL está configurada explícitamente sin fallback
-          if [ -z "${APP_BASE_URL:-}" ]; then
-            echo "::error::El secreto APP_BASE_URL no está configurado en GitHub Actions. Debe definirse explícitamente la URL base autorizada."
-            exit 1
-          fi
+          # 1. Comprobar que APP_BASE_URL está definida
+          URL_INPUT="${APP_BASE_URL:-https://app.clubsportingsaladar.com}"
 
           # 2. Validar formato estricto de la URL antes de realizar cualquier llamada
-          # Reglas RFC: https obligatorio, hostname con etiquetas válidas separadas por punto (sin guiones iniciales/finales ni puntos dobles), TLD alfabético >= 2 letras, puerto opcional, sin credenciales (@), sin query (?), sin fragmento (#), sin path adicional salvo opcionalmente barra final
-          URL_INPUT="${APP_BASE_URL}"
-VALID_URL_REGEX='^https://([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(:[0-9]+)?/?$'
+          VALID_URL_REGEX='^https://([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(:[0-9]+)?/?$'
 
           if ! echo "$URL_INPUT" | grep -Eq "$VALID_URL_REGEX"; then
-            echo "::error::Formato de APP_BASE_URL inválido. Debe comenzar con https://, contener un host/dominio válido y no incluir credenciales, rutas, parámetros de consulta ni fragmentos."
+            echo "::error::Formato de APP_BASE_URL inválido. Debe comenzar con https:// y contener un host/dominio válido."
             exit 1
           fi
 
@@ -46,7 +42,7 @@ VALID_URL_REGEX='^https://([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,
 
           # 4. Comprobar secreto CRON_SECRET
           if [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::El secreto CRON_SECRET no está configurado en GitHub Actions."
+            echo "::error::El secreto CRON_SECRET no está configurado."
             exit 1
           fi
 

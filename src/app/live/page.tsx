@@ -66,7 +66,15 @@ export default async function PublicLivePage() {
 
   const { data: matchesData } = await matchesQuery.order('fecha_hora', { ascending: true })
 
-  const matchesWithTeams = matchesData || []
+  // Excluir de la vista pública en vivo las jornadas de descanso y partidos no disputados por retirada de rival
+  const matchesWithTeams = (matchesData || []).filter((m: any) => {
+    const isRestingByeWeek =
+      (m.coach_summary && (m.coach_summary.includes('DESCANSO') || m.coach_summary.includes('RETIRAD') || m.coach_summary.includes('NO DISPUTADO'))) ||
+      (m.rival_nombre && m.rival_nombre.toLowerCase().includes('descanso')) ||
+      (m.estado === 'Descanso' && !m.live_timer_started_at && (m.live_timer_elapsed_seconds ?? 0) === 0 && !m.first_half_duration_seconds && (!m.match_events || m.match_events.length === 0));
+    return !isRestingByeWeek;
+  });
+
   const liveAds = await getLiveAds();
 
   // Fetch club logo (ensure we get one with a logo)

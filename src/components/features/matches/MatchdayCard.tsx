@@ -44,15 +44,22 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
   }, [match?.rival_nombre, match?.rival, match?.rival_escudo]);
 
 
+  const isRestingByeWeek =
+    (match.coach_summary && (match.coach_summary.includes('DESCANSO') || match.coach_summary.includes('RETIRAD') || match.coach_summary.includes('NO DISPUTADO'))) ||
+    (match.rival_nombre && match.rival_nombre.toLowerCase().includes('descanso')) ||
+    (match.estado === 'Descanso' && !match.live_timer_started_at && (match.live_timer_elapsed_seconds ?? 0) === 0 && !match.first_half_duration_seconds && (!match.match_events || match.match_events.length === 0));
+
   const isSuspended = match.estado === 'Suspendido'
   const isPostponed = match.estado === 'Aplazado'
   const isFinished = match.estado === 'Finalizado'
-  const isDescanso = !isFinished && !isSuspended && !isPostponed && (match.estado === 'Descanso' || 
+  const isDescanso = !isFinished && !isSuspended && !isPostponed && !isRestingByeWeek && (
     (match.first_half_duration_seconds !== null && 
      match.first_half_duration_seconds > 0 &&
      match.live_timer_elapsed_seconds === match.first_half_duration_seconds && 
-     !match.live_timer_started_at));
-  const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && (match.estado === 'En curso' || match.estado === 'En Curso' || match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
+     !match.live_timer_started_at) ||
+    (match.estado === 'Descanso' && ((match.live_timer_elapsed_seconds ?? 0) > 0 || match.first_half_duration_seconds != null || (match.match_events && match.match_events.length > 0)))
+  );
+  const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && !isRestingByeWeek && (match.estado === 'En curso' || match.estado === 'En Curso' || match.live_timer_started_at !== null || (match.live_timer_elapsed_seconds && match.live_timer_elapsed_seconds > 0))
   const isLocal = !/\b(fuera|visitante)\b/i.test(match.lugar || '');
 
   // Cronómetro en vivo
@@ -367,6 +374,15 @@ export function MatchdayCard({ match, onClick, clubLogoUrl }: MatchdayCardProps)
                 </span>
                 <span className="text-[10px] text-orange-700 font-semibold mt-1">
                   Nueva fecha
+                </span>
+              </div>
+            ) : isRestingByeWeek ? (
+              <div className="flex flex-col items-center text-center">
+                <span className="px-2.5 py-1 rounded-lg text-xs font-black tracking-wider bg-sky-600 text-white shadow-xs">
+                  DESCANSO
+                </span>
+                <span className="text-[10px] text-sky-700 font-semibold mt-1">
+                  Jornada de descanso
                 </span>
               </div>
             ) : isLive || isDescanso || isFinished ? (

@@ -156,9 +156,17 @@ export function FamilyMatchdayList({ playerTeamId, clubLogoUrl = "/logo.png" }: 
     };
   }, [selectedMatch?.id]);
 
+  const isRestingByeWeek = (m: any) =>
+    (m.coach_summary && (m.coach_summary.includes('DESCANSO') || m.coach_summary.includes('RETIRAD') || m.coach_summary.includes('NO DISPUTADO'))) ||
+    (m.rival_nombre && m.rival_nombre.toLowerCase().includes('descanso')) ||
+    (m.estado === 'Descanso' && !m.live_timer_started_at && (m.live_timer_elapsed_seconds ?? 0) === 0 && !m.first_half_duration_seconds && (!m.match_events || m.match_events.length === 0));
+
   const hasLiveMatches = matches.some(m => 
-    m.estado === "En curso" || m.estado === "En Curso" || m.estado === "Descanso" ||
-    m.live_timer_started_at !== null || (m.live_timer_elapsed_seconds && m.live_timer_elapsed_seconds > 0)
+    !isRestingByeWeek(m) && (
+      m.estado === "En curso" || m.estado === "En Curso" || 
+      (m.estado === "Descanso" && ((m.live_timer_elapsed_seconds ?? 0) > 0 || m.first_half_duration_seconds != null || (m.match_events && m.match_events.length > 0))) ||
+      m.live_timer_started_at !== null || (m.live_timer_elapsed_seconds && m.live_timer_elapsed_seconds > 0)
+    )
   );
 
   if (loading) {
@@ -227,8 +235,10 @@ export function FamilyMatchdayList({ playerTeamId, clubLogoUrl = "/logo.png" }: 
             const isFinished = m.estado === "Finalizado" && m.resultado_propio !== null && m.resultado_rival !== null;
             const isSuspended = m.estado === "Suspendido";
             const isPostponed = m.estado === "Aplazado";
-            const isDescanso = m.estado === "Descanso";
-            const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && (
+            const isDescanso = !isFinished && !isSuspended && !isPostponed && !isRestingByeWeek(m) && (
+              m.estado === "Descanso" && ((m.live_timer_elapsed_seconds ?? 0) > 0 || m.first_half_duration_seconds != null || (m.match_events && m.match_events.length > 0))
+            );
+            const isLive = !isFinished && !isDescanso && !isSuspended && !isPostponed && !isRestingByeWeek(m) && (
               m.estado === "En curso" || m.estado === "En Curso" || 
               m.live_timer_started_at !== null || 
               (m.live_timer_elapsed_seconds && m.live_timer_elapsed_seconds > 0)

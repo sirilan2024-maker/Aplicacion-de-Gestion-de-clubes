@@ -38,6 +38,11 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     setIsMounted(true)
   }, [])
 
+  const isRestingByeWeek = (m: any) =>
+    (m.coach_summary && (m.coach_summary.includes('DESCANSO') || m.coach_summary.includes('RETIRAD') || m.coach_summary.includes('NO DISPUTADO'))) ||
+    (m.rival_nombre && m.rival_nombre.toLowerCase().includes('descanso')) ||
+    (m.estado === 'Descanso' && !m.live_timer_started_at && (m.live_timer_elapsed_seconds ?? 0) === 0 && !m.first_half_duration_seconds && (!m.match_events || m.match_events.length === 0));
+
   // Compute the ±72h window matches + highlighted matches (excluding matches older than 72h)
   const jornada = React.useMemo(() => {
     const now = Date.now()
@@ -48,12 +53,13 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
 
     const inWindow = matches.filter(m => {
       if (!m?.id || !m?.fecha_hora) return false
+      if (isRestingByeWeek(m)) return false
       const t = new Date(m.fecha_hora).getTime()
       if (isNaN(t)) return false
       const isActivelyLive =
         m.estado !== 'Finalizado' &&
         (now - t) <= h12 &&
-        (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || Boolean(m.live_timer_started_at) || (m.live_timer_elapsed_seconds ?? 0) > 0)
+        (m.estado === 'En Curso' || m.estado === 'En curso' || Boolean(m.live_timer_started_at) || (m.live_timer_elapsed_seconds ?? 0) > 0 || (m.estado === 'Descanso' && ((m.live_timer_elapsed_seconds ?? 0) > 0 || m.first_half_duration_seconds != null || (m.match_events && m.match_events.length > 0))))
       if (isActivelyLive) return true
       return t >= windowStart && t <= windowEnd
     })
@@ -62,6 +68,7 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     const inWindowIds = new Set(inWindow.map(m => m.id))
     const highlighted = matches.filter(m => {
       if (!m?.id || !m?.fecha_hora || !m.highlight_jornada || inWindowIds.has(m.id)) return false
+      if (isRestingByeWeek(m)) return false
       const t = new Date(m.fecha_hora).getTime()
       if (isNaN(t)) return false
       return t >= windowStart
@@ -82,7 +89,8 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     const hasActiveLiveOrUpcomingMatch = () => {
       const now = Date.now();
       return matchesRef.current.some((m) => {
-        if (['en_juego', 'En Curso', 'Descanso', 'descanso'].includes(m.estado)) return true;
+        if (isRestingByeWeek(m)) return false;
+        if (['en_juego', 'En Curso', 'descanso'].includes(m.estado) || (m.estado === 'Descanso' && ((m.live_timer_elapsed_seconds ?? 0) > 0 || m.first_half_duration_seconds != null || (m.match_events && m.match_events.length > 0)))) return true;
         if (m.estado === 'Programado' && m.fecha_hora) {
           const matchMs = new Date(m.fecha_hora).getTime();
           const diffMinutes = (now - matchMs) / (1000 * 60);
@@ -304,12 +312,13 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
   // Separate live (only if match date is within the last 12 hours so old unclosed matches don't stay pinned as live)
   const isMatchActivelyLive = (m: any) => {
     if (!m?.id || !m?.fecha_hora) return false
+    if (isRestingByeWeek(m)) return false
     const t = new Date(m.fecha_hora).getTime()
     if (isNaN(t)) return false
     return (
       m.estado !== 'Finalizado' &&
       (Date.now() - t) <= 12 * 60 * 60 * 1000 &&
-      (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || Boolean(m.live_timer_started_at) || (m.live_timer_elapsed_seconds ?? 0) > 0)
+      (m.estado === 'En Curso' || m.estado === 'En curso' || Boolean(m.live_timer_started_at) || (m.live_timer_elapsed_seconds ?? 0) > 0 || (m.estado === 'Descanso' && ((m.live_timer_elapsed_seconds ?? 0) > 0 || m.first_half_duration_seconds != null || (m.match_events && m.match_events.length > 0))))
     )
   }
   const live = jornada.filter(isMatchActivelyLive)

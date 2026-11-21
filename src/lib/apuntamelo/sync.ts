@@ -1509,6 +1509,30 @@ export async function syncApuntameloMatchDetailToDb(params: {
       });
     }
 
+    // 5a.1 Si aún no hay detalles en Json_goles pero el marcador registra goles (p.ej. 1-0 durante el directo)
+    if (officialGoals.length === 0 && ((finalA || 0) > 0 || (finalB || 0) > 0)) {
+      const localTeamName = isHome ? 'Sporting Saladar' : (mInfo?.Nombre_A || sm?.Nombre_A || 'Local');
+      const awayTeamName = isHome ? (mInfo?.Nombre_B || sm?.Nombre_B || 'Visitante') : 'Sporting Saladar';
+      for (let i = 0; i < (finalA || 0); i++) {
+        officialGoals.push({
+          partido_id: partidoId,
+          player_id: null,
+          tipo_evento: 'Gol',
+          minuto: 1,
+          notas: `[LOCAL] Gol de ${localTeamName}`
+        });
+      }
+      for (let i = 0; i < (finalB || 0); i++) {
+        officialGoals.push({
+          partido_id: partidoId,
+          player_id: null,
+          tipo_evento: 'Gol',
+          minuto: 1,
+          notas: `[VISITANTE] Gol de ${awayTeamName}`
+        });
+      }
+    }
+
     // Conciliar goles en match_events:
     // Si los goles existentes no coinciden en cantidad o no tienen etiquetas [LOCAL]/[VISITANTE], sincronizarlos
     const existingGoalEvents = currentEvents.filter(
@@ -1691,19 +1715,8 @@ export async function syncApuntameloMatchDetailToDb(params: {
       const isDuplaStat = claves.includes('goles.duplas.base');
       const isKickoff1 = claves.includes('inicio_partido');
       const isKickoff2 = claves.includes('inicio_parte2');
-      const isPreMatchContext = claves.includes('posiciones_equipos');
-
-      if (
-        !isGoalNarration &&
-        !isGoalStat &&
-        !isAssistStat &&
-        !isDuplaStat &&
-        !isKickoff1 &&
-        !isKickoff2 &&
-        !isPreMatchContext
-      ) {
-        continue;
-      }
+      const isPreMatchContext = claves.includes('posiciones_equipos') || claves.includes('previa_partido');
+      const isLineup = claves.includes('alineacion_equipo');
 
       if (existingBraveTags.has(nId)) continue;
 
@@ -1712,6 +1725,7 @@ export async function syncApuntameloMatchDetailToDb(params: {
       else if (isGoalNarration) emoji = '🔥';
       else if (isGoalStat || isAssistStat || isDuplaStat) emoji = '📊';
       else if (isPreMatchContext) emoji = '📋';
+      else if (isLineup) emoji = '👥';
 
       // Asegurar que los eventos de la 2ª parte tengan minuto > halfMinutes para ubicarse en la columna Segunda Parte
       const effectiveMin =
@@ -1815,68 +1829,98 @@ export async function syncApuntameloLiveMatchesIfNeeded(
       const config = APUNTAMELO_TEAMS_CONFIG[teamId];
       if (!config) continue;
 
-      const rawGroupMatches = await fetchApuntameloJson<any[]>(
-        `https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=${config.orgId}&grupo=${config.grupoId}`,
-        { ttlMs: 12 * 1000, timeoutMs: 5000 }
-      ).catch(() => null);
-
-      if (!Array.isArray(rawGroupMatches) || rawGroupMatches.length === 0) continue;
-
-      const saladarGroupMatches = rawGroupMatches.filter(
-        (m: any) =>
-          Number(m.FK_EquipoLiga_A) === config.teamApuntameloId ||
-          Number(m.FK_EquipoLiga_B) === config.teamApuntameloId
-      );
-
       const { data: teamPlayers } = await supabase
         .from('players')
         .select('id, first_name, last_name, dorsal, team_id, posicion')
         .eq('team_id', teamId);
 
       const categoryDuration = getOfficialMatchDuration(config.category, 'Liga Brave');
+      let saladarGroupMatches: any[] | null = null;
 
       for (const cand of teamCandidates) {
-        const sm = saladarGroupMatches.find((gm: any) => {
-          const isHome = Number(gm.FK_EquipoLiga_A) === config.teamApuntameloId;
-          const gmRival = isHome ? gm.Nombre_B : gm.Nombre_A;
-          return findMatchingInternalPartido([cand], gm, gmRival)?.id === cand.id;
-        });
-
-        if (!sm) continue;
-
         const { data: existingConvs } = await supabase
           .from('convocatorias')
           .select('partido_id, player_id, titular, tactical_x, tactical_y, minutos_jugados, minutes_played')
           .eq('partido_id', cand.id);
 
-        const matchInfoArr = await fetchApuntameloJson<any[]>(
-          `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`,
-          { ttlMs: 12 * 1000, timeoutMs: 5000 }
-        ).catch(() => null);
+        const directMatchId = cand.acta_oficial_url
+          ? String(cand.acta_oficial_url).match(/partido\/(\d+)/)?.[1]
+          : null;
 
-        if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
-          const mInfo = matchInfoArr[0];
-          const hasStarted =
-            sm.Tipo === 'jugado' ||
-            Boolean(sm.Inicio) ||
-            Boolean(mInfo?.Inicio) ||
-            (sm.Goles_A !== null && sm.Goles_A !== undefined);
-          const hasPreMatchLineup = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []).length > 0;
+        let sm: any = null;
+        let mInfo: any = null;
 
-          if (!hasStarted && !hasPreMatchLineup) continue;
+        // 1. Ruta ultrarrápida: si ya tenemos el ID de Apúntamelo en acta_oficial_url
+        if (directMatchId) {
+          const directInfoArr = await fetchApuntameloJson<any[]>(
+            `https://apuntamelo.com/obtenerInfoPartido?id=${directMatchId}`,
+            { ttlMs: 8 * 1000, timeoutMs: 8000 }
+          ).catch(() => null);
 
-          await syncApuntameloMatchDetailToDb({
-            supabase,
-            config,
-            partidoId: cand.id,
-            existingCoachReport: cand.coach_report,
-            existingConvs: existingConvs || [],
-            sm,
-            mInfo,
-            teamPlayers: teamPlayers || [],
-            categoryDuration
-          });
+          if (Array.isArray(directInfoArr) && directInfoArr.length > 0) {
+            mInfo = directInfoArr[0];
+            sm = mInfo;
+          }
         }
+
+        // 2. Fallback: buscar en el calendario completo de la jornada
+        if (!mInfo) {
+          if (!saladarGroupMatches) {
+            const rawGroupMatches = await fetchApuntameloJson<any[]>(
+              `https://apuntamelo.com/obtenerPartidosPorJornada?organizacion=${config.orgId}&grupo=${config.grupoId}`,
+              { ttlMs: 15 * 1000, timeoutMs: 12000 }
+            ).catch(() => null);
+
+            saladarGroupMatches = Array.isArray(rawGroupMatches)
+              ? rawGroupMatches.filter(
+                  (m: any) =>
+                    Number(m.FK_EquipoLiga_A) === config.teamApuntameloId ||
+                    Number(m.FK_EquipoLiga_B) === config.teamApuntameloId
+                )
+              : [];
+          }
+
+          sm = saladarGroupMatches.find((gm: any) => {
+            const isHome = Number(gm.FK_EquipoLiga_A) === config.teamApuntameloId;
+            const gmRival = isHome ? gm.Nombre_B : gm.Nombre_A;
+            return findMatchingInternalPartido([cand], gm, gmRival)?.id === cand.id;
+          });
+
+          if (sm) {
+            const matchInfoArr = await fetchApuntameloJson<any[]>(
+              `https://apuntamelo.com/obtenerInfoPartido?id=${sm.Id}`,
+              { ttlMs: 10 * 1000, timeoutMs: 8000 }
+            ).catch(() => null);
+
+            if (Array.isArray(matchInfoArr) && matchInfoArr.length > 0) {
+              mInfo = matchInfoArr[0];
+            }
+          }
+        }
+
+        if (!sm || !mInfo) continue;
+
+        const hasStarted =
+          sm.Tipo === 'jugado' ||
+          Boolean(sm.Inicio) ||
+          Boolean(mInfo?.Inicio) ||
+          (sm.Goles_A !== null && sm.Goles_A !== undefined) ||
+          (mInfo?.Goles_A !== null && mInfo?.Goles_A !== undefined);
+        const hasPreMatchLineup = safeJsonParse<any[]>(mInfo?.Json_puntuaciones, []).length > 0;
+
+        if (!hasStarted && !hasPreMatchLineup) continue;
+
+        await syncApuntameloMatchDetailToDb({
+          supabase,
+          config,
+          partidoId: cand.id,
+          existingCoachReport: cand.coach_report,
+          existingConvs: existingConvs || [],
+          sm,
+          mInfo,
+          teamPlayers: teamPlayers || [],
+          categoryDuration
+        });
       }
     }
   } catch (err: any) {

@@ -1777,6 +1777,7 @@ export async function getPublicMatches() {
       .select('id, estado, resultado_propio, resultado_rival, live_timer_started_at, live_timer_elapsed_seconds, first_half_duration_seconds, acta_oficial_url, coach_report')
       .eq('season_id', activeSeasonId)
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .neq('estado', 'Descanso')
 
     if (error) {
       console.error("Error fetching public matches:", error);
@@ -1898,6 +1899,7 @@ export async function getClubMatchdayMatchesAction(teamId?: string) {
       `)
       .eq('season_id', activeSeasonId)
       .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+      .neq('estado', 'Descanso')
       .order('fecha_hora', { ascending: true });
 
     if (error || !rawMatches) {

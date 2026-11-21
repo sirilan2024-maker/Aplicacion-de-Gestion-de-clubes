@@ -58,6 +58,7 @@ export default async function PublicLivePage() {
       )
     `)
     .neq('season_id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+    .neq('estado', 'Descanso')
 
   if (activeSeason?.id) {
     matchesQuery = matchesQuery.eq('season_id', activeSeason.id)

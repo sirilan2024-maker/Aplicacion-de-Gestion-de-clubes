@@ -47,11 +47,13 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     const windowEnd = now + h72
 
     const inWindow = matches.filter(m => {
+      if (!m?.id || !m?.fecha_hora) return false
       const t = new Date(m.fecha_hora).getTime()
+      if (isNaN(t)) return false
       const isActivelyLive =
         m.estado !== 'Finalizado' &&
         (now - t) <= h12 &&
-        (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)
+        (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || Boolean(m.live_timer_started_at) || (m.live_timer_elapsed_seconds ?? 0) > 0)
       if (isActivelyLive) return true
       return t >= windowStart && t <= windowEnd
     })
@@ -59,8 +61,9 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
     // Add admin-highlighted matches that are not already in window and haven't expired (>72h old)
     const inWindowIds = new Set(inWindow.map(m => m.id))
     const highlighted = matches.filter(m => {
-      if (!m.highlight_jornada || inWindowIds.has(m.id)) return false
+      if (!m?.id || !m?.fecha_hora || !m.highlight_jornada || inWindowIds.has(m.id)) return false
       const t = new Date(m.fecha_hora).getTime()
+      if (isNaN(t)) return false
       return t >= windowStart
     })
 
@@ -134,17 +137,26 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
         'postgres_changes',
         { event: '*', schema: 'public', table: 'partidos' },
         (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id
+            if (deletedId) {
+              setMatches(prev => prev.filter(m => m.id !== deletedId))
+            }
+            return
+          }
+
           const updated = payload.new as any
-          if (!updated) return
+          if (!updated || !updated.id) return
 
           setMatches(prev => {
             const exists = prev.find(m => m.id === updated.id)
             if (exists) {
               return prev.map(m => m.id === updated.id ? { ...m, ...updated } : m)
-            } else {
+            } else if (updated.fecha_hora && !isNaN(new Date(updated.fecha_hora).getTime())) {
               const equipo = teams.find(t => t.id === updated.equipo_id)
               return [...prev, { ...updated, equipo }]
             }
+            return prev
           })
         }
       )
@@ -282,11 +294,13 @@ export function MatchdayView({ initialMatches, teams, ads, isAdmin, clubLogoUrl 
 
   // Separate live (only if match date is within the last 12 hours so old unclosed matches don't stay pinned as live)
   const isMatchActivelyLive = (m: any) => {
+    if (!m?.id || !m?.fecha_hora) return false
     const t = new Date(m.fecha_hora).getTime()
+    if (isNaN(t)) return false
     return (
       m.estado !== 'Finalizado' &&
       (Date.now() - t) <= 12 * 60 * 60 * 1000 &&
-      (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || m.live_timer_started_at !== null || m.live_timer_elapsed_seconds > 0)
+      (m.estado === 'Descanso' || m.estado === 'En Curso' || m.estado === 'En curso' || Boolean(m.live_timer_started_at) || (m.live_timer_elapsed_seconds ?? 0) > 0)
     )
   }
   const live = jornada.filter(isMatchActivelyLive)

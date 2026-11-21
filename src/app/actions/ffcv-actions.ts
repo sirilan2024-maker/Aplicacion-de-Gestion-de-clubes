@@ -100,6 +100,11 @@ export async function syncAllFFCVAction(
 
     const { syncAllConfiguredFFCVTeams } = await import('@/lib/ffcv/sync');
     const result = await syncAllConfiguredFFCVTeams(options);
+    const { triggerBraveGitHubWorkflow, scheduleUpcomingMatchesPostSync } = await import('@/lib/ffcv/post-match-scheduler');
+    if (result.groupsFailed > 0) {
+      await triggerBraveGitHubWorkflow('manual:sync-all').catch(() => {});
+    }
+    await scheduleUpcomingMatchesPostSync().catch(() => {});
     revalidatePath('/dashboard/matches');
     revalidatePath('/admin/partidos');
     revalidatePath('/dashboard/equipos');

@@ -346,7 +346,11 @@ export function ClubAgendaCommsSection({
                   return (
                     <React.Fragment key={m.id}>
                       {/* ── Vista Móvil (< sm): Centrado, legible y con nombres completos ── */}
-                      <div className="sm:hidden p-3.5 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2.5 text-center transition-all shadow-2xs">
+                      <div className={`sm:hidden p-3.5 border rounded-2xl space-y-2.5 text-center transition-all shadow-2xs ${
+                        isDescanso
+                          ? "bg-amber-50/70 hover:bg-amber-50/90 border-amber-300 ring-1 ring-amber-200"
+                          : "bg-slate-50/70 hover:bg-slate-50 border-slate-200/80"
+                      }`}>
                         {/* Fila superior centrada: Fecha/Hora y Badges */}
                         <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
                           <span className="inline-flex items-center gap-1.5 font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
@@ -381,8 +385,9 @@ export function ClubAgendaCommsSection({
                               Aplazado
                             </span>
                           ) : isDescanso ? (
-                            <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
-                              DESCANSA
+                            <span className="text-xs font-black text-amber-900 bg-amber-200/90 border border-amber-400 px-3 py-1 rounded-lg uppercase tracking-wider shadow-2xs inline-flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                              JORNADA DE DESCANSO
                             </span>
                           ) : (
                             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg border ${
@@ -432,9 +437,14 @@ export function ClubAgendaCommsSection({
                                 Aplazado
                               </span>
                             ) : isDescanso ? (
-                              <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
-                                DESCANSA
-                              </span>
+                              <div className="flex flex-col items-center gap-1 my-1">
+                                <span className="text-xs font-black uppercase text-amber-950 bg-amber-200/90 border-2 border-amber-400 px-4 py-1 rounded-xl shadow-xs tracking-wider">
+                                  DESCANSO
+                                </span>
+                                <span className="text-[10px] font-black uppercase text-amber-800 tracking-widest bg-amber-100/90 px-2.5 py-0.5 rounded-full border border-amber-300">
+                                  Rival Retirado de Competición
+                                </span>
+                              </div>
                             ) : (
                               <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100 tracking-wider">
                                 VS
@@ -482,7 +492,11 @@ export function ClubAgendaCommsSection({
                       </div>
 
                       {/* ── Vista Desktop (sm: en adelante): Formato fila horizontal ── */}
-                      <div className="hidden sm:flex py-3 first:pt-1 last:pb-1 sm:items-center justify-between gap-3 hover:bg-slate-50/70 rounded-xl px-2.5 -mx-2 transition-colors">
+                      <div className={`hidden sm:flex py-3 first:pt-1 last:pb-1 sm:items-center justify-between gap-3 rounded-xl px-2.5 -mx-2 transition-all ${
+                        isDescanso
+                          ? "bg-amber-50/70 hover:bg-amber-100/60 border border-amber-300 ring-1 ring-amber-200"
+                          : "hover:bg-slate-50/70"
+                      }`}>
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-24 min-w-[90px] text-center shrink-0">
                             <div className="text-[11px] font-bold text-slate-500 uppercase whitespace-nowrap">
@@ -562,9 +576,15 @@ export function ClubAgendaCommsSection({
                               Aplazado
                             </span>
                           ) : isDescanso ? (
-                            <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg uppercase">
-                              DESCANSA
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-xs font-black text-amber-950 bg-amber-200/90 border border-amber-400 px-3 py-1 rounded-lg uppercase tracking-wider shadow-2xs inline-flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                JORNADA DE DESCANSO
+                              </span>
+                              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-tight bg-amber-100/90 px-2 py-0.5 rounded border border-amber-300">
+                                Rival Retirado
+                              </span>
+                            </div>
                           ) : (
                             <div className="flex items-center gap-1.5">
                               {(m as any).tipoPartido === 'amistoso' && (

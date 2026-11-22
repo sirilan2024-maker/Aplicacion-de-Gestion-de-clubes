@@ -434,14 +434,14 @@ export default function FamilyMatchesPage() {
                           : isPostponedMatch
                           ? "bg-orange-100 text-orange-700 border border-orange-300 font-black"
                           : isDescansoMatch
-                          ? "bg-amber-100 text-amber-800 border border-amber-300 font-black"
+                          ? "bg-amber-200 text-amber-950 border border-amber-400 font-black shadow-2xs"
                           : match.estado === 'Finalizado' || (!hasInternalScore && hasFfcvScore)
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : match.estado === 'En Curso'
                           ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : "bg-slate-100 text-slate-500 border border-slate-200"
                       }`}>
-                        {isSuspendedMatch ? 'Suspendido' : isPostponedMatch ? 'Aplazado' : isDescansoMatch ? 'DESCANSA' : (match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
+                        {isSuspendedMatch ? 'Suspendido' : isPostponedMatch ? 'Aplazado' : isDescansoMatch ? 'JORNADA DE DESCANSO' : (match.estado === 'Descanso' || (match.first_half_duration_seconds !== null && match.live_timer_elapsed_seconds === match.first_half_duration_seconds && !match.live_timer_started_at)) ? 'Descanso' : (match.estado === 'Programado' && hasFfcvScore ? 'Finalizado' : match.estado)}
                       </div>
 
                       {isDifferentTeam && (
@@ -551,11 +551,11 @@ export default function FamilyMatchesPage() {
                           )}
                         </div>
                       ) : isDescansoMatch ? (
-                        <div className="flex flex-col items-center text-center max-w-[140px]">
-                          <span className="px-3 py-1 rounded-lg text-xs font-black tracking-wider bg-amber-500 text-white shadow-xs">
-                            DESCANSA
+                        <div className="flex flex-col items-center text-center max-w-[160px] gap-1">
+                          <span className="px-3.5 py-1 rounded-xl text-xs font-black tracking-wider bg-amber-200/90 text-amber-950 border-2 border-amber-400 shadow-xs uppercase">
+                            DESCANSO
                           </span>
-                          <span className="text-[9px] text-amber-800 font-bold mt-1">
+                          <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-300">
                             Rival Retirado
                           </span>
                         </div>

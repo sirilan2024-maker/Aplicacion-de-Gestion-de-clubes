@@ -222,7 +222,11 @@ export default async function DashboardTeamMatchesPage({ params }: { params: Pro
     const st = (p.status || '').toLowerCase();
     if (!seenPlayerIds.has(p.id) && !st.includes('inactiv') && !st.includes('baja')) {
       seenPlayerIds.add(p.id);
-      players.push(p);
+      const matchedTeam = (allTeams || []).find((t: any) => t.id === p.team_id);
+      players.push({
+        ...p,
+        team_name: matchedTeam?.name || effectiveTeam?.name || undefined
+      });
     }
   }
 

@@ -8,6 +8,7 @@ import { evaluatePlayerDiscipline, classifyMatchCards } from "@/lib/ffcv/discipl
 
 interface DisciplineModalProps {
   player: any
+  teamName?: string | null
   cardEvents: any[]
   recentMatches?: any[]
   convocatorias?: any[]
@@ -18,7 +19,7 @@ interface DisciplineModalProps {
 
 const EMPTY_ARRAY: any[] = [];
 
-export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRAY, convocatorias = EMPTY_ARRAY, onClose, onCardsUpdated, readOnly = false }: DisciplineModalProps) {
+export function DisciplineModal({ player, teamName, cardEvents, recentMatches = EMPTY_ARRAY, convocatorias = EMPTY_ARRAY, onClose, onCardsUpdated, readOnly = false }: DisciplineModalProps) {
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [savingCards, setSavingCards] = useState<string | null>(null)
@@ -108,9 +109,20 @@ export function DisciplineModal({ player, cardEvents, recentMatches = EMPTY_ARRA
               </div>
             )}
             <div>
-              <h3 className="text-lg font-bold text-slate-900">{player.first_name} {player.last_name}</h3>
-              <div className="text-sm font-medium text-slate-500">
-                {isEditing ? 'Gestionar Tarjetas en Partidos' : 'Historial de Tarjetas'}
+              <h3 className="text-lg font-bold text-slate-900 leading-tight">{player.first_name} {player.last_name}</h3>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {teamName && (
+                  <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200/70 px-2 py-0.5 rounded-md text-xs leading-none">
+                    {teamName}
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 capitalize">
+                  {player.posicion || 'Sin posición'}
+                </span>
+                <span className="text-xs text-slate-300">·</span>
+                <span className="text-xs font-medium text-slate-500">
+                  {isEditing ? 'Gestionar Tarjetas en Partidos' : 'Historial de Tarjetas'}
+                </span>
               </div>
             </div>
           </div>

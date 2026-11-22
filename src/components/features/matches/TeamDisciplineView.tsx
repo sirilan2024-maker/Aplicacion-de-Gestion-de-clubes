@@ -13,9 +13,10 @@ interface TeamDisciplineViewProps {
   players: any[]
   convocatorias: any[]
   teamId: string
+  teams?: any[]
 }
 
-export function TeamDisciplineView({ matches, players, convocatorias, teamId }: TeamDisciplineViewProps) {
+export function TeamDisciplineView({ matches, players, convocatorias, teamId, teams = [] }: TeamDisciplineViewProps) {
   const router = useRouter()
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -42,6 +43,42 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     checkRole()
   }, [])
 
+  // Helper para resolver con máxima precisión el equipo al que pertenece el jugador
+  const getPlayerTeamName = (player: any): string | null => {
+    if (player.team_name) return player.team_name
+    if (player.team?.name) return player.team.name
+    if (player.teams?.name) return player.teams.name
+    if (Array.isArray(player.teams) && player.teams[0]?.name) return player.teams[0].name
+
+    const rawTeamId = player.team_id || (teamId !== 'all' ? teamId : null)
+    const effectiveTeamId = rawTeamId ? (TEAM_25_TO_26_MAP[rawTeamId] || rawTeamId) : null
+
+    if (effectiveTeamId && teams && teams.length > 0) {
+      const found = teams.find((t: any) => t.id === effectiveTeamId || t.id === rawTeamId)
+      if (found?.name) return found.name
+    }
+
+    // Si el jugador tiene convocatorias registradas, buscar el equipo del partido
+    const playerConvs = localConvocatorias.filter(c => c.player_id === player.id)
+    if (playerConvs.length > 0) {
+      for (const conv of playerConvs) {
+        const m = matches.find(match => match.id === conv.partido_id)
+        if (m?.equipo?.name) return m.equipo.name
+        if (m?.equipo_id && teams && teams.length > 0) {
+          const found = teams.find((t: any) => t.id === m.equipo_id)
+          if (found?.name) return found.name
+        }
+      }
+    }
+
+    if (teamId && teamId !== 'all' && teams && teams.length > 0) {
+      const found = teams.find((t: any) => t.id === teamId)
+      if (found?.name) return found.name
+    }
+
+    return null
+  }
+
   const handleAvisarEntrenador = async (e: React.MouseEvent, player: any) => {
     e.stopPropagation()
     const pTeamId = player.team_id || teamId
@@ -52,11 +89,12 @@ export function TeamDisciplineView({ matches, players, convocatorias, teamId }: 
     
     setAlertingId(player.id)
     try {
+      const resolvedTeam = getPlayerTeamName(player) || player.teams?.name || "Equipo"
       const res = await sendDisciplineAlertAction(
         player.id, 
         pTeamId, 
         `${player.first_name} ${player.last_name}`, 
-        player.teams?.name || "Equipo"
+        resolvedTeam
       )
       
       if (res.success) {
@@ -173,8 +211,11 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
       pendingReason
     } = evalResult;
 
+    const teamName = getPlayerTeamName(player)
+
     return {
       player,
+      teamName,
       totalYellow,
       totalRed,
       cycleCards,
@@ -196,10 +237,14 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
     return a.player.first_name.localeCompare(b.player.first_name);
   });
 
-  // Filtrar por buscador
+  // Filtrar por buscador (nombre, apellidos, equipo o posición)
   const filteredData = disciplineData.filter(d => {
+    const q = searchQuery.toLowerCase().trim()
+    if (!q) return true
     const name = `${d.player.first_name} ${d.player.last_name}`.toLowerCase()
-    return name.includes(searchQuery.toLowerCase())
+    const tName = (d.teamName || '').toLowerCase()
+    const pos = (d.player.posicion || '').toLowerCase()
+    return name.includes(q) || tName.includes(q) || pos.includes(q)
   })
 
   const selectedPlayer = disciplineData.find(d => d.player.id === selectedPlayerId)
@@ -383,7 +428,14 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                          {d.teamName && (
+                            <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md text-[11px] leading-none uppercase tracking-wide">
+                              {d.teamName}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</span>
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -493,7 +545,14 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</div>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    {d.teamName && (
+                      <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md text-[11px] leading-none uppercase tracking-wide">
+                        {d.teamName}
+                      </span>
+                    )}
+                    <span className="text-xs text-slate-500 capitalize">{d.player.posicion || 'Sin posición'}</span>
+                  </div>
                 </div>
                 {canSendAlerts && (d.cycleCards === 4 || d.pendingSanction) && (
                   <button
@@ -564,6 +623,7 @@ const TEAM_25_TO_26_MAP: Record<string, string> = {
       {selectedPlayer && (
         <DisciplineModal 
           player={selectedPlayer.player}
+          teamName={selectedPlayer.teamName || undefined}
           cardEvents={selectedPlayer.cardEvents}
           recentMatches={getPlayerRecentMatches(selectedPlayer.player)}
           convocatorias={localConvocatorias}

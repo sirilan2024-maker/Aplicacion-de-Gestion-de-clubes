@@ -87,6 +87,7 @@ export default async function PartidosPage() {
       .from("player_season_history")
       .select(`
         team_id,
+        teams (id, name),
         players!inner (id, first_name, last_name, posicion, status)
       `)
       .eq("season_id", targetSeasonId)
@@ -97,7 +98,8 @@ export default async function PartidosPage() {
     } else if (historyData && historyData.length > 0) {
       players = historyData.map((h: any) => ({
         ...h.players,
-        team_id: h.team_id
+        team_id: h.team_id,
+        team_name: h.teams?.name || (Array.isArray(h.teams) ? h.teams[0]?.name : undefined)
       }));
     }
   }
@@ -123,6 +125,17 @@ export default async function PartidosPage() {
       .select("id, first_name, last_name, posicion, status, team_id")
       .neq("status", "inactive");
     if (directPlayers) players = directPlayers;
+  }
+
+  // Asegurar que cada jugador tenga su team_name mapeado con la lista de equipos activos
+  if (teams && teams.length > 0) {
+    players = players.map(p => {
+      const matchedTeam = teams.find((t: any) => t.id === p.team_id);
+      return {
+        ...p,
+        team_name: p.team_name || matchedTeam?.name || undefined
+      };
+    });
   }
 
   const matchIds = (matches || []).map(m => m.id);

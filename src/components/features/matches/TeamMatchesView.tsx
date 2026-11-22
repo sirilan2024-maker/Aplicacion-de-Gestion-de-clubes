@@ -349,6 +349,7 @@ export function TeamMatchesView({
             players={data.players}
             convocatorias={data.convocatorias}
             teamId={teamId}
+            teams={data.teams}
           />
         </div>
       ) : (

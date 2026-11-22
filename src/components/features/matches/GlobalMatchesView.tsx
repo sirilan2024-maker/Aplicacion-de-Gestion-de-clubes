@@ -1008,6 +1008,7 @@ export function GlobalMatchesView({ initialMatches, teams: initialTeams, players
                 players={players}
                 convocatorias={convocatorias}
                 teamId={actualEquipoId}
+                teams={teams}
               />
             </div>
           );

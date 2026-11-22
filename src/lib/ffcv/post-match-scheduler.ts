@@ -11,9 +11,12 @@ const MAX_QSTASH_DELAY_SECONDS = 7 * 24 * 3600 - 300; // Margen de seguridad baj
 function getPostMatchWebhookUrl(): string {
   const configured = process.env.QSTASH_POST_MATCH_URL?.trim();
   if (configured) return configured;
+  // Priorizar siempre el dominio canónico de producción (app.clubsportingsaladar.com)
+  // sobre VERCEL_URL, ya que los dominios de despliegue de Vercel (*.vercel.app) tienen activada
+  // la protección de despliegue (Vercel Deployment Protection) y rechazan las peticiones entrantes de QStash con 401.
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://app.clubsportingsaladar.com');
+    'https://app.clubsportingsaladar.com';
   return `${baseUrl.replace(/\/$/, '')}/api/ffcv/post-match`;
 }
 
@@ -141,14 +144,24 @@ export async function scheduleUpcomingMatchesPostSync(customSupabaseClient?: any
     const breakMinutes = 15;
     const matchEndMs = startMs + (durationMinutes + breakMinutes) * 60 * 1000;
 
-    // 2 disparos: +30 min y +90 min tras el pitido final
-    const offsetsMinutes = [
-      { attempt: 1, offsetMin: 30 },
-      { attempt: 2, offsetMin: 90 }
-    ];
+    // Planificación de disparos:
+    // - Para Liga Brave (Apúntamelo): incluye arranque en minuto 0 para pasar a 'En Curso',
+    //   descanso para goles intermedios y 2 post-partido para cierre.
+    // - Para FFCV oficial: 2 disparos post-partido (+30 min y +90 min) para actas oficiales.
+    const schedules: Array<{ attempt: string | number; targetMs: number }> = isBrave
+      ? [
+          { attempt: 'start', targetMs: startMs },
+          { attempt: 'half', targetMs: startMs + Math.round(durationMinutes / 2 + 5) * 60 * 1000 },
+          { attempt: 1, targetMs: matchEndMs + 10 * 60 * 1000 },
+          { attempt: 2, targetMs: matchEndMs + 45 * 60 * 1000 }
+        ]
+      : [
+          { attempt: 1, targetMs: matchEndMs + 30 * 60 * 1000 },
+          { attempt: 2, targetMs: matchEndMs + 90 * 60 * 1000 }
+        ];
 
-    for (const { attempt, offsetMin } of offsetsMinutes) {
-      const targetEpoch = Math.floor((matchEndMs + offsetMin * 60 * 1000) / 1000);
+    for (const { attempt, targetMs } of schedules) {
+      const targetEpoch = Math.floor(targetMs / 1000);
       const delaySeconds = targetEpoch - nowEpoch;
 
       // Solo programar si está en el futuro (>= 60s) y dentro del límite de 7 días de QStash

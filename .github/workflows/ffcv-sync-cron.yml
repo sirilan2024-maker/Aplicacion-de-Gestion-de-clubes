@@ -99,14 +99,22 @@ jobs:
               except Exception:
                   pass
 
+          endpoints = [
+              "obtenerInfoPartido",
+              "obtenerNoticiasPartido",
+              "obtenerPuntuacionesPartido",
+              "obtenerGolesPartidoA",
+              "obtenerGolesPartidoB"
+          ]
           for mid in match_ids:
-              u = f"https://apuntamelo.com/obtenerInfoPartido?id={mid}"
-              try:
-                  data = fetch_json(u)
-                  if data is not None:
-                      cache[u] = data
-              except Exception:
-                  pass
+              for ep in endpoints:
+                  u = f"https://apuntamelo.com/{ep}?id={mid}"
+                  try:
+                      data = fetch_json(u)
+                      if data is not None:
+                          cache[u] = data
+                  except Exception:
+                      pass
 
           print(json.dumps({"apuntameloCache": cache}))
           EOF

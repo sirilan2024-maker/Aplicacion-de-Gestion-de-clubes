@@ -1462,22 +1462,28 @@ export async function syncApuntameloMatchDetailToDb(params: {
       let playerReds = bp.rojas;
 
       // Verificar también en la crónica en vivo (Json_noticias)
-      const cardNoticias = noticias.filter(
-        (n: any) =>
+      const cardNoticias = noticias.filter((n: any) => {
+        const desc = String(n.Descripcion || '').toLowerCase();
+        const matchesFk =
           Number(n.FK_EquipoLiga) === config.teamApuntameloId &&
-          String(n.FK_JugadorLiga) === String(bp.fkJugadorLiga)
-      );
+          String(n.FK_JugadorLiga) === String(bp.fkJugadorLiga);
+        const matchesName = bp.nombre && desc.includes(bp.nombre.toLowerCase());
+        return matchesFk || matchesName;
+      });
 
       for (const cn of cardNoticias) {
         const claves = extractNarracionesClaves(cn);
+        const descUpper = String(cn.Descripcion || '').toUpperCase();
         const isY =
           cn.Icono === 5 ||
           claves.includes('tarjetas.noticia.amarilla') ||
-          String(cn.Descripcion || '').toUpperCase().includes('TARJETA AMARILL');
+          descUpper.includes('TARJETA AMARILL');
         const isR =
           cn.Icono === 6 ||
           claves.includes('tarjetas.noticia.roja') ||
-          String(cn.Descripcion || '').toUpperCase().includes('TARJETA ROJA');
+          descUpper.includes('TARJETA ROJA') ||
+          descUpper.includes('EXPULSI') ||
+          descUpper.includes('VE LA ROJA');
         if (isY) playerYellows = Math.max(playerYellows, 1);
         if (isR) playerReds = Math.max(playerReds, 1);
       }
@@ -1681,23 +1687,34 @@ export async function syncApuntameloMatchDetailToDb(params: {
 
     for (const n of noticias) {
       const claves = extractNarracionesClaves(n);
+      const descUpper = String(n.Descripcion || '').toUpperCase();
       const isYellow =
         n.Icono === 5 ||
         claves.includes('tarjetas.noticia.amarilla') ||
-        String(n.Descripcion || '').toUpperCase().includes('TARJETA AMARILL');
+        descUpper.includes('TARJETA AMARILL');
       const isRed =
         n.Icono === 6 ||
         claves.includes('tarjetas.noticia.roja') ||
-        String(n.Descripcion || '').toUpperCase().includes('TARJETA ROJA');
+        descUpper.includes('TARJETA ROJA') ||
+        descUpper.includes('EXPULSI') ||
+        descUpper.includes('VE LA ROJA');
       if (!isYellow && !isRed) continue;
 
       const cEquipo = Number(n.FK_EquipoLiga);
       const isCardLocal = cEquipo === fkA;
       const isOurCard = cEquipo === config.teamApuntameloId;
-      const pName =
+      let pName =
         n.Nombre_Jugador ||
         jugadorFullNameMap.get(String(n.FK_JugadorLiga)) ||
-        'Tarjeta';
+        '';
+      if (!pName) {
+        const descMatch = String(n.Descripcion || '').match(/(?:para|de)\s+([^.]+?)(?:\.|\s+Ve\s+la|$)/i);
+        if (descMatch && descMatch[1]) {
+          pName = descMatch[1].trim();
+        } else {
+          pName = 'Tarjeta';
+        }
+      }
       const matchedPlayer =
         isOurCard && teamPlayers.length > 0
           ? matchPlayer(pName, undefined, teamPlayers, teamPlayers)
@@ -1757,7 +1774,9 @@ export async function syncApuntameloMatchDetailToDb(params: {
         n.Icono === 6 ||
         claves.some((k) => k.includes('tarjetas.noticia')) ||
         desc.toUpperCase().includes('TARJETA AMARILL') ||
-        desc.toUpperCase().includes('TARJETA ROJA')
+        desc.toUpperCase().includes('TARJETA ROJA') ||
+        desc.toUpperCase().includes('EXPULSI') ||
+        desc.toUpperCase().includes('VE LA ROJA')
       ) {
         continue;
       }

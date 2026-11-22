@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { ChevronLeft, Users, Calendar, MapPin, ClipboardList, CheckSquare, MessageSquare, Award } from "lucide-react"
@@ -31,6 +31,10 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
   const [currentConvocatorias, setCurrentConvocatorias] = useState<any[]>(convocatorias)
+
+  useEffect(() => {
+    setCurrentConvocatorias(convocatorias)
+  }, [convocatorias])
 
   const handleLineupSaved = (updatedConvocatorias: any[]) => {
     setCurrentConvocatorias(updatedConvocatorias)
@@ -137,7 +141,7 @@ export function PremiumMatchManager({ match, players, convocatorias, matchEvents
           {/* TAB: POST-PARTIDO */}
           {activeTab === "post-partido" && (
             <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm font-medium">Cargando informe...</div>}>
-              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={currentConvocatorias} allMatches={allMatches} />
+              <PostMatchTab matchId={matchId} initialData={match} players={activePlayers} convocatorias={currentConvocatorias} allMatches={allMatches} onReportSaved={(updated) => setCurrentConvocatorias(updated)} />
             </Suspense>
           )}
 

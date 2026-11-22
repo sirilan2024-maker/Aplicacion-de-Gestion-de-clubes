@@ -42,13 +42,15 @@ export function PostMatchTab({
   initialData, 
   players = [], 
   convocatorias = [], 
-  allMatches = [] 
+  allMatches = [],
+  onReportSaved
 }: { 
   matchId: string
   initialData?: any
   players?: any[]
   convocatorias?: any[]
-  allMatches?: any[] 
+  allMatches?: any[]
+  onReportSaved?: (updatedConvs: any[]) => void
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -535,6 +537,35 @@ export function PostMatchTab({
         setSuccess(true);
         setHasSavedReport(true);
         toast.success("¡Informe completo y evaluación de jugadores guardados con éxito!");
+
+        // Notificar al componente padre para que la pestaña de Estadísticas se actualice inmediatamente
+        if (onReportSaved) {
+          const updatedConvs = convocatorias.map(c => {
+            const rep = playerReports[c.player_id];
+            if (!rep) return c;
+            let mappedEstado: 'Confirmado' | 'Ausente' | 'Pendiente' = c.estado_asistencia || 'Pendiente';
+            if (rep.status === 'Presente' || rep.status === 'Confirmado') mappedEstado = 'Confirmado';
+            else if (rep.status === 'Ausente' || rep.status === 'Justificado') mappedEstado = 'Ausente';
+            return {
+              ...c,
+              coach_rating: Number(rep.rating) || 0,
+              actitud: Number(rep.actitud) || 0,
+              goals: Number(rep.goals) || 0,
+              goles: Number(rep.goals) || 0,
+              assists: Number(rep.assists) || 0,
+              asistencias: Number(rep.assists) || 0,
+              yellow_cards: Number(rep.yellows) || 0,
+              tarjetas_amarillas: Number(rep.yellows) || 0,
+              red_cards: Number(rep.reds) || 0,
+              tarjetas_rojas: Number(rep.reds) || 0,
+              minutes_played: Number(rep.minutes) || 0,
+              minutos_jugados: Number(rep.minutes) || 0,
+              estado_asistencia: mappedEstado
+            };
+          });
+          onReportSaved(updatedConvs);
+        }
+
         router.refresh();
         setTimeout(() => setSuccess(false), 3000);
       } else {
@@ -1425,11 +1456,11 @@ export function PostMatchTab({
 
           <Button 
             onClick={handleSave} 
-            disabled={isPending || !isEvaluationComplete || pendingPlayers.length > 0}
+            disabled={isPending}
             className={`w-full sm:w-auto gap-2 font-bold px-6 py-3 rounded-xl shadow-md transition-all cursor-pointer ${
               isEvaluationComplete && pendingPlayers.length === 0
                 ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:scale-[1.02]" 
-                : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 hover:scale-[1.01]"
             }`}
           >
             {isPending ? (
@@ -1441,7 +1472,7 @@ export function PostMatchTab({
               ? "Guardado Correctamente" 
               : isEvaluationComplete && pendingPlayers.length === 0
               ? "Guardar Informe Completo del Partido" 
-              : `Faltan ${pendingPlayers.length} jugador(es) por evaluar`}
+              : `Guardar Evaluación (${pendingPlayers.length > 0 ? `${pendingPlayers.length} pendientes` : 'Guardar'})`}
           </Button>
         </div>
 

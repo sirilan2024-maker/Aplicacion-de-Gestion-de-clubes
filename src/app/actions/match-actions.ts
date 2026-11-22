@@ -1343,6 +1343,7 @@ export async function updateMatchAttendanceBatch(
           team_id: teamId,
           title: 'Partido (Autogenerado por Asistencia)',
           date: dateStr,
+          start_time: '10:00:00',
           event_type: 'Partido'
         })
         .select('id')

@@ -21,12 +21,12 @@ export function StatsTab({ players = [], convocatorias = [], matchEvents }: { pl
       avatar: `${p.first_name[0] || ''}${p.last_name[0] || ''}`,
       position: p.posicion_principal || p.posicion || "Jugador",
       status: (conv?.estado_asistencia === 'Ausente' || conv?.estado_asistencia === 'Justificado') ? conv.estado_asistencia : 'Presente',
-      coachRating: conv?.coach_rating || 0,
-      actitud: conv?.actitud || 0,
-      goals: conv?.goals || 0,
-      assists: conv?.assists || 0,
-      yellowCards: conv?.yellow_cards || 0,
-      redCards: conv?.red_cards || 0,
+      coachRating: conv?.coach_rating ?? conv?.rating ?? 0,
+      actitud: conv?.actitud ?? 0,
+      goals: conv?.goals ?? conv?.goles ?? 0,
+      assists: conv?.assists ?? conv?.asistencias ?? 0,
+      yellowCards: conv?.yellow_cards ?? conv?.tarjetas_amarillas ?? 0,
+      redCards: conv?.red_cards ?? conv?.tarjetas_rojas ?? 0,
       minutes: conv?.minutes_played ?? conv?.minutos_jugados ?? 0,
       titular: conv?.titular || false
     };

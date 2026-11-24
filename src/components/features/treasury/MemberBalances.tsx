@@ -1018,7 +1018,7 @@ export default function MemberBalances() {
                 ) : (
                   <Bell className="w-4 h-4" />
                 )}
-                🔔 Notificación Interna (Campanita App)
+                🔔 Notificar por Campanita, Email y Móvil
               </button>
 
               <button

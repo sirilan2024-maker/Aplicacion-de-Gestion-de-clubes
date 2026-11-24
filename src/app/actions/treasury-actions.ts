@@ -3,6 +3,8 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import Stripe from "stripe";
+import { NotificationService } from "@/lib/notifications/notification-service";
+import { getGeneralAlertEmailHtml } from "@/lib/email-service";
 import {
   getAuthenticatedContext,
   canUserAccessFamily,
@@ -557,7 +559,7 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
   const adminSupabase = await createAdminClient();
   const { data: fee } = await adminSupabase
     .from("fees")
-    .select("*, players(first_name, last_name, tutor_id, player_tutors(tutor_id), parent1_email, parent2_email, email)")
+    .select("*, players(id, first_name, last_name, club_id, tutor_id, player_tutors(tutor_id), parent1_email, parent2_email, email)")
     .eq("id", feeId)
     .single();
 
@@ -586,35 +588,85 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
   }
 
   // Check matching parent emails in profiles
-  const emails = [fee.players?.parent1_email, fee.players?.parent2_email, fee.players?.email].filter(Boolean);
+  const emails = [fee.players?.parent1_email, fee.players?.parent2_email, fee.players?.email].filter(Boolean) as string[];
+  const emailToUserIdMap = new Map<string, string>();
   if (emails.length > 0) {
     const { data: matchingProfiles } = await adminSupabase
       .from("profiles")
-      .select("id")
+      .select("id, email")
       .in("email", emails);
     (matchingProfiles || []).forEach((p: any) => {
-      if (p.id) targetUserIds.add(p.id);
+      if (p.id) {
+        targetUserIds.add(p.id);
+        if (p.email) emailToUserIdMap.set(p.email.toLowerCase(), p.id);
+      }
     });
   }
 
   if (method === 'internal') {
-    if (targetUserIds.size === 0) {
-      throw new Error("Este jugador no tiene una cuenta de familiar vinculada para recibir notificaciones.");
+    const targetEmails = Array.from(new Set(emails));
+    if (targetUserIds.size === 0 && targetEmails.length === 0) {
+      throw new Error("Este jugador no tiene emails ni cuenta de familiar vinculada para recibir notificaciones.");
     }
 
+    const playerName = fee.players ? `${fee.players.first_name} ${fee.players.last_name}`.trim() : 'Jugador';
+    const notificationsToDispatch: any[] = [];
+    const processedEmails = new Set<string>();
+
     for (const targetUserId of targetUserIds) {
-      await adminSupabase.from("notifications").insert({
-        user_id: targetUserId,
-        profile_id: targetUserId,
-        club_id: fee.club_id,
-        type: 'tesoreria',
-        title: title,
+      const { data: prof } = await adminSupabase.from("profiles").select("email").eq("id", targetUserId).maybeSingle();
+      const userEmail = prof?.email || targetEmails[0] || undefined;
+      if (userEmail) processedEmails.add(userEmail.toLowerCase());
+
+      notificationsToDispatch.push({
+        userId: targetUserId,
+        userEmail,
+        clubId: fee.club_id,
+        type: 'FEE_ALERT',
+        title: `💳 ${title}: ${fee.concept}`,
         content: msg,
-        is_read: false,
+        link: '/dashboard/family',
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as any,
+        idempotencyKey: `fee_notification_${fee.id}_${targetUserId}_${Date.now()}`,
+        emailSubject: `💳 [Sporting Saladar] ${title} - ${fee.concept} (${playerName})`,
+        emailHtml: getGeneralAlertEmailHtml({
+          title: `${title}: ${fee.concept}`,
+          content: `Hola,<br><br>Te informamos desde la Tesorería del Club Sporting Saladar acerca del estado de la cuota <strong>"${fee.concept}"</strong> por importe de <strong>${amount}€</strong> para <strong>${playerName}</strong>.<br><br>${msg}`,
+          senderName: 'Tesorería Sporting Saladar',
+          viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+        }),
       });
     }
 
-    return { success: true };
+    // Si hay emails familiares que aún no tienen cuenta de usuario creada en profiles, enviarles también el correo directamente
+    for (const email of targetEmails) {
+      if (!processedEmails.has(email.toLowerCase())) {
+        processedEmails.add(email.toLowerCase());
+        notificationsToDispatch.push({
+          userEmail: email,
+          clubId: fee.club_id,
+          type: 'FEE_ALERT',
+          title: `💳 ${title}: ${fee.concept}`,
+          content: msg,
+          link: '/dashboard/family',
+          channels: ['EMAIL'] as any,
+          idempotencyKey: `fee_notification_email_${fee.id}_${email}_${Date.now()}`,
+          emailSubject: `💳 [Sporting Saladar] ${title} - ${fee.concept} (${playerName})`,
+          emailHtml: getGeneralAlertEmailHtml({
+            title: `${title}: ${fee.concept}`,
+            content: `Hola,<br><br>Te informamos desde la Tesorería del Club Sporting Saladar acerca del estado de la cuota <strong>"${fee.concept}"</strong> por importe de <strong>${amount}€</strong> para <strong>${playerName}</strong>.<br><br>${msg}`,
+            senderName: 'Tesorería Sporting Saladar',
+            viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+          }),
+        });
+      }
+    }
+
+    if (notificationsToDispatch.length > 0) {
+      await NotificationService.dispatchBatch({ notifications: notificationsToDispatch });
+    }
+
+    return { success: true, message: "Aviso enviado a la familia por Campanita, Email y Móvil." };
   } else if (method === 'whatsapp') {
     return { success: true, url: `https://wa.me/?text=${encodeURIComponent(msg)}` };
   }
@@ -673,35 +725,85 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
   });
 
   // Also match emails in profiles table
-  const emails = [player.parent1_email, player.parent2_email, player.email].filter(Boolean);
+  const emails = [player.parent1_email, player.parent2_email, player.email].filter(Boolean) as string[];
+  const emailToUserIdMap = new Map<string, string>();
   if (emails.length > 0) {
     const { data: matchingProfiles } = await adminSupabase
       .from("profiles")
-      .select("id")
+      .select("id, email")
       .in("email", emails);
     (matchingProfiles || []).forEach((p: any) => {
-      if (p.id) targetUserIds.add(p.id);
+      if (p.id) {
+        targetUserIds.add(p.id);
+        if (p.email) emailToUserIdMap.set(p.email.toLowerCase(), p.id);
+      }
     });
   }
 
   if (method === 'internal') {
-    if (targetUserIds.size === 0) {
-      throw new Error("Este jugador no tiene una cuenta de familiar vinculada para recibir notificaciones en la campanita.");
+    const targetEmails = Array.from(new Set(emails));
+    if (targetUserIds.size === 0 && targetEmails.length === 0) {
+      throw new Error("Este jugador no tiene emails ni cuenta de familiar vinculada para recibir notificaciones.");
     }
 
+    const playerName = `${player.first_name} ${player.last_name}`.trim();
+    const notificationsToDispatch: any[] = [];
+    const processedEmails = new Set<string>();
+
     for (const targetUserId of targetUserIds) {
-      await adminSupabase.from("notifications").insert({
-        user_id: targetUserId,
-        profile_id: targetUserId,
-        club_id: player.club_id,
-        type: 'tesoreria',
-        title,
+      const { data: prof } = await adminSupabase.from("profiles").select("email").eq("id", targetUserId).maybeSingle();
+      const userEmail = prof?.email || targetEmails[0] || undefined;
+      if (userEmail) processedEmails.add(userEmail.toLowerCase());
+
+      notificationsToDispatch.push({
+        userId: targetUserId,
+        userEmail,
+        clubId: player.club_id,
+        type: 'FEE_ALERT',
+        title: `💳 ${title}`,
         content,
-        is_read: false,
+        link: '/dashboard/family',
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as any,
+        idempotencyKey: `balance_notification_${player.id}_${targetUserId}_${Date.now()}`,
+        emailSubject: `💳 [Sporting Saladar] Aviso de Saldo Pendiente - ${playerName}`,
+        emailHtml: getGeneralAlertEmailHtml({
+          title: `Aviso de Saldo Pendiente: ${amountEur}€`,
+          content: `Hola,<br><br>Te recordamos desde la Tesorería del Club Sporting Saladar que el expediente del jugador <strong>${playerName}</strong> cuenta con un saldo pendiente de <strong>${amountEur}€</strong> en concepto de cuotas deportivas.<br><br>Por favor, accede al portal para consultar el desglose de cuotas y regularizar el pago. Si ya has realizado una transferencia reciente, puedes justificarla o ponerte en contacto con administración.`,
+          senderName: 'Tesorería Sporting Saladar',
+          viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+        }),
       });
     }
 
-    return { success: true, message: "Notificación enviada a la campanita de la familia." };
+    // Si hay emails familiares que aún no tienen cuenta de usuario creada en profiles, enviarles también el correo directamente
+    for (const email of targetEmails) {
+      if (!processedEmails.has(email.toLowerCase())) {
+        processedEmails.add(email.toLowerCase());
+        notificationsToDispatch.push({
+          userEmail: email,
+          clubId: player.club_id,
+          type: 'FEE_ALERT',
+          title: `💳 ${title}`,
+          content,
+          link: '/dashboard/family',
+          channels: ['EMAIL'] as any,
+          idempotencyKey: `balance_notification_email_${player.id}_${email}_${Date.now()}`,
+          emailSubject: `💳 [Sporting Saladar] Aviso de Saldo Pendiente - ${playerName}`,
+          emailHtml: getGeneralAlertEmailHtml({
+            title: `Aviso de Saldo Pendiente: ${amountEur}€`,
+            content: `Hola,<br><br>Te recordamos desde la Tesorería del Club Sporting Saladar que el expediente del jugador <strong>${playerName}</strong> cuenta con un saldo pendiente de <strong>${amountEur}€</strong> en concepto de cuotas deportivas.<br><br>Por favor, accede al portal para consultar el desglose de cuotas y regularizar el pago. Si ya has realizado una transferencia reciente, puedes justificarla o ponerte en contacto con administración.`,
+            senderName: 'Tesorería Sporting Saladar',
+            viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+          }),
+        });
+      }
+    }
+
+    if (notificationsToDispatch.length > 0) {
+      await NotificationService.dispatchBatch({ notifications: notificationsToDispatch });
+    }
+
+    return { success: true, message: "Aviso enviado a la familia por Campanita, Email y Móvil." };
   } else {
     const whatsappText = `Hola, desde la tesorería del club te recordamos que tienes un saldo pendiente de ${amountEur}€ en el expediente de ${player.first_name} ${player.last_name}. Por favor, ponte en contacto con nosotros para regularizarlo. ¡Gracias!`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;

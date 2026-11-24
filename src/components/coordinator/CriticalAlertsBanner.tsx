@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, AlertTriangle, Info, Zap, ShieldAlert, HeartPulse, UserX, Clock, MessageSquare, ClipboardCheck } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, Zap, ShieldAlert, HeartPulse, UserX, Clock, MessageSquare, ClipboardCheck, Bell, Check, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { notifyCoachPendingAttendanceAction } from "@/app/actions/coordinator-actions";
 
 export interface CoordinatorBannerAlert {
   id: string;
@@ -12,6 +14,11 @@ export interface CoordinatorBannerAlert {
   message: string;
   teamId?: string;
   playerId?: string;
+  eventId?: string;
+  date?: string;
+  startTime?: string;
+  eventTitle?: string;
+  coachName?: string | null;
   actionType?: "cartelera" | "chat" | "link";
   actionText?: string;
   actionUrl?: string;
@@ -23,7 +30,35 @@ interface CriticalAlertsBannerProps {
 }
 
 export function CriticalAlertsBanner({ alerts, onOpenCartelera }: CriticalAlertsBannerProps) {
+  const [notifyingAlertId, setNotifyingAlertId] = useState<string | null>(null);
+  const [notifiedAlerts, setNotifiedAlerts] = useState<Record<string, boolean>>({});
+
   if (!alerts || alerts.length === 0) return null;
+
+  const handleNotifyCoach = async (alert: CoordinatorBannerAlert) => {
+    if (!alert.teamId || notifyingAlertId) return;
+    setNotifyingAlertId(alert.id);
+    try {
+      const res = await notifyCoachPendingAttendanceAction({
+        teamId: alert.teamId,
+        eventId: alert.eventId,
+        date: alert.date || new Date().toISOString().split("T")[0],
+        startTime: alert.startTime,
+        title: alert.eventTitle,
+      });
+
+      if (res.success) {
+        setNotifiedAlerts((prev) => ({ ...prev, [alert.id]: true }));
+        toast.success(res.message || "Aviso enviado al entrenador correctamente");
+      } else {
+        toast.error(res.error || "No se pudo avisar al entrenador");
+      }
+    } catch (err: any) {
+      toast.error("Error al avisar: " + err.message);
+    } finally {
+      setNotifyingAlertId(null);
+    }
+  };
 
   return (
     <div className="space-y-2.5">
@@ -95,6 +130,38 @@ export function CriticalAlertsBanner({ alerts, onOpenCartelera }: CriticalAlerts
                 >
                   {alert.actionText || "Cartelera Jornada"}
                 </button>
+              ) : alert.type === "sin_pasar_lista" ? (
+                <div className="flex items-center gap-1.5 self-center shrink-0 ml-1">
+                  <button
+                    type="button"
+                    onClick={() => handleNotifyCoach(alert)}
+                    disabled={notifyingAlertId === alert.id || notifiedAlerts[alert.id]}
+                    className={`shrink-0 flex items-center gap-1 text-[10px] font-black px-2.5 py-1.5 rounded-lg border shadow-2xs transition-all active:scale-95 cursor-pointer ${
+                      notifiedAlerts[alert.id]
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-300 cursor-default"
+                        : "bg-white hover:bg-amber-100 text-amber-950 border-amber-300"
+                    }`}
+                    title="Avisar al entrenador por campanita, correo y notificación móvil"
+                  >
+                    {notifyingAlertId === alert.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-800" />
+                    ) : notifiedAlerts[alert.id] ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Bell className="w-3.5 h-3.5 text-amber-600" />
+                    )}
+                    <span>{notifiedAlerts[alert.id] ? "Avisado" : "Avisar Entrenador"}</span>
+                  </button>
+                  {alert.actionUrl && (
+                    <Link
+                      href={alert.actionUrl}
+                      className="shrink-0 text-[10px] font-black underline bg-white/80 hover:bg-white px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-950 shadow-2xs transition-all active:scale-95"
+                      title={alert.actionText || "Pasar Lista"}
+                    >
+                      {alert.actionText || "Pasar Lista"}
+                    </Link>
+                  )}
+                </div>
               ) : alert.actionUrl ? (
                 <Link
                   href={alert.actionUrl}

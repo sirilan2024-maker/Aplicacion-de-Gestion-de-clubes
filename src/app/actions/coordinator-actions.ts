@@ -1,10 +1,11 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getAuthenticatedContext, ADMIN_ROLES, getEffectiveSelectedSeasonId, canUserAccessModule } from '@/lib/auth-helpers'
+import { getAuthenticatedContext, ADMIN_ROLES, getUserAllRoles, getEffectiveSelectedSeasonId, canUserAccessModule } from '@/lib/auth-helpers'
 import { NotificationService } from '@/lib/notifications/notification-service'
 import { findRivalShield } from '@/lib/ffcv/rival-shields'
 import { formatDateDMY } from '@/lib/utils'
+import { getGeneralAlertEmailHtml } from '@/lib/email-service'
 import { fetchLatestStandingsForGroups, getMatchPositions } from '@/lib/ffcv/standings-helper'
 
 export interface CoordinatorTeamSummary {
@@ -1230,7 +1231,30 @@ export async function getCoordinatorFullDashboardAction(params?: {
       return { success: false, error: 'No autenticado' };
     }
 
+    const COORDINATOR_DASHBOARD_ROLES = [
+      ...ADMIN_ROLES,
+      'director_deportivo',
+      'coordinador',
+      'coordinador_general',
+      'metodologo',
+      'metodologia',
+      'preparador_fisico',
+      'fisio',
+    ];
+    const actorRoles = getUserAllRoles(context);
+    const hasCoordinatorAccess = actorRoles.some((r) => COORDINATOR_DASHBOARD_ROLES.includes(r));
+    if (!hasCoordinatorAccess) {
+      return { success: false, error: 'No tienes permisos para acceder al panel de coordinador' };
+    }
+
     const adminClient = createAdminClient();
+    const isAdmin = actorRoles.some((r) => ADMIN_ROLES.includes(r));
+    if (!isAdmin) {
+      const access = await canUserAccessModule(adminClient, context, 'panel_coordinador');
+      if (!access.allowed) {
+        return { success: false, error: access.reason || 'No tienes permisos configurados para este módulo' };
+      }
+    }
     const clubId = context.profile.club_id;
     const currentUserId = context.user.id;
     if (!clubId) {
@@ -1301,13 +1325,30 @@ export async function getCoordinatorFullDashboardAction(params?: {
 
       const pshPlayerIds = Array.from(pshTeamByPlayer.keys());
 
-      const { data: playersData, error: plErr } = await adminClient
+      // Obtener jugadores directamente por equipo y por historial en lotes para evitar desbordar URI de Supabase
+      let playersData: any[] = [];
+      const { data: teamPlayers, error: plErr } = await adminClient
         .from('players')
         .select('id, team_id, first_name, last_name, dorsal, avatar_url, status, lesiones, observaciones_medicas, medical_info')
-        .or(`team_id.in.(${teamIds.join(',')})${pshPlayerIds.length > 0 ? `,id.in.(${pshPlayerIds.join(',')})` : ''}`)
+        .in('team_id', teamIds)
         .neq('status', 'inactive');
 
-      if (plErr) console.error('[coordinator] Error fetching players:', plErr);
+      if (plErr) console.error('[coordinator] Error fetching team players:', plErr);
+      if (teamPlayers) playersData.push(...teamPlayers);
+
+      const loadedPlayerIds = new Set(playersData.map(p => p.id));
+      const extraPshIds = pshPlayerIds.filter(id => !loadedPlayerIds.has(id));
+      if (extraPshIds.length > 0) {
+        for (let i = 0; i < extraPshIds.length; i += 100) {
+          const chunk = extraPshIds.slice(i, i + 100);
+          const { data: extraPlayers } = await adminClient
+            .from('players')
+            .select('id, team_id, first_name, last_name, dorsal, avatar_url, status, lesiones, observaciones_medicas, medical_info')
+            .in('id', chunk)
+            .neq('status', 'inactive');
+          if (extraPlayers) playersData.push(...extraPlayers);
+        }
+      }
 
       const rawPlayers = playersData || [];
       const seen = new Set<string>();
@@ -1405,16 +1446,28 @@ export async function getCoordinatorFullDashboardAction(params?: {
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
+    const startDateStr = startDate.toISOString().split('T')[0];
+
     const playerIds = players.map(p => p.id);
     let attList: any[] = [];
     if (playerIds.length > 0) {
-      const { data: attendanceRaw } = await adminClient
-        .from('attendance')
-        .select('id, session_id, event_id, player_id, team_id, status, created_at, date, notes')
-        .in('player_id', playerIds)
-        .gte('created_at', startDate.toISOString())
-        .limit(5000);
-      attList = attendanceRaw || [];
+      // Consultar por lotes de 100 IDs para garantizar compatibilidad con PostgREST
+      for (let i = 0; i < playerIds.length; i += 100) {
+        const chunk = playerIds.slice(i, i + 100);
+        const { data: attendanceRaw, error: attBatchErr } = await adminClient
+          .from('attendance')
+          .select('id, session_id, event_id, player_id, team_id, status, created_at, date, notes')
+          .in('player_id', chunk)
+          .or(`date.gte.${startDateStr},created_at.gte.${startDate.toISOString()}`)
+          .limit(5000);
+
+        if (attBatchErr) {
+          console.error('[coordinator] Error fetching attendance batch:', attBatchErr);
+        }
+        if (attendanceRaw) {
+          attList.push(...attendanceRaw);
+        }
+      }
     }
 
     const totalAttRecords = attList.length;
@@ -1837,7 +1890,11 @@ export async function getCoordinatorFullDashboardAction(params?: {
     const trainingGraceMinutes = 45; // tras 45 min del inicio
     const sevenDaysAgoDateStr = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    // Equipos dentro del alcance actual (respetar filtro por equipo o categoría si aplica)
+    const targetEvalTeamIds = new Set(filteredTeams.map(t => t.id));
+
     const pastTrainings = (allTrainingsRaw || []).filter((e: any) => {
+      if (!targetEvalTeamIds.has(e.team_id)) return false;
       if (!e.date || e.date < sevenDaysAgoDateStr || e.date > todayDate) return false;
       if (e.date < todayDate) return true; // Días anteriores dentro de los últimos 7 días
       // Hoy: verificar si ya ha comenzado (+ tiempo de gracia de 45m)
@@ -1847,17 +1904,68 @@ export async function getCoordinatorFullDashboardAction(params?: {
       return now.getTime() >= evTime.getTime() + trainingGraceMinutes * 60 * 1000;
     });
 
-    const unrecordedTrainings: any[] = [];
-    for (const tr of pastTrainings) {
-      const trTeamPlayers = new Set(players.filter(p => p.team_id === tr.team_id).map(p => p.id));
-      const hasAttendance = attList.some(
-        a => a.event_id === tr.id ||
-             a.session_id === tr.id ||
-             (a.date === tr.date && (a.team_id === tr.team_id || trTeamPlayers.has(a.player_id)))
-      );
-      if (!hasAttendance) {
-        unrecordedTrainings.push(tr);
+    // Consultar asistencia directamente por event_id / session_id para los entrenamientos evaluados
+    const pastTrainingIds = pastTrainings.map(t => t.id).filter(Boolean);
+    const recordedEventIds = new Set<string>();
+    const recordedTeamDates = new Set<string>(); // Para proteger contra entrenamientos duplicados en el mismo día
+
+    if (pastTrainingIds.length > 0) {
+      for (let i = 0; i < pastTrainingIds.length; i += 100) {
+        const chunk = pastTrainingIds.slice(i, i + 100);
+        const { data: directAttRows, error: directAttErr } = await adminClient
+          .from('attendance')
+          .select('id, event_id, session_id, player_id, date, team_id')
+          .or(`event_id.in.(${chunk.join(',')}),session_id.in.(${chunk.join(',')})`);
+
+        if (directAttErr) {
+          console.error('[coordinator] Error fetching direct attendance for past trainings:', directAttErr);
+        }
+        if (directAttRows) {
+          directAttRows.forEach((a: any) => {
+            if (a.event_id) recordedEventIds.add(a.event_id);
+            if (a.session_id) recordedEventIds.add(a.session_id);
+            if (a.date) {
+              if (a.team_id) recordedTeamDates.add(`${a.team_id}_${a.date}`);
+              const pl = players.find(p => p.id === a.player_id);
+              if (pl?.team_id) recordedTeamDates.add(`${pl.team_id}_${a.date}`);
+            }
+          });
+        }
       }
+    }
+
+    // Registrar también a partir de attList las asistencias conocidas por fecha y equipo
+    attList.forEach(a => {
+      if (a.event_id) recordedEventIds.add(a.event_id);
+      if (a.session_id) recordedEventIds.add(a.session_id);
+      const aDate = a.date || (a.created_at ? a.created_at.split('T')[0] : null);
+      if (aDate) {
+        if (a.team_id) recordedTeamDates.add(`${a.team_id}_${aDate}`);
+        const pl = players.find(p => p.id === a.player_id);
+        if (pl?.team_id) recordedTeamDates.add(`${pl.team_id}_${aDate}`);
+      }
+    });
+
+    const unrecordedTrainings: any[] = [];
+    const alertedTeamDates = new Set<string>();
+
+    for (const tr of pastTrainings) {
+      const hasDirectAtt = recordedEventIds.has(tr.id);
+      const hasTeamDateAtt = recordedTeamDates.has(`${tr.team_id}_${tr.date}`);
+
+      // Si el evento específico ya tiene lista o el equipo ya pasó lista en esa fecha (ej. sesión duplicada), NO alertar
+      if (hasDirectAtt || hasTeamDateAtt) {
+        continue;
+      }
+
+      // Evitar generar múltiples alertas para el mismo equipo en la misma fecha
+      const teamDateKey = `${tr.team_id}_${tr.date}`;
+      if (alertedTeamDates.has(teamDateKey)) {
+        continue;
+      }
+      alertedTeamDates.add(teamDateKey);
+
+      unrecordedTrainings.push(tr);
     }
 
     // Ordenar de más reciente a más antiguo
@@ -1883,6 +1991,11 @@ export async function getCoordinatorFullDashboardAction(params?: {
         title: `Lista sin pasar: ${tm?.name || 'Equipo'}`,
         message: `El entrenamiento del ${dateStr} a las ${timeStr} no tiene la lista de asistencia registrada${coachLabel}.`,
         teamId: tr.team_id,
+        eventId: tr.id,
+        date: tr.date,
+        startTime: tr.start_time || '18:00',
+        eventTitle: tr.title || 'Entrenamiento',
+        coachName: coachName || null,
         actionType: 'link',
         actionText: 'Pasar Lista',
         actionUrl: `/dashboard/equipos/${tr.team_id}/asistencia?eventId=${tr.id}&date=${tr.date}`,
@@ -2238,7 +2351,30 @@ export async function getCoordinatorPlayerFeesStatusAction(params?: {
       return { success: false, error: 'No autenticado' };
     }
 
+    const COORDINATOR_DASHBOARD_ROLES = [
+      ...ADMIN_ROLES,
+      'director_deportivo',
+      'coordinador',
+      'coordinador_general',
+      'metodologo',
+      'metodologia',
+      'preparador_fisico',
+      'fisio',
+    ];
+    const actorRoles = getUserAllRoles(context);
+    const hasCoordinatorAccess = actorRoles.some((r) => COORDINATOR_DASHBOARD_ROLES.includes(r));
+    if (!hasCoordinatorAccess) {
+      return { success: false, error: 'No tienes permisos para acceder al panel de coordinador' };
+    }
+
     const adminClient = createAdminClient();
+    const isAdmin = actorRoles.some((r) => ADMIN_ROLES.includes(r));
+    if (!isAdmin) {
+      const access = await canUserAccessModule(adminClient, context, 'panel_coordinador');
+      if (!access.allowed) {
+        return { success: false, error: access.reason || 'No tienes permisos configurados para este módulo' };
+      }
+    }
     const clubId = context.profile.club_id;
     if (!clubId) {
       return { success: false, error: 'Perfil sin club asignado' };
@@ -2438,6 +2574,100 @@ export async function getCoordinatorPlayerFeesStatusAction(params?: {
   } catch (err: any) {
     console.error('[getCoordinatorPlayerFeesStatusAction] Error:', err);
     return { success: false, error: err.message || 'Error al obtener estado de cuotas' };
+  }
+}
+
+/**
+ * Envía un aviso urgente al entrenador del equipo recordándole que pase la lista de asistencia
+ * Despacha por Campanita (IN_APP), Correo Electrónico (EMAIL) y Notificación Push (PUSH)
+ */
+export async function notifyCoachPendingAttendanceAction(params: {
+  teamId: string;
+  eventId?: string;
+  date: string;
+  startTime?: string;
+  title?: string;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const { context, error: authError } = await getAuthenticatedContext();
+    if (authError || !context) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const COORDINATOR_DASHBOARD_ROLES = [
+      ...ADMIN_ROLES,
+      'director_deportivo',
+      'coordinador',
+      'coordinador_general',
+      'metodologo',
+      'metodologia',
+    ];
+    const actorRoles = getUserAllRoles(context);
+    const hasAccess = actorRoles.some((r) => COORDINATOR_DASHBOARD_ROLES.includes(r));
+    if (!hasAccess) {
+      return { success: false, error: 'No tienes permisos de coordinación para avisar entrenadores.' };
+    }
+
+    const adminClient = createAdminClient();
+    const clubId = context.profile.club_id;
+
+    // 1. Obtener datos del equipo y del entrenador
+    const { data: team, error: teamErr } = await adminClient
+      .from('teams')
+      .select('id, name, coach_id, coach:coach_id(id, first_name, last_name, email)')
+      .eq('id', params.teamId)
+      .single();
+
+    if (teamErr || !team) {
+      return { success: false, error: 'Equipo no encontrado.' };
+    }
+
+    const rawCoach = (team as any).coach;
+    const coach = Array.isArray(rawCoach) ? rawCoach[0] : rawCoach;
+    const coachId = team.coach_id || coach?.id;
+    const coachEmail = coach?.email;
+    const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : 'Entrenador';
+
+    if (!coachId && !coachEmail) {
+      return { success: false, error: `El equipo ${team.name} no tiene un entrenador asignado con cuenta activa.` };
+    }
+
+    const formattedDate = formatDateDMY(params.date);
+    const timeStr = params.startTime ? params.startTime.substring(0, 5) : '18:00';
+    const alertTitle = `📋 Lista de Asistencia Pendiente: ${team.name}`;
+    const alertMessage = `Hola ${coachName}, desde Coordinación Deportiva te recordamos que el entrenamiento del ${formattedDate} a las ${timeStr} (${params.title || 'Entrenamiento'}) aún no tiene registrada la lista de asistencia. Por favor, accede y complétala lo antes posible.`;
+
+    const actionUrl = params.eventId
+      ? `/dashboard/equipos/${team.id}/asistencia?eventId=${params.eventId}&date=${params.date}`
+      : `/dashboard/equipos/${team.id}/asistencia?date=${params.date}`;
+
+    // 2. Despachar notificación multicanal (In-App, Email y Push)
+    await NotificationService.dispatch({
+      userId: coachId || undefined,
+      userEmail: coachEmail || undefined,
+      clubId: clubId || undefined,
+      type: 'ATTENDANCE_ALERT',
+      title: alertTitle,
+      content: alertMessage,
+      link: actionUrl,
+      channels: ['IN_APP', 'EMAIL', 'PUSH'],
+      idempotencyKey: `attendance_reminder_${params.teamId}_${params.date}_${Date.now()}`,
+      emailSubject: `📋 [Coordinación] Lista de Asistencia Pendiente - ${team.name} (${formattedDate})`,
+      emailHtml: getGeneralAlertEmailHtml({
+        title: alertTitle,
+        content: `Hola <strong>${coachName}</strong>,<br><br>Desde la Dirección Deportiva / Coordinación del club te recordamos que la sesión de entrenamiento del equipo <strong>${team.name}</strong> celebrada el <strong>${formattedDate}</strong> a las <strong>${timeStr}</strong> tiene la <strong>lista de asistencia pendiente de registrar</strong>.<br><br>Es fundamental para el control operativo del club y la información a las familias registrar la asistencia de los jugadores a la mayor brevedad.`,
+        senderName: 'Coordinación Deportiva',
+        viewUrl: `https://app-gestiondeclubes.vercel.app${actionUrl}`,
+      }),
+    });
+
+    return {
+      success: true,
+      message: `Aviso enviado correctamente a ${coachName} (campanita, correo y notificación móvil).`,
+    };
+  } catch (err: any) {
+    console.error('[notifyCoachPendingAttendanceAction] Error:', err);
+    return { success: false, error: err.message || 'Error al enviar el aviso al entrenador.' };
   }
 }
 

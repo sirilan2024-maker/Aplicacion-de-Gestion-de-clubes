@@ -234,7 +234,7 @@ export default function Payments() {
         if (method === 'whatsapp' && res.url) {
           window.open(res.url, "_blank");
         } else {
-          toast.success("Notificación interna enviada");
+          toast.success(res?.message || "Notificación enviada");
         }
       }
       setNotifModalFeeId(null);
@@ -762,7 +762,7 @@ export default function Payments() {
             <h3 className="text-lg font-semibold mb-4 text-center text-slate-800">Notificar Pago</h3>
             <div className="space-y-3">
               <button onClick={() => notify('internal')} className="w-full py-2 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100">
-                💬 Mensajería Interna
+                🔔 Campanita, Email y Móvil
               </button>
               <button onClick={() => notify('whatsapp')} className="w-full py-2 bg-green-50 text-green-700 rounded-lg font-medium hover:bg-green-100">
                 📱 WhatsApp

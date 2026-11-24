@@ -457,7 +457,7 @@ export function getTeamMessageEmailHtml(params: {
   messageContent: string;
   viewUrl?: string;
 }): string {
-  const { senderName, senderRole = 'Cuerpo Técnico', teamName, messageContent, viewUrl = 'https://app-gestiondeclubes.vercel.app/dashboard/mensajes' } = params;
+  const { senderName, senderRole = 'Cuerpo Técnico', teamName, messageContent, viewUrl = 'https://app.clubsportingsaladar.com/dashboard/mensajes' } = params;
 
   return `
   <!DOCTYPE html>
@@ -469,6 +469,7 @@ export function getTeamMessageEmailHtml(params: {
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
       .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
       .header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: #ffffff; padding: 32px 30px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(99, 102, 241, 0.25); color: #c7d2fe; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px; border: 1px solid rgba(199, 210, 254, 0.3); }
       .content { padding: 32px 30px; }
@@ -482,6 +483,7 @@ export function getTeamMessageEmailHtml(params: {
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">📢 Nuevo Aviso de Equipo</span>
         <h1>${teamName}</h1>
       </div>
@@ -534,7 +536,7 @@ export function getConvocationEmailHtml(params: {
     location = 'Por determinar',
     meetingTime,
     notes,
-    viewUrl = 'https://app-gestiondeclubes.vercel.app/dashboard/matches'
+    viewUrl = 'https://app.clubsportingsaladar.com/dashboard/matches'
   } = params;
 
   return `
@@ -547,6 +549,7 @@ export function getConvocationEmailHtml(params: {
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
       .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
       .header { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #ffffff; padding: 36px 30px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(59, 130, 246, 0.25); color: #93c5fd; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; border: 1px solid rgba(147, 197, 253, 0.3); }
       .content { padding: 32px 30px; }
@@ -564,6 +567,7 @@ export function getConvocationEmailHtml(params: {
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">⚽ Oficial: Convocatoria de Partido</span>
         <h1>${teamName} vs ${rivalName}</h1>
       </div>
@@ -647,7 +651,7 @@ export function getUnconvocationEmailHtml(params: {
     rivalName,
     date,
     time = 'Por confirmar',
-    viewUrl = 'https://app-gestiondeclubes.vercel.app/dashboard/matches'
+    viewUrl = 'https://app.clubsportingsaladar.com/dashboard/matches'
   } = params;
 
   return `
@@ -660,6 +664,7 @@ export function getUnconvocationEmailHtml(params: {
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
       .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
       .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #ffffff; padding: 32px 30px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(244, 63, 94, 0.2); color: #fda4af; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px; border: 1px solid rgba(253, 164, 175, 0.3); }
       .content { padding: 32px 30px; }
@@ -677,6 +682,7 @@ export function getUnconvocationEmailHtml(params: {
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">Aviso de Convocatoria Actualizada</span>
         <h1>${teamName} vs ${rivalName}</h1>
       </div>
@@ -748,7 +754,7 @@ export function getEventReminderEmailHtml(params: {
     date,
     time = 'Por confirmar',
     location = 'Instalaciones del Club',
-    viewUrl = 'https://app-gestiondeclubes.vercel.app/dashboard'
+    viewUrl = 'https://app.clubsportingsaladar.com/dashboard'
   } = params;
 
   return `
@@ -761,6 +767,7 @@ export function getEventReminderEmailHtml(params: {
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
       .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
       .header { background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); color: #ffffff; padding: 32px 30px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(52, 211, 153, 0.25); color: #a7f3d0; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px; border: 1px solid rgba(167, 243, 208, 0.3); }
       .content { padding: 32px 30px; }
@@ -777,6 +784,7 @@ export function getEventReminderEmailHtml(params: {
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">⏰ Recordatorio (Próximas 24 Horas)</span>
         <h1>${title}</h1>
       </div>
@@ -834,7 +842,7 @@ export function getGeneralAlertEmailHtml(params: {
     title,
     content,
     senderName = 'Dirección Deportiva',
-    viewUrl = 'https://app-gestiondeclubes.vercel.app/dashboard'
+    viewUrl = 'https://app.clubsportingsaladar.com/dashboard/family'
   } = params;
 
   return `
@@ -847,6 +855,7 @@ export function getGeneralAlertEmailHtml(params: {
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
       .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
       .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #ffffff; padding: 32px 30px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(245, 158, 11, 0.25); color: #fde68a; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 10px; border: 1px solid rgba(253, 230, 138, 0.3); }
       .content { padding: 32px 30px; }
@@ -859,6 +868,7 @@ export function getGeneralAlertEmailHtml(params: {
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">📢 Comunicado Oficial</span>
         <h1>${title}</h1>
       </div>
@@ -915,6 +925,7 @@ export function getPlayerPinEmailHtml({
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
       .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); border: 1px solid #e2e8f0; }
       .header { background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%); color: #ffffff; padding: 32px 28px; text-align: center; }
+      .header img { display: block; margin: 0 auto 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: #ffffff; }
       .header h1 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
       .badge { display: inline-block; background: rgba(59, 130, 246, 0.25); color: #93c5fd; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; border: 1px solid rgba(147, 197, 253, 0.3); }
       .content { padding: 32px 28px; }
@@ -934,6 +945,7 @@ export function getPlayerPinEmailHtml({
   <body>
     <div class="container">
       <div class="header">
+        <img src="https://app.clubsportingsaladar.com/images/sporting-saladar-shield.jpg" alt="Sporting Saladar" width="68" height="68" style="object-fit: contain;" />
         <span class="badge">🔐 Credenciales de Acceso</span>
         <h1>Tu PIN de Registro Familiar</h1>
       </div>

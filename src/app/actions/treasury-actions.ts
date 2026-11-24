@@ -633,7 +633,7 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
           title: `${title}: ${fee.concept}`,
           content: `Hola,<br><br>Te informamos desde la Tesorería del Club Sporting Saladar acerca del estado de la cuota <strong>"${fee.concept}"</strong> por importe de <strong>${amount}€</strong> para <strong>${playerName}</strong>.<br><br>${msg}`,
           senderName: 'Tesorería Sporting Saladar',
-          viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+          viewUrl: 'https://app.clubsportingsaladar.com/dashboard/family',
         }),
       });
     }
@@ -656,7 +656,7 @@ export async function sendPaymentNotificationAction(feeId: string, method: 'inte
             title: `${title}: ${fee.concept}`,
             content: `Hola,<br><br>Te informamos desde la Tesorería del Club Sporting Saladar acerca del estado de la cuota <strong>"${fee.concept}"</strong> por importe de <strong>${amount}€</strong> para <strong>${playerName}</strong>.<br><br>${msg}`,
             senderName: 'Tesorería Sporting Saladar',
-            viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+            viewUrl: 'https://app.clubsportingsaladar.com/dashboard/family',
           }),
         });
       }
@@ -770,7 +770,7 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
           title: `Aviso de Saldo Pendiente: ${amountEur}€`,
           content: `Hola,<br><br>Te recordamos desde la Tesorería del Club Sporting Saladar que el expediente del jugador <strong>${playerName}</strong> cuenta con un saldo pendiente de <strong>${amountEur}€</strong> en concepto de cuotas deportivas.<br><br>Por favor, accede al portal para consultar el desglose de cuotas y regularizar el pago. Si ya has realizado una transferencia reciente, puedes justificarla o ponerte en contacto con administración.`,
           senderName: 'Tesorería Sporting Saladar',
-          viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+          viewUrl: 'https://app.clubsportingsaladar.com/dashboard/family',
         }),
       });
     }
@@ -793,7 +793,7 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
             title: `Aviso de Saldo Pendiente: ${amountEur}€`,
             content: `Hola,<br><br>Te recordamos desde la Tesorería del Club Sporting Saladar que el expediente del jugador <strong>${playerName}</strong> cuenta con un saldo pendiente de <strong>${amountEur}€</strong> en concepto de cuotas deportivas.<br><br>Por favor, accede al portal para consultar el desglose de cuotas y regularizar el pago. Si ya has realizado una transferencia reciente, puedes justificarla o ponerte en contacto con administración.`,
             senderName: 'Tesorería Sporting Saladar',
-            viewUrl: 'https://app-gestiondeclubes.vercel.app/dashboard/family',
+            viewUrl: 'https://app.clubsportingsaladar.com/dashboard/family',
           }),
         });
       }

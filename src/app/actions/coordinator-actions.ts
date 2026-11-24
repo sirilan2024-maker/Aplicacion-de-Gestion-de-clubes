@@ -2657,7 +2657,7 @@ export async function notifyCoachPendingAttendanceAction(params: {
         title: alertTitle,
         content: `Hola <strong>${coachName}</strong>,<br><br>Desde la Dirección Deportiva / Coordinación del club te recordamos que la sesión de entrenamiento del equipo <strong>${team.name}</strong> celebrada el <strong>${formattedDate}</strong> a las <strong>${timeStr}</strong> tiene la <strong>lista de asistencia pendiente de registrar</strong>.<br><br>Es fundamental para el control operativo del club y la información a las familias registrar la asistencia de los jugadores a la mayor brevedad.`,
         senderName: 'Coordinación Deportiva',
-        viewUrl: `https://app-gestiondeclubes.vercel.app${actionUrl}`,
+        viewUrl: `https://app.clubsportingsaladar.com${actionUrl}`,
       }),
     });
 

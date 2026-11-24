@@ -599,7 +599,7 @@ export async function scheduleSessionQStashReminders(
   const isDevMode = !isProduction && (process.env.QSTASH_DEV === 'true' || process.env.QSTASH_DEV === '1');
   const defaultWebhook = isDevMode
     ? 'http://localhost:3000/api/events/send-reminders'
-    : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app-gestiondeclubes.vercel.app'}/api/events/send-reminders`;
+    : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.clubsportingsaladar.com'}/api/events/send-reminders`;
   const webhookBase = process.env.QSTASH_WEBHOOK_URL || defaultWebhook;
 
   if (isProduction) {

@@ -90,7 +90,7 @@ export async function createTeamEventAction(teamId: string, eventData: any, clie
               date: formattedDate,
               time: formattedTime,
               location: data.location || 'Instalaciones del Club',
-              viewUrl: `https://app-gestiondeclubes.vercel.app/dashboard/family/e/${p.id}/eventos`,
+              viewUrl: `https://app.clubsportingsaladar.com/dashboard/family/e/${p.id}/eventos`,
             }),
           };
         }).filter(item => Boolean(item.userId));

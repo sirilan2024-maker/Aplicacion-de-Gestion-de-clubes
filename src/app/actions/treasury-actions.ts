@@ -811,6 +811,219 @@ export async function sendMemberBalanceNotificationAction(playerId: string, meth
   }
 }
 
+/**
+ * Notificación masiva global a todos los jugadores / familias que tengan saldo deudor pendiente
+ */
+export async function sendBatchMembersBalanceNotificationAction(params?: { teamId?: string }) {
+  const { adminSupabase, clubId } = await requireTreasuryContext();
+  if (!clubId) throw new Error("Club no encontrado");
+
+  // Obtener temporada activa garantizando aislamiento estricto
+  const { data: activeSeasonRow } = await adminSupabase
+    .from('seasons')
+    .select('id')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .neq('id', '584f508a-fc1a-4339-b5b2-4296ffde2f4c')
+    .maybeSingle();
+
+  const activeSeasonId = activeSeasonRow?.id || '663ed6ef-1dab-4350-9489-ed50f9e9ac15';
+
+  // 1. Obtener jugadores activos de la temporada activa
+  let pshQuery = adminSupabase
+    .from('player_season_history')
+    .select('player_id, team_id')
+    .eq('season_id', activeSeasonId);
+
+  if (params?.teamId && params.teamId !== 'all') {
+    pshQuery = pshQuery.eq('team_id', params.teamId);
+  }
+
+  const { data: activePsh, error: pshError } = await pshQuery;
+  if (pshError) throw new Error(pshError.message);
+
+  const activePlayerIds = Array.from(new Set((activePsh || []).map((p: any) => p.player_id).filter(Boolean)));
+  if (activePlayerIds.length === 0) {
+    return { success: true, count: 0, message: "No se encontraron jugadores activos en la temporada/equipo seleccionado." };
+  }
+
+  // 2. Obtener cuotas del club para calcular el saldo real
+  const { data: fees, error: feesError } = await adminSupabase
+    .from("fees")
+    .select("id, player_id, concept, amount_cents, amount_paid_cents, estado")
+    .eq("club_id", clubId)
+    .in("player_id", activePlayerIds);
+
+  if (feesError) throw new Error(feesError.message);
+
+  const feesByPlayer: Record<string, any[]> = {};
+  (fees || []).forEach((f: any) => {
+    if (f.player_id) {
+      if (!feesByPlayer[f.player_id]) feesByPlayer[f.player_id] = [];
+      feesByPlayer[f.player_id].push(f);
+    }
+  });
+
+  // 3. Obtener jugadores y contactos familiares
+  const { data: players, error: playersError } = await adminSupabase
+    .from("players")
+    .select("id, first_name, last_name, club_id, tutor_id, player_tutors(tutor_id), parent1_email, parent2_email, email")
+    .in("id", activePlayerIds)
+    .neq("status", "inactive")
+    .neq("status", "inactivo");
+
+  if (playersError) throw new Error(playersError.message);
+
+  // Filtrar exclusivamente los jugadores con saldo deudor (balanceCents > 0)
+  const debtors: { player: any; pendingCents: number }[] = [];
+  (players || []).forEach((player: any) => {
+    const playerFees = feesByPlayer[player.id] || [];
+    let charged = 0;
+    let paid = 0;
+    playerFees.forEach((f: any) => {
+      charged += f.amount_cents || 0;
+      let p = f.amount_paid_cents || 0;
+      if (f.estado === "pagado" && p === 0) p = f.amount_cents || 0;
+      paid += p;
+    });
+    const balance = charged - paid;
+    if (balance > 0) {
+      debtors.push({ player, pendingCents: balance });
+    }
+  });
+
+  if (debtors.length === 0) {
+    return {
+      success: true,
+      count: 0,
+      totalNotifs: 0,
+      totalDebtEur: "0.00",
+      message: "¡Enhorabuena! No hay ningún socio con deuda pendiente en este filtro."
+    };
+  }
+
+  // 4. Mapear emails a profiles para asegurar recepción multicanal (In-App y Push)
+  const allEmails = new Set<string>();
+  debtors.forEach(({ player }) => {
+    if (player.parent1_email) allEmails.add(player.parent1_email.toLowerCase().trim());
+    if (player.parent2_email) allEmails.add(player.parent2_email.toLowerCase().trim());
+    if (player.email) allEmails.add(player.email.toLowerCase().trim());
+  });
+
+  const emailToProfileMap = new Map<string, { id: string; email: string }>();
+  if (allEmails.size > 0) {
+    const emailList = Array.from(allEmails);
+    for (let i = 0; i < emailList.length; i += 200) {
+      const chunk = emailList.slice(i, i + 200);
+      const { data: profiles } = await adminSupabase
+        .from("profiles")
+        .select("id, email")
+        .in("email", chunk);
+      (profiles || []).forEach((p: any) => {
+        if (p.email && p.id) {
+          emailToProfileMap.set(p.email.toLowerCase().trim(), { id: p.id, email: p.email });
+        }
+      });
+    }
+  }
+
+  // 5. Preparar notificaciones para cada socio con deuda
+  const notificationsToDispatch: any[] = [];
+  let totalDebtCents = 0;
+  const nowStamp = Date.now();
+
+  for (const { player, pendingCents } of debtors) {
+    totalDebtCents += pendingCents;
+    const amountEur = (pendingCents / 100).toFixed(2);
+    const playerName = `${player.first_name || ''} ${player.last_name || ''}`.trim();
+    const title = "Aviso de Saldo Pendiente de Pago";
+    const content = `Hola, te recordamos desde la Tesorería del Club Sporting Saladar que tienes un saldo pendiente de ${amountEur}€ en concepto de cuotas del club para ${playerName}. Por favor, accede al portal para regularizarlo.`;
+
+    const targetUserIds = new Set<string>();
+    if (player.tutor_id) targetUserIds.add(player.tutor_id);
+    if (Array.isArray(player.player_tutors)) {
+      player.player_tutors.forEach((pt: any) => {
+        if (pt?.tutor_id) targetUserIds.add(pt.tutor_id);
+      });
+    }
+
+    const emails = [player.parent1_email, player.parent2_email, player.email]
+      .filter(Boolean)
+      .map((e: string) => e.trim().toLowerCase());
+
+    emails.forEach(em => {
+      const matched = emailToProfileMap.get(em);
+      if (matched?.id) targetUserIds.add(matched.id);
+    });
+
+    const targetEmails = Array.from(new Set(emails));
+    const processedEmails = new Set<string>();
+
+    for (const targetUserId of targetUserIds) {
+      const { data: prof } = await adminSupabase.from("profiles").select("email").eq("id", targetUserId).maybeSingle();
+      const userEmail = prof?.email || targetEmails[0] || undefined;
+      if (userEmail) processedEmails.add(userEmail.toLowerCase());
+
+      notificationsToDispatch.push({
+        userId: targetUserId,
+        userEmail,
+        clubId: player.club_id || clubId,
+        type: 'FEE_ALERT',
+        title: `💳 ${title}`,
+        content,
+        link: '/dashboard/family',
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as any,
+        idempotencyKey: `batch_balance_${player.id}_${targetUserId}_${nowStamp}`,
+        emailSubject: `💳 [Sporting Saladar] Aviso de Saldo Pendiente - ${playerName} (${amountEur}€)`,
+        emailHtml: getGeneralAlertEmailHtml({
+          title: `Aviso de Saldo Pendiente: ${amountEur}€`,
+          content: `Hola,<br><br>Te recordamos desde la Tesorería del Club Sporting Saladar que el expediente del jugador <strong>${playerName}</strong> cuenta con un saldo pendiente de <strong>${amountEur}€</strong> en concepto de cuotas deportivas.<br><br>Por favor, accede al portal para consultar el desglose de cuotas y regularizar el pago. Si ya has realizado una transferencia reciente, puedes justificarla o ponerte en contacto con administración.`,
+          senderName: 'Tesorería Sporting Saladar',
+          viewUrl: 'https://app.clubsportingsaladar.com/dashboard/family',
+        }),
+      });
+    }
+
+    // Familiares que solo tienen email y no tienen perfil aún
+    for (const email of targetEmails) {
+      if (!processedEmails.has(email)) {
+        processedEmails.add(email);
+        notificationsToDispatch.push({
+          userEmail: email,
+          clubId: player.club_id || clubId,
+          type: 'FEE_ALERT',
+          title: `💳 ${title}`,
+          content,
+          link: '/dashboard/family',
+          channels: ['EMAIL'] as any,
+          idempotencyKey: `batch_balance_email_${player.id}_${email}_${nowStamp}`,
+          emailSubject: `💳 [Sporting Saladar] Aviso de Saldo Pendiente - ${playerName} (${amountEur}€)`,
+          emailHtml: getGeneralAlertEmailHtml({
+            title: `Aviso de Saldo Pendiente: ${amountEur}€`,
+            content: `Hola,<br><br>Te recordamos desde la Tesorería del Club Sporting Saladar que el expediente del jugador <strong>${playerName}</strong> cuenta con un saldo pendiente de <strong>${amountEur}€</strong> en concepto de cuotas deportivas.<br><br>Por favor, accede al portal para consultar el desglose de cuotas y regularizar el pago. Si ya has realizado una transferencia reciente, puedes justificarla o ponerte en contacto con administración.`,
+            senderName: 'Tesorería Sporting Saladar',
+            viewUrl: 'https://app.clubsportingsaladar.com/dashboard/family',
+          }),
+        });
+      }
+    }
+  }
+
+  // 6. Despachar el lote completo de avisos
+  if (notificationsToDispatch.length > 0) {
+    await NotificationService.dispatchBatch({ notifications: notificationsToDispatch });
+  }
+
+  const totalDebtEur = (totalDebtCents / 100).toFixed(2);
+  return {
+    success: true,
+    count: debtors.length,
+    totalNotifs: notificationsToDispatch.length,
+    totalDebtEur,
+    message: `Se han enviado avisos a ${debtors.length} jugadores/familias con cuotas pendientes (${totalDebtEur}€ acumulados).`,
+  };
+}
+
 export async function updateFeeStatusAction(id: string, newStatus: string, paymentMethod?: string) {
   const { context, error: authError } = await getAuthenticatedContext();
   if (!context || authError) {

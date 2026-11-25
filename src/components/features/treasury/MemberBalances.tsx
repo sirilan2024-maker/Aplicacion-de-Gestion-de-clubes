@@ -74,10 +74,9 @@ export default function MemberBalances() {
   const [notifPlayer, setNotifPlayer] = useState<{ id: string; name: string } | null>(null);
   const [sendingNotif, setSendingNotif] = useState(false);
 
-  // Modal para aviso global masivo a todos los socios con deuda
+  // Modal para aviso masivo a socios con deuda
   const [showBatchNotifModal, setShowBatchNotifModal] = useState(false);
   const [sendingBatchNotif, setSendingBatchNotif] = useState(false);
-  const [batchNotifScope, setBatchNotifScope] = useState<"all" | "team">("all");
 
   // Actions inside drawer
   const [showAddChargeModal, setShowAddChargeModal] = useState(false);
@@ -308,10 +307,11 @@ export default function MemberBalances() {
 
   const handleSendBatchDebtNotification = async () => {
     setSendingBatchNotif(true);
-    const toastId = toast.loading("Enviando avisos multicanal a todos los socios con deuda...");
+    const targetTeamId = selectedTeam !== "all" ? selectedTeam : undefined;
+    const targetTeamName = selectedTeam !== "all" ? (teams.find(t => t.id === selectedTeam)?.name || "este equipo") : "todo el club";
+    const toastId = toast.loading(`Enviando avisos de cobro a ${targetTeamName}...`);
     try {
-      const teamParam = batchNotifScope === "team" && selectedTeam !== "all" ? selectedTeam : undefined;
-      const res = await sendBatchMembersBalanceNotificationAction({ teamId: teamParam });
+      const res = await sendBatchMembersBalanceNotificationAction({ teamId: targetTeamId });
       if (res.success) {
         toast.success(res.message || "Avisos enviados correctamente", { id: toastId });
         setShowBatchNotifModal(false);
@@ -368,6 +368,15 @@ export default function MemberBalances() {
     return matchesSearch && matchesTeam && matchesStatus;
   });
 
+  // Socios con deuda según el equipo actualmente filtrado
+  const teamMembersWithDebt = members.filter((m) => {
+    const matchesTeam = selectedTeam === "all" || m.team_id === selectedTeam;
+    return matchesTeam && m.status === "con_deuda";
+  });
+  const teamDebtCount = teamMembersWithDebt.length;
+  const teamDebtTotal = teamMembersWithDebt.reduce((acc, m) => acc + Math.max(0, m.balance_cents), 0) / 100;
+  const selectedTeamName = selectedTeam !== "all" ? (teams.find((t) => t.id === selectedTeam)?.name || "este equipo") : null;
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-12 space-y-3">
@@ -406,28 +415,15 @@ export default function MemberBalances() {
         </div>
 
         {/* Deuda Pendiente */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-200 bg-gradient-to-br from-white to-amber-50/40 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] md:text-xs font-bold text-amber-700 uppercase tracking-wider">Deuda Pendiente</p>
-              <div className="p-1.5 md:p-2 bg-amber-100 text-amber-700 rounded-xl">
-                <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
-              </div>
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-200 bg-gradient-to-br from-white to-amber-50/40 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] md:text-xs font-bold text-amber-700 uppercase tracking-wider">Deuda Pendiente</p>
+            <div className="p-1.5 md:p-2 bg-amber-100 text-amber-700 rounded-xl">
+              <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
             </div>
-            <p className="text-xl md:text-2xl font-black text-amber-700 mt-2">{summary.totalPending.toFixed(2)} €</p>
-            <p className="text-[10px] md:text-xs text-amber-600 mt-0.5">Pendiente de cobro ({summary.membersConDeuda} socios)</p>
           </div>
-          {summary.membersConDeuda > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowBatchNotifModal(true)}
-              className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-black shadow-sm transition-all"
-              title="Avisar a todos los socios con cuotas pendientes"
-            >
-              <Bell className="w-3.5 h-3.5" />
-              Avisar a todos con deuda ({summary.membersConDeuda})
-            </button>
-          )}
+          <p className="text-xl md:text-2xl font-black text-amber-700 mt-2">{summary.totalPending.toFixed(2)} €</p>
+          <p className="text-[10px] md:text-xs text-amber-600 mt-0.5">Pendiente de cobro</p>
         </div>
 
         {/* Estado de Jugadores */}
@@ -529,8 +525,8 @@ export default function MemberBalances() {
             </button>
           </div>
 
-          {/* Banner de Aviso Global a Socios con Deuda */}
-          {summary.membersConDeuda > 0 && (
+          {/* Banner de Aviso de Deuda (Visible exclusivamente en la vista de socios con Deuda) */}
+          {statusFilter === "con_deuda" && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 bg-amber-50/90 border border-amber-200 rounded-xl">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
@@ -538,21 +534,33 @@ export default function MemberBalances() {
                 </div>
                 <div>
                   <p className="text-xs font-black text-amber-950">
-                    Aviso Global de Cuotas: {summary.membersConDeuda} socios con deuda ({summary.totalPending.toFixed(2)} €)
+                    {selectedTeam !== "all" ? (
+                      <>Aviso de Deuda — {selectedTeamName}: {teamDebtCount} socios con saldo pendiente ({teamDebtTotal.toFixed(2)} €)</>
+                    ) : (
+                      <>Aviso Global de Deuda: {summary.membersConDeuda} socios con saldo pendiente ({summary.totalPending.toFixed(2)} €)</>
+                    )}
                   </p>
                   <p className="text-[11px] text-amber-800 font-medium">
-                    Notifica a todas las familias con saldo pendiente por campanita, email oficial y móvil en un solo clic.
+                    {selectedTeam !== "all"
+                      ? `Solo se enviará el recordatorio a las familias de ${selectedTeamName} con cuotas pendientes.`
+                      : "Notifica a todas las familias del club con saldo pendiente por campanita, email oficial y móvil."}
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowBatchNotifModal(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-black shadow-sm transition-all shrink-0 active:scale-95"
-              >
-                <Bell className="w-3.5 h-3.5" />
-                <span>Avisar a todos con deuda</span>
-              </button>
+              {(selectedTeam !== "all" ? teamDebtCount : summary.membersConDeuda) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowBatchNotifModal(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-black shadow-sm transition-all shrink-0 active:scale-95"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>
+                    {selectedTeam !== "all"
+                      ? `Avisar solo a ${selectedTeamName} (${teamDebtCount})`
+                      : `Avisar a todos con deuda (${summary.membersConDeuda})`}
+                  </span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1331,7 +1339,7 @@ export default function MemberBalances() {
         </div>
       )}
 
-      {/* ====== MODAL: AVISO GLOBAL A TODOS LOS SOCIOS CON DEUDA ====== */}
+      {/* ====== MODAL: AVISO A SOCIOS CON DEUDA ====== */}
       {showBatchNotifModal && (
         <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95">
@@ -1341,8 +1349,10 @@ export default function MemberBalances() {
                   <Bell className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900">Aviso Global de Cuotas</h3>
-                  <p className="text-xs text-slate-500">Notificar a socios con saldo pendiente</p>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {selectedTeam !== "all" ? `Aviso de Cuotas: ${selectedTeamName}` : "Aviso Global de Cuotas"}
+                  </h3>
+                  <p className="text-xs text-slate-500">Recordatorio de cuotas pendientes</p>
                 </div>
               </div>
               <button
@@ -1354,42 +1364,28 @@ export default function MemberBalances() {
               </button>
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-950">
               <div className="flex justify-between font-bold">
-                <span>Socios con deuda pendiente:</span>
-                <span className="text-red-700 text-sm font-black">{summary.membersConDeuda}</span>
+                <span>Equipo destinatario:</span>
+                <span className="text-indigo-900 font-extrabold">{selectedTeam !== "all" ? `⚽ ${selectedTeamName}` : "🏟️ Todo el Club"}</span>
               </div>
               <div className="flex justify-between font-bold">
-                <span>Total deuda acumulada:</span>
-                <span className="text-red-700 text-sm font-black">{summary.totalPending.toFixed(2)} €</span>
+                <span>Socios a notificar:</span>
+                <span className="text-red-700 text-sm font-black">{selectedTeam !== "all" ? teamDebtCount : summary.membersConDeuda}</span>
               </div>
-              {selectedTeam !== "all" && (
-                <div className="pt-2 border-t border-amber-200/60">
-                  <label className="block font-bold text-slate-700 mb-1.5">Alcance del recordatorio:</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setBatchNotifScope("team")}
-                      className={`py-1.5 px-2 rounded-lg font-bold text-xs border transition-all ${
-                        batchNotifScope === "team"
-                          ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                      }`}
-                    >
-                      ⚽ Solo equipo actual
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBatchNotifScope("all")}
-                      className={`py-1.5 px-2 rounded-lg font-bold text-xs border transition-all ${
-                        batchNotifScope === "all"
-                          ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                      }`}
-                    >
-                      🏟️ Todo el club
-                    </button>
-                  </div>
+              <div className="flex justify-between font-bold">
+                <span>Total deuda pendiente:</span>
+                <span className="text-red-700 text-sm font-black">
+                  {(selectedTeam !== "all" ? teamDebtTotal : summary.totalPending).toFixed(2)} €
+                </span>
+              </div>
+              {selectedTeam !== "all" ? (
+                <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200 text-[11px] text-amber-900 font-medium">
+                  🔒 <strong>Filtro aplicado:</strong> El aviso se enviará <strong>exclusivamente</strong> a los socios con cuotas pendientes de <strong>{selectedTeamName}</strong>. Ningún otro equipo recibirá avisos.
+                </div>
+              ) : (
+                <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200 text-[11px] text-amber-900 font-medium">
+                  🏟️ <strong>Envío a todo el club:</strong> Se notificará a todas las familias de todos los equipos que tengan saldo deudor acumulado.
                 </div>
               )}
             </div>
@@ -1435,7 +1431,11 @@ export default function MemberBalances() {
                 ) : (
                   <>
                     <Bell className="w-4 h-4" />
-                    <span>Confirmar y Enviar Avisos</span>
+                    <span>
+                      {selectedTeam !== "all"
+                        ? `Avisar solo a ${selectedTeamName}`
+                        : "Confirmar y Enviar Avisos"}
+                    </span>
                   </>
                 )}
               </button>

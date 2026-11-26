@@ -516,26 +516,35 @@ export async function propagateFfcvMatchesToClubPartidos(customSupabaseClient?: 
   }
 
   // 3. Fetch corresponding FFCV matches for active season 26/27 (excluding historical season 21)
+  // Query per club group to prevent Supabase PostgREST default 1000-row limit truncation (>1200 matches across club groups)
   const clubGroupIds = Array.from(new Set(
     clubPartidos
       .map((cp: any) => (cp.teams as any)?.ffcv_group_id)
       .filter(Boolean)
   ));
 
-  let ffcvQuery = supabase
-    .from('ffcv_matches')
-    .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status, pitch_name, raw_data')
-    .neq('ffcv_season_id', '21')
-    .eq('ffcv_season_id', '22')
-    .limit(5000);
-
+  let ffcvMatches: any[] = [];
   if (clubGroupIds.length > 0) {
-    ffcvQuery = ffcvQuery.in('ffcv_group_id', clubGroupIds);
+    const groupResponses = await Promise.all(
+      clubGroupIds.map(gid =>
+        supabase
+          .from('ffcv_matches')
+          .select('ffcv_match_id, ffcv_group_id, matchday, match_date, match_time, home_team_name, away_team_name, home_team_ffcv_id, away_team_ffcv_id, home_score, away_score, status, pitch_name, raw_data')
+          .eq('ffcv_group_id', gid)
+          .neq('ffcv_season_id', '21')
+          .eq('ffcv_season_id', '22')
+          .limit(1000)
+      )
+    );
+
+    for (const res of groupResponses) {
+      if (!res.error && res.data) {
+        ffcvMatches.push(...res.data);
+      }
+    }
   }
 
-  const { data: ffcvMatches, error: fmErr } = await ffcvQuery;
-
-  if (fmErr || !ffcvMatches || ffcvMatches.length === 0) {
+  if (ffcvMatches.length === 0) {
     return 0;
   }
 

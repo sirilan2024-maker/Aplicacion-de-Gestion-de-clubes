@@ -79,6 +79,80 @@ function performApuntameloRequest<T = any>(
   redirectCount = 0,
   useMobileUa = false
 ): Promise<T> {
+  const proxyBase = process.env.APUNTAMELO_PROXY_URL?.trim();
+  if (proxyBase) {
+    return performProxyApuntameloRequest<T>(url, proxyBase, timeoutMs).catch((proxyErr) => {
+      console.warn(`[Apuntamelo Proxy] Fallo en proxy (${proxyErr.message}). Reintentando conexión directa...`);
+      return performDirectApuntameloRequest<T>(url, timeoutMs, redirectCount, useMobileUa);
+    });
+  }
+  return performDirectApuntameloRequest<T>(url, timeoutMs, redirectCount, useMobileUa);
+}
+
+function performProxyApuntameloRequest<T = any>(
+  targetUrl: string,
+  proxyBase: string,
+  timeoutMs: number
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    try {
+      const pUrl = new URL(proxyBase);
+      pUrl.searchParams.set('url', targetUrl);
+      const proxySecret = process.env.APUNTAMELO_PROXY_SECRET?.trim();
+      const headers: Record<string, string> = {
+        Accept: 'application/json, text/plain, */*'
+      };
+      if (proxySecret) {
+        headers['Authorization'] = `Bearer ${proxySecret}`;
+      }
+
+      const req = https.get(
+        pUrl.toString(),
+        {
+          agent: httpsAgent,
+          timeout: timeoutMs,
+          headers
+        },
+        (res) => {
+          const statusCode = res.statusCode || 0;
+          let data = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => {
+            if (data.length < 2 * 1024 * 1024) data += chunk;
+          });
+          res.on('end', () => {
+            if (statusCode < 200 || statusCode >= 300) {
+              return reject(new Error(`Proxy HTTP ${statusCode}: ${data.slice(0, 200)}`));
+            }
+            const trimmed = data.trim();
+            if (!trimmed || trimmed.startsWith('<')) {
+              return reject(new Error('Proxy devolvió HTML o respuesta vacía'));
+            }
+            try {
+              resolve(JSON.parse(trimmed) as T);
+            } catch (e: any) {
+              reject(new Error(`Error parseando JSON devuelto por proxy: ${e.message}`));
+            }
+          });
+        }
+      );
+
+      req.setTimeout(timeoutMs, () => {
+        req.destroy(new Error(`Timeout (${timeoutMs}ms) en proxy hacia ${targetUrl}`));
+      });
+      req.on('error', (err) => reject(err));
+    } catch (err: any) {
+      reject(err);
+    }
+  });
+}
+
+function performDirectApuntameloRequest<T = any>(
+  url: string,
+  timeoutMs: number,
+  redirectCount = 0,
+  useMobileUa = false
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = useMobileUa
       ? {
@@ -120,7 +194,7 @@ function performApuntameloRequest<T = any>(
           }
           try {
             const redirectUrl = new URL(location, url).toString();
-            return performApuntameloRequest<T>(redirectUrl, timeoutMs, redirectCount + 1, useMobileUa).then(
+            return performDirectApuntameloRequest<T>(redirectUrl, timeoutMs, redirectCount + 1, useMobileUa).then(
               resolve,
               reject
             );
@@ -141,7 +215,7 @@ function performApuntameloRequest<T = any>(
         res.on('end', () => {
           // If Cloudflare challenges the desktop UA with 403, retry once with mobile app headers
           if (statusCode === 403 && !useMobileUa) {
-            return performApuntameloRequest<T>(url, timeoutMs, redirectCount, true).then(
+            return performDirectApuntameloRequest<T>(url, timeoutMs, redirectCount, true).then(
               resolve,
               reject
             );

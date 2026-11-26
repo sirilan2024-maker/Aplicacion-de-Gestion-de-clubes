@@ -2,8 +2,9 @@ name: Sincronizacion Horaria FFCV y Liga Brave Sporting Saladar
 
 on:
   schedule:
-    # Solo entre semana: martes, miércoles y viernes a las 13:00 UTC (~14:00 invierno / 15:00 verano España)
-    # Los fines de semana se disparan automáticamente por Upstash QStash al acabar cada partido (+30 min y +90 min)
+    # Fines de semana (sábados y domingos de 08:00 a 20:00 UTC / 09:00 a 21:00 España): cada hora para captar resultados y actas post-partido
+    - cron: '0 8-20 * * 6,0'
+    # Entre semana: martes, miércoles y viernes a las 13:00 UTC (~14:00 invierno / 15:00 verano España) para actualizaciones de calendarios y sanciones
     - cron: '0 13 * * 2,3,5'
   workflow_dispatch: # Permite ejecutarlo manualmente o vía API (post-partido Liga Brave)
     inputs:
@@ -121,7 +122,7 @@ jobs:
 
           echo "Enviando sincronizacion (mode=${{ inputs.mode || 'all' }})..."
           EXTRA_QUERY=""
-          if [ "${{ inputs.mode }}" = "brave_only" ]; then
+          if [ "${{ inputs.mode || 'all' }}" = "brave_only" ]; then
             EXTRA_QUERY="?braveOnly=true"
           fi
           set +e

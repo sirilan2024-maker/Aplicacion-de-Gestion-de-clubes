@@ -1222,7 +1222,7 @@ export async function getPreviousMatchLineupAction(currentMatchId: string, teamI
   // Buscar partidos del mismo equipo en la temporada activa, ordenados de más reciente a más antiguo
   let query = adminSupabase
     .from('partidos')
-    .select('id, rival_nombre, fecha_hora, jornada, season_id')
+    .select('id, rival_nombre, fecha_hora, highlight_jornada, season_id')
     .eq('equipo_id', effectiveTeamId)
     .neq('season_id', CLOSED_SEASON_ID)
     .neq('id', currentMatchId);
@@ -1234,6 +1234,10 @@ export async function getPreviousMatchLineupAction(currentMatchId: string, teamI
   const { data: pastMatches, error: pastErr } = await query
     .order('fecha_hora', { ascending: false })
     .limit(10);
+
+  if (pastErr) {
+    console.error("[getPreviousMatchLineupAction] Error al consultar partidos anteriores:", pastErr);
+  }
 
   if (pastErr || !pastMatches || pastMatches.length === 0) {
     return { success: true, data: null };
@@ -1283,7 +1287,7 @@ export async function getPreviousMatchLineupAction(currentMatchId: string, teamI
         id: previousMatchWithLineup.id,
         rival_nombre: previousMatchWithLineup.rival_nombre,
         fecha_hora: previousMatchWithLineup.fecha_hora,
-        jornada: previousMatchWithLineup.jornada,
+        jornada: previousMatchWithLineup.highlight_jornada || null,
       },
       convocatorias: previousConvocatorias,
       titulares: previousConvocatorias.filter((c: any) => c.titular),
